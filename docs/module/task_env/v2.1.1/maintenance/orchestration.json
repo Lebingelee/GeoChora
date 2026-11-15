@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-15",
-  "status": "POST_5C_E00_E16_MAINTAINER_ACCEPTED_BOUNDED",
+  "status": "G06A_SOL_ACCEPTED_BOUNDED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -13,16 +13,14 @@
     "branch": "develop"
   },
   "branch_plan": {
-    "stage": "post_5c_optimization",
+    "stage": "6",
     "reuse_existing_checkout": true,
-    "additional_branches": 0,
-    "additional_worktrees": 0,
-    "actual_stage_branch": "codex/v211-stage5-diagnostic",
-    "reason": "Maintainer entered post-5c optimization; reuse current stage branch. Historical stage3 creation record retained in branch_plan_history. No ref cleanup before code acceptance and evidence preservation."
+    "actual_stage_branch": "codex/v211-stage6-parallel",
+    "reason": "Existing G06 implementation branch; review and documentation closeout only."
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "E00-E16 retains maintainer bounded acceptance at 86921c62; C1-C5 implementation and bounded verification are at production code 7f8796b4, with G05 readiness review afb58944. The maintainer authorized committing the three preserved Markdown inputs (0722341b), updating the roadmap (23c6c86f), and fast-forwarding local develop to the current stage delivery; the G06 handoff documentation is included in that local synchronization. Read 20261115_g06_agent_handoff.md and verify live refs, then continue G06 under the maintainer's G06 instruction using the existing owners and original optimization ledger. G06 implementation has not started in this handoff; preserve accepted bounds. No main merge, push, tag or publication is authorized by this local develop synchronization.",
+  "next_action": "Prepare G06b scope from bounded G06a acceptance; do not auto-dispatch. Complete native canonical six cells before separate R3 package; G06c renderer/performance gates remain. GeoPhys main merge/AOT are maintainer-deferred, not PASS.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1752,20 +1750,45 @@
             "4c",
             "5c"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
+          "status": "SOL_ACCEPTED_BOUNDED_6A",
+          "attempt_count": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": "PARTIAL",
+              "output_head": "3a277e03d010e8bb3dbeb2eff26a69232be97572",
+              "review_ref": "reviews/20261115_g06a_attempt001_review.md"
+            },
+            {
+              "attempt": 2,
+              "status": "SOL_ACCEPTED_BOUNDED_6A",
+              "output_head": "3bc9e2a70daea2dda1004352c54ba1d1ada46b54",
+              "geophys_pin": "a2c85b7fb87e821b1e3b211c97ed2b695db8b3c1",
+              "review_ref": "reviews/20261115_g06a_attempt002_acceptance.md"
+            }
+          ],
           "assigned_agent": null,
-          "package_path": null,
+          "package_path": "work-packages/20261115_g06a_attempt002_goal.md",
           "package_sha256": null,
           "input_head": null,
-          "output_head": null,
+          "output_head": "3bc9e2a70daea2dda1004352c54ba1d1ada46b54",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
-          "commits": [],
-          "review_decision": null,
+          "last_observation": "58 fresh targeted checks and 6 offline readbacks passed; native evidence reused with original identities. Bounded G06a accepted, no attempt003 required.",
+          "evidence_refs": [
+            "reviews/20261115_g06a_attempt002_acceptance.md",
+            "../../../../../workspace/maintenance/v211_g06a_attempt002/report.md"
+          ],
+          "commits": [
+            "3a277e03d010e8bb3dbeb2eff26a69232be97572",
+            "3bc9e2a70daea2dda1004352c54ba1d1ada46b54"
+          ],
+          "review_decision": {
+            "status": "SOL_ACCEPTED_BOUNDED_6A",
+            "date": "2026-11-15",
+            "review_ref": "reviews/20261115_g06a_attempt002_acceptance.md",
+            "qualification": false
+          },
           "blockers": []
         },
         {
@@ -1924,12 +1947,10 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "package_id": "V211_G05_5c_unit009",
-    "status": "SOL_ACCEPTED_BOUNDED_5C",
-    "output_head": "b23fb3cc5b1fdfd2699a177c9916019583d63b5c",
-    "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
-    "sol_review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
-    "maintainer_confirmation": "2026-11-11 current conversation: bounded G01-G05 acceptance confirmed; enter post-5c optimization."
+    "package_id": "V211_G06_6a_attempt002",
+    "status": "SOL_ACCEPTED_BOUNDED_6A",
+    "output_head": "3bc9e2a70daea2dda1004352c54ba1d1ada46b54",
+    "sol_review_ref": "reviews/20261115_g06a_attempt002_acceptance.md"
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
@@ -2080,6 +2101,14 @@
       "remote_head": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
       "ahead_at_creation": 236,
       "behind_at_creation": 0
+    },
+    {
+      "stage": "post_5c_optimization",
+      "reuse_existing_checkout": true,
+      "additional_branches": 0,
+      "additional_worktrees": 0,
+      "actual_stage_branch": "codex/v211-stage5-diagnostic",
+      "reason": "Maintainer entered post-5c optimization; reuse current stage branch. Historical stage3 creation record retained in branch_plan_history. No ref cleanup before code acceptance and evidence preservation."
     }
   ],
   "post_5c_optimization": {
@@ -2230,5 +2259,15 @@
       }
     },
     "planning_authority": "Maintainer explicitly accepted E05-E10 on 2026-11-13 in current conversation and requested E11-E16 analysis, detailed ledger and adjusted Goal; planning only."
-  }
+  },
+  "review_history": [
+    {
+      "package_id": "V211_G05_5c_unit009",
+      "status": "SOL_ACCEPTED_BOUNDED_5C",
+      "output_head": "b23fb3cc5b1fdfd2699a177c9916019583d63b5c",
+      "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
+      "sol_review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
+      "maintainer_confirmation": "2026-11-11 current conversation: bounded G01-G05 acceptance confirmed; enter post-5c optimization."
+    }
+  ]
 }

@@ -4,7 +4,7 @@
 
 ## 当前停门
 
-**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；5c 后 E00～E16 代码与项目优化已获维护者有界接收。G06a attempt001 已实施 MJWarp Pendulum device batch 并形成 PARTIAL 返包；[独立复核](reviews/20261115_g06a_attempt001_review.md)确认需继续实现，已准备[attempt002](work-packages/20261115_g06a_attempt002_goal.md)，尚未派发；G06／G07 尚未接收，v2.1.1 尚未完成。** 单元 1～9 是 5c 内部工作单元，版本仍为七阶段、二十二子阶段。当前实现与未通过的 Rasterizer／Recorder 边界见[API](../api/README.md#pendulum-device-batchattempt001未接收)。
+**G01～G05 与优化账本保持原有接收；G06a attempt002 已经[独立主审](reviews/20261115_g06a_attempt002_acceptance.md)有界接收（SOL_ACCEPTED_BOUNDED_6A）。Core 为 `3bc9e2a7`，GeoPhys pin 为 `a2c85b7f`；无需 attempt003。G06b／6c、完整 canonical 六格、R3 和 G07 尚未接收，v2.1.1 尚未完成。** GeoPhys 主分支合并与 AOT 按维护者决定暂缓，不记通过、不阻断本次接收。具体设备、相机及 Recorder 交集见[API](../api/README.md#pendulum-device-batch)；Isaac 第二来源的物理仍为 scalar。下方早期启动表及历史记录保留其时点。
 
 [单元 9 综合主审](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)的 `SOL_ACCEPTED_BOUNDED_5C` 已由维护者在本次启动对话确认；原主审中的“维护者待确认”描述保留其审查时点。优化实施安排见[执行计划](../planning/post-5c-optimization-execution.md)。顺序为：G05 功能接收 → 代码优化、定向复验及人工接收 → 项目证据和 refs／worktree 整理及接收 → 决定进入 G06。G07 继续承担 G06 新增调用者及最终版本收口，7b 三 provider × 三 seed 门保留。
 

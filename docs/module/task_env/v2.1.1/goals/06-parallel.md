@@ -1,12 +1,14 @@
 # G06：并行执行、部分 reset 与整批切换
 
+当前进度（2026-11-15）：[G06a attempt002 独立主审](../maintenance/reviews/20261115_g06a_attempt002_acceptance.md)已给出 `SOL_ACCEPTED_BOUNDED_6A`；6b／6c 和后续 R3 未接收。以下规划门保持，旧 attempt001 状态仅作历史记录。
+
 规划标识：`V211_G06_PARALLEL`。3 个子阶段；复用既有 batch runtime、vector 调用、parallel render 和 Recorder。由[数据协议](../contracts/lifecycle-and-data.md)规定身份与时序，不为 batch 新建第二套任务生命周期。
 
 2026-11-15维护者补充：后续并行实施采用CUDA，不把CPU physics或CPU多进程方案作为本轮并行交付路线。三家仿真器、GeoPhys static沿革、下游实现参考及共同Task／Robot构建建议见[并行环境调研](../planning/20261115_g06_parallel_research.md)。该调研不代表native batch验收；确切provider／task／source／Controller／固定renderer名单仍在6a冻结。
 
-维护者后续提出版本冻结、代码落位审批、canonical action 先行、same-step autoreset 保留完整终止图像、固定 renderer 网格场景及 Pendulum／PickCube 验收要求，详见[G06a～c 实施方案审批稿](../planning/stage6-parallel-execution-plan.md)。后续维护者已确认：canonical 三后端×两任务六格；Rasterizer 首选、MJWarp renderer 备选；CUDA uint8；same-step 保留终止观测与图像；主环境统一入口、依赖按 provider 隔离。PickCube 做传感器×窗口 2×2，Pendulum 无传感器只测窗口开／关；性能从16开始，纯状态无窗口达到10 Hz以上且正常、资源允许才推进256、4096。canonical G06abc先接收，指定后端R3另包。旧文中的“两后端”是原最低目标，当前以六格增强范围为准；规模测量按条件执行，不要求所有渲染配置达到4096。执行分工见[工作分解](../planning/stage6-work-packages.md)，[首包prompt](../maintenance/work-packages/20261115_g06a_attempt001_goal.md)已准备，尚未派发。
+维护者后续提出版本冻结、代码落位审批、canonical action 先行、same-step autoreset 保留完整终止图像、固定 renderer 网格场景及 Pendulum／PickCube 验收要求，详见[G06a～c 实施方案审批稿](../planning/stage6-parallel-execution-plan.md)。后续维护者已确认：canonical 三后端×两任务六格；Rasterizer 首选、MJWarp renderer 备选；CUDA uint8；same-step 保留终止观测与图像；主环境统一入口、依赖按 provider 隔离。PickCube 做传感器×窗口 2×2，Pendulum 无传感器只测窗口开／关；性能从16开始，纯状态无窗口达到10 Hz以上且正常、资源允许才推进256、4096。canonical G06abc先接收，指定后端R3另包。旧文中的“两后端”是原最低目标，当前以六格增强范围为准；规模测量按条件执行，不要求所有渲染配置达到4096。执行分工见[工作分解](../planning/stage6-work-packages.md)，[首包prompt](../maintenance/work-packages/20261115_g06a_attempt001_goal.md)保留派发时点；attempt001／002 已执行，当前状态见本页顶部。
 
-## 当前边界与阶段3前维护的衔接
+## 历史边界与阶段3前维护的衔接
 
 维护者已明确：统一环境路线的并行适配尚未完成，阶段3前重构先完成Pendulum等旧任务的单环境迁移。现存并行注册、factory、脚本及历史证据保留，但不能证明统一路线已适配；`num_env=1`也不构成多环境验证。未适配的并行调用须明确声明或拒绝，不静默降级。
 

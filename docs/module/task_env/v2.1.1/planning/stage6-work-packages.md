@@ -1,5 +1,7 @@
 # G06a～c 工作分解与第一个实施包
 
+当前进度（2026-11-15）：[G06a attempt002 独立主审](../maintenance/reviews/20261115_g06a_attempt002_acceptance.md)已给出 `SOL_ACCEPTED_BOUNDED_6A`；6b／6c 和后续 R3 未接收。以下规划门保持，旧 attempt001 状态仅作历史记录。
+
 日期：2026-11-15。设计输入：`41a09c87a7599f13adce9fb50501eb6378c2a17e`。本文是派发准备，不代表已经启动 agent、安装依赖或完成 native 验收。
 
 以[现行实施方案](stage6-parallel-execution-plan.md)和[G06 Goal](../goals/06-parallel.md)为共同依据；维护者最近决定优先于早期交接的“至少两后端”“不做规模测试”等旧规划。canonical 主包覆盖三后端×两任务；R3 后端名单另定、独立接收。

@@ -6,9 +6,11 @@ Recorder 旧叶节点格式的只读入口为 `task_env.recorders.load_legacy_le
 
 v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会立即失败。当前 Isaac SDK 默认解释器路径没有公开该依赖；验证使用其 episode-recorder 扩展自带的 `h5py`，实际部署须将兼容的 H5 依赖配置到运行解释器。
 
-当前（2026-11-15）：G01～G05 已各自有界接收，5c 单元 1～9 收口；E00～E16 代码与项目优化已获[维护者有界接收](../maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)。G06a attempt001 经[独立复核](../maintenance/reviews/20261115_g06a_attempt001_review.md)为 PARTIAL；attempt002 的合同、设备渲染和记录增量仍待独立复核；以下能力仅限所述实测交集。G06／G07 及版本整体尚未完成。受测能力、正式入口及限制以[当前摘要](../maintenance/current-state.md)、实际源码和对应证据为准；下面的历史设计／实现记录不把未实现目标升级为 API。
+当前（2026-11-15）：G01～G05 已各自有界接收，5c 单元 1～9 收口；E00～E16 代码与项目优化已获[维护者有界接收](../maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)。G06a attempt001 经[独立复核](../maintenance/reviews/20261115_g06a_attempt001_review.md)为 PARTIAL；attempt002 的合同、设备渲染和记录增量已获[G06a 有界接收](../maintenance/reviews/20261115_g06a_attempt002_acceptance.md)；以下能力仅限所述实测交集。G06／G07 及版本整体尚未完成。受测能力、正式入口及限制以[当前摘要](../maintenance/current-state.md)、实际源码和对应证据为准；下面的历史设计／实现记录不把未实现目标升级为 API。
 
-## Pendulum device batch（attempt002，待独立复核）
+<a id="pendulum-device-batch"></a>
+
+## Pendulum device batch（G06a 有界接收）
 
 主解释器安装兼容的 Torch 和 CUDA Python bindings，另以 Python 3.12 创建 [MJWarp worker 依赖环境](../../../../../task_env/dependencies/README.md)。普通调用示例见 [pendulum_device.py](../../../../../examples/parallel/pendulum_device.py)：通过 `task_env.make_parallel_env('pendulum-v1', ..., num_env=3, backend='cuda', execution='device')` 显式选择，`env_config['execution']` 指定 `physics_provider='mujoco_warp'` 和 worker `interpreter`（也可使用 `GEOCHORA_MJWARP_PYTHON`）。目前验证的是 Linux、CUDA 设备 `cuda:0`、MuJoCo／MJWarp 4.0.1、Warp 1.18.0、GeoPhys 的 taichi-forge 0.7.0、B=3，其他任务、设备与版本不因此获得资格；GeoPhys component AOT 仍有缺失接口，不属于所测 JIT 相机交集。
 
@@ -20,7 +22,7 @@ v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会�
 
 MJWarp session 还按 source 声明发布环境局部坐标的具名 frame pose；合成 Scene 的具名 site 已在 B=3、seed 73 和共享 Rasterizer 路径中核对运动学、masked reset 与保留快照。该 fixture 不代表注册任务已配置传感器。
 
-现有 `VectorTransitionRecorder` 可显式包装 device 五元组并选行、选 observation 字段，开启记录时导出 owned 数据至既有 H5，关闭记录时不执行记录数据复制。设备记录在 transition 已发生后失败时会锁存原异常，拒绝继续 reset／step；`end_record()` 或 `close()` 会尝试结束各行，失败行保留供重试。已用 B=3 Pendulum 的显式测试相机记录两个环境的错开 episode，并独立逐像素核对 H5 中的终止帧、新首帧及状态；Pendulum 默认仍无传感器。Isaac PickCube 的双挂载图像来自真实 scalar 设备位姿；其中 hand 帧还通过受控 episode fixture 做了 H5 独立像素与时钟读回，不能当作 PickCube 并行任务或真实终止／reset 全链的接收证据。不要把这些结果视为 G06a、G06 或其他任务／provider 的接收。
+现有 `VectorTransitionRecorder` 可显式包装 device 五元组并选行、选 observation 字段，开启记录时导出 owned 数据至既有 H5，关闭记录时不执行记录数据复制。设备记录在 transition 已发生后失败时会锁存原异常，拒绝继续 reset／step；`end_record()` 或 `close()` 会尝试结束各行，失败行保留供重试。已用 B=3 Pendulum 的显式测试相机记录两个环境的错开 episode，并独立逐像素核对 H5 中的终止帧、新首帧及状态；Pendulum 默认仍无传感器。Isaac PickCube 的双挂载图像来自真实 scalar 设备位姿；其中 hand 帧还通过受控 episode fixture 做了 H5 独立像素与时钟读回，不能当作 PickCube 并行任务或真实终止／reset 全链的接收证据。这些结果只支持上述 G06a 有界接收，不代表 G06 整体或其他任务／provider 的接收。
 
 PickCube 环境通过 `task_env.make_env` 和正式配置构造；调用方需要独立 Solution 时可使用 `task_env.tasks.pick_cube.build_readiness_solution`。旧的 PickCube `build_reference`、`build_isaac_reference` 和 `build_runtime_source` 直接构造入口已退休，历史诊断中的这些调用需迁到正式构建入口。NutAssembly 的独立 `build_runtime_source` 同样已退休；使用正式 `make_env` 和配置构建，独立 Solution 入口保持可用。
 
