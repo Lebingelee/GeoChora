@@ -1,6 +1,6 @@
 # G06a～c CUDA 并行环境实施方案（维护者审批稿）
 
-日期：2026-11-15。状态：`DRAFT_FOR_MAINTAINER_REVIEW`。输入 HEAD：`412dbd79323f668e2aa487abb27704e28533b75b`，阶段分支：`codex/v211-stage6-parallel`。本次只交付方案；尚未安装依赖、改变 pin、运行 native 仿真或实施生产代码。方案批准后，由维护者转交实施 agent。
+日期：2026-11-15。状态：`DRAFT_FOR_MAINTAINER_REVIEW`。本轮讨论修订输入 HEAD：`0c258085e12dc70bb86a60d462ff77b6a1520e45`，阶段分支：`codex/v211-stage6-parallel`。本次只交付方案；尚未安装依赖、改变 pin、运行 native 仿真或实施生产代码。方案批准后，由维护者转交实施 agent。
 
 本文细化[现行 G06 Goal](../goals/06-parallel.md)，承接[项目／上游调研](20261115_g06_parallel_research.md)、[G06 交接](../maintenance/20261115_g06_agent_handoff.md)和[原始优化总账](post-5c-code-project-optimization-diagnostic-ledger.md)。总账的历史待办以[G05 逐项结案](../maintenance/reviews/20261114_e14_current_state_alignment_closeout.md)为准；下文引用其职责原则，不重开已经接收的 G05。
 
@@ -8,18 +8,18 @@
 
 推荐：**统一 SceneDefinition／TaskDefinition，入口分开、声明和计算共享；首批 device API 使用 Dict action、B 轴 observation 和 same-step autoreset；先完成 canonical effort 的 CUDA 链，再接 batch Robot 信息及既有 R3／重力补偿。** 大规模 Env／Robot 精简在 G06 接收后另行规划。
 
-以下为审批项，表中的推荐值不是已批准能力。实施 agent 不自行改变这些项；未通过技术门时回报具体缺口和替代项，不静默降低出口。
+维护者已确认以下范围。确认设计方向不等于依赖兼容性或 native 能力已经通过，也不构成开始实施的授权；讨论完成后再转交实施。
 
-| ID | 需维护者审批 | 推荐值与影响 |
-| --- | --- | --- |
-| D1 | 版本和首批物理矩阵 | Isaac Sim `6.2.0.0`；MuJoCo／MuJoCo Warp `4.0.1` 配对。G06 必达 Pendulum、PickCube × Isaac CUDA／MJWarp CUDA 四格；GeoPhys 先复用 BRS，目标先接 Pendulum CUDA，PickCube 以真实资产准入为前提，不默认计入四格 |
-| D2 | MuJoCo 迁移策略 | 新建隔离 4.0.1 profile，受影响 scalar 路线复核通过后将 Core MuJoCo 目标依赖迁到 4.0.1。旧 3.8.1 环境保留作历史基线；不为 G06 承诺长期维护所有 3.x 组合，不升级 Isaac 内置 MuJoCo |
-| D3 | 公共 API 与控制范围 | 扩展现有 `make_parallel_env`／`HomogeneousVectorTaskEnv` 的显式 device 模式；五元组 step；Dict 各叶前置 B；首批只新增 same-step 模式。四格 canonical effort 先行，随后交付 PickCube 两主路线的既有 R3 与显式重力补偿；不增加新的控制器种类 |
-| D4 | 固定 renderer 和进程／传输 | 优先验证并采用 MJWarp renderer-only CUDA，统一网格展示场景＋每 env 相机；独立 native physics worker，Warp 公共 CUDA IPC；6a 先过兼容门。失败后才由维护者选择其他 renderer／传输，不自动退回 CPU |
-| D5 | 功能模块落位 | 批准第 10 节的 owner 与新增目录／文件职责；公共层、provider、renderer、transport、Controller 数值实现、诊断分开。需要新增职责或大幅改变落位时提交局部调整表 |
-| D6 | 验收与 GeoPhys 边界 | 首批 B=3，单卡，小规模真实动作／状态／相机／reset／A→B→A；G06 不要求完整 Solution 成功。GeoPhys device 端口或资产能力需上游扩展时另列确定的 commit 与改动包；不能把 host-only BRS 标为 CUDA 成功 |
+| ID | 已确认方向／仍待确定事项 |
+| --- | --- |
+| D1 | Isaac＋MJWarp＋GeoPhys 三条 CUDA 路线均须接通 Pendulum 和 PickCube，共六格；GeoPhys 优先复用 BRS，缺失的公开 device／资产能力成为必需工作，不再按可选第三路线处理。Isaac 6.2 固定方向不变；MuJoCo／MJWarp 4.0.1 精确组合仍需兼容验证后冻结 |
+| D2 | 统一用户入口，主环境为 `/home/lly/miniconda3/envs/geochora`；按 provider profile 选择依赖解释器，共用源码。保留 Isaac 专用环境；MJWarp 隔离解析，不擅自升级主环境。隔离只在需要时引入 worker，不要求所有后端一律跨进程 |
+| D3 | Dict action 各叶前置 B；obs 保持树结构并前置 B；same-step autoreset 完整保留终止观测与已配置图像。先验收 canonical action＋batch Robot，再验收 R3／模型／重力补偿。第二包的 provider 范围及是否属于 G06 总出口仍待确认 |
+| D4 | 相机只作传感器挂载，不增加质量／惯量／碰撞。无相机、仅 observer、观测相机分开；具名 `obs["cameras"][name]["rgb"]` 已确认，dtype 尚待确认。几何／相机／时间／图像身份正确即可，一个共同 renderer 验收足够；推荐先验证现有 RayTracer，MJWarp renderer 备选，待维护者选择 |
+| D5 | 主要数据全程 CUDA，允许必要 GPU 内部复制和少量 CPU 控制信息。参考 Isaac Lab／ManiSkill／mjlab 的核心设计和必要局部实现，不引入整套运行依赖。第 10 节具体代码落位仍为审批稿；无资产名／类名专属管线 |
+| D6 | 在当前约 8 GiB VRAM／16 GiB RAM 机器验收。B=3 用于行隔离与生命周期正确性，不是容量上限；纯状态与渲染分别测量。4096 环境、16 control steps/s 是维护者 Go2 历史经验，作为参考，不直接变成 PickCube 或三后端统一硬门 |
 
-D1 的路线选择需要特别确认：原 Goal 要求优先核实 GeoPhys／Isaac，并至少交付两个后端；前期调研已核实 GeoPhys 有 BRS，但尚缺本项目所需的公开 device 链，Panda 接触形状也有限制。因此推荐先将 **Isaac＋MJWarp** 作为不可下调的验收组合，同时推进 GeoPhys 既有 owner 的适配。若维护者指定 GeoPhys 必须成为首批两条之一，其上游 device／资产扩展便成为相应硬依赖，不能仍按本表的四格宣布完成。
+剩余产品取舍：RGB dtype、共同 renderer 首选、R3 包覆盖范围／阶段出口。版本共存、设备互操作、公开相机输出和 GeoPhys 接触能力属于实施前应验证的技术事实，不要求维护者猜测结论。
 
 ## 2. 版本冻结与 MuJoCo 迁移
 
@@ -28,8 +28,8 @@ D1 的路线选择需要特别确认：原 Goal 要求优先核实 GeoPhys／Isa
 | Profile | 当前事实／拟定目标 | 冻结方法 |
 | --- | --- | --- |
 | Isaac native worker | 当前专用环境：Isaac `6.2.0.0`、Torch `2.11.0+cu128`、Warp `1.18.0`、MuJoCo `3.12.0` | 保留 SDK 配套依赖；记录 Python、distribution、扩展包、driver、GPU、资产 source closure、可复现安装来源。禁止向该环境直接装 MuJoCo 4.0.1 |
-| 新 device caller／MJWarp worker | 目标 `mujoco==4.0.1`、`mujoco-core==4.0.1`、`mujoco-studio==4.0.1`、`mujoco-warp==4.0.1`；Warp 候选严格固定 `1.18.0` | 独立环境解析依赖并验证；MuJoCo 元包／core／studio 对齐，保留 classic renderer 的受影响 scalar 能力。Torch 以当前 Core `2.14.0` 为首选候选，实际 wheel／CUDA build 与全部传递依赖经 6a 验证后落锁，不把尚未解析的组合称为已冻结 |
-| Core 历史 scalar 基线 | 当前 Python `3.12.14`、MuJoCo `3.8.1`、Torch `2.14.0`、Gymnasium `1.3.0`、NumPy `2.2.6`、taichi-forge `0.6.3` | 保留原环境与证据；新环境验证不破坏旧环境。4.0.1 迁移接收后更新声明，不让默认入口靠 PATH 随机选版本 |
+| 隔离 MJWarp profile（必要时 worker） | 目标 `mujoco==4.0.1`、`mujoco-core==4.0.1`、`mujoco-studio==4.0.1`、`mujoco-warp==4.0.1`；Warp 候选严格固定 `1.18.0` | 独立环境解析依赖并验证；MuJoCo 元包／core／studio 对齐，保留 classic renderer 的受影响 scalar 能力。Torch 以当前 Core `2.14.0` 为首选候选，实际 wheel／CUDA build 与全部传递依赖经 6a 验证后落锁，不把尚未解析的组合称为已冻结 |
+| 当前用户主环境 `/home/lly/miniconda3/envs/geochora` | 当前 Python `3.12.14`、MuJoCo `3.8.1`、Torch `2.14.0`、Gymnasium `1.3.0`、NumPy `2.2.6`、taichi-forge `0.6.3` | 保持统一入口和现有依赖；隔离验证不破坏主环境。是否迁移其 MuJoCo 在兼容结果明确后另行确定，不靠 PATH 随机选版本 |
 | GeoPhys worker | 当前 submodule pin `c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7`；main 调研点 `2110d359a90f3fbcea89d35d7756a523ebd91cde` | 先以 pin 评估 BRS；需要升级时先批准具体上游提交和 ABI 变化，再更新 pin／profile。`env_task_design` 不是默认依赖，禁止浮动 main |
 
 Menagerie 继续固定 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。当前 Core 的 `mujoco>=3.8.1,<3.9.0` 与 GeoPhys requirements 的 `mujoco>=3.15.0` 已有不一致；实施包必须在依赖 owner 解决，不能靠 `--no-deps` 安装后忽略。Isaac profile 的绑定不由 Core 的 MuJoCo target 锁覆盖。
@@ -99,7 +99,7 @@ provider 路由负责 **物化、native 控制写入、状态／frame 读取、r
 ```python
 env = make_parallel_env(
     uid=task_uid, env_config=config, num_env=3, backend="cuda",
-    api="device", execution="native_worker", transfer_mode="cuda_ipc",
+    api="device",  # 执行解释器与必要传输由已解析的 provider profile 决定
 )
 obs, info = env.reset(seed=seed)
 obs, reward, terminated, truncated, info = env.step(action_dict)
@@ -107,15 +107,15 @@ obs, reward, terminated, truncated, info = env.step(action_dict)
 # 配置变更复用既有 reset 配置解析机制，整批重建，见第 9 节。
 ```
 
-`api="device"` 是新模式；旧省略参数时的 SB3／remote NumPy 行为保留。`execution` 描述依赖隔离和进程归属，不表示 B 个 CPU 仿真进程。单环境入口不自动返回带 B 轴的数据。B=1 device 仍是批量接口。
+`api="device"` 是新模式；旧省略参数时的 SB3／remote NumPy 行为保留。如暴露 `execution`，其只描述依赖隔离和进程归属，不表示 B 个 CPU 仿真进程。单环境入口不自动返回带 B 轴的数据。B=1 device 仍是批量接口。
 
-### 4.2 冻结的 shape 与 dtype
+### 4.2 已确认 shape 与待确认的图像 dtype
 
 | 数据 | 规范形状／语义 |
 | --- | --- |
 | action | Dict 树，每叶 CUDA Torch tensor `[B, *single_leaf_shape]`，首批连续动作 float32；每叶保留其原通道含义／单位与限制 |
 | observation | 现有任务树，数值叶前置 B；任务规定的 float32 等 dtype 不随 provider 改变；本来是标量的叶为 `[B]` |
-| RGB | 每个已声明 camera key 独立 `[B,H,W,3]`，uint8 RGB；同一 vector Env 内 key、尺寸、通道布局固定；不能用 observer 拼图替代 |
+| RGB | 具名 `obs["cameras"][name]["rgb"]`，每 key 独立 `[B,H,W,3]`，推荐 CUDA uint8 RGB，dtype 待确认；同一 vector Env 内 key、尺寸、通道布局固定；不能用 observer 拼图替代 |
 | reward／terminated／truncated | 分别为 CUDA float32 `[B]`、bool `[B]`、bool `[B]`；两个 done 标志保留原始值，重置选区使用 OR |
 | reset mask | CUDA bool `[B]`；错误 shape／dtype／device 明确拒绝；全 false 为无作用，不能暗示全部 reset |
 | info | 列式结构，数值／mask 可驻 CUDA；静态标签留 host。含 env ID、episode ID、generation、step／frame 边界；不每步构造 B 份重复的静态字典 |
@@ -140,11 +140,11 @@ Dict key 使用稳定的语义名称，编译结果再映射到 source-bound Con
 
 ### 5.1 进程归属
 
-推荐 device caller 在新 4.0.1 profile 中运行：持有 public vector Env、共同 TaskDefinition／Controller、固定 MJWarp renderer 和公开结果。任何时刻只启用当前 provider 的一个 native physics worker；该 worker 管一整个 B，不是 B 个 scalar worker。
+用户从 `/home/lly/miniconda3/envs/geochora` 运行统一入口。provider 配置解析到明确的依赖 profile；可共存的实现可同进程调用，必须隔离的 SDK 使用对应解释器启动一个管理整个 B 的 worker。不能通过拼接另一个虚拟环境的 site-packages 来混载 ABI，也不是 B 个 scalar worker。
 
-Isaac worker 使用原专用解释器，MJWarp worker 使用新 profile，GeoPhys worker 使用经批准的 GeoPhys profile。构建、提交和读取通过同一 RuntimeSession 的 proxy／adapter 链；worker 内 native session 是唯一 physics state／step owner，caller 不再维护一个可独立推进的镜像 solver。
+Isaac 使用原专用解释器；MJWarp 先在隔离 profile 解析 4.0.1 组合；GeoPhys 按公开 API 和依赖共存结果决定归属。renderer 采用同一原则：能共存则在现有 owner 中运行，确需隔离才增加进程。版本和进程布局由 6a 实证确定，不能预先强制主环境换成 4.0.1 或叠加所有 SDK context。
 
-worker 用显式解释器启动并传递 resolved build request；不能让默认 `multiprocessing` 子进程继承错误 SDK 环境。公共导入／配置查询不启动 App。IPC 控制消息复用当前 worker 生命周期思路，但不复用旧 SB3 的 NumPy data-plane。
+构建、提交、读取仍通过既有 RuntimeSession adapter；native session 是唯一 physics owner。公共 Task／Controller 的语义与实现共享不等于其所有数值运算必须在 caller 进程：内层控制 cadence 尽量与 native 执行同处，避免每个 substep Python IPC 往返。用户每次 control interval 提交动作，按公开完成边界取得结果。公共导入／配置查询不启动 App；不复用旧 SB3 NumPy data-plane。
 
 ### 5.2 数据面与同步
 
@@ -180,7 +180,7 @@ worker 用显式解释器启动并传递 resolved build request；不能让默�
 4. gravity-only 与包含 Coriolis 等项的完整 bias 必须区分；不能直接将 `qfrc_bias` 全部命名为重力。已有 MuJoCo position-drive 补偿通过参考偏置实现，仅对原受限 profile 成立，不能直接复制到 batch direct effort。
 5. R3＋重力通过显式贡献组合，明确每项来源和相加位置；禁止重复 feedforward，禁止用关闭实体 gravity 冒充补偿。某 provider 不提供所需模型时在 native 副作用前拒绝该 flag，不影响已经准入的 direct effort。
 
-拟定出口：四格 direct effort 与 batch Robot 必达；随后 PickCube × Isaac／MJWarp 两格完成现有 R3 tensor 执行和显式重力补偿。R3 是 Panda 的能力，不给 Pendulum 伪造同类控制器。D3 若按推荐批准，这两格也是本次受限交付门；缺少公开 device model 时先扩展相应 model owner，仍不能成立则报维护者调整范围，不能自行改成可选或用 `UNSUPPORTED` 宣布全包通过。GeoPhys 的 R3／gravity 暂不列硬门，保持具体能力拒绝。R3 可运行与重力补偿验收分别举证。
+两个连续工作包分别验收：包一为三后端×两任务的 canonical action、batch Robot 与公共并行生命周期；包二为现有 R3 的 tensor 执行、所需模型和显式重力补偿。包二具体覆盖哪些 provider、是否必须完成才能接收 G06 总阶段，尚待维护者确认，不再把之前推荐的两后端硬门当作已经批准。R3 与重力分别举证；不给没有对应控制需求的 Pendulum 伪造 R3。
 
 ## 7. same-step autoreset、随机流与记录
 
@@ -219,32 +219,41 @@ worker 用显式解释器启动并传递 resolved build request；不能让默�
 
 ### 8.1 推荐的固定 renderer 与前置技术门
 
-优先实现 MJWarp renderer-only CUDA adapter。其 public renderer 接口可消费 `geom_xpos/xmat`、`cam_xpos/xmat` 等 device 数据；用 provider 发布的 canonical body／frame pose 计算 visual geom 与相机姿态，更新 BVH，再 render／解包 RGB。渲染器不能调用物理 `step`；若需要更新 derived render 状态，应为纯变换／渲染准备，不能再运行一套动力学。
+推荐先验证现有 GeoPhys RayTracer 作为共同 renderer，MJWarp renderer-only 为备选，不同时开发两套。此选择待维护者确认；既有批量几何能力不等于新任务相机合同已经接通。
 
-这是一项**新 renderer adapter**，不是已支持组合：公共 render contract、source closure、asset identity、camera binding、completion／close 均复用；MJWarp native render API 的转换需要新增实现。上游依据：[v4.0.1 exports](https://github.com/google-deepmind/mujoco_warp/blob/v4.0.1/mujoco_warp/__init__.py)、[render 源码](https://github.com/google-deepmind/mujoco_warp/blob/v4.0.1/mujoco_warp/_src/render.py)。
+| 当前适配 | 已有源码能力／路径 | 与本轮要求的缺口 |
+| --- | --- | --- |
+| GeoPhys RayTracer | 通用场景 backend；共享资产／GPU 几何实例／批量 device world-major 变换 | 公开 CUDA RGB 输出、base／hand 多相机、跨物理 provider 输入及生命周期仍需验证；尚不是现有正式 task RGB 路线 |
+| GeoPhys Rasterizer | 通用并行场景 backend；亦有有界 GeoPhys CPU task-camera 路线 | registry 不声明共享资产／GPU 实例和批量变换更新能力；共享 framebuffer 路线不等于已支持 CUDA 多相机观测 |
+| Flora | 已有并行场景共享资产表和多实例 | 当前显式 host transform readback 和 host RGBA8 输出，不满足默认设备图像链 |
+| MuJoCo OpenGL／reference | MuJoCo CPU 与 GeoPhys CPU 的有界同步 task RGB；通用 reference 路线不声明 parallel | 现有 host pose／owned CPU 图像不能直接满足本轮要求 |
+| Isaac RTX | Isaac CUDA 同步 task RGB，已有 frame mount | 跨后端独立 renderer、统一视觉物化与本机共存开销待验；当前公开 task RGB 仍是 CPU copy |
+| MJWarp renderer | 上游候选接口；Geochora 尚无该 adapter | 需要新增适配与完整资产／相机／生命周期验证，作为 RayTracer 不适用时的备选 |
 
-已复核现有复用途径：`ParallelRenderLayout` 已负责网格变换，应直接复用；`ParallelRenderProvider` 当前协议返回 NumPy 展示帧，不能当成 device task image 合同；Flora parallel 已有共享资产表＋多实例，但当前 backend 明确使用 host RGBA8 和 transform readback，不能原样满足本次 device 通路。新 adapter 的理由是补缺失的 native CUDA render API，不是新建 renderer framework。其 device frame／completion 字段在既有 render contracts 扩展，observer 的 host 显示作为显式展示读回；不能为了兼容旧 NumPy 接口把所有 task RGB 悄悄 `.cpu()`。
+上述两类适配分别以 `render/base/backend.py` 的场景 registry 和 `render/base/contracts.py` 的 task-camera 合同为准，不能混成已接通矩阵。RayTracer 优先理由是已有批量设备几何链和资产实例复用；其 `geophys_framebuffer` 声明不证明终端 CUDA Torch RGB 已实现。先在既有 `render/raytracer`、camera／frame owner 补最小公开能力；如果需要读私有 framebuffer 或 solver，必须扩展公开接口，不能用私有补洞。
+
+复用 `ParallelRenderLayout` 的网格变换。当前 `ParallelRenderProvider` 的 NumPy 展示帧不能冒充 device task image；设备 frame／completion 在既有 contracts 扩展，observer 显示单独显式读回。若首选不成立，记录具体缺口后再确认备选及条件性新增文件，不默默切换 renderer。
 
 6a 内先做 R0 门，必须在大规模 batch 适配前回答：
 
 | R0 子项 | 明确证明的内容 |
 | --- | --- |
 | R0.1 visual materialization | 相同 SceneDefinition 的 Pendulum／PickCube geometry、mesh、颜色／材质与 canonical visual map 能构造 renderer-only 模型；USD 来源不能假装 MJCF，所需 source 转换有明确 owner |
-| R0.2 两后端状态同步 | 同一实现接收 Isaac 和 MJWarp 的公开 pose，完成初帧、非零动作后的新帧；不读 provider 私有 solver、不调用额外 physics step |
+| R0.2 三后端状态同步 | 同一实现接收 Isaac、MJWarp、GeoPhys 的公开 pose，完成初帧、非零动作后的新帧；不读 provider 私有 solver、不调用额外 physics step |
 | R0.3 相机与网格 | observer、每 env base、PickCube 每 env hand 挂载正确；稳定 camera ID／env row；末端移动引起相机外参同步变化，RGB 来自同一已完成边界 |
 | R0.4 设备／进程 | 真实 IPC fence、GPU buffer、打包布局可用；重复 render 的显式 physics step 增量为 0；旧帧不能混入 reset／新 generation |
 | R0.5 A/B 资源兼容 | 关闭 A 的 physics 资源后 renderer 可以绑定 B，并按同一相机与输出 schema 重建自有绑定；不需要换 renderer 实现或偷偷启动第二 physics owner |
-| R0.6 显存共存 | 本机 RTX 5060 总显存约 8 GiB；caller／MJWarp renderer 和 Isaac physics worker 同时存在时，B=3 的真实两任务场景在批准预算内可创建、步进、关闭，不用单独运行两者的峰值相加推测 |
+| R0.6 显存共存 | 本机 RTX 5060 总显存约 8 GiB；主环境入口／选定 renderer 与当前 physics provider 同时存在时，B=3 的真实两任务场景在批准预算内可创建、步进、关闭，不用单独运行两者的峰值相加推测 |
 
-若该 renderer 不支持实际视觉资产、相机或 device 同步，6a 记录具体失败；替代候选为统一 Isaac renderer-only，但须另验 source／公开 pose 更新与依赖成本。现有 MuJoCo classic render-only 可用于定位或 scalar 回归，host pose/RGB 通路不能未经 D4 修订成为本轮 CUDA 交付方案。
+R0 未通过不能冻结为已接通共同 renderer。CPU 图像路径只可用于定位或原 scalar 回归，不能替代已确认的 CUDA 主要数据链。
 
-physics worker 采用 headless／physics 所需的最小 SDK 配置，不启动本次未用的 RTX 相机或 observer；固定 renderer 承担图像。是否能关闭相关扩展必须按 Isaac 6.2 的实际依赖验证，不能删掉必需 USD／PhysX／Fabric 功能省显存。若 8 GiB 不能容纳，先精简重复视觉／缓存分配；仍不足时提请维护者选择更大 GPU 或其他经验证架构，不降级 CPU physics，不把 B=1 作为本轮验收。
+physics worker 采用 headless／physics 所需的最小 SDK 配置，不启动本次未用的 RTX 相机或 observer；固定 renderer 承担图像。是否能关闭相关扩展必须按 Isaac 6.2 的实际依赖验证，不能删掉必需 USD／PhysX／Fabric 功能省显存。若 8 GiB 不能容纳，先精简重复视觉／缓存分配；仍不足时报告缺口并调整 renderer／进程架构，在本机重新验证；更大 GPU 不作为本轮出口，不降级 CPU physics，不把 B=1 作为本轮验收。
 
 ### 8.2 网格场景的坐标与隔离
 
 构建一次 logical env template，每 env 的 render root 使用固定网格平移 `T_grid[i]`。列数建议 `ceil(sqrt(B))`；spacing 根据该任务冻结 workspace、运动包络和相机 near／far／FOV 明确计算／设置，6a 记录最终值，不写一个对所有任务通用的任意常数。
 
-共同 renderer 可物化为 **一个 render world 中 B 组 visual 实例**；observer 看全场景，每 env task cameras 对应自己的实例。MJWarp physics 的 B 个 native worlds 仍是独立 world；Isaac physics 可在一个 stage 复制 env namespaces 并使用 collision filtering。两者都向 public state 发布无 grid offset 的 env-local pose。
+共同 renderer 可物化为 **一个 render world 中 B 组 visual 实例**；observer 可看全场景或配置的 K 个展示实例，每 env task cameras 对应自己的实例。MJWarp physics 的 B 个 native worlds 仍是独立 world；Isaac physics 可在一个 stage 复制 env namespaces 并使用 collision filtering。两者都向 public state 发布无 grid offset 的 env-local pose。
 
 `T_visual_world = T_grid[i] @ T_env_local`；若 Isaac native 场景已经包含自身 env origin，adapter 先还原 env-local，再由 renderer 应用 presentation grid，不能叠加两次。固定附件和 hand camera 的 mount 链按同样原则处理。
 
@@ -257,6 +266,16 @@ physics worker 采用 headless／physics 所需的最小 SDK 配置，不启动�
 | observer | 共同 renderer 的 world camera，显示整个 grid；不是 Agent observation | 能辨认 B 个实例及运动；不混入 task image key |
 | base | 任务声明明确使用 env-world 固定 frame 或 Robot base frame，两者不可混称；每 env 同一 intrinsics／mount transform | 公共 frame 投影与图像地标一致；若 Robot root 可移动，挂载按声明更新 |
 | hand | PickCube 绑定现有 canonical hand／EE frame，加一次已声明外参；每 env 独立 camera | 不使用零 pose／另一行手爪；运动前后外参和可见物变化与实际状态对应 |
+
+相机职责分工：Robot 声明公开安装 frame 和可选预设；任务／配置选择启用的相机、内外参、输出 key 与是否进入 obs；公共 camera owner 管绑定和生命周期，不在 Robot 构造时直接创建 SDK 相机。传感器挂载不改变机器人动力学。
+
+三种执行模式必须独立成立：
+
+- 无观测相机且无 observer：保留状态 obs；不分配图像、视觉快照、render scene／BVH 或 RGB fence，不走 render。同一 SDK 必需的 physics App／场景基础开销另计。
+- 仅 observer：按配置频率展示，不加入 Agent obs；可仅物化 K 个选中环境，不要求为全部 B 创建 task-camera 图像。
+- 观测相机：追加具名 cameras 树；同一配置用于 scalar 与 batch，后者只多 B 轴。首批建议每 control step 同步采图，autoreset 在重置前保留终止图，重置后取得首帧；后续降采样需显式帧时钟合同，不能悄悄重复旧帧。
+
+当前旧 `task_rgb` 为单相机 HWC float32、0～1、CPU owned copy；保持旧接口兼容。新具名相机接口推荐 CUDA uint8，scalar／batch 一致，但 dtype 尚待确认，不能称为既有合同。
 
 首批建议 task RGB 每 camera `128×128` RGB、observer `640×480`；如现有 task 配置有已固定规格，以审批后的配置为准并写入 schema。Pendulum 配 base，PickCube 配 base＋hand；不为 Pendulum 伪造 hand。相机不同任务可有不同 key，但同一对象 A→B→A 中 key／shape 保持不变。
 
@@ -309,14 +328,14 @@ renderer 实现／选择在创建时固定到 close；允许其为新 source／g
 | GeoPhys adapter | `runtime/providers/geophys/rigid_batch.py` | EXTEND；改用公开 device port，选入 factory；当前 constructor 读取 `solver.storage` 的路径不能成为新 device 方案，修复受影响绑定，不扩大成全库私有字段清理 |
 | GeoPhys 上游端口／能力 | GeoPhys 既有 materialization、`solvers/rigid/batch`／loaded component owner | COMPOSE 优先；不足时 EXTEND public control／state／mask／completion。禁止把 static physics kernels 搬回 Geochora；pin 改动单独确认 |
 | worker／GPU IPC | 新增 `runtime/transport/worker.py`、`runtime/transport/cuda_ipc.py` | NEW 缺失 transport 实现；worker 管解释器／消息／close，cuda_ipc 管 device buffer／event／borrow；尽量复用现有进程协议，不再复制一套 Env 生命周期 |
-| 公共网格／camera | `render/providers/parallel.py`、`render/parallel_source.py`、`render/camera/api.py`、`render/camera/task_rgb.py`、既有 `render/contracts.py`／`render/base/contracts.py` | EXTEND；复用 ParallelRenderLayout，新增明确的 optional device frame 能力，旧 host 展示协议保留；multi-camera、mount／boundary 在 renderer owner；provider 内没有 Task camera 特判 |
-| 固定 MJWarp renderer | 新增 `render/mujoco_warp/backend.py`、`render/mujoco_warp/scene.py` | NEW render adapter；backend 管 context／完成／RGB，scene 管视觉 source、grid／geometry mapping；挂载数学复用 camera owner，不再造 task RGB consumer |
+| 公共网格／camera | `render/providers/parallel.py`、`render/providers/parallel_source.py`、`render/camera/api.py`、`render/camera/task_rgb.py`、既有 `render/contracts.py`／`render/base/contracts.py` | EXTEND；复用 ParallelRenderLayout，新增明确的 optional device frame 能力，旧 host 展示协议保留；multi-camera、mount／boundary 在 renderer owner；provider 内没有 Task camera 特判 |
+| 固定 renderer | 首选原位扩展 `task_env/render/raytracer/` 与公共 camera／contracts；仅选中 MJWarp 备选时新增 `task_env/render/mujoco_warp/backend.py`、`scene.py` | EXTEND 优先；缺失的 native render API 才 NEW；context／完成／RGB 与视觉 geometry mapping 分工，挂载数学复用 camera owner |
 | batch Robot | `robots/runtime.py`、`environment/protocols.py`、现有 ControlledSubjectV1 | EXTEND；声明／静态映射共享，动态 device view、model capability 按需求供给；不创建 B 个 RobotComponent／Controller |
 | canonical／R3 tensor 实现 | 原 `controllers/canonical/physical_controller.py`、`r3_effort.py`、`production_r3.py` 等保留规格与入口；必要时新增 `controllers/canonical/tensor/effort.py`、`tensor/r3.py` | EXTEND＋NEW 数值实现；只放 device 算术与 B 轴 memory；不复制整个 Controller framework，重力模型留既有 model owner |
 | Task 数值实现 | 现有 Pendulum／PickCube 的 TaskDefinition owner | EXTEND；阈值／分布参数一份，纯 tensor hook 就近放；不得在 tasks 根堆 provider/render/worker 文件 |
 | profiles／版本锁 | 新增 `task_env/dependencies/README.md`、`mujoco-warp.in`／精确 `.lock`、`isaac-6.2.lock`；GeoPhys 锁仅在相应包批准后添加 | 版本／安装说明一个 owner；lock 标注适用平台和解释器，不伪造跨平台通用 freeze，不把本机所有无关包纳入产品依赖 |
 | 有界诊断／offline reader | 新增 `task_env/diagnostics/tasks/v2.1.1/g06/`，按 `contracts.py`、`native.py`、`readback.py`、`run.py` 职责组织 | diagnostics 外部调用公开 API；可按实际需要合并，禁止每个实验新造生产 probe 参数或每运行一轮复制 runner |
-| 用户示例 | 现有 examples 的并行入口 owner；拟按功能建 `task_env/examples/parallel/`，一个 caller＋两个任务配置 | 一个普通用户调用链；不把验收 runner 当唯一生产 caller，不替用户手写 source hash／receipt／IPC handle |
+| 用户示例 | 现有 examples 的并行入口 owner；拟按功能建 `examples/parallel/`，一个 caller＋两个任务配置 | 一个普通用户调用链；不把验收 runner 当唯一生产 caller，不替用户手写 source hash／receipt／IPC handle |
 | 文档／能力 | 当前 `v2.1.1/api`、contracts、capabilities、maintenance | 只更新已实现且有证据的交集；本方案未批准／未实施时不标 PASS，不提前将新目录写入 Skill 为现有能力 |
 
 落位表不是大型重构授权。`reference_env.py` 本次仅做共同构建所需的薄交接；不为 batch 复制其数千行，也不借 G06 顺便大搬家。若某段纯逻辑必须共享，抽出最小连续职责并迁移实际 caller；不通过跨模块调用大量 `_private` 方法假装复用。
@@ -347,12 +366,12 @@ renderer 实现／选择在创建时固定到 close；允许其为新 source／g
 | --- | --- | --- |
 | 6a attempt 1 | 读取审批 D1～D6；精确版本解析／MuJoCo 兼容修复；layout／身份／公共 device shape；共同 build 真实 caller；IPC 与 R0 renderer 前置验证；Pendulum 最短 batch 链 | 实际构建进入共同 owner；版本／ABI 缺口可定位；至少两条代表路线能与固定 renderer 同步短程，或明确未过 R0、不得进入依赖它的 6b 大改 |
 | 6a attempt 2 | 审核真实 diff；补行绑定／错误输入／终止保留／资源故障的关键合同；冻结经过验证的版本、source、相机、预算与能力表 | 6a 合同和必需实现成立；不只交 schema／fake；更新 API 的已实现部分；形成 6b 唯一 ready 包 |
-| 6b attempt 1 | Isaac／MJWarp 四格 canonical effort 小批量；PickCube device Task 计算；batch Robot；R3 tensor 与受限 model／gravity；GeoPhys BRS device 包按准入独立推进 | 两后端两任务真实构建／reset／非零 step／RGB／obs；至少一条 native batch，推荐两条都 native；隔离与物理含义成立 |
-| 6b attempt 2 | 复核状态与相机、控制 cadence／传动、同次记录读回；修复实际问题；确认 GeoPhys／R3／gravity 具体交集 | 四格 direct effort、PickCube 两格 R3／gravity evidence 完整；primary 路线未完成不能降格为单后端 PASS；不跨出实际受测模型声明 |
+| 6b attempt 1 | 三后端六格 canonical effort 小批量；PickCube device Task 计算；batch Robot；GeoPhys BRS 缺失公开能力在对应上游 owner 补齐 | 三后端两任务真实构建／reset／非零 step／RGB／obs；三条均验证 native batch；隔离与物理含义成立 |
+| 6b attempt 2 | 复核状态与相机、控制 cadence／传动、同次记录读回；修复实际问题；确认 GeoPhys／R3／gravity 具体交集 | 先完成六格 direct effort 与 batch Robot；随后开展独立 R3／model／gravity 包，范围和总出口待确认；不跨出实际受测模型声明 |
 | 6c attempt 1 | 全 false／单行／多行 mask；staggered episode autoreset；同一个 public vector 对象 Pendulum A→B→A，再做 PickCube A→B→A；旧 generation／异常重建／close | 固定 renderer 与 schema；不重置未选行；旧资源／命令失效；退出与 worker／IPC／App 释放证据 |
 | 6c attempt 2 | 独立 readback、重复 close／失败清理与最终合同审查；对照本方案和总账收口；更新当前能力与维护交接 | G06abc 按批准范围有界接收；未完成矩阵显式列出；随后另议 Env／Robot 精简，G07 集成门保持原范围 |
 
-6a 的 R0 可以使用最小 native source 和数步执行定位兼容性；6b 必须使用真实冻结 Task source 和非零动作。不能把 6a 原型换名当作四格正式验收，也不把 G07 完整 Solution／三 seed 矩阵前移。
+6a 的 R0 可以使用最小 native source 和数步执行定位兼容性；6b 必须使用真实冻结 Task source 和非零动作。不能把 6a 原型换名当作六格正式验收，也不把 G07 完整 Solution／三 seed 矩阵前移。
 
 ## 12. 验收矩阵、物理 oracle 与运行预算
 
@@ -362,10 +381,10 @@ renderer 实现／选择在创建时固定到 close；允许其为新 source／g
 | --- | --- | --- | --- | --- |
 | Pendulum × Isaac 6.2 CUDA | B=3，原 canonical effort；三行不同非零动作 | base＋observer | 必达 | 必达，A=Isaac，B=MJWarp |
 | Pendulum × MJWarp 4.0.1 CUDA | 同一公共 schema／timebase／分布 | 同上，固定 renderer | 必达 | 同一对象回到 A |
-| PickCube × Isaac 6.2 CUDA | B=3，显式 canonical direct effort；随后 R3／gravity | base＋hand＋observer | 必达，控制规格分别验证 | 必达，另一个 PickCube 对象做同样 A/B/A |
-| PickCube × MJWarp 4.0.1 CUDA | 同一 source 语义／具名映射；随后 R3／gravity | 同上，固定 renderer | 必达，控制规格分别验证 | 同上 |
-| Pendulum × GeoPhys BRS CUDA | B=3，须 public device ports 真实接通 | base，固定 renderer 另验 | 计划第三路线，单列状态 | 不自动扩展为第三条切换硬门 |
-| PickCube × GeoPhys BRS CUDA | 原资产 mesh／contact／transmission 准入后确定 | base＋hand 另验 | 不预先承诺；不换简化资产冒名 | 后续按审批交集安排 |
+| PickCube × Isaac 6.2 CUDA | B=3，显式 canonical direct effort；后续 R3／gravity 包另验 | base＋hand＋observer | 必达，控制规格分别验证 | 必达，另一个 PickCube 对象做同样 A/B/A |
+| PickCube × MJWarp 4.0.1 CUDA | 同一 source 语义／具名映射；后续 R3／gravity 包另验 | 同上，固定 renderer | 必达，控制规格分别验证 | 同上 |
+| Pendulum × GeoPhys BRS CUDA | B=3，须 public device ports 真实接通 | base，使用共同 renderer | 必达，不以 host-only BRS 代替 | mask／autoreset 必达；A/B/A 先以 Isaac↔MJWarp 代表组合 |
+| PickCube × GeoPhys BRS CUDA | B=3，原资产 mesh／contact／transmission 必须接通 | base＋hand，使用共同 renderer | 必达；缺失通用能力在上游补齐，不换简化资产冒名 | mask／autoreset 必达；共同 renderer 必达 |
 
 ### 12.2 一组足够证明问题的用例
 
@@ -389,11 +408,19 @@ renderer 实现／选择在创建时固定到 close；允许其为新 source／g
 
 建议批准以下上限作为首轮默认，实施 agent 在实际资源预检后写入单次执行包；它们不是性能目标，也不允许忽略已有 Harness 更严格的限制：
 
-- 单卡，B=3；IPC/R0 可以 B=2；同一时刻最多一个 native physics worker＋caller 内固定 renderer，App 不并行堆叠。已有 shared native lock／Harness 监督照用，不 unlink 锁绕过占用。
+- 单卡，功能验收 B=3；IPC/R0 可以 B=2。容量测试另按预算逐级增加 B，不能把 B=3 当作性能上限。只启用当前 provider；renderer 仅在需要图像时启动，避免重复 App／context。已有 shared native lock／Harness 监督照用，不 unlink 锁绕过占用。
 - 每个 native run 显式列 seed、physics dt、control substeps、policy intervals 和 maximum explicit physics steps；沿用任务 timebase，不调 dt／solver／horizon 追求 PASS。建议 Pendulum seed73、PickCube seed31 作为单 seed 起点；特殊终止用例单列 Experiment horizon，不修改正式默认值。
 - 初轮短程 20 intervals／run；根据物理／接触不确定性扩到最多 200 intervals 或 10,000 显式 substeps，先达到者停止；编译／启动与 steady execution 分开记录。完整 Solution 超出这一短程窗时不擅自扩大。
 - 每 run 默认 wall-clock 15 分钟（含 SDK／kernel 首次启动，超时由 Harness 收尾）；窗口内可修复后重新运行，但每次新 run 留边界。本次只读硬件查询为 RTX 5060、总显存 8151 MiB、物理 RAM 15792 MiB；建议 G06 整组 caller＋worker 的 VRAM 上限 6144 MiB、RAM 上限 12288 MiB，给桌面与其他工作留余量。运行前必须按实时空闲与既有 Harness 取更严格上限；不能把这份静态查询当作已取得资源独占。无法容纳则回报具体资源缺口，不能未经批准减成 B=1。
 - 每 run 证据默认 ≤256 MiB：只保存能支持结论的初帧、非零动作帧、选定终止／首帧和 A/B/A 关键帧及对应状态；其余只保留小型 step／completion 摘要。没有要求逐 substep 全量录像／大日志。
+
+性能与资源分别按纯状态、仅 observer、观测相机三组报告。纯状态测启动／编译后稳态的 GPU／RAM 峰值和吞吐；observer 记录展示 K 与频率；观测相机记录 B、相机数 C、分辨率、采样频率及终止缓冲。容量可在预算内从小批量递增至 128、512、1024、4096 等适用档位，不要求在无法容纳的配置上硬跑，不为追求吞吐改变物理步长或求解器质量。
+
+维护者提供 Go2 历史经验：B=4096、每秒约 16 个 control step。若指整批每秒推进 16 次，则约 65,536 env transitions/s；本项目尚未复现，任务、接触、控制 substeps、相机和训练器是否计入均需随测量报告。它说明纯状态应另测规模，不构成 PickCube 的预设性能保证。
+
+图像理论预算示例：B=4096、两相机、128×128 RGB，仅一份 uint8 全批图像为 384 MiB，float32 为 1536 MiB；若使用同尺寸独立终止图像缓冲再翻倍。此数值不包含深度／中间 framebuffer、BVH、视觉实例、物理状态、模型、context 或策略。只有实际峰值能证明能否容纳。报告 batch control steps/s 与 B×steps/s，区分 physics substeps 和 sensor FPS；不以图像 FPS 代替仿真吞吐。
+
+通用管线审查要求：asset／Task recipe 可声明各自实体和 frame，provider 可按公开格式／能力分派；不得按 Pendulum／PickCube UID、Panda／Go2 类名或某个资产路径选择专属控制、接触或图像接线。GeoPhys 扩展应形成公开通用形状／约束／device 端口能力。
 
 一个 run 的必要证据为：输入 HEAD／diff、profile／source／配置身份、完整命令、owner／worker／device／传输说明、实际显式 step／clock、选定公开状态＋RGB、done／reset／generation 关联、close／worker 结果。一个统一外部 runner 和一个 offline reader 足够；不按每项 gate 新增生产探针。
 
@@ -415,4 +442,6 @@ G06 接收后再提出 Env／Robot 精简包，按真实重复和职责收益确
 
 本次验证仅覆盖当前源码／官方版本资料核对、设计与 G06abc／总账映射、文档链接／格式和 Git 变化边界。没有 native CUDA／IPC／renderer／4.0.1 安装兼容性实测，因此 D1～D6 中的候选方案仍须按前置门取得证据后才能转成能力声明。既有 `MUJOCO_LOG.TXT` 与历史 migration manifest 的 hash 不一致属于预存文档验证问题，保留原字节并单列，不通过修改保护输入使检查变绿。
 
-本次三个变更文档的相对文件链接检查无缺失，`git diff --check` 无格式错误。全仓文档 validator 仍返回上述唯一保护输入错误，并报告既有 79 项 historical link issues；不将其表述为全仓检查通过。输入／输出的生产 `task_env` tree 保持 `1f6ab03cde3e9075821cc59a09240637a4c4d535`，两个 submodule pin 不变。只读硬件元数据和文档检查明细位于 ignored `workspace/maintenance/v211_g06_plan_20261115_001/`。
+上一版三个变更文档的相对文件链接检查无缺失，`git diff --check` 无格式错误。全仓文档 validator 仍返回上述唯一保护输入错误，并报告既有 79 项 historical link issues；不将其表述为全仓检查通过。输入／输出的生产 `task_env` tree 保持 `1f6ab03cde3e9075821cc59a09240637a4c4d535`，两个 submodule pin 不变。只读硬件元数据和文档检查明细位于 ignored `workspace/maintenance/v211_g06_plan_20261115_001/`。
+
+本轮讨论修订只修改本文；已确认范围与待确认取舍见第 1 节。未开始实施、安装或 native 验证；文档检查记录位于 ignored `workspace/maintenance/v211_g06_plan_20261115_002/`。
