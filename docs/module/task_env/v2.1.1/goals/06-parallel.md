@@ -2,6 +2,8 @@
 
 规划标识：`V211_G06_PARALLEL`。3 个子阶段；复用既有 batch runtime、vector 调用、parallel render 和 Recorder。由[数据协议](../contracts/lifecycle-and-data.md)规定身份与时序，不为 batch 新建第二套任务生命周期。
 
+2026-11-15维护者补充：后续并行实施采用CUDA，不把CPU physics或CPU多进程方案作为本轮并行交付路线。三家仿真器、GeoPhys static沿革、下游实现参考及共同Task／Robot构建建议见[并行环境调研](../planning/20261115_g06_parallel_research.md)。该调研不代表native batch验收；确切provider／task／source／Controller／固定renderer名单仍在6a冻结。
+
 ## 当前边界与阶段3前维护的衔接
 
 维护者已明确：统一环境路线的并行适配尚未完成，阶段3前重构先完成Pendulum等旧任务的单环境迁移。现存并行注册、factory、脚本及历史证据保留，但不能证明统一路线已适配；`num_env=1`也不构成多环境验证。未适配的并行调用须明确声明或拒绝，不静默降级。
