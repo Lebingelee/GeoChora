@@ -6,7 +6,7 @@ Recorder 旧叶节点格式的只读入口为 `task_env.recorders.load_legacy_le
 
 v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会立即失败。当前 Isaac SDK 默认解释器路径没有公开该依赖；验证使用其 episode-recorder 扩展自带的 `h5py`，实际部署须将兼容的 H5 依赖配置到运行解释器。
 
-当前（2026-11-15）：G01～G05 已各自有界接收，5c 单元 1～9 收口；E00～E16 代码与项目优化已获[维护者有界接收](../maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)。G06a attempt001 的 Pendulum device 路线已实施并有界验证，整体 PARTIAL、待独立复核；G06／G07 及版本整体尚未完成。受测能力、正式入口及限制以[当前摘要](../maintenance/current-state.md)、实际源码和对应证据为准；下面的历史设计／实现记录不把未实现目标升级为 API。
+当前（2026-11-15）：G01～G05 已各自有界接收，5c 单元 1～9 收口；E00～E16 代码与项目优化已获[维护者有界接收](../maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)。G06a attempt001 的 Pendulum device 路线已实施并有界验证，经[独立复核](../maintenance/reviews/20261115_g06a_attempt001_review.md)仍为 PARTIAL，须修复合同并补设备渲染／记录；G06／G07 及版本整体尚未完成。受测能力、正式入口及限制以[当前摘要](../maintenance/current-state.md)、实际源码和对应证据为准；下面的历史设计／实现记录不把未实现目标升级为 API。
 
 ## Pendulum device batch（attempt001，未接收）
 
@@ -14,7 +14,9 @@ v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会�
 
 `reset(seed=...)` 返回任务树与 info；`step({'torque': action})` 的 action 是 CUDA float32 `[B, 1]`，返回任务树、CUDA float32 reward `[B]`、CUDA bool terminated／truncated `[B]` 和 info。结束行在同一 step 自动 reset：reward 与 done 属于旧 episode，返回 observation 属于新 episode；`final_mask` 标识结束行，`final_observation`、`final_episode_id`、`final_episode_step` 仅在有结束行时以行顺序保存旧值。`episode_id` 和 `episode_step` 是返回状态的逐行时钟。`reset(mask=...)` 接受 CUDA bool `[B]`，只重置选中行；native 全局 step／time 不因逐行 reset 倒退。`read_device_state` 返回带 source／generation／revision／native clock 身份的 owned snapshot，可以跨 step 保留。每行独立维护 seed 和随机流，采样范围与既有 Pendulum 相同，但 device 随机算法不保证与 NumPy 产生逐值相同的样本。
 
-此路线不创建相机、render scene 或窗口；现有 Recorder 尚不支持该 device-batch transition。GeoPhys Rasterizer 已验证公开 pose 驱动离屏图像，但其公开读帧是 host float RGB，尚无本目标所需的 CUDA uint8 frame 合同；Isaac 第二来源、PickCube 挂载成像和窗口均未在本窗口验证。不要把这些结果视为 G06a、G06 或其他任务／provider 的接收。
+注意：上述终止字段描述的是001当前实现，压缩done行与已确认方案的固定B轴合同不一致；transition Task infos还会被丢弃，已列入002修复，不能据此冻结公共API。
+
+此路线不创建相机、render scene 或窗口；现有 Recorder 尚不支持该 device-batch transition。诊断脚本另建的 MJWarp native 模型已驱动 Rasterizer world0 离屏图像；这尚未接入正式 batch session／Env，其公开读帧是 host float RGB，尚无本目标所需的 CUDA uint8 frame 合同；Isaac 第二来源、PickCube 挂载成像和窗口均未在本窗口验证。不要把这些结果视为 G06a、G06 或其他任务／provider 的接收。
 
 PickCube 环境通过 `task_env.make_env` 和正式配置构造；调用方需要独立 Solution 时可使用 `task_env.tasks.pick_cube.build_readiness_solution`。旧的 PickCube `build_reference`、`build_isaac_reference` 和 `build_runtime_source` 直接构造入口已退休，历史诊断中的这些调用需迁到正式构建入口。NutAssembly 的独立 `build_runtime_source` 同样已退休；使用正式 `make_env` 和配置构建，独立 Solution 入口保持可用。
 

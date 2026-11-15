@@ -42,3 +42,7 @@ attempt 是实现＋修复＋验证＋返包的完整窗口，不等于一次测
 第一包正文：[G06a attempt001 goal prompt](../maintenance/work-packages/20261115_g06a_attempt001_goal.md)。用户可以将全文转交实施 agent；本会话仅生成文件，不自动派发。实际派发HEAD和prompt SHA保存在同次 ignored package index；如派发前HEAD变化，只允许确认本文的文档提交后继，生产变更必须重新核对，禁止reset工作区。
 
 代码约束以该prompt中的“账本约束→代码归属→审查证据”表执行。总账的历史欠账不重开；但任何新实现重新引入同类问题，均不能通过本包代码接收。
+
+## 5. attempt001 后的现行派发状态
+
+生产输入 `3a277e03` 经[独立复核](../maintenance/reviews/20261115_g06a_attempt001_review.md)保持PARTIAL。首包不是仅缺文档：终止B轴／info、reset提交边界、正式pose publication、Rasterizer CUDA图像、第二来源与device Recorder仍需实现。[attempt002完整prompt](../maintenance/work-packages/20261115_g06a_attempt002_goal.md)已准备，包含有限GeoPhys公开render接口扩展的明确增量范围，须维护者整体派发后生效；本次未启动实施。预计活动6～10小时，上限10小时。
