@@ -28,6 +28,7 @@ _METHODS = frozenset({
     'step', 'step_control_interval', 'apply_mixed_actuator_command',
     'bind_mixed_controller', 'step_mixed_actuator_interval',
     'position_preflight', 'position_apply',
+    'device_pose_description', 'publish_device_poses',
 })
 _PROPERTIES = frozenset({
     'provider_materialization_id', 'episode_id', 'state_revision',
@@ -281,6 +282,8 @@ class RemoteSession:
         self._request_identity, self._sequence, self._closed = request_identity, 0, False
         self._episode_id = None
         self._close_receipt = None
+        self._device_pose_ipc = None
+        self._device_pose_names = None
         try:
             ready = _receive(sock)
             if ready.get('request_identity') != request_identity:
@@ -292,8 +295,11 @@ class RemoteSession:
             self._materialization_id = ready['materialization_id']
             self._methods = frozenset(ready['methods'])
             self._properties = frozenset(ready['properties'])
-        except BaseException:
-            self._terminate()
+        except BaseException as error:
+            try:
+                self._terminate()
+            except BaseException as cleanup_error:
+                error.add_note(f'worker startup cleanup also failed: {cleanup_error!r}')
             raise
 
     def _terminate(self):
@@ -366,9 +372,13 @@ class RemoteSession:
                 return _decode(response.get('result'))
             except (ValueError, TypeError, KeyError) as error:
                 raise TransportProtocolError('invalid worker result') from error
-        except (EOFError, OSError, TimeoutError, TransportProtocolError):
-            self._terminate()
-            self._closed = True
+        except (EOFError, OSError, TimeoutError, TransportProtocolError) as error:
+            try:
+                self._terminate()
+            except BaseException as cleanup_error:
+                error.add_note(f'worker retirement also failed: {cleanup_error!r}')
+            finally:
+                self._closed = True
             raise
 
     @property
@@ -396,34 +406,97 @@ class RemoteSession:
     def step_mixed_actuator_interval(self, command_factory):
         return self._call('step_mixed_actuator_interval', callbacks={'command_factory': command_factory})
 
+    def read_device_state(self, names):
+        """Read owned CUDA body-pose snapshots from the existing worker."""
+        from ..contracts import DeviceBatchState, DeviceStateIdentity
+        from ..transport.cuda_ipc import CudaIpcConnection
+
+        requested = tuple(names)
+        if not requested or len(set(requested)) != len(requested):
+            raise ValueError('device state requires unique named fields')
+        if 'device_pose_description' not in self._methods or 'publish_device_poses' not in self._methods:
+            raise RuntimeError('remote provider does not publish device poses')
+        if self._device_pose_ipc is None:
+            description = self._call('device_pose_description')
+            self._device_pose_names = tuple(description['body_names'])
+            self._device_pose_ipc = CudaIpcConnection(description)
+        if set(requested) - {'body_position', 'body_orientation'}:
+            raise KeyError('remote device state supports named body pose fields only')
+        publication = self._call('publish_device_poses')
+        if tuple(publication['body_names']) != self._device_pose_names:
+            raise RuntimeError('remote device pose names changed within a materialization')
+        self._device_pose_ipc.wait_ready()
+        arrays = {name: self._device_pose_ipc.read(name) for name in requested}
+        self._device_pose_ipc.synchronize()
+        return DeviceBatchState(arrays, 'cuda:0', 1, DeviceStateIdentity(**publication['identity']),
+                                'owned_snapshot')
+
+    @property
+    def device_pose_names(self):
+        if self._device_pose_names is None:
+            raise RuntimeError('read device poses before querying their names')
+        return self._device_pose_names
+
     def __getattr__(self, name):
-        if name in self._methods:
+        if name in vars(self).get('_methods', ()):
             return lambda *args, **kwargs: self._call(name, *args, **kwargs)
-        if name in self._properties:
+        if name in vars(self).get('_properties', ()):
             return self._call(name)
         raise AttributeError(name)
 
     def close(self):
         if self._closed:
+            # A prior close or a transport failure may already have retired
+            # the worker while leaving an import that still needs cleanup.
+            if getattr(self, '_device_pose_ipc', None) is not None:
+                self._device_pose_ipc.close()
+                self._device_pose_ipc = None
             return
         primary = None
+        def record(error, operation):
+            nonlocal primary
+            if primary is None:
+                primary = error
+            else:
+                primary.add_note(f'{operation} also failed: {error!r}')
+
+        if getattr(self, '_device_pose_ipc', None) is not None:
+            try:
+                self._device_pose_ipc.release_imports()
+            except BaseException as error:
+                record(error, 'CUDA pose import cleanup')
         try:
             self._close_receipt = self._call('close')
         except BaseException as error:
-            primary = error
+            record(error, 'worker close')
         finally:
             self._closed = True
-            self._sock.close()
+            try:
+                self._sock.close()
+            except BaseException as error:
+                record(error, 'worker socket cleanup')
             try:
                 self._process.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                self._terminate()
+                try:
+                    self._terminate()
+                except BaseException as error:
+                    record(error, 'worker retirement')
+            except BaseException as error:
+                record(error, 'worker wait')
+                try:
+                    self._terminate()
+                except BaseException as cleanup_error:
+                    record(cleanup_error, 'worker retirement')
             if self._process.returncode:
                 error = RuntimeError(f'runtime worker exited abnormally: {self._process.returncode}')
-                if primary is None:
-                    primary = error
-                else:
-                    primary.add_note(str(error))
+                record(error, 'worker exit')
+            if getattr(self, '_device_pose_ipc', None) is not None:
+                try:
+                    self._device_pose_ipc.close()
+                    self._device_pose_ipc = None
+                except BaseException as error:
+                    record(error, 'CUDA pose IPC cleanup')
         if primary is not None:
             raise primary
 

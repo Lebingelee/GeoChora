@@ -559,6 +559,7 @@ class DeviceBatchTransition:
     truncated: Any
     device: str
     infos: Any = None
+    boundary: DeviceStateIdentity | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "device", str(self.device))

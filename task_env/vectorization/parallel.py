@@ -244,10 +244,12 @@ def make_parallel_env(
         if start_method != 'spawn' or compile_mode != 'fastest':
             raise ValueError('SB3 worker options do not apply to device execution')
         worker_directory = env_kwargs.pop('worker_directory', None)
+        render_mode = env_kwargs.pop('render_mode', None)
         if env_kwargs:
             raise TypeError(f'unsupported device environment options: {sorted(env_kwargs)}')
         spec = make_selected_device_spec(uid=uid, num_env=num_env, env_config=env_config,
-                                         backend=backend, worker_directory=worker_directory)
+                                         backend=backend, worker_directory=worker_directory,
+                                         render_mode=render_mode)
         try:
             return HomogeneousVectorTaskEnv(spec, execution_mode='device')
         except BaseException:

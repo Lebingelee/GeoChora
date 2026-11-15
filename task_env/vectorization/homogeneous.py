@@ -19,12 +19,48 @@ from ..utils.tree import tree_copy, tree_stack, validate_batched_tree
 
 
 def _copy_selected_device_tree(value, mask):
-    """Retain only terminal rows from a device observation tree."""
+    """Retain terminal rows in a fixed batch-shaped owned tree."""
+    import torch
+
     if isinstance(value, Mapping):
         return {key: _copy_selected_device_tree(item, mask) for key, item in value.items()}
     if isinstance(value, tuple):
         return tuple(_copy_selected_device_tree(item, mask) for item in value)
-    return value[mask].clone()
+    result = torch.zeros_like(value)
+    result[mask] = value[mask]
+    return result
+
+
+def _copy_device_info(value):
+    """Retain task evidence before a reset can mutate task-owned buffers."""
+    import torch
+
+    if isinstance(value, Mapping):
+        return {key: _copy_device_info(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(_copy_device_info(item) for item in value)
+    if isinstance(value, list):
+        return [_copy_device_info(item) for item in value]
+    return value.clone() if isinstance(value, torch.Tensor) else value
+
+
+def _scalar_device_tree(value, *, add_batch_axis):
+    """Adapt one device row without copying or owning task lifecycle state."""
+    import torch
+
+    if isinstance(value, Mapping):
+        return {key: _scalar_device_tree(item, add_batch_axis=add_batch_axis)
+                for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(_scalar_device_tree(item, add_batch_axis=add_batch_axis) for item in value)
+    if isinstance(value, list):
+        return [_scalar_device_tree(item, add_batch_axis=add_batch_axis) for item in value]
+    if isinstance(value, torch.Tensor):
+        if add_batch_axis:
+            return value.unsqueeze(0)
+        if value.ndim and value.shape[0] == 1:
+            return value[0]
+    return value
 
 
 class HomogeneousVectorTaskEnv:
@@ -35,27 +71,38 @@ class HomogeneousVectorTaskEnv:
     batch shape validation and terminal-slot guards.
     """
 
-    def __init__(self, task_spec: ParallelTaskSpecProtocol, *, execution_mode='host') -> None:
+    def __init__(self, task_spec: ParallelTaskSpecProtocol, *, execution_mode='host', scalar_device=False) -> None:
         if execution_mode not in {'host', 'device'}:
             raise ValueError('homogeneous execution mode must be host or device')
         self._execution_mode = execution_mode
         self._closed = False
+        self._close_complete = False
         self._task_spec = task_spec
         self.num_envs = int(task_spec.num_envs)
         if self.num_envs < 1:
             raise ValueError("num_envs must be positive")
+        if scalar_device and (execution_mode != 'device' or self.num_envs != 1):
+            raise ValueError('scalar device execution requires one device world')
+        self._scalar_device = bool(scalar_device)
         self.single_action_space = task_spec.single_action_space
         self.single_observation_space = task_spec.single_observation_space
-        self.action_space = self.single_action_space
-        self.observation_space = self.single_observation_space
+        if execution_mode == 'device' and not self._scalar_device:
+            from gymnasium.vector.utils import batch_space
+            self.action_space = batch_space(self.single_action_space, self.num_envs)
+            self.observation_space = batch_space(self.single_observation_space, self.num_envs)
+        else:
+            self.action_space = self.single_action_space
+            self.observation_space = self.single_observation_space
         self.metadata = tree_copy(task_spec.metadata)
+        if self._scalar_device:
+            self.metadata['execution'] = 'device_scalar_worker'
         self._parallel_render_provider = getattr(
             task_spec,
             "parallel_render_provider",
             None,
         )
         self.render_mode = (
-            RenderMode.HUMAN.value
+            task_spec.metadata.get('render_mode', RenderMode.HUMAN.value)
             if self._parallel_render_provider is not None
             else None
         )
@@ -129,8 +176,13 @@ class HomogeneousVectorTaskEnv:
                 raise RuntimeError('vector environment is closed')
             if options:
                 raise ValueError('device reset does not support reset options')
+            if self._scalar_device and mask is not None:
+                raise ValueError('scalar device reset does not accept a batch mask')
             result = self._task_spec.reset_sampled_device(seed=seed, mask=mask)
             self._has_reset = True
+            if self._scalar_device:
+                return (_scalar_device_tree(result.observation, add_batch_axis=False),
+                        _scalar_device_tree(result.infos, add_batch_axis=False))
             return result.observation, result.infos
         if mask is not None:
             mask_value = np.asarray(mask, dtype=np.bool_)
@@ -149,6 +201,10 @@ class HomogeneousVectorTaskEnv:
 
     def step(self, actions: Any):
         if self._execution_mode == 'device':
+            if self._scalar_device:
+                actions = _scalar_device_tree(actions, add_batch_axis=True)
+                result = self._step_device_with_autoreset(actions)
+                return _scalar_device_tree(result, add_batch_axis=False)
             return self._step_device_with_autoreset(actions)
         if not self._has_reset:
             raise RuntimeError("reset() must be called before vector step()")
@@ -200,17 +256,38 @@ class HomogeneousVectorTaskEnv:
         done = torch.logical_or(transition.terminated, transition.truncated)
         selection = self._task_spec.prepare_device_reset_selection(done)
         old_episode = self._task_spec.device_episode_ids
-        infos = {'episode_id': old_episode, 'episode_step': self._task_spec.device_episode_steps,
-                 'final_mask': done.clone()}
+        old_step = self._task_spec.device_episode_steps
+        env_id = torch.arange(self.num_envs, dtype=torch.int64, device=transition.device)
+        task_info = {} if transition.infos is None else transition.infos
+        if not isinstance(task_info, Mapping):
+            raise TypeError('device transition task infos must be a mapping')
+        reserved = {'env_id', 'episode_id', 'episode_step', 'boundary', 'final_observation',
+                    '_final_observation', 'final_mask', 'final_info', '_final_info',
+                    'reset_info', '_reset_info', 'final_episode_id', 'final_episode_step'}
+        if reserved.intersection(task_info):
+            raise ValueError('task infos conflict with lifecycle metadata')
+        valid = done.clone()
+        retained_task_info = _copy_device_info(task_info)
+        final_info = {'env_id': env_id, 'episode_id': old_episode, 'episode_step': old_step,
+                      'boundary': transition.boundary, 'task': retained_task_info}
+        infos = dict(retained_task_info)
+        infos.update({'env_id': env_id, 'episode_id': old_episode, 'episode_step': old_step,
+                      'boundary': transition.boundary,
+                      'final_observation': _copy_selected_device_tree(transition.observation, done),
+                      '_final_observation': valid, 'final_mask': valid,
+                      'final_info': final_info, '_final_info': valid,
+                      'reset_info': {}, '_reset_info': valid,
+                      'final_episode_id': old_episode.clone(), 'final_episode_step': old_step.clone()})
         observation = transition.observation
         if selection.selected_count:
-            infos['final_observation'] = _copy_selected_device_tree(observation, done)
-            infos['final_episode_id'] = old_episode[done].clone()
-            infos['final_episode_step'] = infos['episode_step'][done].clone()
             reset = self._task_spec.reset_sampled_device(mask=done, selection=selection)
             observation = reset.observation
             infos['episode_id'] = reset.infos['episode_id']
             infos['episode_step'] = self._task_spec.device_episode_steps
+            infos['boundary'] = getattr(getattr(reset, 'state', None), 'identity', None)
+            infos['reset_info'] = {'env_id': env_id, 'episode_id': infos['episode_id'],
+                                   'episode_step': infos['episode_step'],
+                                   'boundary': infos['boundary'], 'task': dict(reset.infos)}
         return observation, transition.reward, transition.terminated, transition.truncated, infos
 
     def _validate_action(self, actions: Any) -> None:
@@ -365,9 +442,12 @@ class HomogeneousVectorTaskEnv:
 
     def close(self) -> None:
         if self._execution_mode == 'device':
-            if self._closed:
+            if self._close_complete:
                 return
             self._closed = True
+            self._task_spec.close()
+            self._close_complete = True
+            return
         try:
             self.close_render()
         except BaseException as error:

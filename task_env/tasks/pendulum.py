@@ -316,17 +316,20 @@ class PendulumTaskDefinition(TaskDefinitionBase):
         self._upright_steps = 0
         self._device_upright_steps = None
 
+    def device_reset_spec(self):
+        """Declare per-row random domains and source state fields."""
+        return {'random': {'angle': (), 'angular_velocity': ()},
+                'state_fields': ('qpos', 'qvel')}
+
     def sample_device_reset(self, uniforms, template):
         """Apply the same angle/velocity reset distributions to device uniforms."""
         import torch
 
-        if tuple(uniforms.shape) != (template['qpos'].shape[0], 2):
-            raise ValueError('Pendulum device reset needs two uniforms per row')
         qpos, qvel = torch.zeros_like(template['qpos']), torch.zeros_like(template['qvel'])
         angle_low, angle_high = self._semantics.reset_angle_range
         velocity_low, velocity_high = self._semantics.reset_velocity_range
-        qpos[:, self.qpos_id] = angle_low + uniforms[:, 0] * (angle_high - angle_low)
-        qvel[:, self.qvel_id] = velocity_low + uniforms[:, 1] * (velocity_high - velocity_low)
+        qpos[:, self.qpos_id] = angle_low + uniforms['angle'] * (angle_high - angle_low)
+        qvel[:, self.qvel_id] = velocity_low + uniforms['angular_velocity'] * (velocity_high - velocity_low)
         return {'qpos': qpos, 'qvel': qvel}
 
     def device_observation_space(self):

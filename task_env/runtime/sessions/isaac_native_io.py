@@ -2225,6 +2225,77 @@ class IsaacSimNativeRuntimeIOV1:
             max(0.0, after[1] - self._episode_origin_time),
         )
 
+    def device_pose_description(self):
+        """Describe owned IPC buffers for the declared live rigid-body frames."""
+        if self._closed or self._episode_origin_step is None:
+            raise RuntimeError('Isaac device poses require an active reset episode')
+        if getattr(self, '_device_pose_publisher', None) is None:
+            from isaacsim.core.simulation_manager import SimulationManager
+            from ..transport.cuda_ipc import CudaIpcPublisher
+
+            robots = self._source.scene_definition.robots
+            robot_entities = {robot.entity_id for robot in robots}
+            articulations = tuple(articulation for articulation in self._source.scene_definition.articulations
+                                  if articulation.entity_id in robot_entities)
+            if len(articulations) != 1:
+                raise ValueError('Isaac device pose publication requires one declared articulation')
+            entity = articulations[0].entity_id
+            declared = {frame.frame_id for frame in self._source.scene_definition.frames
+                        if frame.entity_id == entity and frame.frame_kind == 'runtime'}
+            names, paths = tuple(self._articulation.link_names), self._articulation.link_paths
+            if len(paths) != 1 or len(paths[0]) != len(names):
+                raise ValueError('Isaac public link paths differ from the articulation names')
+            mapped = {f'{entity}/{name}': str(path) for name, path in zip(names, paths[0], strict=True)
+                      if name in declared}
+            for semantic in self._source.bodies:
+                ref = self._artifact.legacy_frame_bindings.get(semantic)
+                if ref is None:
+                    raise ValueError(f'Isaac body {semantic!r} lacks a declared Frame')
+                name = f'{ref.entity_id}/{ref.frame_id}'
+                receipt = self._frame_pose_readback_receipts[semantic]
+                path = receipt.get('rigid_body_path')
+                if not path:
+                    raise ValueError(f'Isaac body {semantic!r} lacks a live rigid-body path')
+                if name in mapped and mapped[name] != path:
+                    raise ValueError(f'Isaac Frame {name!r} has conflicting live paths')
+                mapped[name] = path
+            if not mapped:
+                raise ValueError('Isaac source declares no device-readable rigid-body frames')
+            simulation = SimulationManager.get_physics_simulation_view()
+            if simulation is None:
+                raise RuntimeError('Isaac public physics tensor view is unavailable')
+            self._device_pose_views = {name: simulation.create_rigid_body_view(path)
+                                       for name, path in mapped.items()}
+            self._device_pose_names = tuple(mapped)
+            count = len(mapped)
+            self._device_pose_publisher = CudaIpcPublisher(
+                {'body_position': (1, count, 3), 'body_orientation': (1, count, 4)})
+        return {**self._device_pose_publisher.description(), 'body_names': self._device_pose_names,
+                'pose_layout': 'world_body_xyz_wxyz_env_local'}
+
+    def publish_device_poses(self):
+        """Publish one completed public PhysX tensor boundary without CPU pose copies."""
+        import warp as wp
+
+        description = self.device_pose_description()
+        before = self._counter()
+        positions, orientations = [], []
+        for name in self._device_pose_names:
+            value = self._device_pose_views[name].get_transforms()
+            tensor = value if isinstance(value, self._torch.Tensor) else wp.to_torch(value)
+            if tuple(tensor.shape) != (1, 7) or tensor.device.type != 'cuda':
+                raise ValueError(f'Isaac public body tensor for {name!r} is not CUDA (1, 7)')
+            positions.append(tensor[0, :3])
+            orientations.append(tensor[0, [6, 3, 4, 5]])
+        self._device_pose_publisher.publish({
+            'body_position': self._torch.stack(positions).unsqueeze(0).contiguous(),
+            'body_orientation': self._torch.stack(orientations).unsqueeze(0).contiguous(),
+        })
+        after = self._counter()
+        if after != before:
+            raise RuntimeError('Isaac device pose publication advanced physics')
+        return {'body_names': description['body_names'], 'native_step': after[0], 'native_time_s': after[1]}
+
     def write_position_targets(self, target_identity_sha256: str,
                                targets: tuple[tuple[int, str, float], ...]) -> NativePositionWriteAckV1:
         if self._closed:
@@ -3289,10 +3360,21 @@ class IsaacSimNativeRuntimeIOV1:
         import gc
 
         primary = None
+        publisher = getattr(self, '_device_pose_publisher', None)
+        if publisher is not None:
+            try:
+                publisher.close()
+                self._device_pose_publisher = None
+                self._device_pose_views = {}
+            except BaseException as error:
+                primary = error
         try:
             self._close_task_camera_sensor()
         except BaseException as error:
-            primary = error
+            if primary is None:
+                primary = error
+            else:
+                primary.add_note(f'Isaac task camera cleanup also failed: {error!r}')
         task_camera_path, self._task_camera_path = self._task_camera_path, None
         self._task_camera_geometry = None
         if task_camera_path is not None and self._stage is not None:

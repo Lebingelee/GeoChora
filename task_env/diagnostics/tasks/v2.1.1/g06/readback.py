@@ -13,7 +13,20 @@ def _receipt(directory):
     if supervisor['exit_code'] != 0 or supervisor['violation'] or supervisor['forced_retirement']:
         raise ValueError(f'unsuccessful supervised run: {path}')
     lines = (path / 'stdout.log').read_text().splitlines()
-    return path, json.loads(lines[-1])
+    # A native child can finish a partial log line just before the parent
+    # prints its JSON receipt. Accept that prefix, but require a complete JSON
+    # object through the end of the line rather than a substring match.
+    line = lines[-1]
+    for offset, char in enumerate(line):
+        if char != '{':
+            continue
+        try:
+            receipt = json.loads(line[offset:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(receipt, dict):
+            return path, receipt
+    raise ValueError(f'supervised run has no complete JSON receipt: {path}')
 
 
 def readback(ipc, physics, raster, formal, example):
@@ -89,16 +102,448 @@ def readback(ipc, physics, raster, formal, example):
             'example_steps': example_file['steps']}
 
 
+def readback_device_recording(directory):
+    """Compare existing H5 reader output with values returned by the same run."""
+    import h5py
+    from task_env.recorders import inspect_trajectory_h5
+
+    path, receipt = _receipt(directory)
+    if receipt['recorded_env_ids'] != [0, 1] or not receipt['closed']:
+        raise ValueError('selected device recording did not close')
+    camera = receipt.get('camera', False)
+    witness = None
+    if receipt.get('public_boundary_witness'):
+        witness = json.loads((path / 'public_record_contexts.json').read_text())
+    with np.load(path / 'expected_record_values.npz') as expected:
+        checks = [
+            ('trajectory_slot_000_episode_000000.h5', 0, 1, 20, 'initial_0', 'final_0'),
+            ('trajectory_slot_001_episode_000000.h5', 1, 1, 5, 'initial_1', 'old_1'),
+            ('trajectory_slot_001_episode_000001.h5', 1, 2, 16 if camera else 15, 'reset_1', 'last_1'),
+        ]
+        if camera:
+            checks.append(('trajectory_slot_000_episode_000001.h5', 0, 2, 1, 'next_0', 'after_0'))
+        for filename, slot, episode, count, first_key, last_key in checks:
+            summary = inspect_trajectory_h5(path / filename)
+            contexts = summary['boundary_contexts']
+            key = Path(filename).stem
+            if witness is not None and contexts != witness[key]['contexts']:
+                raise ValueError(f'public boundary identity or native clock differs in {filename}')
+            if (summary['transition_count'] != count or len(contexts) != count + 1
+                    or any(c['env_id'] != slot or c['episode_id'] != episode for c in contexts)
+                    or contexts[0]['episode_step'] != 0 or contexts[-1]['episode_step'] != count
+                    or len({c['generation'] for c in contexts}) != 1):
+                raise ValueError(f'identity or clock mismatch in {filename}')
+            with h5py.File(path / filename) as h5:
+                values = np.asarray(h5['obs/state/proprioception'])
+                if witness is not None:
+                    with np.load(path / 'public_record_traces.npz') as public:
+                        if not np.array_equal(values, public[key + '__state']):
+                            raise ValueError(f'public state trace differs from {filename}')
+                        if camera and not np.array_equal(
+                                np.asarray(h5['obs/cameras/base/rgb']).transpose(0, 2, 3, 1),
+                                public[key + '__rgb']):
+                            raise ValueError(f'public camera trace differs from {filename}')
+                    for flag in ('terminated', 'truncated'):
+                        if np.asarray(h5[flag]).tolist() != witness[key][flag]:
+                            raise ValueError(f'public {flag} trace differs from {filename}')
+                if not np.array_equal(values[0], expected[first_key]) or not np.array_equal(values[-1], expected[last_key]):
+                    raise ValueError(f'public state values differ from {filename}')
+                if camera:
+                    rgb_chw = np.asarray(h5['obs/cameras/base/rgb'])
+                    if rgb_chw.dtype != np.uint8 or rgb_chw.shape[1:] != (3, 128, 128):
+                        raise ValueError(f'recorded camera layout differs in {filename}')
+                    rgb = rgb_chw.transpose(0, 2, 3, 1)
+                    if (rgb.dtype != np.uint8
+                            or not np.array_equal(rgb[0], expected[first_key + '_rgb'])
+                            or not np.array_equal(rgb[-1], expected[last_key + '_rgb'])):
+                        raise ValueError(f'public camera pixels differ from {filename}')
+                    if slot == 0 and episode == 1:
+                        if (np.asarray(h5['terminated'])[-1] or not np.asarray(h5['truncated'])[-1]):
+                            raise ValueError('recorded terminal flags differ from the public transition')
+        if np.array_equal(expected['final_0'], expected['next_0']):
+            raise ValueError('terminal and new episode observations were not distinguished')
+        if camera and np.array_equal(expected['final_0_rgb'], expected['next_0_rgb']):
+            raise ValueError('terminal and new episode camera frames were not distinguished')
+    return {'status': 'PASS', 'scope': ('two device rows, staggered episodes and CUDA camera pixels'
+                                        if camera else 'two selected device state rows and staggered episodes; no RGB'),
+            'files': len(checks), 'control_intervals': receipt['control_intervals'],
+            'all_public_boundaries_checked': witness is not None}
+
+
+def readback_observer_fixture(directory, *, mounted=False):
+    """Compare H5 pixels, state, flags and clocks against the same fixture returns."""
+    import h5py
+    from task_env.recorders import inspect_trajectory_h5
+
+    path, receipt = _receipt(directory)
+    if mounted:
+        receipt = receipt['recording_fixture']
+    if (receipt['recorded_env_ids'] != [0, 1] or receipt['control_intervals'] != 20
+            or receipt['fixture_transitions'] != 3 or not receipt['closed']):
+        raise ValueError('observer fixture receipt differs from its declared scope')
+    checks = (
+        (0, 0, 1, ('initial', 'next1', 'final2'), (0, 2, 3), (False, True), (False, True)),
+        (1, 0, 1, ('initial', 'final1'), (0, 1), (True,), (False,)),
+        (1, 1, 2, ('next1', 'next2', 'final3'), (2, 4, 5), (False, False), (False, True)),
+        (0, 1, 2, ('next2', 'next3'), (4, 6), (False,), (False,)),
+    )
+    values_file = 'expected_mounted_values.npz' if mounted else 'expected_observer_values.npz'
+    with np.load(path / values_file) as expected:
+        for slot, file_episode, episode, names, boundaries, terminated, truncated in checks:
+            filename = f'trajectory_slot_{slot:03d}_episode_{file_episode:06d}.h5'
+            summary = inspect_trajectory_h5(path / filename)
+            contexts = summary['boundary_contexts']
+            if (summary['transition_count'] != len(names) - 1 or len(contexts) != len(names)
+                    or [entry['env_id'] for entry in contexts] != [slot] * len(names)
+                    or [entry['episode_id'] for entry in contexts] != [episode] * len(names)
+                    or [entry['episode_step'] for entry in contexts] != list(range(len(names)))
+                    or [entry['native_step'] for entry in contexts] != expected['native_steps'][list(boundaries)].tolist()
+                    or any(entry['generation'] != int(expected['generation']) for entry in contexts)
+                    or not np.allclose([entry['native_time_s'] for entry in contexts],
+                                       expected['native_times'][list(boundaries)], rtol=0., atol=1e-12)):
+                raise ValueError(f'fixture identity or clock differs in {filename}')
+            with h5py.File(path / filename) as h5:
+                rgb_path = 'obs/cameras/hand/rgb' if mounted else 'obs/frames/observer_crop/rgb'
+                state_path = 'obs/state/hand_position' if mounted else 'obs/state/proprioception'
+                rgb = np.asarray(h5[rgb_path]).transpose(0, 2, 3, 1)
+                state = np.asarray(h5[state_path])
+                if (rgb.dtype != np.uint8
+                        or not np.array_equal(rgb, np.stack([expected[f'{name}_rgb'][slot] for name in names]))
+                        or not np.array_equal(state, np.stack([expected[f'{name}_state'][slot] for name in names]))
+                        or np.asarray(h5['terminated']).tolist() != list(terminated)
+                        or np.asarray(h5['truncated']).tolist() != list(truncated)):
+                    raise ValueError(f'fixture pixels, state or done flags differ in {filename}')
+        for slot, index in ((1, 1), (0, 2), (1, 3)):
+            if np.array_equal(expected[f'final{index}_rgb'][slot], expected[f'next{index}_rgb'][slot]):
+                raise ValueError('terminal and next-episode frames are identical')
+    return {'status': 'PASS', 'scope': ('real Isaac hand-camera pixels and controlled lifecycle; scalar physics'
+                                        if mounted else 'real CUDA observer pixels plus controlled lifecycle; not sensor cameras'),
+            'files': len(checks), 'recorded_env_ids': [0, 1], 'fixture_transitions': 3}
+
+
+def readback_formal_frame(directory):
+    """Recompute synthetic source-site FK independently from saved qpos."""
+    import hashlib
+    import xml.etree.ElementTree as ET
+    from task_env.artifacts import SceneDefinition
+
+    path, receipt = _receipt(directory)
+    if (receipt['frame_names'] != ['pendulum-v1/frame_probe'] or receipt['device'] != 'cuda:0'
+            or receipt['native_batch_steps'] != 500 or receipt['world_steps'] != 1500
+            or receipt['control_intervals'] != 20 or receipt['seed'] != 73
+            or receipt['reset_sampler'] != 'device task lifecycle' or not receipt['closed']
+            or receipt['renderer'] != 'geophys-rasterizer' or receipt['repeated_render_advanced_physics']
+            or not receipt['all_false_reset_keeps_fields']
+            or not receipt['masked_reset_keeps_unselected_frames']):
+        raise ValueError('formal frame receipt differs from the bounded source session')
+    original = (path / 'frame-source-input.xml').read_bytes()
+    projected = (path / 'frame-source-projected.xml').read_bytes()
+    scene = SceneDefinition.from_mapping(json.loads((path / 'frame-scene.json').read_text()))
+    root = ET.fromstring(original)
+    site = root.find(".//body[@name='pendulum_link']/site[@name='frame_probe']")
+    if (site is None or site.get('pos') != '.1 0 .3'
+            or root.findall('./asset/*[@file]')
+            or scene.assets[0].source_content_sha256 != hashlib.sha256(original).hexdigest()
+            or receipt['source_id'] != f'scene-definition-v3:{scene.identity_hash}'):
+        raise ValueError('saved source XML or declared Scene identity differs')
+    manifest = {'schema_version': 'source-closure-v1', 'files': [
+        {'path': 'scene.xml', 'size_bytes': len(projected), 'sha256': hashlib.sha256(projected).hexdigest()}]}
+    closure = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(',', ':'),
+                                        allow_nan=False).encode()).hexdigest()
+    if closure != receipt['source_closure_sha256']:
+        raise ValueError('saved projected XML differs from the source closure identity')
+    errors = []
+    with np.load(path / 'formal_frame_values.npz') as values:
+        for prefix in ('initial', 'final', 'masked'):
+            angle = values[f'{prefix}_q'][:, 0].astype(np.float64)
+            xyz = values[f'{prefix}_position'][:, 0].astype(np.float64)
+            wxyz = values[f'{prefix}_quaternion'][:, 0].astype(np.float64)
+            if angle.shape != (3,) or xyz.shape != (3, 3) or wxyz.shape != (3, 4):
+                raise ValueError('formal frame publication has an invalid B or pose shape')
+            expected_xyz = np.column_stack((.1 * np.cos(angle) + .3 * np.sin(angle),
+                                            np.zeros(3), .3 * np.cos(angle) - .1 * np.sin(angle)))
+            cy, sy = np.cos(angle / 2), np.sin(angle / 2)
+            cz, sz = np.cos(np.pi / 8), np.sin(np.pi / 8)
+            expected_wxyz = np.column_stack((cy * cz, sy * sz, sy * cz, cy * sz))
+            error = np.minimum(np.max(np.abs(wxyz - expected_wxyz), axis=1),
+                               np.max(np.abs(wxyz + expected_wxyz), axis=1)).max()
+            errors.extend((float(np.abs(xyz - expected_xyz).max()), float(error)))
+        old = values['previous_q'][:, 0].astype(np.float64)
+        previous_xyz = np.column_stack((.1 * np.cos(old) + .3 * np.sin(old),
+                                        np.zeros(3), .3 * np.cos(old) - .1 * np.sin(old)))
+        stale_error = float(np.abs(values['final_position'][:, 0] - previous_xyz).max())
+        for field in ('q', 'position', 'quaternion'):
+            if (not np.array_equal(values[f'noop_{field}'], values[f'final_{field}'])
+                    or not np.array_equal(values[f'masked_{field}'][[0, 2]],
+                                          values[f'final_{field}'][[0, 2]])):
+                raise ValueError(f'no-op or masked reset changed unselected {field}')
+        if not np.array_equal(values['masked_q'][1], values['initial_q'][1]):
+            raise ValueError('masked reset did not restore the selected joint state')
+        images = (values['initial_image'], values['final_image'])
+        if any(image.shape != (480, 640, 3) or image.dtype != np.uint8 for image in images):
+            raise ValueError('formal source image contract differs')
+        if int(np.count_nonzero(images[0] != images[1])) != receipt['changed_pixel_components']:
+            raise ValueError('formal source changed-pixel count differs')
+        centers = []
+        for image in images:
+            rgb = image.astype(np.float32)
+            blue = ((rgb[:, :, 2] > 1.18 * rgb[:, :, 0])
+                    & (rgb[:, :, 2] > 1.1 * rgb[:, :, 1]) & (rgb[:, :, 0] < 180))
+            row = []
+            for left, right in ((160, 240), (280, 360), (400, 480)):
+                y, x = np.where(blue[:, left:right])
+                if len(x) < 5:
+                    raise ValueError('a declared world is missing its visible source mesh')
+                row.append(float(x.mean() + left))
+            centers.append(row)
+        if (not centers[0][0] < centers[0][1] < centers[0][2]
+                or centers[1][0] <= centers[0][0] + 2
+                or centers[1][1] >= centers[0][1] - 2):
+            raise ValueError('world placement or independent motion differs')
+    if max(errors) > 2e-5 or stale_error < 1e-4:
+        raise ValueError(f'formal frame FK or previous-boundary negative control differs: {errors}, {stale_error}')
+    return {'status': 'PASS', 'scope': 'source-bound batch session with a synthetic declared site',
+            'max_fk_error': max(errors), 'previous_boundary_position_error': stale_error,
+            'initial_mesh_centroids_x': centers[0], 'final_mesh_centroids_x': centers[1]}
+
+
+def _readback_isaac_pose_values(path, receipt):
+    """Compare public CUDA pose snapshots to scalar observations from the same run."""
+    names = receipt['body_names']
+    with np.load(path / 'isaac_pose_values.npz') as values:
+        hand, cube = names.index('panda-v1/hand'), names.index('cube-v1/cube')
+        movement = float(np.linalg.norm(values['final'][0, hand] - values['initial'][0, hand]))
+        errors = []
+        for prefix in ('initial', 'final'):
+            pos = values[prefix][0, cube]
+            quat = values[f'{prefix}_orientation'][0, cube]
+            observed = values[f'{prefix}_cube_observation']
+            errors.extend((float(np.abs(pos - observed[:3]).max()),
+                min(float(np.abs(quat - observed[3:]).max()), float(np.abs(quat + observed[3:]).max()))))
+    if (movement < 1e-4 or abs(movement - receipt['hand_displacement_m']) > 1e-6
+            or max(errors) > 1e-4 or abs(max(errors) - receipt['cube_public_observation_max_error']) > 1e-6):
+        raise ValueError('Isaac device pose differs from the public observation or hand movement')
+    return movement, max(errors)
+
+
+def readback_isaac_window(directory):
+    """Check the scalar Isaac, real window and device-pose evidence independently."""
+    path, receipt = _receipt(directory)
+    window = receipt['window']
+    if (receipt['seed'] != 31 or receipt['device'] != 'cuda:0' or not receipt['closed']
+            or receipt['renderer'] != 'geophys-rasterizer' or receipt['control_intervals'] != 21
+            or receipt['repeated_native_step'] != receipt['initial_native_step']
+            or receipt['final_native_step'] - receipt['initial_native_step'] != 100
+            or not window['display'] or len(window['xorg_window_ids']) != 1
+            or window['sensor_enabled'] or not window['renderer_closed']
+            or window['before_close_step'] != receipt['final_native_step']
+            or window['after_close_step'] != window['before_close_step']
+            or window['after_following_step'] != window['after_close_step'] + 5):
+        raise ValueError('Isaac window or physical clock receipt differs')
+    movement, cube_error = _readback_isaac_pose_values(path, receipt)
+    with np.load(path / 'isaac_device_frames.npz') as values:
+        initial, final = values['initial'], values['final']
+        if (initial.shape != (480, 640, 3) or initial.dtype != np.uint8
+                or final.shape != initial.shape or final.dtype != np.uint8
+                or int(np.count_nonzero(initial != final)) != receipt['changed_pixels']
+                or receipt['changed_pixels'] == 0):
+            raise ValueError('Isaac source device frames differ from the public capture')
+    return {'status': 'PASS', 'scope': 'scalar Isaac with sensor off and a real Xorg window',
+            'hand_displacement_m': movement, 'cube_public_observation_max_error': cube_error,
+            'native_batch_steps': window['after_following_step'] - receipt['initial_native_step'],
+            'world_steps': window['after_following_step'] - receipt['initial_native_step'],
+            'window_closed_without_physics_change': True}
+
+
+def readback_isaac_no_window(directory):
+    """Verify the sensor-off, renderer-off scalar Isaac resource path."""
+    path, receipt = _receipt(directory)
+    if (receipt['seed'] != 31 or receipt['device'] != 'cuda:0' or not receipt['closed']
+            or receipt['sensor_enabled'] or receipt['window_enabled']
+            or not receipt['window_absence_checked'] or receipt['renderer'] is not None
+            or receipt['window'] is not None or receipt['control_intervals'] != 20
+            or receipt['repeated_native_step'] != receipt['initial_native_step']
+            or receipt['final_native_step'] - receipt['initial_native_step'] != 100):
+        raise ValueError('Isaac sensor-off, window-off receipt differs')
+    movement, cube_error = _readback_isaac_pose_values(path, receipt)
+    return {'status': 'PASS', 'scope': 'scalar Isaac with sensor and window off',
+            'hand_displacement_m': movement, 'cube_public_observation_max_error': cube_error,
+            'native_batch_steps': 100, 'world_steps': 100}
+
+
+def readback_isaac_mount(directory, *, sensor=False, window=False):
+    """Check real device mount composition against an independent rotation library."""
+    from scipy.spatial.transform import Rotation
+
+    path, receipt = _receipt(directory)
+    mount = receipt['mount_pose_probe']
+    if (receipt['seed'] != 31 or receipt['device'] != 'cuda:0' or not receipt['closed']
+            or receipt['control_intervals'] != 20 + int(window)
+            or receipt['sensor_enabled'] != sensor or receipt['window_enabled'] != window
+            or receipt['final_native_step'] - receipt['initial_native_step'] != 100
+            or mount['parents'] != ['panda-v1/link0', 'panda-v1/hand']
+            or mount['camera_names'] != ['base', 'hand'] or mount['shape'] != [2, 1, 3, 3]
+            or mount['grid_shape'] != [2, 3, 3, 3]
+            or mount['grid_scope'] != 'one scalar pose repeated for layout; not batch physics'
+            or mount['device'] != 'cuda:0'
+            or (not sensor and not mount['frame_capture'].startswith('NOT_RUN'))):
+        raise ValueError('Isaac mount probe differs from its declared scope')
+    _readback_isaac_pose_values(path, receipt)
+    errors = []
+    names = receipt['body_names']
+    with np.load(path / 'camera_mount_values.npz') as values, np.load(path / 'isaac_pose_values.npz') as published:
+        offset = values['offset'][0].astype(np.float64)
+        if not np.allclose(offset, mount['layout_offset_m'], rtol=0., atol=1e-7):
+            raise ValueError('mount layout offset differs from its receipt')
+        grid_offsets = values['grid_offsets'].astype(np.float64)
+        if not np.array_equal(grid_offsets, [[-.625, -.625, 0.], [.625, -.625, 0.], [-.625, .625, 0.]]):
+            raise ValueError('B=3 grid layout differs from its declared row order')
+        for boundary in ('initial', 'final'):
+            body_positions = values[f'{boundary}_parent_position']
+            body_quaternions = values[f'{boundary}_parent_quaternion']
+            if (not np.array_equal(body_positions, published[boundary])
+                    or not np.array_equal(body_quaternions, published[f'{boundary}_orientation'])):
+                raise ValueError('camera mount parents differ from published device poses')
+            for index, parent in enumerate(mount['parents']):
+                body_index = names.index(parent)
+                q = body_quaternions[0, body_index].astype(np.float64)
+                local_q = values['spec_quaternion'][index].astype(np.float64)
+                parent_rotation = Rotation.from_quat(q[[1, 2, 3, 0]])
+                local_rotation = Rotation.from_quat(local_q[[1, 2, 3, 0]])
+                position = body_positions[0, body_index] + parent_rotation.apply(values['spec_position'][index])
+                rotation = parent_rotation * local_rotation
+                expected = np.stack((position, position + rotation.apply([1., 0., 0.]),
+                                     rotation.apply([0., 0., 1.])))
+                placed = expected.copy()
+                placed[:2] += offset
+                actual = values[f'{boundary}_local'][index, 0]
+                actual_placed = values[f'{boundary}_placed'][index, 0]
+                errors.extend((float(np.abs(actual - expected).max()),
+                               float(np.abs(actual_placed - placed).max())))
+                grid = values[f'{boundary}_grid'][index]
+                for row in range(3):
+                    expected_row = expected.copy()
+                    expected_row[:2] += grid_offsets[row]
+                    errors.append(float(np.abs(grid[row] - expected_row).max()))
+        base_change = float(np.abs(values['final_local'][0] - values['initial_local'][0]).max())
+        hand_change = float(np.linalg.norm(values['final_local'][1, 0, 0] - values['initial_local'][1, 0, 0]))
+    if (max(errors) > 2e-5 or base_change > 1e-5 or hand_change < 1e-4
+            or abs(base_change - mount['base_max_change']) > 1e-6
+            or abs(hand_change - mount['hand_position_change_m']) > 1e-6):
+        raise ValueError(f'camera mount FK, offset, or motion differs: {errors}, {base_change}, {hand_change}')
+    if sensor:
+        if mount['frame_capture'] != 'CUDA sensor frames saved in isaac_sensor_frames.npz':
+            raise ValueError('sensor frame receipt is missing')
+        with np.load(path / 'isaac_sensor_frames.npz') as frames:
+            for name in ('base', 'hand'):
+                first, last = frames[f'{name}_initial'], frames[f'{name}_final']
+                if (first.shape != (3, 128, 128, 3) or first.dtype != np.uint8
+                        or last.shape != first.shape or last.dtype != np.uint8
+                        or np.count_nonzero(first != last) == 0
+                        or any(len(np.unique(row.reshape(-1, 3), axis=0)) < 10 for row in first)):
+                    raise ValueError(f'{name} camera frames lack shape, color or motion')
+            if np.array_equal(frames['base_initial'], frames['hand_initial']):
+                raise ValueError('base and hand views are identical')
+    if window:
+        event = receipt['window']
+        if (not event['display'] or len(event['xorg_window_ids']) != 1 or not event['sensor_enabled']
+                or not event['renderer_closed'] or event['before_close_step'] != event['after_close_step']
+                or event['after_following_step'] != event['after_close_step'] + 5):
+            raise ValueError('sensor-on window lifecycle or physics clock differs')
+    return {'status': 'PASS', 'scope': ('real Isaac poses and mounted CUDA camera frames; scalar physics'
+                                        if sensor else 'real Isaac device poses and CameraSpec mounts; no camera frames'),
+            'max_pose_error': max(errors), 'base_max_change': base_change,
+            'hand_position_change_m': hand_change, 'native_batch_steps': 100 + 5 * int(window),
+            'world_steps': 100 + 5 * int(window), 'window': window}
+
+
+def readback_scalar_camera(directory):
+    """Verify the scalar camera's saved images and supervised lifecycle receipt."""
+    path, receipt = _receipt(directory)
+    if (receipt['shape'] != [128, 128, 3] or receipt['dtype'] != 'torch.uint8'
+            or receipt['device'] != 'cuda:0' or receipt['control_intervals'] != 21
+            or receipt['native_batch_steps'] != 525 or receipt['world_steps'] != 525
+            or not receipt['terminal_snapshot_retained'] or not receipt['closed']):
+        raise ValueError('scalar camera lifecycle receipt differs')
+    with np.load(path / 'scalar_camera_frames.npz') as frames:
+        initial, final, reset = (frames[name] for name in ('initial', 'final', 'reset'))
+        if any(frame.shape != (128, 128, 3) or frame.dtype != np.uint8
+               or np.unique(frame.reshape(-1, 3), axis=0).shape[0] < 10
+               for frame in (initial, final, reset)):
+            raise ValueError('scalar camera output does not contain valid color frames')
+        if np.array_equal(initial, final) or np.array_equal(final, reset):
+            raise ValueError('scalar camera motion or episode boundary is missing')
+    return {'status': 'PASS', 'scope': 'scalar CUDA camera images and owned terminal boundary',
+            'control_intervals': 21, 'native_batch_steps': 525, 'world_steps': 525}
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ipc', required=True)
-    parser.add_argument('--physics', required=True)
-    parser.add_argument('--raster', required=True)
-    parser.add_argument('--formal', required=True)
-    parser.add_argument('--example', required=True)
+    parser.add_argument('--ipc')
+    parser.add_argument('--physics')
+    parser.add_argument('--raster')
+    parser.add_argument('--formal')
+    parser.add_argument('--example')
+    parser.add_argument('--record')
+    parser.add_argument('--observer-fixture')
+    parser.add_argument('--mounted-fixture')
+    parser.add_argument('--frame-session')
+    parser.add_argument('--isaac-window')
+    parser.add_argument('--isaac-no-window')
+    parser.add_argument('--isaac-mount')
+    parser.add_argument('--isaac-sensor')
+    parser.add_argument('--sensor-window', action='store_true')
+    parser.add_argument('--scalar-camera')
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
-    result = readback(args.ipc, args.physics, args.raster, args.formal, args.example)
+    if args.scalar_camera:
+        if any((args.mounted_fixture, args.isaac_sensor, args.isaac_mount, args.isaac_no_window,
+                args.isaac_window, args.frame_session, args.observer_fixture, args.record,
+                args.ipc, args.physics, args.raster, args.formal, args.example, args.sensor_window)):
+            parser.error('--scalar-camera cannot be mixed with other readbacks')
+        result = readback_scalar_camera(args.scalar_camera)
+    elif args.mounted_fixture:
+        if any((args.isaac_sensor, args.isaac_mount, args.isaac_no_window, args.isaac_window,
+                args.frame_session, args.observer_fixture, args.record, args.ipc, args.physics,
+                args.raster, args.formal, args.example)):
+            parser.error('--mounted-fixture cannot be mixed with other readbacks')
+        result = readback_observer_fixture(args.mounted_fixture, mounted=True)
+    elif args.isaac_sensor:
+        if any((args.isaac_mount, args.isaac_no_window, args.isaac_window, args.frame_session,
+                args.observer_fixture, args.record, args.ipc, args.physics, args.raster, args.formal, args.example)):
+            parser.error('--isaac-sensor cannot be mixed with other readbacks')
+        result = readback_isaac_mount(args.isaac_sensor, sensor=True, window=args.sensor_window)
+    elif args.isaac_mount:
+        if any((args.isaac_no_window, args.isaac_window, args.frame_session, args.observer_fixture,
+                args.record, args.ipc, args.physics, args.raster, args.formal, args.example)):
+            parser.error('--isaac-mount cannot be mixed with other readbacks')
+        result = readback_isaac_mount(args.isaac_mount)
+    elif args.isaac_no_window:
+        if any((args.isaac_window, args.frame_session, args.observer_fixture, args.record, args.ipc,
+                args.physics, args.raster, args.formal, args.example)):
+            parser.error('--isaac-no-window cannot be mixed with other readbacks')
+        result = readback_isaac_no_window(args.isaac_no_window)
+    elif args.isaac_window:
+        if any((args.frame_session, args.observer_fixture, args.record, args.ipc, args.physics,
+                args.raster, args.formal, args.example)):
+            parser.error('--isaac-window cannot be mixed with other readbacks')
+        result = readback_isaac_window(args.isaac_window)
+    elif args.frame_session:
+        if any((args.observer_fixture, args.record, args.ipc, args.physics, args.raster, args.formal, args.example)):
+            parser.error('--frame-session cannot be mixed with other readbacks')
+        result = readback_formal_frame(args.frame_session)
+    elif args.observer_fixture:
+        if any((args.record, args.ipc, args.physics, args.raster, args.formal, args.example)):
+            parser.error('--observer-fixture cannot be mixed with other readbacks')
+        result = readback_observer_fixture(args.observer_fixture)
+    elif args.record:
+        if any((args.ipc, args.physics, args.raster, args.formal, args.example)):
+            parser.error('--record cannot be mixed with the original combined readback')
+        result = readback_device_recording(args.record)
+    else:
+        if not all((args.ipc, args.physics, args.raster, args.formal, args.example)):
+            parser.error('provide all original run directories or --record')
+        result = readback(args.ipc, args.physics, args.raster, args.formal, args.example)
     Path(args.output).write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
 

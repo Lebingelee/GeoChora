@@ -209,7 +209,7 @@ def _physics():
             'scope': 'native diagnostic only; not the formal TaskEnv device route'}
 
 
-def _transport_physics(worker_python):
+def _transport_physics(worker_python, *, frame_probe=False):
     """Exercise the actual worker/provider/IPC owners before public admission."""
     import torch
     from task_env.environment.configuration import resolve_task_env_config
@@ -226,7 +226,7 @@ def _transport_physics(worker_python):
     execution.validate_source(scene=source.scene_definition, artifact_sha256=built['artifact'].identity_hash,
         source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
     channels = execution.compiled.binding.channels
-    request = {'device': 'cuda:0', 'source_xml': source.scene_source.xml,
+    request = {'provider': 'mujoco_warp', 'device': 'cuda:0', 'source_xml': source.scene_source.xml,
                'source_joints': dict(source.joints), 'num_envs': 3,
                'physics_dt': built['artifact'].timebase.physics_dt,
                'control_substeps': built['artifact'].timebase.control_substeps,
@@ -234,6 +234,14 @@ def _transport_physics(worker_python):
                              'joint': execution.joint_bindings[
                                  f'{channel.entity_id}/{channel.joint_id}'].to_mapping()}
                             for channel in channels]}
+    if frame_probe:
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(request['source_xml'])
+        body = root.find(".//body[@name='pendulum_link']")
+        ET.SubElement(body, 'site', name='frame_probe', pos='.1 0 .3',
+                      quat='.9238795325112867 0 0 .3826834323650898')
+        request['source_xml'] = ET.tostring(root, encoding='unicode')
+        request['source_frames'] = {'probe/frame': 'frame_probe'}
     worker = RuntimeWorker(worker_python, request, working_directory=os.getcwd())
     connection = None
     try:
@@ -266,6 +274,29 @@ def _transport_physics(worker_python):
                 first = before_v[:, 0].cpu().tolist()
         if not (first[0] < 0 < first[1] < first[2]):
             raise AssertionError(f'native rows do not follow effort signs: {first}')
+        frame_error = None
+        if frame_probe:
+            import math
+            frame_position = connection.read('frame_position')[:, 0]
+            frame_orientation = connection.read('frame_orientation')[:, 0]
+            connection.synchronize()
+            angles = before_q[:, 0]
+            cosine, sine = torch.cos(angles), torch.sin(angles)
+            expected_position = torch.stack((.1 * cosine + .3 * sine,
+                                              torch.zeros_like(angles),
+                                              -.1 * sine + .3 * cosine), dim=1)
+            cy, sy = torch.cos(angles / 2), torch.sin(angles / 2)
+            cz, sz = math.cos(math.pi / 8), math.sin(math.pi / 8)
+            expected_orientation = torch.stack((cy * cz, sy * sz, sy * cz, cy * sz), dim=1)
+            # A quaternion and its negation represent the same rotation.
+            alignment = torch.where((frame_orientation * expected_orientation).sum(dim=1, keepdim=True) < 0,
+                                    -1., 1.)
+            frame_error = max(float((frame_position - expected_position).abs().max().item()),
+                              float((frame_orientation * alignment - expected_orientation).abs().max().item()))
+            if frame_error > 2e-5:
+                raise AssertionError(f'device site frame disagrees with independent FK: {frame_error}; '
+                    f'position={frame_position.cpu().tolist()} expected={expected_position.cpu().tolist()}; '
+                    f'orientation={frame_orientation.cpu().tolist()} expected={expected_orientation.cpu().tolist()}')
         mask = torch.tensor([False, True, False], dtype=torch.bool, device='cuda')
         connection.write('reset_qpos', q)
         connection.write('reset_qvel', v)
@@ -287,7 +318,8 @@ def _transport_physics(worker_python):
         return {'scope': 'worker/provider/IPC diagnostic, not formal TaskEnv', 'batch': 3,
                 'first_qd_rad_s': first, 'masked_reset_rows': [1], 'nonselected_unchanged': True,
                 'control_intervals': 20, 'native_batch_steps': 500, 'world_steps': 1500,
-                'source_id': source.source_id, 'worker_closed': True}
+                'source_id': source.source_id, 'worker_closed': True,
+                'site_frame_fk_max_error': frame_error}
     finally:
         if connection is not None:
             connection.release_imports()
@@ -458,6 +490,15 @@ def _formal_device(worker_python):
                 if (np.max(np.abs(first_q - predicted_q)) > .01
                         or np.max(np.abs(first_v - predicted_v)) > .05):
                     raise AssertionError('first interval disagrees with the independent hinge oracle')
+                poses = env.read_device_state(('body_position', 'body_orientation'))
+                body_names = env.metadata['runtime_resource_summary']['device_transition']['body_names']
+                link = body_names.index('pendulum-v1/pendulum_link')
+                measured_quat = poses.arrays['body_orientation'][:, link].cpu().numpy()
+                expected_quat = np.stack((np.cos(first_q / 2), np.zeros(3),
+                                          np.sin(first_q / 2), np.zeros(3)), axis=1)
+                if (np.max(np.abs(measured_quat - expected_quat)) > 1e-5
+                        or poses.identity != current.identity):
+                    raise AssertionError('public body pose differs from same-boundary hinge FK')
             if tick == 4:
                 before = env.read_device_state(('qpos', 'qvel'))
                 mask = torch.tensor([False, True, False], dtype=torch.bool, device='cuda')
@@ -474,16 +515,16 @@ def _formal_device(worker_python):
             raise AssertionError('staggered horizon did not terminate exactly the expected rows')
         final = info['final_observation']['state']['proprioception']
         preserved = final.clone()
-        if tuple(final.shape) != (2, 3) or info['episode_id'].tolist() != [2, 2, 2]:
+        if tuple(final.shape) != (3, 3) or info['_final_observation'].tolist() != [True, False, True] or info['episode_id'].tolist() != [2, 2, 2]:
             raise AssertionError('same-step reset did not retain final rows and advance episodes')
-        if info['episode_step'].tolist() != [0, 15, 0] or info['final_episode_step'].tolist() != [20, 20]:
+        if info['episode_step'].tolist() != [0, 15, 0] or info['final_episode_step'].tolist() != [20, 15, 20]:
             raise AssertionError('per-row clocks do not match the staggered reset')
         expected_final = np.stack((np.cos(terminal_q), np.sin(terminal_q), terminal_v), axis=1)[[0, 2]]
-        actual_final = final.cpu().numpy().copy()
+        actual_final = final[[0, 2]].cpu().numpy().copy()
         if (np.max(np.abs(actual_final[:, :2] - expected_final[:, :2])) > .01
                 or np.max(np.abs(actual_final[:, 2] - expected_final[:, 2])) > .05):
             raise AssertionError('saved terminal observations do not describe the old transition')
-        if torch.equal(final, observation['state']['proprioception'][[0, 2]]):
+        if torch.equal(final[[0, 2]], observation['state']['proprioception'][[0, 2]]):
             raise AssertionError('done observations did not switch to the new episode')
         env.step(action)
         if not torch.equal(final, preserved):
@@ -495,6 +536,7 @@ def _formal_device(worker_python):
                   'q_tolerance_rad': .01, 'qd_tolerance_rad_s': .05,
                   'truncated': truncated.tolist(), 'episode_id': info['episode_id'].tolist(),
                   'terminal_observation_shape': list(final.shape), 'terminal_snapshot_retained': True,
+                  'body_pose_fk_max_error': float(np.max(np.abs(measured_quat - expected_quat))),
                   'terminal_observation': actual_final.tolist(), 'expected_terminal_observation': expected_final.tolist(),
                   'terminal_previous_q_rad': terminal_q_before.tolist(),
                   'terminal_previous_qd_rad_s': terminal_v_before.tolist(),
@@ -506,6 +548,608 @@ def _formal_device(worker_python):
     env.close()
     result['worker_closed'] = True
     return result
+
+
+def _formal_render(worker_python):
+    """Exercise the public batch route, device poses, and shared Rasterizer."""
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+
+    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+              'episode': {'seed': 73, 'horizon': 200}}
+    env = make_parallel_env('pendulum-v1', env_config=config, num_env=3, backend='cuda',
+                            execution='device', render_mode='rgb_array', worker_directory=os.getcwd())
+    try:
+        env.reset(seed=73)
+        initial_state = env.read_device_state(('qpos', 'body_position', 'body_orientation'))
+        nondefault_stream = torch.cuda.Stream()
+        with torch.cuda.stream(nondefault_stream):
+            first = env.render()
+            repeat = env.render()
+        after_render = env.read_device_state(('qpos', 'body_position', 'body_orientation'))
+        if (str(first.device) != 'cuda:0' or first.dtype != torch.uint8 or
+                tuple(first.shape) != (480, 640, 3) or not torch.equal(first, repeat)):
+            raise AssertionError('device Rasterizer frame dtype, shape, or repeated capture differs')
+        if initial_state.identity != after_render.identity:
+            raise AssertionError('render advanced physics or changed its boundary')
+        action = {'torque': torch.tensor([[-1.5], [.5], [1.5]], device='cuda', dtype=torch.float32)}
+        for _ in range(20):
+            env.step(action)
+        final_state = env.read_device_state(('qpos', 'body_position', 'body_orientation'))
+        final = env.render()
+        if torch.equal(first, final) or final_state.identity.native_step != 500:
+            raise AssertionError('nonzero physics did not change the device render at the correct clock')
+        initial_image = first.cpu().numpy()
+        final_image = final.cpu().numpy()
+        def blue_centroids(image):
+            rgb = image.astype(np.float32)
+            mask = ((rgb[:, :, 2] > 1.18 * rgb[:, :, 0])
+                    & (rgb[:, :, 2] > 1.1 * rgb[:, :, 1]) & (rgb[:, :, 0] < 180))
+            result = []
+            for left, right in ((160, 240), (280, 360), (400, 480)):
+                y, x = np.where(mask[:, left:right])
+                if len(x) < 5:
+                    raise AssertionError('an expected world has no visible blue mesh')
+                result.append([float(x.mean() + left), float(y.mean())])
+            return result
+        before_xy, after_xy = blue_centroids(initial_image), blue_centroids(final_image)
+        if not (before_xy[0][0] < before_xy[1][0] < before_xy[2][0]
+                and after_xy[0][0] > before_xy[0][0] + 2
+                and after_xy[1][0] < before_xy[1][0] - 2):
+            raise AssertionError('world layout or opposing hinge motion is inconsistent')
+        np.savez_compressed('device_frames.npz', initial=initial_image, final=final_image)
+        return {'scope': 'formal device route to shared Rasterizer', 'batch': 3,
+                'device': str(first.device), 'dtype': str(first.dtype), 'shape': list(first.shape),
+                'initial_native_step': initial_state.identity.native_step,
+                'after_repeated_capture_step': after_render.identity.native_step,
+                'final_native_step': final_state.identity.native_step,
+                'initial_q': initial_state.arrays['qpos'][:, 0].cpu().tolist(),
+                'final_q': final_state.arrays['qpos'][:, 0].cpu().tolist(),
+                'initial_mesh_centroids': before_xy, 'final_mesh_centroids': after_xy,
+                'changed_pixels': int(np.count_nonzero(initial_image != final_image)),
+                'native_batch_steps': 500, 'world_steps': 1500, 'closed': True}
+    finally:
+        env.close()
+
+
+def _formal_camera(worker_python):
+    """Capture configured finite-clip cameras through the public device lifecycle."""
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+
+    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+              'episode': {'seed': 73, 'horizon': 200},
+              'render': {'backend': 'rasterizer', 'camera_obs': True,
+                         'cameras': [{'name': 'base', 'width': 128, 'height': 128,
+                                      'rgb_dtype': 'uint8', 'near': .01, 'far': 3.0}]}}
+    env = make_parallel_env('pendulum-v1', env_config=config, num_env=3, backend='cuda',
+                            execution='device', worker_directory=os.getcwd())
+    try:
+        if env.observation_space['cameras']['base']['rgb'].shape != (3, 128, 128, 3):
+            raise AssertionError('camera observation space does not match batch shape')
+        observation, _ = env.reset(seed=73)
+        first = observation['cameras']['base']['rgb'].clone()
+        if first.device.type != 'cuda' or first.dtype != torch.uint8 or tuple(first.shape) != (3, 128, 128, 3):
+            raise AssertionError('camera image is not CUDA uint8 BHWC')
+        action = {'torque': torch.tensor([[-1.5], [.5], [1.5]], device='cuda', dtype=torch.float32)}
+        for _ in range(20):
+            observation, _, _, _, _ = env.step(action)
+        last = observation['cameras']['base']['rgb']
+        state = env.read_device_state(('qpos',))
+        if state.identity.native_step != 500:
+            raise AssertionError('camera capture changed the physics clock')
+        changed = int(torch.count_nonzero(first != last).item())
+        if not changed:
+            raise AssertionError('camera image did not respond to nonzero motion')
+        np.savez_compressed('camera_frames.npz', initial=first.cpu().numpy(), final=last.cpu().numpy())
+        return {'scope': 'public MJWarp device camera and shared finite-clip rasterizer',
+                'shape': list(first.shape), 'dtype': str(first.dtype), 'device': str(first.device),
+                'changed_channels': changed, 'control_intervals': 20,
+                'native_batch_steps': 500, 'world_steps': 1500, 'closed': True}
+    finally:
+        env.close()
+
+
+def _x11_geochora_windows():
+    """Find client windows, excluding the window manager's decoration frames."""
+    import re
+
+    tree = subprocess.check_output(['xwininfo', '-root', '-tree'], text=True)
+    lines = [line.strip() for line in tree.splitlines() if 'GeoChora' in line]
+    clients = {match.group(1) for line in lines
+               if (match := re.match(r'(0x[0-9a-f]+)\s+"GeoChora[^"]*":\s+\("GeoChora"\s+"GeoChora"\)', line))}
+    return clients, lines
+
+
+def _formal_window(worker_python):
+    """Exercise a real display and close its renderer independently of physics."""
+    import torch
+    from task_env import make_parallel_env
+
+    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+              'episode': {'seed': 73, 'horizon': 200}}
+    env = make_parallel_env('pendulum-v1', env_config=config, num_env=3, backend='cuda',
+                            execution='device', render_mode='human', worker_directory=os.getcwd())
+    try:
+        env.reset(seed=73)
+        initial = env.read_device_state(('qpos',)).identity
+        existing_windows, _ = _x11_geochora_windows()
+        if env.render() is not None:
+            raise AssertionError('human presentation returned an image')
+        windows, entries = _x11_geochora_windows()
+        opened_windows = windows - existing_windows
+        if len(opened_windows) != 1:
+            raise AssertionError(f'expected one new Xorg client, got {opened_windows!r}; entries={entries!r}')
+        presented = env.read_device_state(('qpos',)).identity
+        if presented != initial:
+            raise AssertionError('window presentation advanced physics')
+        action = {'torque': torch.tensor([[-1.5], [.5], [1.5]], device='cuda', dtype=torch.float32)}
+        for _ in range(20):
+            env.step(action)
+        env.render()
+        before_close = env.read_device_state(('qpos',)).identity
+        env.close_render()
+        env.close_render()
+        if opened_windows & _x11_geochora_windows()[0]:
+            raise AssertionError('window client remained after renderer close')
+        after_close = env.read_device_state(('qpos',)).identity
+        if before_close != after_close:
+            raise AssertionError('closing the window changed the physical boundary')
+        env.step(action)
+        after_step = env.read_device_state(('qpos',)).identity
+        if after_step.native_step != before_close.native_step + 25:
+            raise AssertionError('physics did not continue after the window closed')
+        return {'display': os.environ.get('DISPLAY'), 'batch': 3, 'control_intervals': 21,
+                'native_batch_steps': 525, 'world_steps': 1575,
+                'initial_native_step': initial.native_step,
+                'before_window_close': before_close.native_step,
+                'after_window_close': after_close.native_step,
+                'after_following_step': after_step.native_step, 'closed': True}
+    finally:
+        env.close()
+
+
+def _record_device(worker_python, *, camera=False):
+    """Record selected rows from the ordinary five-tuple device environment."""
+    from dataclasses import asdict
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+    from task_env.recorders import VectorTransitionRecorder
+
+    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+              'episode': {'seed': 73, 'horizon': 20}}
+    if camera:
+        config['render'] = {'backend': 'rasterizer', 'camera_obs': True,
+                            'cameras': [{'name': 'base', 'width': 128, 'height': 128,
+                                         'rgb_dtype': 'uint8', 'near': .01, 'far': 3.0}]}
+    env = make_parallel_env('pendulum-v1', env_config=config, num_env=3, backend='cuda',
+                            execution='device', worker_directory=os.getcwd())
+    recorder = VectorTransitionRecorder(env, path=os.getcwd(), env_ids=(0, 1))
+    action = {'torque': torch.tensor([[-1.5], [.5], [1.5]], device='cuda', dtype=torch.float32)}
+    expected = {}
+    witnesses = {}
+
+    def capture(slot, observation, info, *, flags=None):
+        episode = int(info['episode_id'][slot].item())
+        name = f'trajectory_slot_{slot:03d}_episode_{episode - 1:06d}'
+        trace = witnesses.setdefault(name, {'contexts': [], 'states': [], 'images': [],
+                                            'terminated': [], 'truncated': []})
+        trace['contexts'].append({'schema_version': 'device-batch-boundary-v1',
+                                  'env_id': int(info['env_id'][slot].item()),
+                                  'episode_id': episode,
+                                  'episode_step': int(info['episode_step'][slot].item()),
+                                  **asdict(info['boundary'])})
+        trace['states'].append(observation['state']['proprioception'][slot].cpu().numpy().copy())
+        if camera:
+            trace['images'].append(observation['cameras']['base']['rgb'][slot].cpu().numpy().copy())
+        if flags is not None:
+            trace['terminated'].append(bool(flags[0]))
+            trace['truncated'].append(bool(flags[1]))
+
+    def capture_step(observation, terminated, truncated, info):
+        for slot in (0, 1):
+            flags = (terminated[slot].item(), truncated[slot].item())
+            ended = any(flags)
+            capture(slot, info['final_observation'] if ended else observation,
+                    info['final_info'] if ended else info, flags=flags)
+            if ended:
+                capture(slot, observation, info['reset_info'])
+
+    try:
+        obs, info = recorder.reset(seed=73)
+        for slot in (0, 1):
+            capture(slot, obs, info)
+        expected['initial_0'] = obs['state']['proprioception'][0].cpu().numpy().copy()
+        expected['initial_1'] = obs['state']['proprioception'][1].cpu().numpy().copy()
+        if camera:
+            for slot in (0, 1):
+                expected[f'initial_{slot}_rgb'] = obs['cameras']['base']['rgb'][slot].cpu().numpy().copy()
+        for tick in range(20):
+            if tick == 5:
+                obs, info = recorder.reset(mask=torch.tensor([False, True, False], device='cuda'))
+                capture(1, obs, info)
+                expected['reset_1'] = obs['state']['proprioception'][1].cpu().numpy().copy()
+                if camera:
+                    expected['reset_1_rgb'] = obs['cameras']['base']['rgb'][1].cpu().numpy().copy()
+            obs, reward, terminated, truncated, info = recorder.step(action)
+            capture_step(obs, terminated, truncated, info)
+            if tick == 4:
+                expected['old_1'] = obs['state']['proprioception'][1].cpu().numpy().copy()
+                if camera:
+                    expected['old_1_rgb'] = obs['cameras']['base']['rgb'][1].cpu().numpy().copy()
+            if tick == 19:
+                if info['_final_observation'].tolist() != [True, False, True]:
+                    raise AssertionError('staggered terminal mask differs')
+                expected['final_0'] = info['final_observation']['state']['proprioception'][0].cpu().numpy().copy()
+                expected['next_0'] = obs['state']['proprioception'][0].cpu().numpy().copy()
+                expected['last_1'] = obs['state']['proprioception'][1].cpu().numpy().copy()
+                if camera:
+                    expected['final_0_rgb'] = info['final_observation']['cameras']['base']['rgb'][0].cpu().numpy().copy()
+                    expected['next_0_rgb'] = obs['cameras']['base']['rgb'][0].cpu().numpy().copy()
+                    expected['last_1_rgb'] = obs['cameras']['base']['rgb'][1].cpu().numpy().copy()
+        if camera:
+            obs, _, terminated, truncated, info = recorder.step(action)
+            capture_step(obs, terminated, truncated, info)
+            expected['after_0'] = obs['state']['proprioception'][0].cpu().numpy().copy()
+            expected['after_0_rgb'] = obs['cameras']['base']['rgb'][0].cpu().numpy().copy()
+            expected['last_1'] = obs['state']['proprioception'][1].cpu().numpy().copy()
+            expected['last_1_rgb'] = obs['cameras']['base']['rgb'][1].cpu().numpy().copy()
+        np.savez('expected_record_values.npz', **expected)
+        traces = {}
+        contexts = {}
+        for name, trace in witnesses.items():
+            traces[name + '__state'] = np.stack(trace['states'])
+            if camera:
+                traces[name + '__rgb'] = np.stack(trace['images'])
+            contexts[name] = {key: trace[key] for key in ('contexts', 'terminated', 'truncated')}
+        np.savez_compressed('public_record_traces.npz', **traces)
+        Path('public_record_contexts.json').write_text(json.dumps(contexts, indent=2) + '\n')
+    finally:
+        recorder.close()
+    files = [path.name for path in recorder.saved_paths]
+    if len(files) != (4 if camera else 3):
+        raise AssertionError(f'unexpected staggered episode files: {files!r}')
+    return {'scope': 'public device state and camera recording' if camera else 'public device state recording, no camera',
+            'camera': camera, 'batch': 3,
+            'recorded_env_ids': [0, 1], 'files': files, 'public_boundary_witness': True,
+            'control_intervals': 21 if camera else 20,
+            'native_batch_steps': 525 if camera else 500, 'world_steps': 1575 if camera else 1500,
+            'closed': True}
+
+
+def _isaac_device(worker_python, *, render=False, window=False, mount=False, sensor=False, record=False):
+    """Use the existing scalar Isaac session as a second device-pose source."""
+    import numpy as np
+    import torch
+    from task_env import make_env
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    if window and not render:
+        raise ValueError('a window requires the shared renderer')
+    if record and not sensor:
+        raise ValueError('mounted recording requires the sensor')
+
+    initial_window_ids = _x11_geochora_windows()[0] if os.environ.get('DISPLAY') else None
+    config = {'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
+                            'physics_device': 'cuda:0', 'interpreter': worker_python},
+              'episode': {'seed': 31, 'horizon': 200}}
+    env = make_env('pick-cube-p16-reference-v1', config=config)
+    render_owner = visual_binding = visual_source = None
+    primary = None
+    try:
+        obs, info = env.reset(seed=31)
+        if 'cameras' in obs:
+            raise AssertionError('sensor-off probe unexpectedly enabled task cameras')
+        solution = build_readiness_solution(backend='cuda')
+        solution.reset(obs, info, env.metadata)
+        first = env.session.read_device_state(('body_position', 'body_orientation'))
+        names = env.session.device_pose_names
+        if 'panda-v1/hand' not in names or 'panda-v1/link0' not in names:
+            raise AssertionError(f'Isaac source did not publish base and hand: {names!r}')
+        if first.device != 'cuda:0' or first.arrays['body_position'].shape != (1, len(names), 3):
+            raise AssertionError('Isaac public body poses have wrong device or shape')
+        cube_index = names.index('cube-v1/cube')
+        initial_cube_observation = np.asarray(obs['privileged_state']['cube_v1_body_pose'][0]).copy()
+        if mount or sensor:
+            from mount_fixture import capture, prepare, save
+            specs, sensors, offset, grid_offsets = prepare(names)
+            initial_mount = capture(sensors, offset, grid_offsets, first)
+        if render or sensor:
+            from task_env.environment.configuration import resolve_task_env_config
+            from task_env.registry import ENV_REGISTRY
+            from task_env.render.providers.parallel import ParallelRenderProvider
+            from task_env.render.rasterizer.device import DeviceBatchRasterSource
+
+            cls = ENV_REGISTRY.get('pick-cube-p16-reference-v1')
+            visual_config = resolve_task_env_config(cls, {'execution': {'physics_provider': 'mujoco',
+                'physics_backend': 'cpu', 'physics_device': 'cpu'}, 'episode': {'horizon': 200}})
+            visual_binding = cls._build_selected_binding(visual_config)
+            built = visual_binding.build_for_request('mujoco', 'cpu', 31, 200)
+            visual_source = built['source']
+            def robot_articulation(scene):
+                entities = {robot.entity_id for robot in scene.robots}
+                matches = [item.to_mapping() for item in scene.articulations if item.entity_id in entities]
+                if len(matches) != 1:
+                    raise ValueError('expected one declared visual robot articulation')
+                return matches[0]
+            if robot_articulation(visual_source.scene_definition) != robot_articulation(env.value['source'].scene_definition):
+                raise ValueError('visual and physical Robot declarations differ')
+            runtime = env.session
+            if sensor:
+                from task_env.runtime.contracts import DeviceBatchState
+                class RepeatedScalarPose:
+                    """Present one real scalar Isaac snapshot in three visual layout cells."""
+                    def read_device_state(self, fields):
+                        state = env.session.read_device_state(fields)
+                        return DeviceBatchState(
+                            {name: value.expand(3, *value.shape[1:]).clone()
+                             for name, value in state.arrays.items()},
+                            state.device, 3, state.identity, 'owned_snapshot')
+                runtime = RepeatedScalarPose()
+            render_source = DeviceBatchRasterSource(runtime=runtime, source=visual_source,
+                                                     body_names=names, cameras=specs if sensor else ())
+            render_owner = ParallelRenderProvider(num_envs=3 if sensor else 1, render_source=render_source,
+                                                  width=640, height=480)
+            if sensor:
+                render_owner.enable_device_cameras()
+                initial_sensor = render_owner.capture_cameras(state=first)
+                for camera in specs:
+                    frame = initial_sensor[camera.name]['rgb']
+                    if (frame.dtype != torch.uint8 or str(frame.device) != 'cuda:0'
+                            or tuple(frame.shape) != (3, 128, 128, 3)):
+                        raise AssertionError('mounted camera returned an invalid device image')
+                if torch.equal(initial_sensor['base']['rgb'], initial_sensor['hand']['rgb']):
+                    raise AssertionError('base and hand cameras returned identical views')
+                if record:
+                    hand_index = names.index('panda-v1/hand')
+                    record_frames = [initial_sensor['hand']['rgb'].clone()]
+                    record_states = [first.arrays['body_position'][:, hand_index].expand(3, 3).clone()]
+                    record_identities = [first.identity]
+            if render:
+                initial_frame = render_owner.render(mode='rgb_array')
+                if (initial_frame.dtype != torch.uint8 or str(initial_frame.device) != 'cuda:0'
+                        or tuple(initial_frame.shape) != (480, 640, 3)):
+                    raise AssertionError('Isaac Rasterizer output has the wrong device frame contract')
+            if window:
+                import time
+                existing_windows, _ = _x11_geochora_windows()
+                if render_owner.render(mode='human') is not None:
+                    raise AssertionError('human renderer unexpectedly returned an image')
+                deadline = time.monotonic() + 3.0
+                while True:
+                    windows, entries = _x11_geochora_windows()
+                    opened_windows = windows - existing_windows
+                    if opened_windows or time.monotonic() >= deadline:
+                        break
+                    time.sleep(.1)
+                if len(opened_windows) != 1:
+                    raise AssertionError(f'expected one new Xorg client, got {opened_windows!r}; entries={entries!r}')
+                if env.session.read_device_state(('body_position',)).identity != first.identity:
+                    raise AssertionError('opening the window advanced Isaac physics')
+        retained = first.arrays['body_position'].clone()
+        repeat = env.session.read_device_state(('body_position', 'body_orientation'))
+        if repeat.identity.native_step != first.identity.native_step:
+            raise AssertionError('reading Isaac device poses advanced physics')
+        completed = 0
+        for _ in range(20):
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+            completed += 1
+            if record and completed in (3, 6, 9, 12, 16, 20):
+                boundary = env.session.read_device_state(('body_position', 'body_orientation'))
+                camera_frame = render_owner.capture_cameras(state=boundary)['hand']['rgb']
+                record_frames.append(camera_frame.clone())
+                record_states.append(boundary.arrays['body_position'][:, hand_index].expand(3, 3).clone())
+                record_identities.append(boundary.identity)
+            if terminated or truncated or solution.done or solution.failed:
+                break
+        last = env.session.read_device_state(('body_position', 'body_orientation'))
+        final_cube_observation = np.asarray(obs['privileged_state']['cube_v1_body_pose'][0]).copy()
+        hand = names.index('panda-v1/hand')
+        movement = float(torch.linalg.vector_norm(
+            last.arrays['body_position'][0, hand] - first.arrays['body_position'][0, hand]).item())
+        if completed != 20 or movement < 1e-4 or not torch.equal(first.arrays['body_position'], retained):
+            raise AssertionError(f'Isaac hand motion, step count or owned snapshot differs: {movement}, {completed}')
+        def cube_error(public_state, observed):
+            position = public_state.arrays['body_position'][0, cube_index].cpu().numpy()
+            quaternion = public_state.arrays['body_orientation'][0, cube_index].cpu().numpy()
+            return max(float(np.abs(position - observed[:3]).max()),
+                       min(float(np.abs(quaternion - observed[3:]).max()),
+                           float(np.abs(quaternion + observed[3:]).max())))
+        cube_pose_error = max(cube_error(first, initial_cube_observation),
+                              cube_error(last, final_cube_observation))
+        if cube_pose_error > 1e-4:
+            raise AssertionError(f'Isaac device cube pose differs from public observation: {cube_pose_error}')
+        mount_result = None
+        if mount or sensor:
+            final_mount = capture(sensors, offset, grid_offsets, last)
+            if env.session.read_device_state(('body_position',)).identity != last.identity:
+                raise AssertionError('camera mount resolution advanced Isaac physics')
+            mount_result = save(specs, offset, grid_offsets, first, last, initial_mount, final_mount)
+        sensor_result = None
+        if sensor:
+            final_sensor = render_owner.capture_cameras(state=last)
+            arrays = {}
+            for camera in specs:
+                before = initial_sensor[camera.name]['rgb']
+                after = final_sensor[camera.name]['rgb']
+                change = int(torch.count_nonzero(before != after).item())
+                if change == 0:
+                    raise AssertionError(f'{camera.name} mounted camera did not reflect motion')
+                arrays[f'{camera.name}_initial'] = before.cpu().numpy()
+                arrays[f'{camera.name}_final'] = after.cpu().numpy()
+            np.savez_compressed('isaac_sensor_frames.npz', **arrays)
+            if env.session.read_device_state(('body_position',)).identity != last.identity:
+                raise AssertionError('sensor capture advanced Isaac physics')
+            sensor_result = {'cameras': [camera.name for camera in specs], 'shape': [3, 128, 128, 3],
+                             'device': 'cuda:0', 'layout': 'one real scalar pose repeated into three visual cells'}
+            mount_result['frame_capture'] = 'CUDA sensor frames saved in isaac_sensor_frames.npz'
+        recording_result = None
+        if record:
+            from recording_fixture import record_frames as record_mounted_frames
+            recording_result = record_mounted_frames(record_frames, record_states, record_identities, mounted=True)
+        changed_pixels = None
+        window_result = None
+        if render:
+            final_frame = render_owner.render(mode='rgb_array')
+            initial_image, final_image = initial_frame.cpu().numpy(), final_frame.cpu().numpy()
+            changed_pixels = int(np.count_nonzero(initial_image != final_image))
+            if changed_pixels == 0:
+                raise AssertionError('Isaac nonzero motion did not change the Rasterizer frame')
+            np.savez_compressed('isaac_device_frames.npz', initial=initial_image, final=final_image)
+            if window:
+                render_owner.render(mode='human')
+                after_present = env.session.read_device_state(('body_position',)).identity
+                if after_present != last.identity:
+                    raise AssertionError('window presentation advanced Isaac physics')
+                render_owner.close_render()
+                render_owner.close_render()
+                if opened_windows & _x11_geochora_windows()[0]:
+                    raise AssertionError('the Xorg window remained after renderer close')
+                after_close = env.session.read_device_state(('body_position',)).identity
+                if after_close != last.identity:
+                    raise AssertionError('closing the renderer changed the Isaac boundary')
+                if sensor:
+                    after_window = render_owner.capture_cameras(state=last)
+                    if any(not torch.equal(after_window[camera.name]['rgb'], final_sensor[camera.name]['rgb'])
+                           for camera in specs):
+                        raise AssertionError('closing window changed the sensor frame at the same boundary')
+                action = solution.act(obs, info)
+                obs, reward, terminated, truncated, info = env.step(action)
+                solution.observe(obs, reward, terminated, truncated, info)
+                continued = env.session.read_device_state(('body_position',)).identity
+                substeps = env.value['artifact'].timebase.control_substeps
+                if continued.native_step != last.identity.native_step + substeps:
+                    raise AssertionError('Isaac physics did not continue after renderer close')
+                window_result = {'display': os.environ.get('DISPLAY'), 'xorg_window_ids': sorted(opened_windows),
+                    'sensor_enabled': sensor, 'before_close_step': last.identity.native_step,
+                    'after_close_step': after_close.native_step,
+                    'after_following_step': continued.native_step, 'renderer_closed': True}
+        np.savez('isaac_pose_values.npz', initial=first.arrays['body_position'].cpu().numpy(),
+                 final=last.arrays['body_position'].cpu().numpy(),
+                 initial_orientation=first.arrays['body_orientation'].cpu().numpy(),
+                 final_orientation=last.arrays['body_orientation'].cpu().numpy(),
+                 initial_cube_observation=initial_cube_observation,
+                 final_cube_observation=final_cube_observation)
+        if (not window and initial_window_ids is not None
+                and _x11_geochora_windows()[0] - initial_window_ids):
+            raise AssertionError('window-off probe created a GeoChora window')
+        return {'scope': 'existing scalar Isaac source and public CUDA pose; not parallel task qualification',
+                'seed': 31, 'device': first.device, 'body_names': list(names),
+                'initial_native_step': first.identity.native_step,
+                'repeated_native_step': repeat.identity.native_step,
+                'final_native_step': last.identity.native_step, 'hand_displacement_m': movement,
+                'cube_public_observation_max_error': cube_pose_error,
+                'renderer': 'geophys-rasterizer' if render or sensor else None, 'changed_pixels': changed_pixels,
+                'sensor_enabled': sensor, 'window_enabled': window, 'sensor': sensor_result,
+                'recording_fixture': recording_result,
+                'window_absence_checked': not window and initial_window_ids is not None,
+                'mount_pose_probe': mount_result,
+                'control_intervals': completed + int(window), 'window': window_result, 'closed': True}
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        cleanup = None
+        for owner in (render_owner, env):
+            if owner is None:
+                continue
+            try:
+                owner.close()
+            except BaseException as error:
+                if cleanup is None:
+                    cleanup = error
+                else:
+                    cleanup.add_note(f'additional owner cleanup failed: {error!r}')
+        if visual_binding is not None:
+            from task_env.runtime.sessions.source import close_source_and_task_resources
+            cleanup = close_source_and_task_resources(visual_source, visual_binding, error=cleanup)
+        if cleanup is not None:
+            if primary is not None:
+                primary.add_note(f'Isaac diagnostic cleanup failed: {cleanup!r}')
+            else:
+                raise cleanup
+
+
+def _clip_cuda():
+    """Run the existing independent mesh clipping oracle directly on CUDA."""
+    import importlib.util
+    import io
+    import taichi as ti
+
+    path = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering/raster_clip_interval_cpu_smoke.py'
+    spec = importlib.util.spec_from_file_location('raster_clip_interval_oracle', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    initialize = ti.init
+    def initialize_cuda(*args, **kwargs):
+        return initialize(arch=ti.cuda, device_memory_GB=.5, offline_cache=False)
+    ti.init = initialize_cuda
+    output = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(output):
+            module.main()
+    finally:
+        ti.init = initialize
+        ti.reset()
+    result = json.loads(output.getvalue().splitlines()[-1])
+    result.update(scope='direct CUDA clipping oracle only; separate from engine admission',
+                  oracle_path=str(path))
+    return result
+
+
+def _scalar_camera_schema(worker_python):
+    """Check scalar CUDA camera observations through the public task lifecycle."""
+    import numpy as np
+    import torch
+    from task_env import make_env
+
+    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+              'episode': {'seed': 73, 'horizon': 20},
+              'render': {'backend': 'rasterizer', 'camera_obs': True,
+                         'cameras': [{'name': 'base', 'width': 128, 'height': 128,
+                                      'rgb_dtype': 'uint8', 'near': .01, 'far': 3.0}]}}
+    env = make_env('pendulum-v1', config=config, execution='device', worker_directory=os.getcwd())
+    try:
+        spaces = env.observation_space.spaces
+        if 'cameras' not in spaces:
+            raise AssertionError('configured scalar observation space has no cameras group')
+        image = spaces['cameras']['base']['rgb']
+        if tuple(image.shape) != (128, 128, 3) or str(image.dtype) != 'uint8':
+            raise AssertionError('configured scalar camera has an incorrect RGB space')
+        observation, _ = env.reset(seed=73)
+        initial = observation['cameras']['base']['rgb'].clone()
+        if initial.device.type != 'cuda' or initial.dtype != torch.uint8 or tuple(initial.shape) != (128, 128, 3):
+            raise AssertionError('scalar camera is not CUDA uint8 HWC')
+        action = {'torque': torch.tensor([.5], device='cuda', dtype=torch.float32)}
+        for _ in range(20):
+            observation, reward, terminated, truncated, info = env.step(action)
+        if (reward.shape != () or terminated.shape != () or truncated.shape != ()
+                or reward.dtype != torch.float32 or terminated.dtype != torch.bool or truncated.dtype != torch.bool
+                or any(value.device.type != 'cuda' for value in (reward, terminated, truncated))
+                or info['_final_observation'].shape != () or info['_final_observation'].dtype != torch.bool
+                or not bool(truncated) or not bool(info['_final_observation'])):
+            raise AssertionError('scalar reward, flags or terminal mask differs')
+        final = info['final_observation']['cameras']['base']['rgb']
+        reset = observation['cameras']['base']['rgb']
+        if torch.equal(final, reset):
+            raise AssertionError('scalar final image and new episode image are identical')
+        retained = final.clone()
+        env.step(action)
+        if not torch.equal(final, retained) or env.read_device_state(('qpos',)).identity.native_step != 525:
+            raise AssertionError('scalar terminal image ownership or native clock differs')
+        np.savez_compressed('scalar_camera_frames.npz', initial=initial.cpu().numpy(),
+                            final=final.cpu().numpy(), reset=reset.cpu().numpy())
+        return {'scope': 'public scalar device task camera; same one-world lifecycle',
+                'shape': list(initial.shape), 'dtype': str(initial.dtype), 'device': str(initial.device),
+                'control_intervals': 21, 'native_batch_steps': 525, 'world_steps': 525,
+                'terminal_snapshot_retained': True, 'closed': True}
+    finally:
+        env.close()
 
 
 def _scalar_compat():
@@ -800,12 +1444,87 @@ def _run(worker_python, output, case):
         example = Path(__file__).resolve().parents[5] / 'examples/parallel/pendulum_device.py'
         command = [sys.executable, '-u', str(example), '--interpreter', worker_python,
                    '--output', str(output / 'result.json')]
+    elif case in ('framebuffer-device', 'geophys-camera'):
+        filename = ('test_framebuffer_device_rgb.py' if case == 'framebuffer-device'
+                    else 'test_raster_task_camera_binding.py')
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering' / filename
+        command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'transport-regression':
+        test = Path(__file__).resolve().parents[5] / 'task_env/diagnostics/tasks/test_v211_g03_3a_transport.py'
+        command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'core-semantics':
+        test = Path(__file__).resolve().parent / 'test_device_semantics.py'
+        command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'geophys-aot-core':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering/test_raster_lighting_component.py'
+        command = [sys.executable, '-m', 'pytest', '-q', str(test) + '::test_raster_lighting_component[constant]']
+    elif case == 'geophys-merge-regression':
+        root = Path(__file__).resolve().parents[5] / 'GeoPhys'
+        tests = ['test/verification/rigid/test_rigid_state_host_io.py',
+                 'test/verification/agent/test_agent_contracts.py',
+                 'test/verification/rendering/test_raster_task_camera_binding.py']
+        command = [sys.executable, '-m', 'pytest', '-q', *(str(root / name) for name in tests)]
+    elif case == 'geophys-merge-clip':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering/raster_clip_interval_cpu_smoke.py'
+        command = [sys.executable, str(test)]
+    elif case == 'geophys-merge-focused':
+        root = Path(__file__).resolve().parents[5] / 'GeoPhys'
+        tests = ['test/verification/rigid/test_rigid_state_host_io.py',
+                 'test/verification/rendering/test_raster_task_camera_binding.py',
+                 'test/verification/agent/test_agent_contracts.py::test_control_exports_robot_arm_owner_and_keeps_driver_abi_exact']
+        command = [sys.executable, '-m', 'pytest', '-q', *(str(root / name) for name in tests)]
+    elif case == 'geophys-merge-lighting':
+        root = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering'
+        command = [sys.executable, '-m', 'pytest', '-q', str(root / 'test_raster_lighting_component.py'),
+                   str(root / 'test_punctual_shadow_batches.py'), str(root / 'test_builtin_area_lights.py')]
+    elif case == 'geophys-merge-mjcf-light':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering/mjcf_light_cpu_smoke.py'
+        command = [sys.executable, str(test)]
+    elif case == 'geophys-merge-rigid':
+        root = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid'
+        command = [sys.executable, '-m', 'pytest', '-q', str(root / 'test_rigid_actuator_force_limits.py'),
+                   str(root / 'test_rigid_state_snapshot_restore.py')]
+    elif case == 'geophys-merge-robot':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/robot_arm_control_runtime_smoke.py'
+        command = [sys.executable, str(test)]
+    elif case == 'core-regression':
+        root = Path(__file__).resolve().parents[5]
+        tests = [
+            'task_env/diagnostics/tasks/v2.1.1/g06/test_device_semantics.py',
+            'task_env/diagnostics/tasks/v2.1.1/test_component_source_declarations.py',
+            'task_env/diagnostics/tasks/v2.1.1/test_renderer_capabilities.py',
+            'task_env/diagnostics/tasks/v2.1.1/test_recording_observation_metadata.py',
+            'task_env/diagnostics/tasks/v2.1.1/test_recording_preflight.py',
+            'task_env/diagnostics/tasks/v2.1.1/test_physical_recording_readback.py',
+            'task_env/diagnostics/tasks/test_v211_render_fault_cleanup.py',
+            'task_env/diagnostics/tasks/test_v211_render_binding.py',
+            'task_env/diagnostics/tasks/test_v211_g03_3a_transport.py',
+            'task_env/diagnostics/tasks/test_v211_physical_recording.py',
+            'task_env/diagnostics/tasks/test_phase_ii_c05a_structured_recording.py',
+        ]
+        command = [sys.executable, '-m', 'pytest', '-q', *(str(root / name) for name in tests)]
     elif case == 'physics':
         command = [worker_python, '-u', __file__, '--physics']
     else:
         role = {'ipc': '--parent', 'raster': '--raster', 'transport-physics': '--transport-physics',
                 'session-physics': '--session-physics', 'formal-device': '--formal-device',
-                'scalar': '--scalar'}[case]
+                'transport-frames': '--transport-frames',
+                'formal-render': '--formal-render',
+                'formal-camera': '--formal-camera',
+                'formal-frames': '--formal-frames',
+                'formal-window': '--formal-window',
+                'record-device': '--record-device',
+                'record-camera': '--record-camera',
+                'record-render-fixture': '--record-render-fixture',
+                'clip-cuda': '--clip-cuda',
+                'isaac-device': '--isaac-device',
+                'isaac-render': '--isaac-render',
+                'isaac-window': '--isaac-window',
+                'isaac-mount': '--isaac-mount',
+                'isaac-sensor': '--isaac-sensor',
+                'isaac-sensor-window': '--isaac-sensor-window',
+                'isaac-sensor-record': '--isaac-sensor-record',
+                'scalar': '--scalar', 'scalar-camera-schema': '--scalar-camera-schema'}[case]
         command = [sys.executable, '-u', __file__, role,
                    '--worker-python', worker_python]
     start = time.monotonic()
@@ -856,11 +1575,29 @@ def main():
     parser.add_argument('--raster', action='store_true')
     parser.add_argument('--mount-intent', action='store_true')
     parser.add_argument('--transport-physics', action='store_true')
+    parser.add_argument('--transport-frames', action='store_true')
     parser.add_argument('--session-physics', action='store_true')
     parser.add_argument('--formal-device', action='store_true')
+    parser.add_argument('--formal-render', action='store_true')
+    parser.add_argument('--formal-camera', action='store_true')
+    parser.add_argument('--formal-frames', action='store_true')
+    parser.add_argument('--formal-window', action='store_true')
+    parser.add_argument('--record-device', action='store_true')
+    parser.add_argument('--record-camera', action='store_true')
+    parser.add_argument('--record-render-fixture', action='store_true')
+    parser.add_argument('--clip-cuda', action='store_true')
+    parser.add_argument('--isaac-device', action='store_true')
+    parser.add_argument('--isaac-render', action='store_true')
+    parser.add_argument('--isaac-window', action='store_true')
+    parser.add_argument('--isaac-mount', action='store_true')
+    parser.add_argument('--isaac-sensor', action='store_true')
+    parser.add_argument('--isaac-sensor-window', action='store_true')
+    parser.add_argument('--isaac-sensor-record', action='store_true')
     parser.add_argument('--scalar', action='store_true')
-    parser.add_argument('--case', choices=('ipc', 'physics', 'raster', 'transport-physics', 'session-physics',
-                                           'formal-device', 'example', 'scalar'),
+    parser.add_argument('--scalar-camera-schema', action='store_true')
+    parser.add_argument('--case', choices=('ipc', 'physics', 'raster', 'transport-physics', 'transport-frames', 'session-physics',
+                                           'formal-device', 'formal-render', 'formal-camera', 'formal-frames', 'formal-window', 'record-device', 'record-camera', 'record-render-fixture', 'clip-cuda', 'isaac-device', 'isaac-render', 'isaac-window', 'isaac-mount', 'isaac-sensor', 'isaac-sensor-window', 'isaac-sensor-record', 'example', 'scalar', 'scalar-camera-schema', 'framebuffer-device',
+                                           'geophys-camera', 'geophys-aot-core', 'geophys-merge-regression', 'geophys-merge-clip', 'geophys-merge-focused', 'geophys-merge-lighting', 'geophys-merge-mjcf-light', 'geophys-merge-rigid', 'geophys-merge-robot', 'transport-regression', 'core-semantics', 'core-regression'),
                         default='ipc')
     parser.add_argument('--worker-python')
     parser.add_argument('--output')
@@ -877,12 +1614,48 @@ def main():
         print(json.dumps(_mount_intent()))
     elif args.transport_physics:
         print(json.dumps(_transport_physics(args.worker_python)))
+    elif args.transport_frames:
+        print(json.dumps(_transport_physics(args.worker_python, frame_probe=True)))
     elif args.session_physics:
         print(json.dumps(_session_physics(args.worker_python)))
     elif args.formal_device:
         print(json.dumps(_formal_device(args.worker_python)))
+    elif args.formal_render:
+        print(json.dumps(_formal_render(args.worker_python)))
+    elif args.formal_camera:
+        print(json.dumps(_formal_camera(args.worker_python)))
+    elif args.formal_frames:
+        from frame_fixture import run
+        print(json.dumps(run(args.worker_python)))
+    elif args.formal_window:
+        print(json.dumps(_formal_window(args.worker_python)))
+    elif args.record_device:
+        print(json.dumps(_record_device(args.worker_python)))
+    elif args.record_camera:
+        print(json.dumps(_record_device(args.worker_python, camera=True)))
+    elif args.record_render_fixture:
+        from recording_fixture import run
+        print(json.dumps(run(args.worker_python)))
+    elif args.clip_cuda:
+        print(json.dumps(_clip_cuda()))
+    elif args.isaac_device:
+        print(json.dumps(_isaac_device(args.worker_python)))
+    elif args.isaac_render:
+        print(json.dumps(_isaac_device(args.worker_python, render=True)))
+    elif args.isaac_window:
+        print(json.dumps(_isaac_device(args.worker_python, render=True, window=True)))
+    elif args.isaac_mount:
+        print(json.dumps(_isaac_device(args.worker_python, mount=True)))
+    elif args.isaac_sensor:
+        print(json.dumps(_isaac_device(args.worker_python, sensor=True)))
+    elif args.isaac_sensor_window:
+        print(json.dumps(_isaac_device(args.worker_python, render=True, window=True, sensor=True)))
+    elif args.isaac_sensor_record:
+        print(json.dumps(_isaac_device(args.worker_python, sensor=True, record=True)))
     elif args.scalar:
         print(json.dumps(_scalar_compat()))
+    elif args.scalar_camera_schema:
+        print(json.dumps(_scalar_camera_schema(args.worker_python)))
     elif args.physics:
         print(json.dumps(_physics()))
     elif args.run:

@@ -62,6 +62,16 @@ class MuJoCoWarpNativeBatch:
             raise ValueError('MJWarp num_envs must be positive')
         self._wp, self._mjw, self._mujoco, self._device, self._model = wp, mjw, mujoco, device, model
         self.num_envs, self.substeps = count, int(request['control_substeps'])
+        self._body_names = tuple(request.get('source_bodies', {}))
+        body_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, native)
+                    for native in request.get('source_bodies', {}).values()]
+        if any(body_id < 0 for body_id in body_ids):
+            raise ValueError('MJWarp source body mapping contains an unknown native body')
+        self._frame_names = tuple(request.get('source_frames', {}))
+        frame_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, native)
+                     for native in request.get('source_frames', {}).values()]
+        if any(frame_id < 0 for frame_id in frame_ids):
+            raise ValueError('MJWarp source frame mapping contains an unknown native site')
         if self.substeps < 1:
             raise ValueError('control substeps must be positive')
         with wp.ScopedMempool(device, False):
@@ -75,13 +85,19 @@ class MuJoCoWarpNativeBatch:
                 'reset_mask': wp.zeros(count, dtype=wp.bool, device=device),
                 'effort': wp.zeros((count, len(channels)), dtype=wp.float32, device=device),
             }
+            if body_ids:
+                self._buffers['body_position'] = wp.zeros((count, len(body_ids), 3), dtype=wp.float32, device=device)
+                self._buffers['body_orientation'] = wp.zeros((count, len(body_ids), 4), dtype=wp.float32, device=device)
+            if frame_ids:
+                self._buffers['frame_position'] = wp.zeros((count, len(frame_ids), 3), dtype=wp.float32, device=device)
+                self._buffers['frame_orientation'] = wp.zeros((count, len(frame_ids), 4), dtype=wp.float32, device=device)
         self._dofs = wp.array(dofs, dtype=wp.int32, device=device)
         self._signs = wp.array(signs, dtype=wp.float32, device=device)
+        self._body_ids = wp.array(body_ids, dtype=wp.int32, device=device) if body_ids else None
+        self._frame_ids = wp.array(frame_ids, dtype=wp.int32, device=device) if frame_ids else None
         self._ready = wp.Event(device=device, interprocess=True)
         self._written = None
         self._closed = False
-        self._publish()
-
         @wp.kernel
         def apply_effort(values: wp.array2d(dtype=wp.float32), ids: wp.array(dtype=wp.int32),
                          direction: wp.array(dtype=wp.float32), force: wp.array2d(dtype=wp.float32)):
@@ -99,7 +115,35 @@ class MuJoCoWarpNativeBatch:
                 if column < native_v.shape[1]:
                     native_v[row, column] = v[row, column]
 
-        self._apply_effort, self._apply_reset = apply_effort, apply_reset
+        @wp.kernel
+        def copy_body_pose(ids: wp.array(dtype=wp.int32), positions: wp.array2d(dtype=wp.vec3),
+                           orientations: wp.array2d(dtype=wp.quat),
+                           out_positions: wp.array3d(dtype=wp.float32),
+                           out_orientations: wp.array3d(dtype=wp.float32)):
+            row, body = wp.tid()
+            position = positions[row, ids[body]]
+            orientation = orientations[row, ids[body]]
+            for component in range(3):
+                out_positions[row, body, component] = position[component]
+            for component in range(4):
+                out_orientations[row, body, component] = orientation[component]
+
+        @wp.kernel
+        def copy_frame_pose(ids: wp.array(dtype=wp.int32), positions: wp.array2d(dtype=wp.vec3),
+                            rotations: wp.array2d(dtype=wp.mat33),
+                            out_positions: wp.array3d(dtype=wp.float32),
+                            out_orientations: wp.array3d(dtype=wp.float32)):
+            row, frame = wp.tid()
+            position = positions[row, ids[frame]]
+            quat = wp.quat_from_matrix(rotations[row, ids[frame]])
+            for component in range(3):
+                out_positions[row, frame, component] = position[component]
+                out_orientations[row, frame, component + 1] = quat[component]
+            out_orientations[row, frame, 0] = quat[3]
+
+        self._apply_effort, self._apply_reset, self._copy_body_pose = apply_effort, apply_reset, copy_body_pose
+        self._copy_frame_pose = copy_frame_pose
+        self._publish()
 
     def description(self):
         import sys
@@ -113,7 +157,8 @@ class MuJoCoWarpNativeBatch:
                 'python': sys.executable, 'python_version': list(sys.version_info[:2]),
                 'module_paths': {'mujoco': self._mujoco.__file__, 'mujoco_warp': self._mjw.__file__,
                                  'warp': self._wp.__file__},
-                'nq': self._model.nq, 'nv': self._model.nv}
+                'nq': self._model.nq, 'nv': self._model.nv, 'body_names': list(self._body_names),
+                'frame_names': list(self._frame_names)}
 
     def bind_written_event(self, encoded):
         if self._written is not None:
@@ -131,6 +176,14 @@ class MuJoCoWarpNativeBatch:
     def _publish(self):
         self._wp.copy(self._buffers['qpos'], self._data.qpos)
         self._wp.copy(self._buffers['qvel'], self._data.qvel)
+        if self._body_ids is not None:
+            self._wp.launch(self._copy_body_pose, dim=(self.num_envs, len(self._body_names)),
+                inputs=[self._body_ids, self._data.xpos, self._data.xquat,
+                        self._buffers['body_position'], self._buffers['body_orientation']], device=self._device)
+        if self._frame_ids is not None:
+            self._wp.launch(self._copy_frame_pose, dim=(self.num_envs, len(self._frame_names)),
+                inputs=[self._frame_ids, self._data.site_xpos, self._data.site_xmat,
+                        self._buffers['frame_position'], self._buffers['frame_orientation']], device=self._device)
         self._wp.record_event(self._ready)
 
     def reset(self):
@@ -152,16 +205,19 @@ class MuJoCoWarpNativeBatch:
         for _ in range(self.substeps):
             self._mjw.step(self._model_device, self._data)
         self._data.qfrc_applied.zero_()
+        # MJWarp's step integrates qpos after its derived-pose computation.
+        # Refresh kinematics at the published boundary without advancing time.
+        self._mjw.forward(self._model_device, self._data)
         self._publish()
 
     def close(self):
-        if self._closed:
+        if self._closed and self._ipc is None and self._worker is None:
             return
         self._wp.synchronize_device(self._device)
         self._written = None
         self._buffers.clear()
         self._ready = self._data = self._model_device = None
-        self._dofs = self._signs = None
+        self._dofs = self._signs = self._body_ids = self._frame_ids = None
         self._closed = True
 
 
@@ -201,7 +257,8 @@ class MuJoCoWarpBatchSession:
             raise ValueError('Task timebase has inconsistent control cadence')
         if str(device) != 'cuda:0':
             raise ValueError('MJWarp profile currently admits cuda:0 only')
-        request = {'device': str(device), 'source_xml': source.scene_source.xml,
+        request = {'provider': 'mujoco_warp', 'device': str(device), 'source_xml': source.scene_source.xml,
+                   'source_bodies': dict(source.bodies), 'source_frames': dict(source.frames),
                    'source_joints': dict(source.joints), 'num_envs': count,
                    'physics_dt': timebase.physics_dt, 'control_substeps': timebase.control_substeps,
                    'channels': [{'channel': channel.to_mapping(),
@@ -232,7 +289,15 @@ class MuJoCoWarpBatchSession:
             self._profile = {name: description[name] for name in ('python', 'python_version',
                 'mujoco_version', 'mujoco_warp_version', 'warp_version', 'module_paths')}
             self._ipc = CudaIpcConnection(description)
+            self._body_names = tuple(description['body_names'])
+            self._frame_names = tuple(description['frame_names'])
             self._state_shapes = {'qpos': (int(description['nq']),), 'qvel': (int(description['nv']),)}
+            if self._body_names:
+                self._state_shapes.update(body_position=(len(self._body_names), 3),
+                                          body_orientation=(len(self._body_names), 4))
+            if self._frame_names:
+                self._state_shapes.update(frame_position=(len(self._frame_names), 3),
+                                          frame_orientation=(len(self._frame_names), 4))
             self._worker.call('bind_event', handle=self._ipc.written_handle)
         except BaseException as error:
             try:
@@ -256,7 +321,7 @@ class MuJoCoWarpBatchSession:
     def _read_publication(self):
         from ...contracts import DeviceBatchState
         self._ipc.wait_ready()
-        arrays = {name: self._ipc.read(name) for name in ('qpos', 'qvel')}
+        arrays = {name: self._ipc.read(name) for name in self._state_shapes}
         self._ipc.synchronize()
         self._last_state = DeviceBatchState(arrays, self.device, self.num_envs,
                                             self._identity(), 'owned_snapshot')
@@ -298,7 +363,7 @@ class MuJoCoWarpBatchSession:
         if not bool(mask.any()):
             if self._last_state is None:
                 raise ValueError('initial MJWarp reset must select at least one row')
-            return self.read_device_state(('qpos', 'qvel'))
+            return self.read_device_state(tuple(self._state_shapes))
         if self._last_state is None and not bool(mask.all()):
             raise ValueError('initial MJWarp reset must select every row')
         try:
@@ -357,8 +422,10 @@ class MuJoCoWarpBatchSession:
         return {'num_envs': self.num_envs, 'provider': 'mujoco_warp',
                 'dependency_profile': dict(self._profile),
                 'device_transition': {'available': True, 'field_device': self.device,
-                    'transport': 'cuda_ipc', 'state_readback_fields': ['qpos', 'qvel'],
-                    'state_shapes': self._state_shapes}}
+                    'transport': 'cuda_ipc', 'state_readback_fields': list(self._state_shapes),
+                    'state_shapes': self._state_shapes,
+                    'body_names': self._body_names, 'frame_names': self._frame_names,
+                    'pose_layout': 'world_body_xyz_wxyz_env_local'}}
 
     def close(self):
         if self._closed:
@@ -378,9 +445,12 @@ class MuJoCoWarpBatchSession:
                     error = caught
                 else:
                     error.add_note(f'worker close also failed: {caught!r}')
-        if self._ipc is not None:
+            if self._worker.closed:
+                self._worker = None
+        if self._ipc is not None and self._worker is None:
             try:
                 self._ipc.close()
+                self._ipc = None
             except BaseException as caught:
                 if error is None:
                     error = caught

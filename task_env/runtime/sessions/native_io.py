@@ -581,6 +581,7 @@ class UsdCoreRuntimeSession(_SessionValues):
         } if not simple_effort else {})
         self._open_actuators = ()
         self._native_step_count = 0
+        self._device_pose_generation = 0
         self._reset_write_receipt: NativeResetWriteReceiptV1 | None = None
         self._last_native_position_ack: NativePositionWriteAckV1 | None = None
         self._last_interval_advances: tuple[dict[str, object], ...] = ()
@@ -600,6 +601,7 @@ class UsdCoreRuntimeSession(_SessionValues):
         )
         self._physical_controller_versions = versions
         self.physical_control_generation = execution.generation
+        self._device_pose_generation = execution.generation
 
     def assess_physical_control(self, binding):
         return self._physical_port.assessment(binding)
@@ -937,6 +939,27 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._state_revision += 1
         return self.snapshot()
 
+
+    def device_pose_description(self):
+        """Describe an explicitly supported native device-pose publication."""
+        self._require_reset()
+        publish = getattr(self._native_io, 'device_pose_description', None)
+        if not callable(publish):
+            raise RuntimeError('native provider has no device pose publication')
+        return publish()
+
+    def publish_device_poses(self):
+        """Publish the same reset/step boundary through the native pose owner."""
+        from dataclasses import asdict
+        from ..contracts import DeviceStateIdentity
+
+        self._require_reset()
+        result = self._native_io.publish_device_poses()
+        identity = DeviceStateIdentity(self._source.source_id, self._source.source_closure_digest,
+            self._artifact.identity_hash, self.provider_materialization_id,
+            int(self._device_pose_generation), self.state_revision, result['native_step'],
+            result['native_time_s'], self._artifact.timebase.control_dt)
+        return {'identity': asdict(identity), 'body_names': result['body_names']}
 
     def close(self) -> None:
         if not self._closed:

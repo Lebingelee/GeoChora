@@ -333,6 +333,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
             config['controller']['profile_id'] = supplied.controller_profile
         if supplied.robot_uid is not None:
             config.setdefault("robot", {})["uid"] = supplied.robot_uid
+        if execution_scope == 'device_batch':
+            config['render'] = asdict(supplied.environment.render)
     if isinstance(config, (str, Path)):
         config = load_yaml_mapping(config)
     if config is None:
@@ -341,6 +343,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
     allowed = {"execution", "episode", "task", "controller", "robot"}
+    if execution_scope == 'device_batch':
+        allowed.add('render')
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
@@ -484,6 +488,13 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
     env = replace(base, runtime=replace(base.runtime, backend=backend),
                   control=replace(base.control, profile_id=profile),
                   episode=replace(base.episode, horizon=horizon, seed=seed, ignore_done=ignore_done))
+    if execution_scope == 'device_batch':
+        # Preserve the device renderer's established layout while exposing it
+        # through the same public render configuration as camera placement.
+        grid = replace(env.render.parallel, columns=4, cell_width=4.0, cell_depth=4.0, padding=0.5)
+        env = replace(env, render=replace(env.render, parallel=grid))
+    if execution_scope == 'device_batch' and 'render' in values:
+        env = overlay_public_env_config(env, {'render': values['render']})
     task_configuration_json = None
     if task_configuration is not None:
         # Keep physics/render defaults in their resolved execution owner.  The
@@ -548,6 +559,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
                     "episode": {"horizon": result.environment.episode.horizon, "seed": result.environment.episode.seed,
                                 "ignore_done": result.environment.episode.ignore_done},
                     "task": dict(result.task_parameters)}
+        if execution_scope == 'device_batch':
+            original['render'] = asdict(result.environment.render)
         if result.robot_uid is not None:
             original["robot"] = {"uid": result.robot_uid}
         original['controller'] = {'parameters': json.loads(result.controller_parameters_json)}

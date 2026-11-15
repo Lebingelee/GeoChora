@@ -25,6 +25,59 @@ def _decode_handle(kind, encoded):
     return handle
 
 
+class CudaIpcPublisher:
+    """Own fixed CUDA buffers and a ready event for one read-only consumer."""
+
+    def __init__(self, shapes, *, device='cuda:0'):
+        import warp as wp
+        import torch
+
+        wp.init()
+        self._wp, self._torch = wp, torch
+        self._device = wp.get_device(device)
+        if not self._device.is_cuda or not self._device.is_ipc_supported:
+            raise RuntimeError('CUDA publisher requires an IPC-capable device')
+        self._buffers, self._ready = {}, None
+        try:
+            with wp.ScopedMempool(self._device, False):
+                for name, shape in shapes.items():
+                    self._buffers[name] = wp.zeros(shape, dtype=wp.float32, device=self._device)
+            self._ready = wp.Event(device=self._device, interprocess=True)
+        except BaseException as error:
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'CUDA publisher construction cleanup failed: {cleanup_error!r}')
+            raise
+
+    def description(self):
+        return {'device': str(self._device),
+                'ready': base64.b64encode(self._ready.ipc_handle()).decode('ascii'),
+                'buffers': {name: {'handle': base64.b64encode(value.ipc_handle()).decode('ascii'),
+                                   'shape': list(value.shape), 'dtype': 'float32'}
+                            for name, value in self._buffers.items()}}
+
+    def publish(self, values):
+        if set(values) != set(self._buffers):
+            raise ValueError('CUDA publication fields do not match the fixed buffers')
+        for name, tensor in values.items():
+            target = self._wp.to_torch(self._buffers[name])
+            if (not isinstance(tensor, self._torch.Tensor) or tensor.device != target.device
+                    or tensor.dtype != self._torch.float32 or tensor.shape != target.shape):
+                raise ValueError(f'CUDA publication field {name!r} differs from its declaration')
+            target.copy_(tensor)
+        # The producer and Warp may use different streams. The ready event is
+        # recorded only after the Torch copies complete.
+        self._torch.cuda.current_stream(device=str(self._device)).synchronize()
+        self._wp.record_event(self._ready)
+
+    def close(self):
+        if self._buffers or self._ready is not None:
+            self._wp.synchronize_device(self._device)
+            self._buffers.clear()
+            self._ready = None
+
+
 class CudaIpcConnection:
     """Import one worker's buffers and synchronize copies on a Torch stream."""
 
@@ -52,8 +105,11 @@ class CudaIpcConnection:
             self._ready = _check(cu.cuIpcOpenEventHandle(
                 _decode_handle(cu.CUipcEventHandle, description['ready'])))
             self._written = _check(cu.cuEventCreate(6))
-        except BaseException:
-            self.close()
+        except BaseException as error:
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'CUDA IPC construction cleanup failed: {cleanup_error!r}')
             raise
 
     @property
@@ -92,18 +148,48 @@ class CudaIpcConnection:
 
     def release_imports(self):
         """Unmap worker-owned resources while leaving our exported event alive."""
+        error = None
         if self._buffers or self._ready is not None:
-            self.synchronize()
-        for pointer, _, _ in self._buffers.values():
-            _check(self._cu.cuIpcCloseMemHandle(pointer))
-        self._buffers.clear()
+            try:
+                self.synchronize()
+            except BaseException as caught:
+                error = caught
+        for name, (pointer, _, _) in tuple(self._buffers.items()):
+            try:
+                _check(self._cu.cuIpcCloseMemHandle(pointer))
+                del self._buffers[name]
+            except BaseException as caught:
+                if error is None:
+                    error = caught
+                else:
+                    error.add_note(f'IPC buffer {name!r} cleanup failed: {caught!r}')
         if self._ready is not None:
-            _check(self._cu.cuEventDestroy(self._ready))
-            self._ready = None
+            try:
+                _check(self._cu.cuEventDestroy(self._ready))
+                self._ready = None
+            except BaseException as caught:
+                if error is None:
+                    error = caught
+                else:
+                    error.add_note(f'IPC ready event cleanup failed: {caught!r}')
+        if error is not None:
+            raise error
 
     def close(self):
         """Close after the worker has released its import of the written event."""
-        self.release_imports()
+        error = None
+        try:
+            self.release_imports()
+        except BaseException as caught:
+            error = caught
         if self._written is not None:
-            _check(self._cu.cuEventDestroy(self._written))
-            self._written = None
+            try:
+                _check(self._cu.cuEventDestroy(self._written))
+                self._written = None
+            except BaseException as caught:
+                if error is None:
+                    error = caught
+                else:
+                    error.add_note(f'IPC written event cleanup failed: {caught!r}')
+        if error is not None:
+            raise error

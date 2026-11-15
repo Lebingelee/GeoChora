@@ -21,6 +21,8 @@ def test_physical_record_keeps_spec_batch_ack_and_no_measured_force():
         compiled=plan,controllers=(SimpleNamespace(writer_id='controller-a'),))))
     spec={'kind':'joint','spec_id':'0'*64,'generation':1,'controller_identity':'b'*64,'shape':[8]}
     env=SimpleNamespace(physical_action_spec=lambda:spec, _physical_reset_selection=selection,
+        _physical_execution=lambda: selection.current.execution,
+        typed_state=SimpleNamespace(view=SimpleNamespace(boundary=context.boundary, sample_clock=context.clock)),
         recorder=Recorder(), obs={'position':np.array([1.])},evaluation=SimpleNamespace(reward=.2,success=False),info={})
     resolved = SimpleNamespace(accepted_receipt=accepted, joints=(ResolvedJointEffortV1(
         'arm','drive','dof0','N*m',1.,('effort-a',),False,False),))
@@ -35,3 +37,5 @@ def test_physical_record_keeps_spec_batch_ack_and_no_measured_force():
     assert writer['applied_control']['payload']['native_write_ack']['stage'] == 'native_write_ack'
     assert writer['applied_control']['payload']['independent_measurement'] == 'unavailable'
     assert writer['applied_control']['payload']['admitted_joint_efforts'][0]['value'] == 1.
+    assert args[7]['boundary_context_v1']['state_boundary_identity'] == context.boundary.to_mapping()
+    assert args[7]['boundary_context_v1']['state_sample_clock'] == context.clock.to_mapping()

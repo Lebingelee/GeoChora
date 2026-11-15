@@ -132,15 +132,36 @@ def make_env(
     *,
     config=None,
     render_mode=None,
+    execution: str | None = None,
     **kwargs,
 ) -> TaskEnvironmentComponent:
-    """Construct a task env from task defaults plus a public config overlay."""
+    """Construct a scalar task; explicit device execution reuses one batch world."""
 
     # Registration modules are loaded at the actual construction boundary so
     # learner-only imports do not initialize Taichi or concrete task assets.
     import importlib
 
     importlib.import_module("task_env.tasks")
+    if execution is not None:
+        if execution != 'device':
+            raise ValueError("scalar execution must be 'device' when explicitly selected")
+        backend = kwargs.pop('backend', 'cuda')
+        worker_directory = kwargs.pop('worker_directory', None)
+        if kwargs:
+            raise TypeError(f'unsupported scalar device environment options: {sorted(kwargs)}')
+        from .vectorization.factory import make_selected_device_spec
+        from .vectorization.homogeneous import HomogeneousVectorTaskEnv
+
+        spec = make_selected_device_spec(uid=uid, num_env=1, env_config=config, backend=backend,
+                                         worker_directory=worker_directory, render_mode=render_mode)
+        try:
+            return HomogeneousVectorTaskEnv(spec, execution_mode='device', scalar_device=True)
+        except BaseException as error:
+            try:
+                spec.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'scalar device construction cleanup also failed: {cleanup_error!r}')
+            raise
     if uid in {"pick-cube-v1", "nut-assembly-square-v1"}:
         raise ValueError(
             "legacy reference task UID retired from active make_env; use "

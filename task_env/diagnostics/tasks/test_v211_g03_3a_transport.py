@@ -111,6 +111,20 @@ def test_worker_rejects_non_value_before_sending_and_wrong_startup_identity(tmp_
         _spawn(tmp_path, identity='b' * 64)
 
 
+@pytest.mark.parametrize('forbidden', ['mujoco', 'solvers'])
+def test_no_engine_worker_guard_still_rejects_native_imports(tmp_path, forbidden):
+    from task_env.utils._paths import GEOCHORA_ROOT, GEOPHYS_PROVIDER_ROOT
+
+    code = PRODUCTION_BOOTSTRAP_FAKE_SESSION.replace(
+        'sys.meta_path.insert(0, BlockNative())',
+        f'sys.meta_path.insert(0, BlockNative())\nimport {forbidden}', 1)
+    result = subprocess.run([sys.executable, '-c', code, str(GEOCHORA_ROOT),
+                             str(GEOPHYS_PROVIDER_ROOT / 'src'), '-1', 'normal'],
+                            cwd=tmp_path, text=True, capture_output=True, timeout=5)
+    assert result.returncode != 0
+    assert f'native import forbidden: {forbidden}' in result.stderr
+
+
 def test_episode_tamper_stops_worker_and_timeout_exits_process(tmp_path):
     session, process, _path = _spawn(tmp_path)
     session.reset('episode-a')
@@ -137,9 +151,10 @@ core, geophys, fd, launcher_mode = sys.argv[1:]
 prefix = str(pathlib.Path(sys.executable).parent.parent)
 paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
 sys.path[:0] = [core, geophys, paths['purelib'], paths['platlib']]
+# The real Scene source parser is allowed; native runtimes and solvers remain blocked.
 class BlockNative(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.split('.')[0] in {'mujoco','taichi','taichi_forge','scene','solvers','geophys','isaacsim','omni','carb','pxr','isaaclab','sapien','genesis','warp'}:
+        if fullname.split('.')[0] in {'mujoco','taichi','taichi_forge','solvers','geophys','isaacsim','omni','carb','pxr','isaaclab','sapien','genesis','warp'}:
             raise AssertionError('native import forbidden: ' + fullname)
 sys.meta_path.insert(0, BlockNative())
 real_find_spec = importlib.util.find_spec
@@ -175,7 +190,7 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
     from task_env.runtime.sessions.provenance import probe_interpreter_environment
     from task_env.utils._paths import GEOCHORA_ROOT, GEOPHYS_PROVIDER_ROOT
 
-    env = make_env('pick-cube-p16-reference-v1', config={'provider': 'mujoco'})
+    env = make_env('pick-cube-p16-reference-v1', config={'execution': {'physics_provider': 'mujoco'}})
     try:
         execution = ExecutionSpec('mujoco', PROFILE, 'none', 'cpu', 0, 'strict')
         source = env.value['source']
@@ -212,7 +227,7 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
         monkeypatch.chdir(tmp_path)
         session = transport.start_selected_worker(interpreter, payload)
         try:
-            sample = env.binding.reset_sample(env.artifact, 31)
+            sample = env.value['reset_plan'].reset_sample
             assert session.reset(sample) == sample
             assert session.episode_id == 'fixture-episode'
         finally:
@@ -233,13 +248,17 @@ def test_public_factory_remote_rejects_unchecked_fixture(monkeypatch):
         "api._materialize_admitted = lambda *args, **kwargs: FakeSession()",
         "from task_env.diagnostics.tasks.test_selected_consumers import FakeSession as FixtureSession\n"
         "from task_env.runtime.sessions import control\n"
-        "control.materialize_control = FixtureSession",
+        "class UncheckedSession(FixtureSession):\n"
+        "    def __init__(self, *args, **kwargs):\n"
+        "        super().__init__(*args, **kwargs)\n"
+        "        self._build_layout_facts = None\n"
+        "control.materialize_control = UncheckedSession",
     )
     monkeypatch.setattr(transport, '_WORKER_BOOTSTRAP', fake_bootstrap)
     env = make_env('pick-cube-p16-reference-v1', config={
         'execution': {'physics_provider': 'mujoco', 'deployment': 'isolated_worker',
                       'interpreter': sys.executable},
-        'episode': {'horizon': 3}, 'task': {'controller_profile': 'r3_continuous_v1'},
+        'episode': {'horizon': 3}, 'controller': {'profile_id': 'r3_continuous_v1'},
     })
     try:
         with pytest.raises(RuntimeError, match='layout was not checked'):

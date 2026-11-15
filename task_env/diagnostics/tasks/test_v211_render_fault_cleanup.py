@@ -127,7 +127,7 @@ def test_env_reports_fault_and_cleanup_without_touching_physics():
     from task_env.environment.reference_env import SelectedReferenceEnv
     s,p,_,closed=_fixture('camera-dynamic-source-v2',rollback='fail',close_fails=True)
     env=object.__new__(SelectedReferenceEnv)
-    env._visual_state_session=s;env._camera_consumer=None
+    env._visual_state_session=s;env._task_rgb_consumer=None
     with pytest.raises(RuntimeError,match='primary update'):s._consume_projection(p)
     status=env.visual_binding_status()
     assert status['faulted'] and not status['bound']
@@ -144,7 +144,7 @@ def test_env_close_preserves_first_error_and_renderer_cleanup_outcome():
     def first():raise RuntimeError('consumer first')
     def second():raise RuntimeError('renderer second')
     visual=N(close=second,close_status={'status':'close_failed_unknown_release','error':'renderer second'})
-    env._camera_consumer=N(close=first);env._visual_state_session=visual
+    env._task_rgb_consumer=N(close=first);env._visual_state_session=visual
     with pytest.raises(RuntimeError,match='consumer first') as error:env._close_camera_consumer()
     assert any('renderer second' in note for note in error.value.__notes__)
     assert env.visual_binding_status()['close']['status']=='close_failed_unknown_release'

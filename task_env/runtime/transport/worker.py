@@ -62,37 +62,60 @@ class RuntimeWorker:
         _send(self._process.stdin, {'command': command, **payload})
         return _receive(self._process.stdout)
 
+    @property
+    def closed(self):
+        return self._process is None
+
     def close(self):
-        process, self._process = self._process, None
+        process = self._process
         error = None
-        try:
-            if process is not None:
-                if process.poll() is None:
+        def record(caught, operation):
+            nonlocal error
+            if error is None:
+                error = caught
+            else:
+                error.add_note(f'{operation} also failed: {caught!r}')
+
+        if process is not None:
+            if process.poll() is None:
+                try:
+                    _send(process.stdin, {'command': 'close'})
+                    _receive(process.stdout, timeout=10)
+                except BaseException as caught:
+                    record(caught, 'worker close request')
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    record(TimeoutError('native batch worker did not close'), 'worker wait')
                     try:
-                        _send(process.stdin, {'command': 'close'})
-                        _receive(process.stdout, timeout=10)
-                    except BaseException as caught:
-                        error = caught
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        if error is None:
-                            error = TimeoutError('native batch worker did not close')
+                        process.terminate()
                         try:
-                            process.terminate()
                             process.wait(timeout=5)
                         except subprocess.TimeoutExpired:
                             process.kill()
                             process.wait()
-                if process.returncode != 0 and error is None:
-                    error = RuntimeError(f'native batch worker exited with code {process.returncode}')
-                if process.stdin is not None:
-                    process.stdin.close()
-                if process.stdout is not None:
-                    process.stdout.close()
-        finally:
-            if self._temporary_directory is not None:
+                    except BaseException as caught:
+                        record(caught, 'worker retirement')
+                except BaseException as caught:
+                    record(caught, 'worker wait')
+            if process.poll() is not None and process.returncode != 0 and error is None:
+                error = RuntimeError(f'native batch worker exited with code {process.returncode}')
+            for name in ('stdin', 'stdout'):
+                stream = getattr(process, name)
+                if stream is not None and not stream.closed:
+                    try:
+                        stream.close()
+                    except BaseException as caught:
+                        record(caught, f'worker {name} close')
+            if process.poll() is not None and all(
+                    stream is None or stream.closed for stream in (process.stdin, process.stdout)):
+                self._process = None
+        if self._temporary_directory is not None and (process is None or process.poll() is not None):
+            try:
                 self._temporary_directory.cleanup()
+                self._temporary_directory = None
+            except BaseException as caught:
+                record(caught, 'worker directory cleanup')
         if error is not None:
             raise error
 
@@ -103,8 +126,9 @@ def main():
     try:
         request = _receive(sys.stdin, timeout=None)
         with contextlib.redirect_stdout(sys.stderr):
-            from ..providers.mujoco_warp.batch import MuJoCoWarpNativeBatch
-            native = MuJoCoWarpNativeBatch(request)
+            from ..factory import load_device_provider
+            native_type = load_device_provider(request['provider'], worker=True)
+            native = native_type(request)
             description = native.description()
         _send(sys.stdout, description)
         while True:

@@ -32,6 +32,7 @@ def run(interpreter, *, output=None, seed=73, steps=20):
                   'observation_shape': list(observation['state']['proprioception'].shape),
                   'reward': reward.cpu().tolist(), 'terminated': terminated.cpu().tolist(),
                   'truncated': truncated.cpu().tolist(), 'episode_id': info['episode_id'].cpu().tolist(),
+                  'final_observation_mask': info['_final_observation'].cpu().tolist(),
                   'native_step': state.identity.native_step, 'native_time_s': state.identity.native_time_s}
     finally:
         env.close()

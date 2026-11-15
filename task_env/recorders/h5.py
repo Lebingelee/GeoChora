@@ -358,6 +358,12 @@ def _save_v2(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
     action_leaves = _write_action(root, trajectory.actions, _action_schema(trajectory.record_metadata))
     _write_common_transition_data(root, trajectory)
     meta = root.require_group("meta")
+    boundary_contexts = [trajectory.reset_info.get('boundary_context_v1'),
+                         *(info.get('boundary_context_v1') for info in trajectory.infos)]
+    if any(value is not None for value in boundary_contexts):
+        if any(not isinstance(value, Mapping) for value in boundary_contexts):
+            raise ValueError('boundary context must be present at every recorded boundary')
+        _json_dataset(meta, 'boundary_context_v1_json', boundary_contexts)
     env_meta = _env_meta(trajectory, leaves, action_leaves)
     _yaml_dataset(meta, "env_meta", env_meta)
     _yaml_dataset(meta, "env_cfg", trajectory.record_metadata.get("resolved_config", {}))
@@ -942,6 +948,11 @@ def _inspect_v2_group(group) -> dict[str, Any]:
     result["env_cfg"] = load_metadata(_read_text(group, "meta/env_cfg"))
     if "meta/episode_meta" in group:
         result["episode_meta"] = load_metadata(_read_text(group, "meta/episode_meta"))
+    if 'meta/boundary_context_v1_json' in group:
+        contexts = json.loads(_read_text(group, 'meta/boundary_context_v1_json'))
+        if len(contexts) != result['observation_count'] or not all(isinstance(v, dict) for v in contexts):
+            raise ValueError('boundary contexts must match the recorded observation count')
+        result['boundary_contexts'] = contexts
     return result
 
 
