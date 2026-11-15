@@ -2,6 +2,8 @@
 
 日期：2026-11-15。性质：源码／官方资料调研与设计建议；不是 G06 实施、native 验收或新 Qualification。本文响应维护者本轮提出的五类问题，供补充材料和后续 6a～6c 工作包使用；不替代[现行 G06 Goal](../goals/06-parallel.md)、[交接记录](../maintenance/20261115_g06_agent_handoff.md)或既有接收结论。
 
+维护者补充要求后的具体版本目标、模块落位、设备／终止／相机合同及执行窗口，统一收于[G06a～c 实施方案审批稿](stage6-parallel-execution-plan.md)。本文保留调研基线，实施以维护者批准后的方案和当前源码为准。
+
 ## 1. 结论与调研基线
 
 **建议保留既有 `make_parallel_env` 入口，复用同一 Task 注册、声明、source 构建及 TaskDefinition；以 CUDA tensor 为并行数据路径，扩展既有 batch lifecycle 和 provider owner。不要复制完整的 ParallelTask／ParallelRobot／ParallelReferenceEnv。**

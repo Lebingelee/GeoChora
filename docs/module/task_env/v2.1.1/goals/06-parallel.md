@@ -4,6 +4,8 @@
 
 2026-11-15维护者补充：后续并行实施采用CUDA，不把CPU physics或CPU多进程方案作为本轮并行交付路线。三家仿真器、GeoPhys static沿革、下游实现参考及共同Task／Robot构建建议见[并行环境调研](../planning/20261115_g06_parallel_research.md)。该调研不代表native batch验收；确切provider／task／source／Controller／固定renderer名单仍在6a冻结。
 
+维护者后续提出版本冻结、代码落位审批、canonical action 先行、same-step autoreset 保留完整终止图像、固定 renderer 网格场景及 Pendulum／PickCube 验收要求，详见[G06a～c 实施方案审批稿](../planning/stage6-parallel-execution-plan.md)。该方案包含待审批的 D1～D6，不自动改变本 Goal 的已批准出口或代表实施已经开始。
+
 ## 当前边界与阶段3前维护的衔接
 
 维护者已明确：统一环境路线的并行适配尚未完成，阶段3前重构先完成Pendulum等旧任务的单环境迁移。现存并行注册、factory、脚本及历史证据保留，但不能证明统一路线已适配；`num_env=1`也不构成多环境验证。未适配的并行调用须明确声明或拒绝，不静默降级。
