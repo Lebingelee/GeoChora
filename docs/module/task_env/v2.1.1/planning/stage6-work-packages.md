@@ -52,3 +52,7 @@ attempt 是实现＋修复＋验证＋返包的完整窗口，不等于一次测
 ## 6. G06b attempt001 已准备，待维护者转发
 
 6a 已有界接收。下一包为[6b attempt001 完整 goal prompt](../maintenance/work-packages/20261115_g06b_attempt001_goal.md)：真实 canonical 六格、batch Robot、三后端设备物理与相机行对应，随后18项B=16性能矩阵及满足条件的256／4096扩容。预计活动8～12小时、上限12小时；包含限定的GeoPhys rigid公开端口及必要接触／传动修复。生成本文不启动agent，6b attempt计数在实际派发后更新。
+
+## 7. G06b attempt001 专项复核与 attempt002
+
+2026-11-16：[专项主审](../maintenance/reviews/20261116_g06b_attempt001_review.md)维持PARTIAL_NOT_ACCEPTED。六格主链保留，GeoPhys大穿透是待修数值问题，不能仅缩小动作范围接收；Rasterizer B16双sensor＋window停滞须定位根因。[attempt002完整prompt](../maintenance/work-packages/20261116_g06b_attempt002_goal.md)已准备，聚焦数值修复、GPU停滞与受影响性能矩阵。旧scalar控制回执无SHA迁移建议单列；本包不擅自修改公开回执。未派发。

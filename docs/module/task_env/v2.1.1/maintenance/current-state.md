@@ -1,6 +1,6 @@
 # v2.1.1 当前状态
 
-更新时间：2026-11-15。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
+更新时间：2026-11-16。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
 ## 当前停门
 
@@ -14,7 +14,7 @@
 
 2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。[G06 Agent handoff](20261115_g06_agent_handoff.md)保留派发前时点；后续 attempt001 已开始实施，main／远端未同步、未发布。
 
-G06b：[attempt001 goal prompt](work-packages/20261115_g06b_attempt001_goal.md)已启动；本次有部分实现和待审证据，GeoPhys PickCube、完整性能矩阵等仍有缺口。不得将它记为六格接收，也不因此启动 6c。
+G06b attempt001 在 `1ad14dd8` 经[专项主审](reviews/20261116_g06b_attempt001_review.md)维持 **PARTIAL_NOT_ACCEPTED**；六格主链有实现与有界证据，GeoPhys接触异常和B16混合渲染停滞仍需修复。[attempt002](work-packages/20261116_g06b_attempt002_goal.md)已准备，待维护者转发；未启动，6b执行attempt计数仍为1。
 
 ## 启动输入与工作归属
 
