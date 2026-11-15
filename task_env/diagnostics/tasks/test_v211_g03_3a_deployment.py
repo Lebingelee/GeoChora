@@ -194,10 +194,15 @@ def test_missing_asset_closure_rejects_before_existing_session_is_closed(monkeyp
     from types import SimpleNamespace
     from task_env import make_env
     from task_env.runtime.sessions.provenance import DeploymentPreflightError
-    from dataclasses import replace
-    env = make_env('pick-cube-p16-reference-v1', config={'provider': 'mujoco'})
+    from copy import copy
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+    })
     original_source = env.value['source']
-    env.value['source'] = replace(original_source, execution_source_receipt=None, source_closure_digest=None)
+    corrupted_source = copy(original_source)
+    # Fault injection: normal RuntimeSource construction rejects inconsistent provenance.
+    object.__setattr__(corrupted_source, 'source_closure_digest', None)
+    env.value['source'] = corrupted_source
     effects = []
     sentinel = SimpleNamespace(close=lambda: effects.append('session.close'))
     env.session = sentinel
@@ -208,7 +213,7 @@ def test_missing_asset_closure_rejects_before_existing_session_is_closed(monkeyp
         receipt = failure.value.receipt
         row = next(r for r in receipt['assessment']['rows'] if r['capability_id'] == 'source_closure')
         assert row['requirement_status'] == 'unsatisfied'
-        assert 'no source-bound receipt' in row['reason']
+        assert 'no declared closure digest' in row['reason']
         assert json.loads(json.dumps(receipt)) == receipt
         assert env.session is sentinel and effects == []
     finally:
