@@ -19,8 +19,15 @@
     "reason": "Existing G06 implementation branch; review and documentation closeout only."
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "Prepare G06b scope from bounded G06a acceptance; do not auto-dispatch. Complete native canonical six cells before separate R3 package; G06c renderer/performance gates remain. GeoPhys main merge/AOT are maintainer-deferred, not PASS.",
+  "next_candidate": {
+    "package_id": "V211_G06_6b_attempt001",
+    "status": "PREPARED_NOT_DISPATCHED",
+    "package_path": "work-packages/20261115_g06b_attempt001_goal.md",
+    "input_head": "44a69cda592014045f831017717f7d38e265e3a4",
+    "prompt_sha256": "c9068811e41e4884ba418bd9af5d04e0ac0ede25262c69fcd88bf2504ef4c4cf",
+    "manual_forward_only": true
+  },
+  "next_action": "Maintainer may forward prepared G06b attempt001. No dispatch or execution yet; 6b attempt_count remains 0. Preserve bounded G06a acceptance and deferred GeoPhys main/AOT issues.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,

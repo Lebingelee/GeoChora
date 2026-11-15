@@ -48,3 +48,7 @@ attempt 是实现＋修复＋验证＋返包的完整窗口，不等于一次测
 ## 5. attempt001 后的现行派发状态
 
 生产输入 `3a277e03` 经[独立复核](../maintenance/reviews/20261115_g06a_attempt001_review.md)保持PARTIAL。首包不是仅缺文档：终止B轴／info、reset提交边界、正式pose publication、Rasterizer CUDA图像、第二来源与device Recorder仍需实现。[attempt002完整prompt](../maintenance/work-packages/20261115_g06a_attempt002_goal.md)已准备，包含有限GeoPhys公开render接口扩展的明确增量范围，须维护者整体派发后生效；本次未启动实施。预计活动6～10小时，上限10小时。
+
+## 6. G06b attempt001 已准备，待维护者转发
+
+6a 已有界接收。下一包为[6b attempt001 完整 goal prompt](../maintenance/work-packages/20261115_g06b_attempt001_goal.md)：真实 canonical 六格、batch Robot、三后端设备物理与相机行对应，随后18项B=16性能矩阵及满足条件的256／4096扩容。预计活动8～12小时、上限12小时；包含限定的GeoPhys rigid公开端口及必要接触／传动修复。生成本文不启动agent，6b attempt计数在实际派发后更新。

@@ -14,6 +14,8 @@
 
 2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。[G06 Agent handoff](20261115_g06_agent_handoff.md)保留派发前时点；后续 attempt001 已开始实施，main／远端未同步、未发布。
 
+G06b 后续包：[attempt001 goal prompt](work-packages/20261115_g06b_attempt001_goal.md)已准备，待维护者手动转发；尚未启动实施，不计一次已执行 attempt。
+
 ## 启动输入与工作归属
 
 | 项目 | 2026-11-11 启动核对 |
