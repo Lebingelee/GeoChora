@@ -18,6 +18,15 @@ from .contracts import ParallelTaskSpecProtocol
 from ..utils.tree import tree_copy, tree_stack, validate_batched_tree
 
 
+def _copy_selected_device_tree(value, mask):
+    """Retain only terminal rows from a device observation tree."""
+    if isinstance(value, Mapping):
+        return {key: _copy_selected_device_tree(item, mask) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(_copy_selected_device_tree(item, mask) for item in value)
+    return value[mask].clone()
+
+
 class HomogeneousVectorTaskEnv:
     """Generic batch contract over one task-owned ParallelTaskSpec.
 
@@ -26,7 +35,11 @@ class HomogeneousVectorTaskEnv:
     batch shape validation and terminal-slot guards.
     """
 
-    def __init__(self, task_spec: ParallelTaskSpecProtocol) -> None:
+    def __init__(self, task_spec: ParallelTaskSpecProtocol, *, execution_mode='host') -> None:
+        if execution_mode not in {'host', 'device'}:
+            raise ValueError('homogeneous execution mode must be host or device')
+        self._execution_mode = execution_mode
+        self._closed = False
         self._task_spec = task_spec
         self.num_envs = int(task_spec.num_envs)
         if self.num_envs < 1:
@@ -46,7 +59,8 @@ class HomogeneousVectorTaskEnv:
             if self._parallel_render_provider is not None
             else None
         )
-        self._terminal = np.zeros(self.num_envs, dtype=np.bool_)
+        self._terminal = (None if execution_mode == 'device'
+                          else np.zeros(self.num_envs, dtype=np.bool_))
         self._has_reset = False
 
     @property
@@ -110,6 +124,14 @@ class HomogeneousVectorTaskEnv:
         options: dict[str, Any] | None = None,
         mask: np.ndarray | None = None,
     ):
+        if self._execution_mode == 'device':
+            if self._closed:
+                raise RuntimeError('vector environment is closed')
+            if options:
+                raise ValueError('device reset does not support reset options')
+            result = self._task_spec.reset_sampled_device(seed=seed, mask=mask)
+            self._has_reset = True
+            return result.observation, result.infos
         if mask is not None:
             mask_value = np.asarray(mask, dtype=np.bool_)
             if mask_value.shape != (self.num_envs,):
@@ -126,6 +148,8 @@ class HomogeneousVectorTaskEnv:
         return tree_copy(result.observation), tree_copy(result.infos)
 
     def step(self, actions: Any):
+        if self._execution_mode == 'device':
+            return self._step_device_with_autoreset(actions)
         if not self._has_reset:
             raise RuntimeError("reset() must be called before vector step()")
         if np.any(self._terminal):
@@ -151,6 +175,43 @@ class HomogeneousVectorTaskEnv:
             truncated.copy(),
             tree_copy(result.infos),
         )
+
+    def _step_device_with_autoreset(self, actions):
+        if self._closed:
+            raise RuntimeError('vector environment is closed')
+        if not self._has_reset:
+            raise RuntimeError('reset() must be called before vector step()')
+        transition = self._task_spec.step_device(actions)
+        try:
+            return self._finish_device_autoreset(transition)
+        except BaseException as error:
+            self._task_spec.latch_device_fault(error)
+            raise
+
+    def _finish_device_autoreset(self, transition):
+        import torch
+
+        for name, value, dtype in (('reward', transition.reward, torch.float32),
+                                   ('terminated', transition.terminated, torch.bool),
+                                   ('truncated', transition.truncated, torch.bool)):
+            if (not isinstance(value, torch.Tensor) or value.dtype != dtype
+                    or str(value.device) != transition.device or tuple(value.shape) != (self.num_envs,)):
+                raise ValueError(f'device {name} must have shape (B,) and the declared dtype/device')
+        done = torch.logical_or(transition.terminated, transition.truncated)
+        selection = self._task_spec.prepare_device_reset_selection(done)
+        old_episode = self._task_spec.device_episode_ids
+        infos = {'episode_id': old_episode, 'episode_step': self._task_spec.device_episode_steps,
+                 'final_mask': done.clone()}
+        observation = transition.observation
+        if selection.selected_count:
+            infos['final_observation'] = _copy_selected_device_tree(observation, done)
+            infos['final_episode_id'] = old_episode[done].clone()
+            infos['final_episode_step'] = infos['episode_step'][done].clone()
+            reset = self._task_spec.reset_sampled_device(mask=done, selection=selection)
+            observation = reset.observation
+            infos['episode_id'] = reset.infos['episode_id']
+            infos['episode_step'] = self._task_spec.device_episode_steps
+        return observation, transition.reward, transition.terminated, transition.truncated, infos
 
     def _validate_action(self, actions: Any) -> None:
         if isinstance(self.single_action_space, (gym.spaces.Dict, gym.spaces.Tuple)):
@@ -248,6 +309,9 @@ class HomogeneousVectorTaskEnv:
     def step_device(self, actions: Any):
         """Optional device transition forwarding; NumPy path is unchanged."""
 
+        if self._execution_mode == 'device':
+            raise RuntimeError('use step() for the coordinated device lifecycle')
+
         stepper = getattr(self._task_spec, "step_device", None)
         if not callable(stepper):
             raise RuntimeError("homogeneous task has no step_device capability")
@@ -280,6 +344,8 @@ class HomogeneousVectorTaskEnv:
         return preparer(mask)
 
     def reset_device(self, state: Mapping[str, Any], mask: Any, *, selection=None):
+        if self._execution_mode == 'device':
+            raise RuntimeError('use reset() for the coordinated device lifecycle')
         resetter = getattr(self._task_spec, "reset_device", None)
         if not callable(resetter):
             raise RuntimeError("homogeneous task has no reset_device capability")
@@ -288,6 +354,8 @@ class HomogeneousVectorTaskEnv:
         return resetter(state, mask, selection=selection)
 
     def reset_device_from_mask(self, mask: Any, *, selection=None):
+        if self._execution_mode == 'device':
+            raise RuntimeError('use reset() for the coordinated device lifecycle')
         resetter = getattr(self._task_spec, "reset_device_from_mask", None)
         if not callable(resetter):
             raise RuntimeError("homogeneous task has no device autoreset capability")
@@ -296,6 +364,10 @@ class HomogeneousVectorTaskEnv:
         return resetter(mask, selection=selection)
 
     def close(self) -> None:
+        if self._execution_mode == 'device':
+            if self._closed:
+                return
+            self._closed = True
         try:
             self.close_render()
         except BaseException as error:

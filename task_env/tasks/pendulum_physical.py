@@ -7,7 +7,6 @@ from ..artifacts import Timebase
 from ..environment.task_source import compile_existing_subject_effort_task, compile_named_effort_joint_reset_plan
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ExistingSubjectEffortTask
-from ..environment.gym_compat import Box, Dict
 
 from .pendulum import (PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                        PENDULUM_SUCCESS_DEFINITION, PendulumTaskDefinition,
@@ -36,7 +35,7 @@ def _reset_plan(artifact, source, seed, sampled=None):
 
 
 def _observation_spaces(_env):
-    return {'state': Dict({'proprioception': Box(-np.inf, np.inf, (3,), dtype=np.float32)})}
+    return dict(PendulumObservationBuilder(qpos_id=0, qvel_id=0).observation_space.spaces)
 
 
 def _task_state(state):
@@ -48,7 +47,8 @@ def _task_state(state):
 
 def reset_metadata(sample):
     return {'profile': 'pendulum_uniform_angle_velocity_v1',
-        'angle_range_rad': [-np.pi, np.pi], 'angular_velocity_range_rad_s': [-1., 1.],
+        'angle_range_rad': list(PENDULUM_TASK_SEMANTICS.reset_angle_range),
+        'angular_velocity_range_rad_s': list(PENDULUM_TASK_SEMANTICS.reset_velocity_range),
         'theta_rad': sample.joint_position[JOINT],
         'theta_dot_rad_s': sample.joint_velocity[JOINT]}
 

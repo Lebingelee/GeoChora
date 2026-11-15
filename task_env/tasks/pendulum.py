@@ -72,6 +72,10 @@ class PendulumTaskSemantics:
     success_window_steps: int = PENDULUM_SUCCESS_WINDOW_STEPS
     horizon: int = PENDULUM_HORIZON
     torque_limit: float = float(PENDULUM_ACTION_CONTRACT.high)
+    reset_angle_range: tuple[float, float] = (-math.pi, math.pi)
+    reset_velocity_range: tuple[float, float] = (-1.0, 1.0)
+    angular_velocity_cost_weight: float = 0.10
+    torque_cost_weight: float = 0.001
 
     def __post_init__(self) -> None:
         if self.upright_angle_rad <= 0.0 or self.upright_angular_velocity <= 0.0:
@@ -108,12 +112,12 @@ class PendulumTaskSemantics:
     ) -> tuple[np.ndarray | np.float32, np.ndarray | np.float32]:
         if size is None:
             return (
-                np.float32(rng.uniform(-math.pi, math.pi)),
-                np.float32(rng.uniform(-1.0, 1.0)),
+                np.float32(rng.uniform(*self.reset_angle_range)),
+                np.float32(rng.uniform(*self.reset_velocity_range)),
             )
         return (
-            rng.uniform(-math.pi, math.pi, size=int(size)).astype(np.float32),
-            rng.uniform(-1.0, 1.0, size=int(size)).astype(np.float32),
+            rng.uniform(*self.reset_angle_range, size=int(size)).astype(np.float32),
+            rng.uniform(*self.reset_velocity_range, size=int(size)).astype(np.float32),
         )
 
     def validate_torque(self, torque: np.ndarray) -> None:
@@ -147,8 +151,8 @@ class PendulumTaskSemantics:
         success = next_upright_steps >= self.success_window_steps
         reward_terms = {
             "upright": math.cos(float(theta)),
-            "angular_velocity_cost": -0.10 * float(theta_dot) ** 2,
-            "torque_cost": -0.001 * float(torque) ** 2,
+            "angular_velocity_cost": -self.angular_velocity_cost_weight * float(theta_dot) ** 2,
+            "torque_cost": -self.torque_cost_weight * float(torque) ** 2,
             "success": 1.0 if success else 0.0,
         }
         metrics = {
@@ -209,8 +213,8 @@ class PendulumTaskSemantics:
         truncated = elapsed >= self.horizon
         reward_terms = {
             "upright": np.cos(theta_value).astype(np.float32),
-            "angular_velocity_cost": (-0.10 * theta_dot_value * theta_dot_value).astype(np.float32),
-            "torque_cost": (-0.001 * torque_value * torque_value).astype(np.float32),
+            "angular_velocity_cost": (-self.angular_velocity_cost_weight * theta_dot_value * theta_dot_value).astype(np.float32),
+            "torque_cost": (-self.torque_cost_weight * torque_value * torque_value).astype(np.float32),
             "success": success.astype(np.float32),
         }
         reward = np.sum(np.stack(tuple(reward_terms.values()), axis=0), axis=0).astype(np.float32)
@@ -294,6 +298,7 @@ class PendulumObservationBuilder:
 @dataclass
 class PendulumTaskDefinition(TaskDefinitionBase):
     uses_unified_state_view = True
+    device_state_required_fields = ('qpos', 'qvel')
 
     qpos_id: int
     qvel_id: int
@@ -309,6 +314,65 @@ class PendulumTaskDefinition(TaskDefinitionBase):
             horizon=PENDULUM_HORIZON,
         )
         self._upright_steps = 0
+        self._device_upright_steps = None
+
+    def sample_device_reset(self, uniforms, template):
+        """Apply the same angle/velocity reset distributions to device uniforms."""
+        import torch
+
+        if tuple(uniforms.shape) != (template['qpos'].shape[0], 2):
+            raise ValueError('Pendulum device reset needs two uniforms per row')
+        qpos, qvel = torch.zeros_like(template['qpos']), torch.zeros_like(template['qvel'])
+        angle_low, angle_high = self._semantics.reset_angle_range
+        velocity_low, velocity_high = self._semantics.reset_velocity_range
+        qpos[:, self.qpos_id] = angle_low + uniforms[:, 0] * (angle_high - angle_low)
+        qvel[:, self.qvel_id] = velocity_low + uniforms[:, 1] * (velocity_high - velocity_low)
+        return {'qpos': qpos, 'qvel': qvel}
+
+    def device_observation_space(self):
+        """Use the same declared observation schema as the scalar task."""
+        return PendulumObservationBuilder(qpos_id=self.qpos_id, qvel_id=self.qvel_id).observation_space
+
+    def reset_device(self, *, state, reset_mask, selection=None):
+        """Reset only the selected rows of the task's device success window."""
+        import torch
+
+        del selection
+        if self._device_upright_steps is None:
+            self._device_upright_steps = torch.zeros(state.num_envs, dtype=torch.int32, device=state.device)
+        self._device_upright_steps.masked_fill_(reset_mask, 0)
+
+    def close_device(self):
+        self._device_upright_steps = None
+
+    def build_device_observation(self, state):
+        import torch
+
+        q = state.arrays['qpos'][:, self.qpos_id]
+        qd = state.arrays['qvel'][:, self.qvel_id]
+        theta = torch.remainder(q + math.pi, 2.0 * math.pi) - math.pi
+        return {'state': {'proprioception': torch.stack((torch.cos(theta), torch.sin(theta), qd), dim=1)}}
+
+    def evaluate_device(self, *, state, action, elapsed_steps, previous_state=None):
+        """Evaluate the existing Pendulum reward and dwell semantics on device."""
+        import torch
+
+        del previous_state
+        if self._device_upright_steps is None:
+            raise RuntimeError('Pendulum device task must be reset before evaluation')
+        q = state.arrays['qpos'][:, self.qpos_id]
+        qd = state.arrays['qvel'][:, self.qvel_id]
+        theta = torch.remainder(q + math.pi, 2.0 * math.pi) - math.pi
+        effort = action['torque'][:, 0]
+        upright = (theta.abs() <= self._semantics.upright_angle_rad) & (
+            qd.abs() <= self._semantics.upright_angular_velocity)
+        self._device_upright_steps = torch.where(upright, self._device_upright_steps + 1,
+                                                 torch.zeros_like(self._device_upright_steps))
+        success = self._device_upright_steps >= self._semantics.success_window_steps
+        reward = (torch.cos(theta) - self._semantics.angular_velocity_cost_weight * qd.square()
+                  - self._semantics.torque_cost_weight * effort.square() + success.float())
+        return {'reward': reward, 'terminated': success,
+                'truncated': elapsed_steps >= self._semantics.horizon}
 
     def _coerce_action(
         self,

@@ -4,7 +4,7 @@
 
 ## 当前停门
 
-**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；5c 后 E00～E16 代码与项目优化已获维护者有界接收。G06／G07 尚未开始，v2.1.1 尚未完成。** 单元 1～9 是 5c 内部工作单元，版本仍为七阶段、二十二子阶段。
+**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；5c 后 E00～E16 代码与项目优化已获维护者有界接收。G06a attempt001 已实施 MJWarp Pendulum device batch 并形成 PARTIAL 返包，待独立复核；G06／G07 尚未接收，v2.1.1 尚未完成。** 单元 1～9 是 5c 内部工作单元，版本仍为七阶段、二十二子阶段。当前实现与未通过的 Rasterizer／Recorder 边界见[API](../api/README.md#pendulum-device-batchattempt001未接收)。
 
 [单元 9 综合主审](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)的 `SOL_ACCEPTED_BOUNDED_5C` 已由维护者在本次启动对话确认；原主审中的“维护者待确认”描述保留其审查时点。优化实施安排见[执行计划](../planning/post-5c-optimization-execution.md)。顺序为：G05 功能接收 → 代码优化、定向复验及人工接收 → 项目证据和 refs／worktree 整理及接收 → 决定进入 G06。G07 继续承担 G06 新增调用者及最终版本收口，7b 三 provider × 三 seed 门保留。
 
@@ -12,7 +12,7 @@
 
 维护者另行提出的[Env／provider／renderer精简计划](../planning/post-optimization-env-provider-render-slimming-plan.md)已完成 C1～C5 的有界实施和[集中复验](reviews/20261114_post_optimization_c5_final.md)，其限制及独立复核见交付记录；不是未关闭的原账目。基于 `7f8796b4` 的[G05→G06复核](reviews/20261114_g05_pre_g06_readiness_7f8796b4.md)未发现须重开G05的功能阻断项，已同步当前说明；可以准备G06的范围和执行包，本次不自动启动G06。
 
-2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。接手请读取[G06 Agent handoff](20261115_g06_agent_handoff.md)并核对实时refs；G06实际实施仍由后续agent开展，main／远端未同步、未发布。
+2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。[G06 Agent handoff](20261115_g06_agent_handoff.md)保留派发前时点；后续 attempt001 已开始实施，main／远端未同步、未发布。
 
 ## 启动输入与工作归属
 
@@ -73,4 +73,4 @@ E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务�
 
 2026-11-14阶段性记录：维护者批准三处停用工作树的[集中清单及具体例外](reviews/20261114_e11_e16_three_worktree_decision.md)，完成 camera、core-baseline 和旧版 clean checkout 的 Git 移除；保留主checkout与冻结archive。该时点尚待T35收敛和快照处置，后续状态见下；各次测量及恢复限制保留在[原执行结果](reviews/20261114_e11_e16_three_worktree_execution.md)。
 
-当前项目停门：[E15 最终清理与独立复核](reviews/20261114_e15_final_disposition_execution.md)已完成维护者批准清单；同序含 U5 和分类日志的范围下降 29,109,616,640 B，保留两项原位例外。U4/U5 不重开；维护者已接收 [项目接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)所列边界及交付 `86921c62`。旧 Git 管理元数据损失、历史精确净额 UNKNOWN、同次 completion 及不可见进程限制保留，G06 不启动。
+E15 项目停门时：[E15 最终清理与独立复核](reviews/20261114_e15_final_disposition_execution.md)已完成维护者批准清单；同序含 U5 和分类日志的范围下降 29,109,616,640 B，保留两项原位例外。U4/U5 不重开；维护者已接收 [项目接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)所列边界及交付 `86921c62`。旧 Git 管理元数据损失、历史精确净额 UNKNOWN、同次 completion 及不可见进程限制保留；其时 G06 尚未启动。

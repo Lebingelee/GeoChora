@@ -464,6 +464,36 @@ class WorldRandomizationRuntimeProtocol(Protocol):
 
 
 @dataclass(frozen=True)
+class DeviceStateIdentity:
+    """Identity of a device publication shared by all rows of one batch."""
+
+    source_id: str
+    source_closure_sha256: str
+    artifact_sha256: str
+    materialization_id: str
+    generation: int
+    revision: int
+    native_step: int
+    native_time_s: float
+    control_dt_s: float
+
+    def __post_init__(self):
+        import math
+        import re
+
+        if not self.source_id or not self.materialization_id:
+            raise ValueError('device state requires source and materialization identities')
+        if any(re.fullmatch('[0-9a-f]{64}', value) is None
+               for value in (self.source_closure_sha256, self.artifact_sha256)):
+            raise ValueError('device state requires source and artifact SHA-256 identities')
+        if (self.generation < 0 or self.revision < 0 or self.native_step < 0
+                or not math.isfinite(self.native_time_s) or self.native_time_s < 0
+                or not math.isfinite(self.control_dt_s)
+                or self.control_dt_s <= 0):
+            raise ValueError('device state generation, revision or control cadence is invalid')
+
+
+@dataclass(frozen=True)
 class DeviceBatchState:
     """Opaque device-resident named state exposed at the learner boundary.
 
@@ -478,6 +508,10 @@ class DeviceBatchState:
     arrays: Mapping[str, Any]
     device: str
     num_envs: int
+    identity: DeviceStateIdentity | None = None
+    lifetime: str | None = None
+    episode_ids: Any = None
+    episode_steps: Any = None
 
     def __post_init__(self) -> None:
         if int(self.num_envs) < 1:
@@ -496,6 +530,18 @@ class DeviceBatchState:
                 )
         object.__setattr__(self, "arrays", normalized)
         object.__setattr__(self, "device", str(self.device))
+        if self.identity is not None and not isinstance(self.identity, DeviceStateIdentity):
+            raise TypeError('device state identity must be DeviceStateIdentity')
+        if self.lifetime not in (None, 'owned_snapshot', 'provider_alias'):
+            raise ValueError('unsupported device state lifetime')
+        if (self.episode_ids is None) != (self.episode_steps is None):
+            raise ValueError('device episode IDs and clocks must be published together')
+        if self.episode_ids is not None:
+            for name, value, dtype in (('episode_ids', self.episode_ids, 'torch.int64'),
+                                       ('episode_steps', self.episode_steps, 'torch.int32')):
+                if (tuple(value.shape) != (self.num_envs,) or str(value.device) != self.device
+                        or str(value.dtype) != dtype):
+                    raise ValueError(f'{name} must have shape (B,) and the declared device/dtype')
 
 
 @dataclass(frozen=True)
@@ -635,6 +681,7 @@ __all__ = [
     "DeviceBatchResetResult",
     "DeviceBatchState",
     "DeviceBatchTransition",
+    "DeviceStateIdentity",
     "DeviceResetSelection",
     "WorldRandomizationBatch",
     "WorldRandomizationRuntimeProtocol",

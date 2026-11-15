@@ -264,19 +264,23 @@ def _layered_execution_selection(*, provider, backend, device, renderer, runtime
     import sys
     host, engine, family = {
         "mujoco": ("standalone", "mujoco", "unknown"),
+        "mujoco_warp": ("standalone", "mujoco_warp", "rigid"),
         "geophys": ("standalone", "geophys", "rigid"),
         "isaacsim": ("isaacsim", "physx", "physx"),
     }[provider]
     defaults = {
         "host": host, "engine": engine, "solver_family": family,
         "solver_algorithm": (runtime.rigid_solver_backend or "unknown") if provider == "geophys" else "unknown",
-        "coupler": "not_applicable" if provider == "mujoco" else "unknown",
+        "coupler": "not_applicable" if provider in {"mujoco", "mujoco_warp"} else "unknown",
         "batch_layout": "scalar", "deployment": "in_process",
         "interpreter": sys.executable, "native_dt": None,
     }
     if selected:
         import os
-        if provider == 'geophys':
+        if provider == 'mujoco_warp':
+            defaults.update(batch_layout='native_batch', deployment='isolated_worker',
+                            interpreter=os.environ.get('GEOCHORA_MJWARP_PYTHON'))
+        elif provider == 'geophys':
             defaults.update(deployment='isolated_worker', interpreter=os.environ.get('GEOCHORA_GEOPHYS_PYTHON'))
         elif provider == 'isaacsim':
             defaults.update(deployment='isolated_worker', interpreter=os.environ.get('ISAAC_SIM_PYTHON'))
@@ -289,14 +293,15 @@ def _layered_execution_selection(*, provider, backend, device, renderer, runtime
     route = {name: values.get(name, default) for name, default in defaults.items()}
     selection = ExecutionSpecV2(
         schema_version="execution-spec-v2", physics_provider=provider,
-        physics_backend=backend, physics_device=device, physics_profile="unknown",
+        physics_backend=backend, physics_device=device,
+        physics_profile="mujoco-warp-4.0.1" if provider == 'mujoco_warp' else "unknown",
         provider_seed=None, determinism_mode="unknown", render_default=renderer,
         **route,
     )
     return selection, defaults
 
 
-def _resolve_selected_config(environment_type, config):
+def _resolve_selected_config(environment_type, config, *, execution_scope='scalar'):
     """Resolve the formal task configuration into one build request."""
     supplied = config if isinstance(config, ResolvedSelectedConfig) else None
     if supplied is not None:
@@ -394,6 +399,10 @@ def _resolve_selected_config(environment_type, config):
     task_configuration = environment_type.selected_task_configuration()
     base = environment_type.selected_default_config(task_configuration)
     execution_defaults = dict(_CORE_SELECTED_EXECUTION_DEFAULTS)
+    if execution_scope == 'device_batch':
+        if 'physics_provider' not in sections['execution']:
+            raise ValueError('device batch requires an explicit physics provider')
+        execution_defaults.update(physics_backend='cuda', physics_device='cuda:0')
     class_defaults = environment_type.selected_execution_defaults
     task_yaml_defaults = (
         {} if task_configuration is None else task_configuration.get("execution", {})
@@ -413,9 +422,10 @@ def _resolve_selected_config(environment_type, config):
     provider = execution_defaults["physics_provider"]
     backend = execution_defaults["physics_backend"]
     device = execution_defaults["physics_device"]
-    if (provider, backend, device) not in {("geophys", "cpu", "cpu"),
-                                           ("mujoco", "cpu", "cpu"),
-                                           ("isaacsim", "cuda", "cuda:0")}:
+    admitted_routes = ({('mujoco_warp', 'cuda', 'cuda:0')} if execution_scope == 'device_batch' else
+                       {('geophys', 'cpu', 'cpu'), ('mujoco', 'cpu', 'cpu'),
+                        ('isaacsim', 'cuda', 'cuda:0')})
+    if (provider, backend, device) not in admitted_routes:
         raise ValueError(
             "unsupported selected physics provider/backend/device combination: "
             f"{provider!r}/{backend!r}/{device!r}"
@@ -497,8 +507,12 @@ def _resolve_selected_config(environment_type, config):
     for name in ("host", "engine", "solver_family", "solver_algorithm", "coupler"):
         if getattr(selection, name) != route_defaults[name]:
             raise ValueError(f"static_config: requested {name} has no implemented adapter for {provider}")
-    if selection.batch_layout != "scalar":
-        raise ValueError("static_config: selected native batch is not implemented")
+    expected_layout = 'native_batch' if execution_scope == 'device_batch' else 'scalar'
+    if selection.batch_layout != expected_layout:
+        raise ValueError(f'static_config: selected execution requires {expected_layout} layout')
+    if execution_scope == 'device_batch' and (
+            selection.deployment != 'isolated_worker' or not selection.interpreter):
+        raise ValueError('MJWarp device batch requires an explicit isolated-worker interpreter')
     if selection.deployment == "in_process":
         import sys
         if selection.interpreter is None or Path(selection.interpreter).resolve() != Path(sys.executable).resolve():
@@ -543,7 +557,7 @@ def _resolve_selected_config(environment_type, config):
             original.setdefault('robot', {})['native_drive'] = result.native_drive
         if result.controller_profile is not None:
             original['controller']['profile_id'] = result.controller_profile
-        reconstructed = _resolve_selected_config(environment_type, original)
+        reconstructed = _resolve_selected_config(environment_type, original, execution_scope=execution_scope)
         if (reconstructed.environment != result.environment
                 or reconstructed.execution_spec_v2 != result.execution_spec_v2
                 or reconstructed.source_delivery_manifest != result.source_delivery_manifest):
@@ -578,6 +592,7 @@ def _normalize_controller_selection(config):
 def _resolve_task_env_config_impl(
     environment_type,
     config: ResolvedEnvConfig | Mapping[str, object] | str | Path | None,
+    *, execution_scope='scalar',
 ) -> ResolvedEnvConfig:
     """Resolve task defaults plus an optional public YAML/mapping override.
 
@@ -589,7 +604,9 @@ def _resolve_task_env_config_impl(
     """
 
     if getattr(environment_type, "uses_selected_public_config", False):
-        return _resolve_selected_config(environment_type, config)
+        return _resolve_selected_config(environment_type, config, execution_scope=execution_scope)
+    if execution_scope != 'scalar':
+        raise ValueError('device batch requires a selected task configuration')
     config = _normalize_controller_selection(config)
     if isinstance(config, ResolvedEnvConfig):
         resolved = config
@@ -614,10 +631,12 @@ def _resolve_task_env_config_impl(
 
 
 
-def resolve_task_env_config(environment_type, config):
+def resolve_task_env_config(environment_type, config, *, execution_scope='scalar'):
     """Resolve the common config and attach a stable receipt to static rejections."""
     try:
-        return _resolve_task_env_config_impl(environment_type, config)
+        if execution_scope not in {'scalar', 'device_batch'}:
+            raise ValueError('unsupported execution scope')
+        return _resolve_task_env_config_impl(environment_type, config, execution_scope=execution_scope)
     except Exception as error:
         try:
             snapshot = _identity_value(config)

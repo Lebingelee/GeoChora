@@ -13,6 +13,34 @@ from ...artifacts.state import StateBoundaryIdentity, StateSampleClock
 from .contracts import digest
 
 
+@dataclass(frozen=True)
+class DeviceJointEffortCommand:
+    """One source-bound batch of direct joint efforts on a CUDA device."""
+
+    boundary: object
+    binding_sha256: str
+    writer_id: str
+    channel_keys: tuple[tuple[str, str, str], ...]
+    values: object
+    episode_ids: object
+    episode_steps: object
+
+    def __post_init__(self):
+        from ...runtime.contracts import DeviceStateIdentity
+
+        if not isinstance(self.boundary, DeviceStateIdentity):
+            raise TypeError('device effort requires a typed state boundary')
+        _sha(self.binding_sha256, 'binding')
+        _name(self.writer_id)
+        if not self.channel_keys or len(set(self.channel_keys)) != len(self.channel_keys):
+            raise ValueError('device effort requires unique ordered channels')
+        if len(tuple(self.values.shape)) != 2 or self.values.shape[1] != len(self.channel_keys):
+            raise ValueError('device effort shape differs from declared channels')
+        if (tuple(self.episode_ids.shape) != (self.values.shape[0],)
+                or tuple(self.episode_steps.shape) != (self.values.shape[0],)):
+            raise ValueError('device effort episode identity and clock require shape (B,)')
+
+
 def _sha(value, label):
     if not _SHA256.fullmatch(value):
         raise ValueError(f'{label} must be lowercase SHA-256')

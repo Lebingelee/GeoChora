@@ -277,8 +277,13 @@ def build_device_field_plan(
         task_optional_fields = ()
         missing.append(f"task.device_state_optional_fields: {exc}")
 
+    transition_summary = summary.get('device_transition')
+    declared_fields = (transition_summary.get('state_readback_fields')
+                       if isinstance(transition_summary, Mapping) else None)
+    explicit_device_fields = execution == 'device_worker' and isinstance(declared_fields, (list, tuple))
     required_state_fields: list[str] = []
-    for name in _BASE_STATE_FIELDS + (
+    base_fields = () if explicit_device_fields else _BASE_STATE_FIELDS
+    for name in base_fields + (
         _CONTACT_STATE_FIELDS if bool(summary.get("contact_enabled", False)) else ()
     ) + task_required_fields:
         if name not in required_state_fields:
@@ -288,7 +293,12 @@ def build_device_field_plan(
     )
     supported_optional_fields: list[str] = []
     reader = runtime_methods["runtime.read_device_state"]
-    can_probe = transition_available and callable(reader)
+    can_probe = transition_available and callable(reader) and not explicit_device_fields
+    if explicit_device_fields:
+        absent = set(required_state_fields) - set(declared_fields)
+        if absent:
+            missing.append(f'runtime lacks declared task device fields: {sorted(absent)}')
+        supported_optional_fields.extend(name for name in optional_state_fields if name in declared_fields)
     if can_probe:
         for name in required_state_fields:
             try:
@@ -388,7 +398,7 @@ def build_device_field_plan(
             ),
         )
     )
-    if execution not in {"local", "remote"}:
+    if execution not in {"local", "remote", "device_worker"}:
         missing.append(f"unsupported execution provenance: {execution}")
     if transfer_mode not in {"device", "host_numpy"}:
         missing.append(f"unsupported transfer mode: {transfer_mode}")

@@ -277,6 +277,7 @@ class DirectJointEffortControllerV1:
         if any(key not in channels or controller_id not in channels[key].owner_ids for key in keys):
             raise ValueError('direct effort channels differ from their declared writer')
         self.binding, self.writer_id = binding, controller_id
+        self._binding_hash = binding.identity_hash
         self._channels = tuple(channels[key] for key in keys)
         self._action_key = action_key
         self.identity = digest({'schema_version': 'direct-joint-effort-controller-v1',
@@ -287,6 +288,7 @@ class DirectJointEffortControllerV1:
         self.action_space = Dict({action_key: Box(low=low, high=high, dtype=np.float32)})
         self._episode_id = None
         self.last_action = None
+        self._device_limits = {}
 
     def compatibility_feedback(self, resolved, ack, *, mode, include_diagnostics):
         """Project a validated unit-transmission command, not a force measurement."""
@@ -319,11 +321,54 @@ class DirectJointEffortControllerV1:
             feedback.update(action_clipped=False, ctrl_clipped=False)
         return feedback
 
+    @property
+    def channel_keys(self):
+        """Ordered physical targets consumed by this Controller."""
+        return tuple(channel.target_key for channel in self._channels)
+
     def reset_from_realized_state(self, state):
         if state.boundary.scene_identity_hash != self.binding.scene_sha256:
             raise ValueError('direct effort reset state differs from bound Scene')
         self._episode_id = state.boundary.episode_id
         self.last_action = np.zeros(len(self._channels), dtype=np.float32)
+
+    def convert_device_batch(self, action, state):
+        """Consume one named device action at the published state boundary."""
+        from collections.abc import Mapping
+        import torch
+        from .physical_commands import DeviceJointEffortCommand
+        from ...runtime.contracts import DeviceBatchState
+
+        if not isinstance(state, DeviceBatchState) or state.identity is None:
+            raise TypeError('direct device effort requires an identified state publication')
+        if state.episode_ids is None or state.episode_steps is None:
+            raise ValueError('direct device effort requires per-row episode identity and clocks')
+        boundary = state.identity
+        if (boundary.source_id, boundary.source_closure_sha256, boundary.artifact_sha256) != (
+                self.binding.source_id, self.binding.source_closure_sha256, self.binding.artifact_sha256):
+            raise ValueError('device effort state differs from Controller source binding')
+        if not isinstance(action, Mapping) or set(action) != {self._action_key}:
+            raise ValueError('direct effort action tree differs from its declaration')
+        values = action[self._action_key]
+        if (not isinstance(values, torch.Tensor) or str(values.device) != state.device
+                or values.dtype != torch.float32 or tuple(values.shape) != (state.num_envs, len(self._channels))):
+            raise ValueError('direct device effort requires CUDA float32 values with shape (B, channels)')
+        if values.device.type != 'cuda' or not bool(torch.isfinite(values).all()):
+            raise ValueError('direct device effort must be finite and CUDA-resident')
+        if values.device not in self._device_limits:
+            self._device_limits[values.device] = (
+                torch.tensor([c.effort_range[0] for c in self._channels], device=values.device),
+                torch.tensor([c.effort_range[1] for c in self._channels], device=values.device))
+        low, high = self._device_limits[values.device]
+        if bool(((values < low) | (values > high)).any()):
+            raise ValueError('direct device effort exceeds its declared bounds')
+        return DeviceJointEffortCommand(boundary, self._binding_hash, self.writer_id,
+                                        tuple(channel.target_key for channel in self._channels),
+                                        values.contiguous(), state.episode_ids.clone(), state.episode_steps.clone())
+
+    def close_device(self):
+        """Release Controller-owned device constants after the batch closes."""
+        self._device_limits.clear()
 
     def compute(self, action, state, context):
         from collections.abc import Mapping

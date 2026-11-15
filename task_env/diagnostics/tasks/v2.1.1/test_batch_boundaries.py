@@ -1,5 +1,8 @@
 """Pure capability admission and SB3 lifecycle checks; no native worker."""
 from dataclasses import dataclass
+import multiprocessing
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import gymnasium as gym
@@ -15,11 +18,23 @@ FORMAL_UIDS = ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'
 def test_formal_batch_rejected_before_worker_or_runtime(uid, execution, monkeypatch):
     from task_env import make_parallel_env
     from task_env.environment.types import StageUnavailableError
-    from task_env.vectorization import parallel
-
-    monkeypatch.setattr(parallel.mp, 'get_context', lambda *_: pytest.fail('worker requested'))
+    monkeypatch.setattr(multiprocessing, 'get_context', lambda *_: pytest.fail('worker requested'))
     with pytest.raises(StageUnavailableError, match='no formal batch adapter'):
         make_parallel_env(uid, num_env=2, backend='cpu', execution=execution)
+
+
+def test_parallel_entry_does_not_require_sb3_until_bridge_is_used():
+    code = '''
+import builtins
+original = builtins.__import__
+def guarded(name, *args, **kwargs):
+    if name.startswith("stable_baselines3"):
+        raise AssertionError("SB3 imported before its bridge was requested")
+    return original(name, *args, **kwargs)
+builtins.__import__ = guarded
+import task_env.vectorization.parallel
+'''
+    subprocess.run([sys.executable, '-c', code], check=True)
 
 
 @pytest.mark.parametrize('uid', FORMAL_UIDS)
@@ -127,7 +142,7 @@ def test_renderer_close_failure_still_closes_task_and_runtime():
             calls.append('runtime_close')
 
     renderer = Renderer()
-    spec = SimpleNamespace(num_envs=1, metadata={}, parallel_render_provider=renderer,
+    spec = SimpleNamespace(num_envs=1, metadata={}, parallel_render_provider=renderer, _source_resources=None,
         single_action_space=gym.spaces.Box(-1, 1, shape=(1,), dtype=np.float32),
         single_observation_space=gym.spaces.Box(-1, 1, shape=(1,), dtype=np.float32),
         runtime=Runtime())

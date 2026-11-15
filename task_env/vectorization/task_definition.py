@@ -9,6 +9,7 @@ framework.  All episode bookkeeping remains here.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 import inspect
 from typing import Any
 
@@ -200,6 +201,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         metadata: Mapping[str, Any],
         horizon: int,
         ignore_done: bool,
+        source_resources=None,
     ) -> None:
         if int(num_envs) < 1:
             raise ValueError("num_envs must be positive")
@@ -221,6 +223,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         self.metadata = dict(metadata)
         self.horizon = int(horizon)
         self.ignore_done = bool(ignore_done)
+        self._source_resources = source_resources
         self.resolved_config = {
             "task_uid": self.uid,
             "num_envs": self.num_envs,
@@ -258,6 +261,9 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         # canonical Gym/SB3 bookkeeping path; it must not be copied back on
         # every device transition.
         self._device_elapsed_steps = None
+        self._device_rng_state = None
+        self._device_episode_ids = None
+        self._device_fault = None
         self._last_state = None
         self._last_device_state = None
         runtime_admission = admit_runtime_port(
@@ -272,7 +278,13 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                 self.metadata.get("transfer_mode", "device")
             ),
         )
-        if not runtime_admission.host_available:
+        device_execution = self.metadata.get('execution') == 'device_worker'
+        if device_execution and not runtime_admission.device_available:
+            raise StageUnavailableError(
+                'batch runtime does not satisfy the device Runtime Port: '
+                + ', '.join(runtime_admission.device_reasons)
+            )
+        if not device_execution and not runtime_admission.host_available:
             raise StageUnavailableError(
                 "batch runtime does not satisfy the host Runtime Port: "
                 + ", ".join(runtime_admission.host_reasons)
@@ -540,7 +552,11 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         continue to use the existing Gym/SB3 NumPy route.
         """
 
-        if self._last_state is None:
+        if self._device_fault is not None:
+            raise RuntimeError('device task is faulted; close and reconstruct it') from self._device_fault
+        has_state = (self._last_device_state is not None if self.metadata.get('execution') == 'device_worker'
+                     else self._last_state is not None)
+        if not has_state:
             raise RuntimeError("batch reset() must be called before step_device()")
         if not self.device_field_plan.available:
             raise StageUnavailableError(
@@ -559,10 +575,21 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                 device=self.device_field_plan.device,
                 phase="runtime.read_device_state()",
             )
+            if self.metadata.get('execution') == 'device_worker':
+                device_before = self._with_device_episode_metadata(device_before)
             control = self._device_action_converter(actions, device_before)
         finally:
             if profile is not None:
                 profile.end("bridge_input")
+        try:
+            return self._advance_device_transition(actions, device_before, control, profile)
+        except BaseException as error:
+            if self.metadata.get('execution') == 'device_worker':
+                self._device_fault = error
+            raise
+
+    def _advance_device_transition(self, actions, device_before, control, profile):
+        """Advance and publish after the action has passed boundary validation."""
         if profile is not None:
             profile.begin("runtime_transition")
         try:
@@ -589,6 +616,8 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                 (self.num_envs,), dtype=torch.int32, device=state_device
             )
         self._device_elapsed_steps.add_(1)
+        if self.metadata.get('execution') == 'device_worker':
+            device_state = self._with_device_episode_metadata(device_state)
         if profile is not None:
             profile.begin("task_evaluation")
         try:
@@ -634,6 +663,9 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                 truncated if hasattr(truncated, "device") else torch.as_tensor(truncated, device=state_device),
                 horizon,
             )
+            if self.ignore_done:
+                terminated = torch.zeros_like(terminated)
+                truncated = torch.zeros_like(truncated)
             self._last_device_state = device_state
             transition_infos = evaluation.get("infos")
             if transition_infos is None:
@@ -661,7 +693,10 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         if not callable(self._device_runtime_read):
             raise StageUnavailableError("runtime has no public read_device_state capability")
         requested = tuple(str(name) for name in names)
-        return self._device_runtime_read(requested)
+        state = self._device_runtime_read(requested)
+        if self.metadata.get('execution') == 'device_worker':
+            state = self._with_device_episode_metadata(state)
+        return state
 
     @property
     def has_privileged_observation(self) -> bool:
@@ -927,6 +962,92 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
             infos=None,
         )
 
+    def latch_device_fault(self, error):
+        """Stop further device operations after a partially executed boundary."""
+        if self._device_fault is None:
+            self._device_fault = error
+
+    def _with_device_episode_metadata(self, state):
+        return replace(state, episode_ids=self.device_episode_ids,
+                       episode_steps=self.device_episode_steps)
+
+    @property
+    def device_episode_ids(self):
+        if self._device_episode_ids is None:
+            raise RuntimeError('device task must be reset before reading episode IDs')
+        return self._device_episode_ids.clone()
+
+    @property
+    def device_episode_steps(self):
+        if self._device_elapsed_steps is None:
+            raise RuntimeError('device task must be reset before reading episode clocks')
+        return self._device_elapsed_steps.clone()
+
+    def reset_sampled_device(self, *, seed=None, mask=None, selection=None):
+        """Sample the Task's reset distribution and apply it on the device."""
+        import torch
+
+        if self._device_fault is not None:
+            raise RuntimeError('device task is faulted; close and reconstruct it') from self._device_fault
+        sampler = getattr(self.task_definition, 'sample_device_reset', None)
+        if not callable(sampler) or not self.device_field_plan.available:
+            raise StageUnavailableError('task has no admitted device reset sampler')
+        device = self.device_field_plan.device
+        if mask is None:
+            mask = torch.ones(self.num_envs, dtype=torch.bool, device=device)
+        if (not isinstance(mask, torch.Tensor) or str(mask.device) != device
+                or mask.dtype != torch.bool or tuple(mask.shape) != (self.num_envs,)):
+            raise ValueError('device reset mask must be CUDA bool with shape (B,)')
+        if seed is None and self._device_rng_state is None:
+            seed = self.base_seed
+        if seed is not None:
+            if (isinstance(seed, int) and not isinstance(seed, bool)
+                    and 0 <= seed <= 2**63 - self.num_envs):
+                seeds = torch.arange(self.num_envs, dtype=torch.int64, device=device) + seed
+            elif isinstance(seed, (tuple, list)) and len(seed) == self.num_envs and all(
+                    isinstance(value, int) and not isinstance(value, bool) and 0 <= value < 2**63
+                    for value in seed):
+                seeds = torch.tensor(seed, dtype=torch.int64, device=device)
+            else:
+                raise ValueError('device reset seed must be nonnegative or contain B nonnegative integers')
+            # Bijectively mix seeds into distinct 63-bit stream states.
+            limit = 0x7fffffffffffffff
+            mixed = seeds ^ (seeds >> 30)
+            mixed = (mixed * 6364136223846793005) & limit
+            mixed = mixed ^ (mixed >> 27)
+            mixed = (mixed * 6364136223846793005) & limit
+            seeded = mixed ^ (mixed >> 31)
+            if self._device_rng_state is None:
+                self._device_rng_state = seeded
+            else:
+                self._device_rng_state = torch.where(mask, seeded, self._device_rng_state)
+        # Full-period 63-bit LCG; high 24 bits give exactly representable
+        # float32 uniforms. Masking leaves unselected streams unchanged.
+        limit = 0x7fffffffffffffff
+        first = (self._device_rng_state * 6364136223846793005 + 1442695040888963407) & limit
+        second = (first * 6364136223846793005 + 1442695040888963407) & limit
+        uniforms = torch.stack(((first >> 39).float(), (second >> 39).float()), dim=1) / 16777216.0
+        shapes = self.runtime.resource_summary()['device_transition']['state_shapes']
+        template = {name: torch.zeros((self.num_envs, *shapes[name]), dtype=torch.float32, device=device)
+                    for name in ('qpos', 'qvel')}
+        sampled = sampler(uniforms, template)
+        if self._device_elapsed_steps is None:
+            self._device_elapsed_steps = torch.zeros(self.num_envs, dtype=torch.int32, device=device)
+        if self._device_episode_ids is None:
+            self._device_episode_ids = torch.zeros(self.num_envs, dtype=torch.int64, device=device)
+        try:
+            state = self.reset_device(sampled, mask, selection=selection)
+        except BaseException as error:
+            self.latch_device_fault(error)
+            raise
+        self._device_rng_state = torch.where(mask, second, self._device_rng_state)
+        self._device_episode_ids = self._device_episode_ids + mask.to(torch.int64)
+        state = self._with_device_episode_metadata(state)
+        self._last_device_state = state
+        observation = self._device_observation_builder(state)
+        return DeviceBatchResetResult(state=state, observation=observation, device=device,
+                                      infos={'episode_id': self._device_episode_ids.clone()})
+
     def resource_summary(self) -> dict[str, Any]:
         summary = dict(self.runtime.resource_summary())
         summary["device_field_plan"] = self.device_field_plan.as_dict()
@@ -934,18 +1055,42 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
 
     def close(self) -> None:
         provider = self.parallel_render_provider
+        error = None
         try:
             if provider is not None:
                 close_provider = getattr(provider, "close", None)
                 if callable(close_provider):
                     close_provider()
-        except BaseException as error:
-            try:
-                self.runtime.close()
-            except BaseException as cleanup_error:
+        except BaseException as caught:
+            error = caught
+        try:
+            self.runtime.close()
+        except BaseException as cleanup_error:
+            if error is None:
+                error = cleanup_error
+            else:
                 error.add_note(f"runtime cleanup also failed: {cleanup_error!r}")
-            raise
-        self.runtime.close()
+        if self.metadata.get('execution') == 'device_worker':
+            for owner in (self.action_adapter, self.task_definition):
+                close_device = getattr(owner, 'close_device', None)
+                if callable(close_device):
+                    try:
+                        close_device()
+                    except BaseException as cleanup_error:
+                        if error is None:
+                            error = cleanup_error
+                        else:
+                            error.add_note(f'device owner cleanup also failed: {cleanup_error!r}')
+            self._last_device_state = self._device_rng_state = None
+            self._device_elapsed_steps = self._device_episode_ids = None
+            self._device_fault = None
+        if self._source_resources is not None:
+            from ..runtime.sessions.source import close_source_and_task_resources
+            source, binding = self._source_resources
+            self._source_resources = None
+            error = close_source_and_task_resources(source, binding, error=error)
+        if error is not None:
+            raise error
 
     def _normalize_reset_mask(self, mask: np.ndarray | None) -> np.ndarray:
         if mask is None:

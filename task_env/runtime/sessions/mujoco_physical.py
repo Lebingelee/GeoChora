@@ -24,6 +24,34 @@ def _same(a, b):
     return bool(np.allclose(a, b, rtol=0, atol=1e-12))
 
 
+def resolve_physical_joint(model, mj, source_joints, definition, channel):
+    """Resolve and verify a declared scalar channel against one native model."""
+    semantic = f'{channel.entity_id}/{channel.joint_id}'
+    native = source_joints.get(semantic)
+    if native is None:
+        raise ValueError('physical channel has no named source joint')
+    joint_id = int(model.joint(native).id)
+    kind = mj.mjtJoint.mjJNT_HINGE if channel.kind == 'revolute' else mj.mjtJoint.mjJNT_SLIDE
+    if int(model.jnt_type[joint_id]) != int(kind) or channel.dof_id != 'dof0':
+        raise ValueError('compiled physical joint kind/DOF differs')
+    if not _same(model.jnt_axis[joint_id], definition.axis):
+        raise ValueError('compiled joint axis differs from declared source')
+    return joint_id, int(model.jnt_dofadr[joint_id])
+
+
+def validate_direct_motor(model, mj, actuator, channel):
+    """Check direct-motor limits and dynamics before native drive isolation."""
+    if (bool(model.actuator_forcelimited[actuator])
+            or not bool(model.actuator_ctrllimited[actuator])
+            or not _same(model.actuator_ctrlrange[actuator], channel.native_range)
+            or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))
+            or int(model.actuator_biastype[actuator]) != int(mj.mjtBias.mjBIAS_NONE)
+            or int(model.actuator_gaintype[actuator]) != int(mj.mjtGain.mjGAIN_FIXED)
+            or int(model.actuator_dyntype[actuator]) != int(mj.mjtDyn.mjDYN_NONE)
+            or float(model.actuator_gainprm[actuator, 0]) != 1.0):
+        raise ValueError('compiled direct motor range, gear or gain differs')
+
+
 def preflight_physical_mujoco(execution, artifact, source):
     """Reject foreign declarations or missing dependency before materialization."""
     from importlib import metadata
@@ -70,18 +98,8 @@ class MuJoCoPhysicalPort:
                         raise ValueError('physical motor subject root is not a fixed world child')
         groups, dofs, actuator_ids, equality_ids = {}, {}, set(), []
         for channel in binding.channels:
-            semantic = f'{channel.entity_id}/{channel.joint_id}'
-            native = source.joints.get(semantic)
-            if native is None:
-                raise ValueError('physical channel has no named source joint')
-            joint_id = int(model.joint(native).id)
-            kind = mj.mjtJoint.mjJNT_HINGE if channel.kind == 'revolute' else mj.mjtJoint.mjJNT_SLIDE
-            if int(model.jnt_type[joint_id]) != int(kind) or channel.dof_id != 'dof0':
-                raise ValueError('compiled physical joint kind/DOF differs')
             definition = definitions[(channel.entity_id, channel.joint_id)]
-            if not _same(model.jnt_axis[joint_id], definition.axis):
-                raise ValueError('compiled joint axis differs from declared source')
-            dof = int(model.jnt_dofadr[joint_id])
+            joint_id, dof = resolve_physical_joint(model, mj, source.joints, definition, channel)
             if dof in dofs.values():
                 raise ValueError('physical channels alias one native DOF')
             dofs[channel.target_key] = dof
@@ -112,15 +130,7 @@ class MuJoCoPhysicalPort:
                     'source_range_N': list(source_range), 'configured_range_N': list(first.native_range),
                     'source_mjcf_modified': False}
             if direct_motor:
-                if (bool(model.actuator_forcelimited[actuator])
-                        or not bool(model.actuator_ctrllimited[actuator])
-                        or not _same(model.actuator_ctrlrange[actuator], first.native_range)
-                        or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))
-                        or int(model.actuator_biastype[actuator]) != int(mj.mjtBias.mjBIAS_NONE)
-                        or int(model.actuator_gaintype[actuator]) != int(mj.mjtGain.mjGAIN_FIXED)
-                        or int(model.actuator_dyntype[actuator]) != int(mj.mjtDyn.mjDYN_NONE)
-                        or float(model.actuator_gainprm[actuator, 0]) != 1.0):
-                    raise ValueError('compiled direct motor range, gear or gain differs')
+                validate_direct_motor(model, mj, actuator, first)
             elif (not bool(model.actuator_forcelimited[actuator])
                     or not _same(model.actuator_forcerange[actuator], first.native_range)
                     or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))

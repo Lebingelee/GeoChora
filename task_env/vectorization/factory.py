@@ -262,4 +262,57 @@ def make_framework_parallel_spec(
     return adapter
 
 
-__all__ = ["make_framework_parallel_spec"]
+def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_directory=None):
+    """Use the selected task's shared source and Controller to construct a device batch."""
+    from dataclasses import asdict
+    from ..runtime.sessions.source import close_source_and_task_resources
+    from ..runtime.providers.mujoco_warp.batch import MuJoCoWarpBatchSession
+
+    if backend != 'cuda':
+        raise ValueError('device batch requires backend=cuda')
+    environment_type = ENV_REGISTRY.get(uid)
+    config = resolve_task_env_config(environment_type, env_config, execution_scope='device_batch')
+    binding = environment_type._build_selected_binding(config)
+    built = None
+    runtime = None
+    try:
+        seed = config.environment.episode.seed
+        seed = 73 if seed is None else seed
+        built = binding.build_for_request(config.physics_provider, config.environment.runtime.backend,
+                                          seed, config.environment.episode.horizon)
+        binding = binding.bind_compiled_control(built)
+        if not callable(binding.task_definition_factory):
+            raise StageUnavailableError('task does not declare a device TaskDefinition')
+        definition = binding.task_definition_factory(built['artifact'])
+        required = ('sample_device_reset', 'reset_device', 'build_device_observation',
+                    'evaluate_device', 'device_observation_space')
+        if any(not callable(getattr(definition, name, None)) for name in required):
+            raise StageUnavailableError('task does not declare the required device semantics')
+        controller = built['controller']
+        if not callable(getattr(controller, 'convert_device_batch', None)):
+            raise StageUnavailableError('compiled Controller has no device action capability')
+        runtime = MuJoCoWarpBatchSession(built, num_envs=num_env, device=config.physics_device,
+            interpreter=config.execution_spec_v2.interpreter, working_directory=worker_directory)
+        metadata = {'task_uid': uid, 'num_envs': int(num_env), 'backend': backend,
+                    'execution': 'device_worker', 'transfer_mode': 'device',
+                    'runtime_resource_summary': runtime.resource_summary(),
+                    'action_schema': dict(binding.action_schema),
+                    'observation_schema': asdict(binding.task_observation_schema)}
+        return BatchTaskLifecycleAdapter(uid=uid, num_envs=num_env, backend=backend,
+            base_seed=seed, runtime=runtime, reset_sampler=binding.task_reset_sampler,
+            compiled_scene=None, initial_state=None, task_definition=definition,
+            action_adapter=controller, single_action_space=binding.action_space_factory(),
+            single_observation_space=definition.device_observation_space(), metadata=metadata,
+            horizon=config.environment.episode.horizon, ignore_done=config.environment.episode.ignore_done,
+            source_resources=(built['source'], binding))
+    except BaseException as error:
+        if runtime is not None:
+            try:
+                runtime.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'device runtime cleanup also failed: {cleanup_error!r}')
+        close_source_and_task_resources(None if built is None else built.get('source'), binding, error=error)
+        raise
+
+
+__all__ = ["make_framework_parallel_spec", "make_selected_device_spec"]
