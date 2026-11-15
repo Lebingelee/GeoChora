@@ -4,9 +4,12 @@ import pytest
 import torch
 
 
-@pytest.mark.parametrize('coupled', (False, True))
-@pytest.mark.parametrize('integrator', ('Euler', 'implicitfast'))
-def test_source_layout_two_joints_free_body_sites_and_masked_reset(monkeypatch, coupled, integrator):
+@pytest.mark.parametrize('coupled,integrator,renamed', (
+    (False, 'Euler', False), (True, 'Euler', False),
+    (False, 'implicitfast', False), (True, 'implicitfast', False),
+    (True, 'Euler', True),
+))
+def test_source_layout_two_joints_free_body_sites_and_masked_reset(monkeypatch, coupled, integrator, renamed):
     import json
     import subprocess
     from pathlib import Path
@@ -78,6 +81,37 @@ def test_source_layout_two_joints_free_body_sites_and_masked_reset(monkeypatch, 
         'fixed_roots': ['root'], 'num_envs': 3, 'physics_dt': .002, 'control_substeps': 1,
         'gravity': (0, 0, 0), 'broadphase': 'n2', 'contact_mode': 'discrete'}
 
+    # Exercise the same semantic structure after both source renaming and
+    # native object/DOF reordering, instead of relying on a fixed Panda layout.
+    names = {'joint_a': 'axis_alpha', 'joint_b': 'axis_beta', 'cube_free': 'payload_free',
+             'link_a': 'segment_alpha', 'link_b': 'segment_beta', 'cube': 'payload',
+             'tip': 'tool_anchor', 'motor_a': 'drive_alpha', 'motor_b': 'drive_beta',
+             'motor_split': 'drive_pair', 'split': 'coupler'} if renamed else {}
+
+    def rename(value):
+        if isinstance(value, str):
+            for old, new in sorted(names.items(), key=lambda item: len(item[0]), reverse=True):
+                value = value.replace(old, new)
+            return value
+        if isinstance(value, dict):
+            return {rename(key): rename(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [rename(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(rename(item) for item in value)
+        return value
+
+    if renamed:
+        import xml.etree.ElementTree as ET
+        root_xml = ET.fromstring(request['source_xml'])
+        worldbody = root_xml.find('worldbody')
+        worldbody[:] = list(reversed(worldbody[:]))
+        rig_body = next(body for body in worldbody if body.get('name') == 'root')
+        rig_body[:] = list(reversed(rig_body[:]))
+        request['source_xml'] = ET.tostring(root_xml, encoding='unicode')
+        request = rename(request)
+        xml = request['source_xml']
+
     class Publisher:
         def __init__(self, fields):
             self.values = {name: torch.zeros(shape, device='cuda', dtype=(torch.bool if dtype == 'bool' else torch.float32))
@@ -95,15 +129,21 @@ def test_source_layout_two_joints_free_body_sites_and_masked_reset(monkeypatch, 
         assert description['physical_layout_facts']['contact_mode_resolved'] == 'discrete'
         assert (description['nq'], description['nv']) == (9, 8)
         joint_positions = description['joint_qpos_indices']
-        cube_qpos = description['free_joint_qpos_indices']['object/cube_free']
+        cube_qpos = description['free_joint_qpos_indices'][rename('object/cube_free')]
         dof_b, dof_a = description['physical_layout_facts']['source_dofs']
         cube_dofs = [index for index in range(8) if index not in (dof_a, dof_b)]
         assert cube_dofs == list(range(cube_dofs[0], cube_dofs[0] + 6))
-        assert len({joint_positions['rig/joint_a'], joint_positions['rig/joint_b'], *range(cube_qpos, cube_qpos + 7)}) == 9
+        assert len({joint_positions[rename('rig/joint_a')], joint_positions[rename('rig/joint_b')], *range(cube_qpos, cube_qpos + 7)}) == 9
+        if renamed:
+            # The free body is authored first and the two source children in
+            # reverse order; require this to change the compiled slot layout.
+            assert cube_qpos == 0 and cube_dofs == list(range(6))
+            assert joint_positions[rename('rig/joint_b')] < joint_positions[rename('rig/joint_a')]
+            assert dof_b < dof_a
         publisher = adapter._publisher
         q = publisher.values['qpos'].clone()
-        q[:, joint_positions['rig/joint_a']] = torch.tensor([.1, .2, -.1], device='cuda')
-        q[:, joint_positions['rig/joint_b']] = torch.tensor([-.2, .3, .1], device='cuda')
+        q[:, joint_positions[rename('rig/joint_a')]] = torch.tensor([.1, .2, -.1], device='cuda')
+        q[:, joint_positions[rename('rig/joint_b')]] = torch.tensor([-.2, .3, .1], device='cuda')
         q[:, cube_qpos:cube_qpos+3] = torch.tensor([[.5, 0., 0.], [1., .1, 0.], [1.5, 0., .2]], device='cuda')
         q[:, cube_qpos+3:cube_qpos+7] = torch.tensor([1., 0., 0., 0.], device='cuda')
         v = torch.zeros((3, 8), device='cuda')
@@ -133,8 +173,8 @@ payload=json.load(sys.stdin)
 assert mujoco.__version__ == '4.0.1'
 model=mujoco.MjModel.from_xml_string(payload['xml'])
 model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_ACTUATION)
-q={n:int(model.jnt_qposadr[mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_JOINT,n)]) for n in ('joint_a','joint_b','cube_free')}
-v={n:int(model.jnt_dofadr[mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_JOINT,n)]) for n in q}
+q={key:int(model.jnt_qposadr[mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_JOINT,name)]) for key,name in payload['names'].items()}
+v={key:int(model.jnt_dofadr[mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_JOINT,name)]) for key,name in payload['names'].items()}
 out=[]
 for row in payload['rows']:
  data=mujoco.MjData(model)
@@ -153,8 +193,8 @@ print(json.dumps(out))
 '''
         rows = []
         for world in range(3):
-            rows.append({'joint_q': [q[world, joint_positions['rig/joint_a']].item(),
-                                     q[world, joint_positions['rig/joint_b']].item()],
+            rows.append({'joint_q': [q[world, joint_positions[rename('rig/joint_a')]].item(),
+                                     q[world, joint_positions[rename('rig/joint_b')]].item()],
                          'joint_v': [v[world, dof_a].item(), v[world, dof_b].item()],
                          'free_q': q[world, cube_qpos:cube_qpos+7].cpu().tolist(),
                          'free_v': v[world, cube_dofs].cpu().tolist(),
@@ -163,12 +203,13 @@ print(json.dumps(out))
         oracle_python = (Path(__file__).resolve().parents[5] /
                          'workspace/environments/g06-mujoco-warp-4.0.1/bin/python')
         oracle = subprocess.run([str(oracle_python), '-c', oracle_script],
-                                input=json.dumps({'xml': xml, 'rows': rows}), text=True,
+                                input=json.dumps({'xml': xml, 'rows': rows,
+                                                  'names': {key: rename(key) for key in ('joint_a', 'joint_b', 'cube_free')}}), text=True,
                                 capture_output=True, check=True)
         expected = json.loads(oracle.stdout)
         for world in range(3):
             for index, (name, dof) in enumerate((('joint_a', dof_a), ('joint_b', dof_b))):
-                np.testing.assert_allclose(actual['qpos'][world, joint_positions['rig/' + name]], expected[world]['joint_q'][index], atol=3e-6, rtol=0)
+                np.testing.assert_allclose(actual['qpos'][world, joint_positions[rename('rig/' + name)]], expected[world]['joint_q'][index], atol=3e-6, rtol=0)
                 np.testing.assert_allclose(actual['qvel'][world, dof], expected[world]['joint_v'][index], atol=3e-6, rtol=0)
             np.testing.assert_allclose(actual['qpos'][world, cube_qpos:cube_qpos+7], expected[world]['free_q'], atol=3e-6, rtol=0)
             np.testing.assert_allclose(actual['qvel'][world, cube_dofs], expected[world]['free_v'], atol=3e-6, rtol=0)

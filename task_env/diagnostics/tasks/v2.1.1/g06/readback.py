@@ -29,6 +29,61 @@ def _receipt(directory):
     raise ValueError(f'supervised run has no complete JSON receipt: {path}')
 
 
+def readback_masked_reset_step(directory):
+    """Recompute the moving-row control from retained public state arrays."""
+    path, receipt = _receipt(directory)
+    version = receipt.get('schema', 'masked-reset-step-control-v1')
+    if version not in ('masked-reset-step-control-v1', 'masked-reset-step-control-v2'):
+        raise ValueError('unsupported masked reset evidence schema')
+    if (receipt['mask'] != [True, False, True] or receipt['control_intervals_before_reset'] != 3
+            or receipt['native_step_before_reset'] != receipt['native_step_after_reset']
+            or (version == 'masked-reset-step-control-v2'
+                and receipt['revision_after_reset'] <= receipt['revision_before_reset'])):
+        raise ValueError('masked reset metadata differs from the frozen control')
+    with np.load(path / receipt['state_arrays']) as data:
+        arrays = {key: data[key].copy() for key in data.files}
+    if version == 'masked-reset-step-control-v2':
+        if receipt['action_key'] == 'effort':
+            expected_action = np.zeros((3, 8), dtype=np.float32)
+            expected_action[:, 0] = [5., 2., -5.]
+            expected_action[:, -1] = [-4., 0., 4.]
+        elif receipt['action_key'] == 'torque':
+            expected_action = np.asarray([[-1.5], [.5], [1.5]], dtype=np.float32)
+        else:
+            raise ValueError('masked reset action key differs from the frozen control')
+        if not np.array_equal(arrays['action'], expected_action):
+            raise ValueError('masked reset actions differ from the frozen control')
+        before_episode = arrays['before_episode']
+        before_step = arrays['before_episode_step']
+        reset_step = before_step.copy()
+        reset_step[[0, 2]] = 0
+        if (not np.array_equal(arrays['reset_env_id'], [0, 1, 2])
+                or not np.array_equal(arrays['reset_episode'], before_episode + [1, 0, 1])
+                or not np.array_equal(arrays['reset_episode_step'], reset_step)
+                or not np.array_equal(arrays['after_episode'], arrays['reset_episode'])
+                or not np.array_equal(arrays['after_episode_step'], reset_step + 1)):
+            raise ValueError('masked reset episode identities or steps differ from the frozen control')
+    errors = {}
+    for name, tolerance in (('qpos', 1e-4), ('qvel', 1e-3)):
+        keys = [f'{prefix}_{name}' for prefix in ('initial', 'restarted', 'before_control',
+                 'expected', 'before_reset', 'after_reset', 'actual')]
+        if any(key not in arrays or arrays[key].ndim != 2 or arrays[key].shape[0] != 3
+               or not np.isfinite(arrays[key]).all() for key in keys):
+            raise ValueError(f'masked reset {name} states are incomplete')
+        if not np.allclose(arrays[f'initial_{name}'], arrays[f'restarted_{name}'], atol=1e-6, rtol=0):
+            raise ValueError(f'masked reset {name} control starts from a different state')
+        if not np.array_equal(arrays[f'before_reset_{name}'][1], arrays[f'after_reset_{name}'][1]):
+            raise ValueError(f'masked reset changed the unselected {name} before stepping')
+        errors[name] = float(np.max(np.abs(arrays[f'actual_{name}'][1] - arrays[f'expected_{name}'][1])))
+        if errors[name] > tolerance:
+            raise ValueError(f'unreset moving row {name} differs from control: {errors[name]}')
+    movement = float(np.max(np.abs(arrays['expected_qpos'][1] - arrays['before_control_qpos'][1])))
+    if movement <= 1e-6:
+        raise ValueError('the unreset control row did not actually move')
+    return {'status': 'PASS', 'scope': receipt['scope'], 'row1_errors': errors,
+            'row1_position_change': movement, 'masked_reset_did_not_advance_clock': True}
+
+
 def readback_pickcube_fk(directory, source_xml):
     """Independently compare recorded initial hand/EE poses to source MuJoCo FK."""
     import mujoco
@@ -788,6 +843,7 @@ def main():
     parser.add_argument('--pickcube-projection')
     parser.add_argument('--projection-phase', choices=('initial', 'final'), default='initial')
     parser.add_argument('--isaac-filter')
+    parser.add_argument('--masked-reset-step')
     parser.add_argument('--finger-geometry')
     parser.add_argument('--source-xml')
     parser.add_argument('--observer-fixture')
@@ -801,7 +857,15 @@ def main():
     parser.add_argument('--scalar-camera')
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
-    if args.finger_geometry:
+    if args.masked_reset_step:
+        if any((args.isaac_filter, args.finger_geometry, args.source_xml, args.pickcube_projection,
+                args.pickcube_fk, args.pickcube_record, args.scalar_camera, args.mounted_fixture,
+                args.isaac_sensor, args.isaac_mount, args.isaac_no_window, args.isaac_window,
+                args.frame_session, args.observer_fixture, args.record, args.ipc, args.physics,
+                args.raster, args.formal, args.example, args.sensor_window)):
+            parser.error('--masked-reset-step cannot be mixed with other readbacks')
+        result = readback_masked_reset_step(args.masked_reset_step)
+    elif args.finger_geometry:
         if not args.source_xml or any((args.isaac_filter, args.pickcube_projection, args.pickcube_fk,
                 args.pickcube_record, args.scalar_camera, args.mounted_fixture, args.isaac_sensor,
                 args.isaac_mount, args.isaac_no_window, args.isaac_window, args.frame_session,
