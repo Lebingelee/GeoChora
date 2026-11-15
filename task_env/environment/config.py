@@ -592,6 +592,7 @@ class ResolvedSelectedConfig:
     robot_uid: str | None = None
     native_drive: str | None = None
     controller_parameters_json: str = '{}'
+    geophys_contact_mode: Literal['provider_default', 'discrete', 'continuous'] = 'provider_default'
 
     @property
     def physics_provider(self) -> str:
@@ -611,6 +612,10 @@ class ResolvedSelectedConfig:
         return self.environment.control.profile_id
 
     def __post_init__(self) -> None:
+        if self.geophys_contact_mode not in ('provider_default', 'discrete', 'continuous'):
+            raise ValueError('unsupported GeoPhys contact mode')
+        if self.geophys_contact_mode != 'provider_default' and self.physics_provider != 'geophys':
+            raise ValueError('explicit GeoPhys contact mode requires the GeoPhys provider')
         if self.native_drive not in (None, 'position', 'disabled'):
             raise ValueError('unsupported Robot native drive selection')
         if (type(self.controller_parameters_json) is not str

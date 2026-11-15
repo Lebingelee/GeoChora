@@ -4,7 +4,7 @@
 
 ## 当前停门
 
-**G01～G05 与优化账本保持原有接收；G06a attempt002 已经[独立主审](reviews/20261115_g06a_attempt002_acceptance.md)有界接收（SOL_ACCEPTED_BOUNDED_6A）。Core 为 `3bc9e2a7`，GeoPhys pin 为 `a2c85b7f`；无需 attempt003。G06b／6c、完整 canonical 六格、R3 和 G07 尚未接收，v2.1.1 尚未完成。** GeoPhys 主分支合并与 AOT 按维护者决定暂缓，不记通过、不阻断本次接收。具体设备、相机及 Recorder 交集见[API](../api/README.md#pendulum-device-batch)；Isaac 第二来源的物理仍为 scalar。下方早期启动表及历史记录保留其时点。
+**G01～G05 与优化账本保持原有接收；G06a attempt002 已经[独立主审](reviews/20261115_g06a_attempt002_acceptance.md)有界接收（SOL_ACCEPTED_BOUNDED_6A）。Core 为 `3bc9e2a7`，GeoPhys pin 为 `a2c85b7f`；无需 attempt003。G06b／6c、完整 canonical 六格、R3 和 G07 尚未接收，v2.1.1 尚未完成。** GeoPhys 主分支合并与 AOT 按维护者决定暂缓，不记通过、不阻断本次接收。G06a 的 Isaac 第二来源证据是 scalar 物理；G06b 新增的 native batch 有界证据及限制见[API](../api/README.md)，仍待独立主审。下方早期启动表及历史记录保留其时点。
 
 [单元 9 综合主审](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)的 `SOL_ACCEPTED_BOUNDED_5C` 已由维护者在本次启动对话确认；原主审中的“维护者待确认”描述保留其审查时点。优化实施安排见[执行计划](../planning/post-5c-optimization-execution.md)。顺序为：G05 功能接收 → 代码优化、定向复验及人工接收 → 项目证据和 refs／worktree 整理及接收 → 决定进入 G06。G07 继续承担 G06 新增调用者及最终版本收口，7b 三 provider × 三 seed 门保留。
 
@@ -14,7 +14,7 @@
 
 2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。[G06 Agent handoff](20261115_g06_agent_handoff.md)保留派发前时点；后续 attempt001 已开始实施，main／远端未同步、未发布。
 
-G06b 后续包：[attempt001 goal prompt](work-packages/20261115_g06b_attempt001_goal.md)已准备，待维护者手动转发；尚未启动实施，不计一次已执行 attempt。
+G06b：[attempt001 goal prompt](work-packages/20261115_g06b_attempt001_goal.md)已启动；本次有部分实现和待审证据，GeoPhys PickCube、完整性能矩阵等仍有缺口。不得将它记为六格接收，也不因此启动 6c。
 
 ## 启动输入与工作归属
 

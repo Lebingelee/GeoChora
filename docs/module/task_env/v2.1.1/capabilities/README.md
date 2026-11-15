@@ -5,7 +5,7 @@
 
 3b attempt003 经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)接收为 **ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION**：冻结三路线的实际模型／reset／执行／同次记录读回，以及Panda MuJoCo CPU开启补偿的最终350步保持与两任务方向检查已闭合。新N08-v2通过，原N08三路线FAIL保留；不外推全任务或跨后端重力补偿。3c的[ACCEPTED_BOUNDED_3C_RESET_REBUILD](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)限于显式PickCube profile、四条声明边、固定观测、随机流和故障处置。G03有界收尾。6.1辅助App状态为VERSION_VERIFIED_CLOSE_TIMEOUT，仅启动／版本有真实证据，完整运行和正常关闭未通过；不提升最终能力格或Qualification。
 
-[capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。`current_support` 列出五条完整单 seed 交集的实际结果、source／Controller 身份、记录和限制，并列 Pendulum／双轮等历史短程冻结输入；本轮新增结果仍待独立主审。初建时的 `targets`、`target_resolution` 和最终九格保留为明确标注的历史规划快照。Isaac CUDA 本轮运行有效，但任务与 Solution 未成功，v3 completion 字段缺失的边界仍开放。G06 尚未实现或接收，G07 三 provider × 三 seed 最终门仍未运行；不能把本轮单 seed 结果填成最终九格通过。阶段状态另由[编排索引](../maintenance/orchestration.json)维护；它不授予能力。
+[capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。`current_support` 列出五条完整单 seed 交集的实际结果、source／Controller 身份、记录和限制，并列 Pendulum／双轮等历史短程冻结输入；本轮新增结果仍待独立主审。初建时的 `targets`、`target_resolution` 和最终九格保留为明确标注的历史规划快照。Isaac CUDA 本轮运行有效，但任务与 Solution 未成功，v3 completion 字段缺失的边界仍开放。G06a 已获有界接收，G06b 有部分实现和待审证据，G06 整体尚未接收；G07 三 provider × 三 seed 最终门仍未运行。不能把本轮单 seed 结果填成最终九格通过。阶段状态另由[编排索引](../maintenance/orchestration.json)维护；它不授予能力。
 
 v2.1.0 的历史实现和有界结果继续查询 [v2.1.0 matrix](../../v2.1.0/capabilities/capability-matrix.json)。新目标 NOT_RUN 不否认那些历史结果，也不把历史 native 结果升级为当前 renderer／控制／并行证据。
 

@@ -123,11 +123,13 @@ class LinearEffortControllerV1:
         self.writer_id = profile.controller_id
         self.profile_id = profile.selection_profile_id or profile.model_requirement.profile_id
         self._channels = tuple(channels[key] for key in profile.channel_keys)
+        self._device_binding_hash = binding.identity_hash
         self.identity = digest({'profile': profile.identity_hash, 'binding': binding.identity_hash,
                                 'model': model.identity_hash})
         self._episode_id = None
         self.last_action = None
         self.action_space = None
+        self._device_constants = {}
         if profile.action_key is not None:
             from gymnasium.spaces import Box, Dict
             self.action_space = Dict({profile.action_key: Box(
@@ -137,6 +139,83 @@ class LinearEffortControllerV1:
     @property
     def action_shape(self):
         return (len(self.profile.action_names),)
+
+    @property
+    def channel_keys(self):
+        """Ordered physical targets produced by this Controller."""
+        return tuple(channel.target_key for channel in self._channels)
+
+    def device_action_space(self):
+        """Describe the bounded named inputs for an isolated device batch.
+
+        A rectangular input space is only derived when every output depends on
+        one input. General coupled linear maps need an explicit admissible set.
+        """
+        from gymnasium.spaces import Box, Dict
+        from .model import AffineJointBiasModelV1
+
+        model = self.model
+        if (type(model) is not AffineJointBiasModelV1 or any(model.offsets)
+                or any(model.position_coefficients) or any(model.velocity_coefficients)):
+            raise ValueError('device linear effort requires the declared zero-bias model')
+        low = np.full(self.action_shape, -np.inf, dtype=np.float64)
+        high = np.full(self.action_shape, np.inf, dtype=np.float64)
+        for channel, row in zip(self._channels, self.profile.action_to_effort, strict=True):
+            nonzero = [(index, coefficient) for index, coefficient in enumerate(row) if coefficient != 0]
+            if len(nonzero) != 1:
+                raise ValueError('device linear effort requires separable input bounds')
+            index, coefficient = nonzero[0]
+            first, second = (value / coefficient for value in channel.effort_range)
+            low[index] = max(low[index], min(first, second))
+            high[index] = min(high[index], max(first, second))
+        if self.profile.action_key is not None:
+            low = np.maximum(low, self.profile.action_low)
+            high = np.minimum(high, self.profile.action_high)
+        if not np.isfinite(low).all() or not np.isfinite(high).all() or np.any(low > high):
+            raise ValueError('device linear effort cannot derive finite action bounds')
+        return Dict({self.profile.action_key or 'effort': Box(
+            low=low.astype(np.float32), high=high.astype(np.float32), dtype=np.float32)})
+
+    def convert_device_batch(self, action, state):
+        """Apply the source-bound linear effort map on CUDA for every row."""
+        from collections.abc import Mapping
+        import torch
+        from .physical_commands import DeviceJointEffortCommand
+        from ...runtime.contracts import DeviceBatchState
+
+        if not isinstance(state, DeviceBatchState) or state.identity is None:
+            raise TypeError('device linear effort requires an identified state publication')
+        if state.episode_ids is None or state.episode_steps is None:
+            raise ValueError('device linear effort requires per-row episode identity and clocks')
+        boundary = state.identity
+        if (boundary.source_id, boundary.source_closure_sha256, boundary.artifact_sha256) != (
+                self.binding.source_id, self.binding.source_closure_sha256, self.binding.artifact_sha256):
+            raise ValueError('device linear effort state differs from Controller source binding')
+        key = self.profile.action_key or 'effort'
+        if not isinstance(action, Mapping) or set(action) != {key}:
+            raise ValueError('device linear effort action tree differs from its declaration')
+        values = action[key]
+        if (not isinstance(values, torch.Tensor) or str(values.device) != state.device
+                or values.device.type != 'cuda' or values.dtype != torch.float32
+                or tuple(values.shape) != (state.num_envs, *self.action_shape)):
+            raise ValueError('device linear effort requires CUDA float32 values with shape (B, inputs)')
+        if values.device not in self._device_constants:
+            space = self.device_action_space().spaces[key]
+            self._device_constants[values.device] = (
+                torch.as_tensor(space.low, device=values.device),
+                torch.as_tensor(space.high, device=values.device),
+                torch.tensor(self.profile.action_to_effort, dtype=values.dtype, device=values.device))
+        low, high, matrix = self._device_constants[values.device]
+        if not bool(torch.isfinite(values).all()) or bool(((values < low) | (values > high)).any()):
+            raise ValueError('device linear effort is nonfinite or exceeds its declared bounds')
+        efforts = (values @ matrix.T).contiguous()
+        return DeviceJointEffortCommand(boundary, self._device_binding_hash, self.writer_id,
+            tuple(channel.target_key for channel in self._channels), efforts,
+            state.episode_ids.clone(), state.episode_steps.clone())
+
+    def close_device(self):
+        """Release the Controller-owned device constants."""
+        self._device_constants.clear()
 
     def reset_from_realized_state(self, state):
         if state.boundary.scene_identity_hash != self.binding.scene_sha256:

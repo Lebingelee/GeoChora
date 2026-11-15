@@ -10,6 +10,10 @@ from ..environment import ResolvedEnvConfig
 _DEVICE_PROVIDER_TYPES = {
     'mujoco_warp': ('task_env.runtime.providers.mujoco_warp.batch',
                     'MuJoCoWarpBatchSession', 'MuJoCoWarpNativeBatch'),
+    'geophys': ('task_env.runtime.providers.geophys.device_batch',
+                'GeoPhysDeviceBatchSession', 'GeoPhysNativeBatch'),
+    'isaacsim': ('task_env.runtime.providers.isaac.batch',
+                 'IsaacDeviceBatchSession', 'IsaacNativeBatch'),
 }
 
 

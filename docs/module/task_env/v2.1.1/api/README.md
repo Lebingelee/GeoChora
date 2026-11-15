@@ -8,6 +8,14 @@ v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会�
 
 当前（2026-11-15）：G01～G05 已各自有界接收，5c 单元 1～9 收口；E00～E16 代码与项目优化已获[维护者有界接收](../maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)。G06a attempt001 经[独立复核](../maintenance/reviews/20261115_g06a_attempt001_review.md)为 PARTIAL；attempt002 的合同、设备渲染和记录增量已获[G06a 有界接收](../maintenance/reviews/20261115_g06a_attempt002_acceptance.md)；以下能力仅限所述实测交集。G06／G07 及版本整体尚未完成。受测能力、正式入口及限制以[当前摘要](../maintenance/current-state.md)、实际源码和对应证据为准；下面的历史设计／实现记录不把未实现目标升级为 API。
 
+G06b 开发中的 PickCube canonical physical observation 不再包含 `state.boundary_identity_sha256`；单环境和设备批量的 `state` 均为 `ee_pose`、`joint_position`、`hand_pose`，后者只增加 B 轴。边界元数据在 `info` 中：设备路径按 `env_id`、`episode_id`、`episode_step`，以及 `boundary` 的 source、materialization、generation、revision、native step／time 组合识别；同一步的部分 reset 会改变 revision 和选中行 episode，不会倒退 native clock。显式设备记录使用这些字段和实际状态独立核对；不为 observation 计算或填充 SHA。旧 Position profile 的 digest 和对应历史 H5 读取器保留为兼容路径。已有 scalar physical 控制提交合同仍使用摘要，完全移除 scalar 默认 step 中的摘要计算尚未完成，不能将其写成设备热路径之外的全部路径均已迁移。
+
+G06b 开发检查已通过普通设备入口运行三个 provider 的 Pendulum 与 PickCube。PickCube 的 GeoPhys 证据限定为显式离散碰撞和已验证任务配置：B=3 的原源 mesh／多点接触、耦合手指、部分 reset、base／hand 相机及两行 H5 已实测；独立几何读回的受控接触轨迹最大桌面穿透约 0.77 mm，自由下落及较弱保持动作则出现约 5～12 mm 穿透。该限制不能外推为通用稳定接触。Isaac 复用一个 PhysX owner，分别对重叠 cube、重叠机器人及跨环境机器人／方块做了碰撞过滤的有无对照。Isaac 的源 MJCF 阻尼由 provider 在设备端逐子步实现。上述结果均为待审的有界证据，尚不能宣布 G06b 或 G06 接收。
+
+设备批量的 GeoPhys 碰撞模式可在既有 `execution.geophys_contact_mode` 中设为 `provider_default`、`discrete` 或 `continuous`；缺省保持 provider 原有行为。显式 `discrete` 只选择关闭时间连续 CCD，显式值进入运行身份并报告解析结果；未支持的组合会拒绝，不会自动回退。当前源 mesh 与约束组合尚未支持连续模式，离散模式与连续模式不声明物理等价。GeoPhys 的 source implicitfast 仅对适配器实际验证的平滑动力学条件接受，不能据此推断通用积分器等价。
+
+普通设备批量示例见 [Pendulum](../../../../../examples/parallel/pendulum_device.py) 和 [PickCube](../../../../../examples/parallel/pick_cube_device.py)，默认关闭可选相机与窗口。传感器采集和窗口彼此独立；Recorder 是显式操作。MJWarp 可在 info 提供每行原生 world time；Isaac 提供共享模拟管理器时钟，GeoPhys 提供直接 solver step 计数，不能将后二者当作逐 world 原生时钟。
+
 <a id="pendulum-device-batch"></a>
 
 ## Pendulum device batch（G06a 有界接收）

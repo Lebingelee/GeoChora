@@ -72,6 +72,17 @@ class PandaAgent(BaseAgent):
             'panda-direct-effort-assembly', 'panda-direct-effort-components',
             'direct-effort-zero-bias-v1', 'finger-tendon-effort')
 
+    @staticmethod
+    def device_effort_action_components(controller):
+        """Name the shared action inputs independently of native transmission."""
+        profile = controller.profile
+        names = tuple(profile.action_names)
+        if ((profile.action_key or 'effort') != 'effort' or len(names) < 2
+                or len(set(names)) != len(names)
+                or names[-1] not in {'finger-tendon-effort', 'finger-pair-effort'}):
+            raise ValueError('Panda device effort requires its declared effort inputs')
+        return (*names[:-1], 'finger-pair-effort')
+
     def reference_source_actuation(self):
         """Declare the arm targets and coupled opening actuator of this source."""
         names = self.physical_joint_names()
@@ -112,6 +123,16 @@ class PandaAgent(BaseAgent):
     def physical_reference_observation(self, env, state):
         from .panda_observation import physical_reference_observation
         return physical_reference_observation(self, env, state)
+
+    def device_reference_observation_space(self):
+        """Declare the Robot state used by the canonical device observation."""
+        from .panda_observation import device_reference_observation_space
+        return device_reference_observation_space(self)
+
+    def device_reference_observation(self, view, state):
+        """Project the live source-bound Robot view without boundary digests."""
+        from .panda_observation import device_reference_observation
+        return device_reference_observation(self, view, state)
 
     def position_subject_layout(self, *, entity_id, end_frame_id):
         """Declare the existing Panda subject and its position control groups."""

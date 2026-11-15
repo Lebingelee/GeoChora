@@ -11,6 +11,10 @@ route remains unaccepted and does not establish compatibility on other systems.
 `pip check` passed in the isolated worker. Select the worker interpreter through
 the explicit runtime configuration; no machine-specific path is embedded here.
 
+G06b also uses a separate Isaac Sim 6.2 Python 3.12 worker with the same main
+learner interpreter. Its measured native-batch routes remain unreviewed and
+limited to the source and physics intersections documented in the current API.
+
 For the merged GeoPhys main integration, the learner interpreter uses
 `taichi-forge==0.7.0` and `taichi-forge-runtime==0.7.0`, matching GeoPhys's
 declared version. CUDA framebuffer, finite clipping, a B=3 MJWarp task-camera

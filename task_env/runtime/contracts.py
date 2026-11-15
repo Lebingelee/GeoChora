@@ -560,6 +560,7 @@ class DeviceBatchTransition:
     device: str
     infos: Any = None
     boundary: DeviceStateIdentity | None = None
+    native_world_time: Any = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "device", str(self.device))

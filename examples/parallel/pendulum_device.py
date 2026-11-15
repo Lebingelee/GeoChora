@@ -1,7 +1,4 @@
-"""Run the registered Pendulum task as a three-world CUDA batch.
-
-Use a Python 3.12 interpreter with the documented MJWarp dependency profile.
-"""
+"""Run the registered Pendulum task with a selected CUDA batch provider."""
 from __future__ import annotations
 
 import argparse
@@ -13,21 +10,27 @@ import torch
 from task_env import make_parallel_env
 
 
-def run(interpreter, *, output=None, seed=73, steps=20):
-    if steps < 1:
-        raise ValueError('steps must be positive')
-    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': interpreter},
+def run(interpreter, *, output=None, seed=73, steps=20, provider='mujoco_warp', num_env=3, window=False):
+    if steps < 1 or num_env < 1:
+        raise ValueError('steps and num_env must be positive')
+    execution = {'physics_provider': provider}
+    if interpreter is not None:
+        execution['interpreter'] = interpreter
+    config = {'execution': execution,
               'episode': {'seed': seed, 'horizon': steps}}
     directory = None if output is None else str(Path(output).resolve().parent)
-    env = make_parallel_env('pendulum-v1', env_config=config, num_env=3, backend='cuda',
-                            execution='device', worker_directory=directory)
+    env = make_parallel_env('pendulum-v1', env_config=config, num_env=num_env, backend='cuda',
+                            execution='device', render_mode='human' if window else None,
+                            worker_directory=directory)
     try:
         observation, _ = env.reset(seed=seed)
-        actions = {'torque': torch.tensor([[-1.5], [0.5], [1.5]], device='cuda', dtype=torch.float32)}
+        actions = {'torque': torch.linspace(-1.5, 1.5, num_env, device='cuda').reshape(-1, 1)}
         for _ in range(steps):
             observation, reward, terminated, truncated, info = env.step(actions)
+            if window:
+                env.render()
         state = env.read_device_state(('qpos', 'qvel'))
-        result = {'task': 'pendulum-v1', 'provider': 'mujoco_warp', 'num_envs': env.num_envs,
+        result = {'task': 'pendulum-v1', 'provider': provider, 'num_envs': env.num_envs,
                   'steps': steps, 'seed': seed, 'device': str(reward.device),
                   'observation_shape': list(observation['state']['proprioception'].shape),
                   'reward': reward.cpu().tolist(), 'terminated': terminated.cpu().tolist(),
@@ -44,12 +47,16 @@ def run(interpreter, *, output=None, seed=73, steps=20):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--interpreter', required=True)
+    parser.add_argument('--interpreter')
+    parser.add_argument('--provider', choices=('mujoco_warp', 'geophys', 'isaacsim'), default='mujoco_warp')
+    parser.add_argument('--num-env', type=int, default=3)
+    parser.add_argument('--window', action='store_true')
     parser.add_argument('--output')
     parser.add_argument('--seed', type=int, default=73)
     parser.add_argument('--steps', type=int, default=20)
     args = parser.parse_args()
-    print(json.dumps(run(args.interpreter, output=args.output, seed=args.seed, steps=args.steps)))
+    print(json.dumps(run(args.interpreter, output=args.output, seed=args.seed, steps=args.steps,
+                         provider=args.provider, num_env=args.num_env, window=args.window)))
 
 
 if __name__ == '__main__':

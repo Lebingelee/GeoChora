@@ -7,14 +7,36 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 
+def device_reference_observation_space(robot):
+    """Declare the Robot's state leaves without recording-only identity bytes."""
+    return Dict(OrderedDict((
+        ('ee_pose', Box(-np.inf, np.inf, (7,), dtype=np.float32)),
+        ('joint_position', Box(-np.inf, np.inf, (len(robot.physical_joint_names()),), dtype=np.float32)),
+        ('hand_pose', Box(-np.inf, np.inf, (7,), dtype=np.float32)),
+    )))
+
+
+def device_reference_observation(robot, view, state):
+    """Project this Robot's declared joints and frames from a live batch."""
+    entity = robot.uid
+    hand, _end = robot.reference_frame_parents()['ee']
+    joints = tuple(f'{entity}/{name}' for name in robot.physical_joint_names())
+    return {'ee_pose': view.frame_pose(state, f'{entity}/ee'),
+            'joint_position': view.joint_positions(state, joints),
+            'hand_pose': view.frame_pose(state, f'{entity}/{hand}')}
+
+
 def reference_observation_spaces(env, *, include_robot_state=False):
     state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
     if env.position_profile or include_robot_state:
         state_spaces.update({
             'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
             'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-            'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
         })
+        # The historical Position profile and its H5 witnesses retain their
+        # explicit compatibility field. Canonical physical observations do not.
+        if env.position_profile:
+            state_spaces['boundary_identity_sha256'] = Box(0, 255, (32,), dtype=np.uint8)
         if env.dual_entity_position:
             state_spaces['entities'] = Dict(OrderedDict(
                 (profile.entity_id, Dict(OrderedDict((
@@ -110,9 +132,7 @@ def physical_reference_observation(robot, env, state):
     boundary = view.boundary
     subject = {'ee_pose': np.asarray((*site.position, *site.quaternion_wxyz), dtype=np.float32),
                'joint_position': np.asarray([joints[n].position[0] for n in names], dtype=np.float32),
-               'hand_pose': np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32),
-               'boundary_identity_sha256': np.frombuffer(bytes.fromhex(
-                   boundary.boundary_id.removeprefix('state-boundary-')), dtype=np.uint8).copy()}
-    info = {'state_boundary_identity': boundary.to_mapping(), 'state_boundary_id': boundary.boundary_id,
+               'hand_pose': np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32)}
+    info = {'state_boundary_identity': boundary.to_mapping(),
             'state_sample_clock': view.sample_clock.to_mapping()}
     return adapted, subject, info

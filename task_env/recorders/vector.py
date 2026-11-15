@@ -383,10 +383,13 @@ class VectorTransitionRecorder:
         boundary = self._device_row(info['boundary'], slot)
         if not isinstance(boundary, Mapping):
             raise TypeError('device recording boundary must be a typed identity')
-        return {'schema_version': 'device-batch-boundary-v1', 'env_id': slot,
-                'episode_id': int(self._device_row(info['episode_id'], slot)),
-                'episode_step': int(self._device_row(info['episode_step'], slot)),
-                **boundary}
+        result = {'schema_version': 'device-batch-boundary-v1', 'env_id': slot,
+                  'episode_id': int(self._device_row(info['episode_id'], slot)),
+                  'episode_step': int(self._device_row(info['episode_step'], slot)),
+                  **boundary}
+        if 'native_world_time' in info:
+            result['native_world_time_s'] = float(self._device_row(info['native_world_time'], slot))
+        return result
 
     def _begin_device_rows(self, slots, observation, info):
         for slot in slots:

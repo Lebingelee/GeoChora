@@ -294,21 +294,44 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
         controller = built['controller']
         if not callable(getattr(controller, 'convert_device_batch', None)):
             raise StageUnavailableError('compiled Controller has no device action capability')
+        device_action_space = getattr(controller, 'device_action_space', None)
+        action_space = (device_action_space() if callable(device_action_space)
+                        else binding.action_space_factory())
         session_type = load_device_provider(config.physics_provider)
         runtime = session_type(built, num_envs=num_env, device=config.physics_device,
-            interpreter=config.execution_spec_v2.interpreter, working_directory=worker_directory)
+            interpreter=config.execution_spec_v2.interpreter, runtime_config=config.environment.runtime,
+            contact_mode=config.geophys_contact_mode,
+            working_directory=worker_directory)
+        from ..robots.batch_view import RobotBatchView
+
+        robot_view = RobotBatchView(robot=binding.robot, execution=built['physical_execution'], runtime=runtime)
+        bind_device = getattr(definition, 'bind_device', None)
+        if callable(bind_device):
+            definition = bind_device(artifact=built['artifact'], robot_view=robot_view,
+                                     source=built['source'], runtime=runtime,
+                                     terminate_on_success=binding.physical_terminate_on_success)
+        schema_builder = getattr(definition, 'device_observation_schema', None)
+        schema = schema_builder() if callable(schema_builder) else binding.task_observation_schema
+        action_schema = dict(binding.action_schema)
+        if not action_schema.get('components'):
+            component_declaration = getattr(binding.robot, 'device_effort_action_components', None)
+            names = (tuple(component_declaration(controller)) if callable(component_declaration)
+                     else tuple(getattr(getattr(controller, 'profile', None), 'action_names', ())))
+            if names:
+                action_schema['components'] = list(names)
         metadata = {'task_uid': uid, 'num_envs': int(num_env), 'backend': backend,
                     'execution': 'device_worker', 'transfer_mode': 'device',
                     'runtime_resource_summary': runtime.resource_summary(),
-                    'action_schema': dict(binding.action_schema),
-                    'observation_schema': asdict(binding.task_observation_schema)}
+                    'action_schema': action_schema,
+                    'observation_schema': asdict(schema)}
         adapter = BatchTaskLifecycleAdapter(uid=uid, num_envs=num_env, backend=backend,
             base_seed=seed, runtime=runtime, reset_sampler=binding.task_reset_sampler,
             compiled_scene=None, initial_state=None, task_definition=definition,
-            action_adapter=controller, single_action_space=binding.action_space_factory(),
+            action_adapter=controller, single_action_space=action_space,
             single_observation_space=definition.device_observation_space(), metadata=metadata,
             horizon=config.environment.episode.horizon, ignore_done=config.environment.episode.ignore_done,
             source_resources=(built['source'], binding))
+        adapter.robot = robot_view
         render_config = config.environment.render
         if render_config.camera_obs or render_mode is not None:
             from ..render.providers.parallel import ParallelRenderLayout, ParallelRenderProvider
@@ -331,7 +354,6 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                 from ..environment.types import ObservationFieldSpec
 
                 adapter.configure_device_cameras(cameras)
-                schema = binding.task_observation_schema
                 camera_fields = tuple(ObservationFieldSpec(
                     name=f'cameras.{camera.name}.rgb', shape=(camera.height, camera.width, 3),
                     dtype='uint8', semantic=f'{camera.name} RGB', unit='uint8[0,255]',

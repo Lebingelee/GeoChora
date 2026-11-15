@@ -40,8 +40,8 @@ class DeviceBatchRasterSource:
     """One visual scene driven by named public device body poses.
 
     It owns renderer fields and optional window only; physics stays with the
-    supplied runtime. The visual asset table is constructed from the same MJCF
-    source, and transforms are remapped by declared native body names.
+    supplied runtime. The visual asset table is constructed from the verified
+    MJCF or USD source, and transforms are remapped by declared body names.
     """
 
     frame_transport = 'device_rgb8'
@@ -60,6 +60,7 @@ class DeviceBatchRasterSource:
         self._canvas = None
         self._world_ids = self._world_transforms = None
         self._body_order = None
+        self._source_lease = None
         self._closed = False
 
     def _configure_visualizer(self, scene_source):
@@ -79,17 +80,34 @@ class DeviceBatchRasterSource:
             raise
 
     def _build(self, world_ids, transforms, width, height):
+        try:
+            self._build_owned(world_ids, transforms, width, height)
+        except BaseException as error:
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'device renderer cleanup also failed: {cleanup_error!r}')
+            raise
+
+    def _build_owned(self, world_ids, transforms, width, height):
         import torch
         import taichi as ti
         from scene import SceneSource, import_scene_source
+        from ...assembly.source import UsdTaskSceneSourceV1
         from visualization.scene_source import SceneVisualizationSource
         from ..providers.parallel_source import _replicate_render_scene_for_parallel
         from ...runtime.provider_bootstrap import init_task_env_backend
 
         init_task_env_backend('cuda', device_memory_GB=1.0, offline_cache=False)
-        imported = import_scene_source(SceneSource.mjcf_string(
-            self.source.scene_source.xml, base_dir=self.source.scene_source.base_dir,
-            label=self.source.source_id), cache=False)
+        task_source = self.source.scene_source
+        if isinstance(task_source, UsdTaskSceneSourceV1):
+            self._source_lease = task_source.acquire_snapshot()
+            entry = self._source_lease.root / task_source.loaded_delivery.delivery.entry_file
+            imported = import_scene_source(SceneSource.usd_path(str(entry)), cache=False)
+        else:
+            imported = import_scene_source(SceneSource.mjcf_string(
+                task_source.xml, base_dir=task_source.base_dir,
+                label=self.source.source_id), cache=False)
         model = imported.build_rigid_scene_model()
         objects = tuple(model.objects)
         if not objects or tuple(int(obj.object_id) for obj in objects) != tuple(range(len(objects))):
@@ -102,21 +120,37 @@ class DeviceBatchRasterSource:
         native_mapping = {}
         for semantic, native in self.source.bodies.items():
             canonical = semantic
-            if '/' not in semantic and semantic in articulation_roots:
+            if (semantic not in publication_indices and '/' not in semantic
+                    and semantic in articulation_roots):
                 canonical = f'{semantic}/{articulation_roots[semantic]}'
                 if canonical not in publication_indices:
                     matches = [name for name in published if name.startswith(semantic + '/')]
                     if len(matches) == 1:
                         canonical = matches[0]
-            native_mapping[native] = (publication_indices.get(canonical), semantic)
+            # USD body bindings are entry-relative paths; the shared MJCF
+            # visual source identifies those bodies by their source leaf name.
+            # Reject ambiguous leaves rather than silently choosing a row.
+            native_key = native.rsplit('/', 1)[-1]
+            value = (publication_indices.get(canonical), semantic)
+            if native_key in native_mapping and native_mapping[native_key] != value:
+                raise ValueError(f'render source body name is ambiguous: {native_key!r}')
+            native_mapping[native_key] = value
         order, static_position, static_orientation, static_mask = [], [], [], []
         joint_data = model.joint_data
         for obj in objects:
             index, semantic = native_mapping.get(obj.object_key, (None, None))
+            if index is None and semantic is None:
+                matches = [(i, name) for name, i in publication_indices.items()
+                           if name.rsplit('/', 1)[-1] == obj.object_key]
+                if len(matches) > 1:
+                    raise ValueError(f'render source body name is ambiguous: {obj.object_key!r}')
+                if matches:
+                    index, semantic = matches[0]
             if index is None:
                 entity = None if semantic is None else semantic.split('/')[0]
-                if (semantic is None or entity in articulation_roots
-                        or int(joint_data['body_parentid'][obj.object_id]) != -1):
+                if (entity in articulation_roots
+                        or int(joint_data['body_parentid'][obj.object_id]) != -1
+                        or int(joint_data['body_jntnum'][obj.object_id]) != 0):
                     raise ValueError(f'render body has no public device pose: {obj.object_key!r}')
                 static_mask.append(True)
                 static_position.append(joint_data['body_pos'][obj.object_id])
@@ -280,6 +314,15 @@ class DeviceBatchRasterSource:
                     error = caught
                 else:
                     error.add_note(f'visualizer cleanup also failed: {caught!r}')
+        if self._source_lease is not None and self._visualizer is None:
+            try:
+                self._source_lease.close()
+                self._source_lease = None
+            except BaseException as caught:
+                if error is None:
+                    error = caught
+                else:
+                    error.add_note(f'USD visual source cleanup also failed: {caught!r}')
         if error is not None:
             raise error
         self._pose_source = self._body_order = self._translation = None

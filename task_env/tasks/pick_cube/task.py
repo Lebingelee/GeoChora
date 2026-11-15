@@ -125,11 +125,26 @@ def _evaluate_bound(state, semantics):
 
 
 @dataclass(frozen=True)
+class _DeviceTaskBinding:
+    robot_view: object
+    joint_initial: tuple[tuple[int, float], ...]
+    cube_qpos_start: int
+    cube_body_index: int
+    cube_pose: tuple[float, ...]
+    random_bounds: tuple[tuple[float, float], ...]
+    terminate_on_success: bool
+
+
+@dataclass(frozen=True)
 class PickCubeTaskDefinition(TaskDefinitionBase):
     """Core Task Definition using the same measured lift predicate as the Artifact."""
 
     semantics: SemanticDefinition
+    device_binding: _DeviceTaskBinding | None = None
     uses_unified_state_view = True
+    device_state_required_fields = ('qpos', 'qvel', 'body_position', 'body_orientation',
+                                    'frame_position', 'frame_orientation')
+    device_random_algorithm = 'pcg64-v0'
 
     @property
     def success_definition(self):
@@ -149,6 +164,118 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
 
     def reset(self, state, reset_mask=None) -> TaskEvaluation:
         return self._evaluate_snapshot(state)
+
+    def bind_device(self, *, artifact, robot_view, source, runtime, terminate_on_success=False):
+        """Bind the shared Task declaration to one source-resolved device layout."""
+        if artifact.semantics != self.semantics:
+            raise ValueError('PickCube device semantics differ from the selected Artifact')
+        layout = runtime.resource_summary()['device_transition']
+        joints = layout['joint_qpos_indices']
+        free = layout['free_joint_qpos_indices']
+        bodies = tuple(layout['body_names'])
+        if ('cube-v1' not in free or 'cube-v1' not in bodies
+                or EEF not in layout['frame_names']
+                or not set(artifact.initialization.joint_position) <= set(joints)
+                or not set(FINGERS) <= set(joints)):
+            raise ValueError('PickCube device source lacks declared joints, cube, or end frame')
+        dimensions = artifact.initialization.randomization
+        if tuple(item.name for item in dimensions) != (
+                'cube-v1.position_world.x', 'cube-v1.position_world.y'):
+            raise ValueError('PickCube device reset requires its declared XY randomization')
+        pose = artifact.initialization.poses_world['cube-v1']
+        binding = _DeviceTaskBinding(robot_view,
+            tuple((int(joints[name]), float(value))
+                  for name, value in artifact.initialization.joint_position.items()),
+            int(free['cube-v1']), bodies.index('cube-v1'),
+            (*pose.position, *pose.quaternion_wxyz),
+            tuple(tuple(item.training_bounds) for item in dimensions), bool(terminate_on_success))
+        return replace(self, device_binding=binding)
+
+    def _device_binding(self):
+        if self.device_binding is None:
+            raise RuntimeError('PickCube device task is not bound to a source')
+        return self.device_binding
+
+    def device_reset_spec(self):
+        return {'random': {'cube_x': (), 'cube_y': ()}, 'state_fields': ('qpos', 'qvel')}
+
+    def sample_device_reset(self, uniforms, template):
+        import torch
+
+        binding = self._device_binding()
+        qpos, qvel = torch.zeros_like(template['qpos']), torch.zeros_like(template['qvel'])
+        for index, value in binding.joint_initial:
+            qpos[:, index] = value
+        start = binding.cube_qpos_start
+        qpos[:, start:start + 7] = torch.tensor(binding.cube_pose, dtype=qpos.dtype, device=qpos.device)
+        for offset, name in enumerate(('cube_x', 'cube_y')):
+            low, high = binding.random_bounds[offset]
+            qpos[:, start + offset] = low + uniforms[name] * (high - low)
+        return {'qpos': qpos, 'qvel': qvel}
+
+    def reset_device(self, *, state, reset_mask, selection=None):
+        """PickCube has no extra per-episode Task state to reset."""
+        del state, reset_mask, selection
+        self._device_binding()
+
+    def device_observation_space(self):
+        from ...environment.gym_compat import Box, Dict
+        robot = self._device_binding().robot_view.robot
+        return Dict({'state': robot.device_reference_observation_space(),
+                     'privileged_state': Dict({'cube_v1_body_pose':
+                         Box(-np.inf, np.inf, (1, 7), dtype=np.float32)})})
+
+    def device_observation_schema(self):
+        from ...environment.types import ObservationFieldSpec, ObservationSchema
+        robot = self._device_binding().robot_view.robot
+        robot_fields = robot.reference_observation_field_metadata(None)
+        fields = []
+        for name, space in self.device_observation_space()['state'].spaces.items():
+            semantic, unit, frame = robot_fields[f'state.{name}']
+            fields.append(ObservationFieldSpec(f'state.{name}', tuple(space.shape), str(space.dtype),
+                                               semantic, unit, frame))
+        fields.append(ObservationFieldSpec('privileged_state.cube_v1_body_pose', (1, 7), 'float32',
+            'task object pose [x,y,z,qw,qx,qy,qz]', 'm + unit quaternion', 'world'))
+        return ObservationSchema('selected-reference-observation-v1', tuple(fields),
+                                 groups=('state', 'privileged_state'))
+
+    def build_device_observation(self, state):
+        import torch
+
+        binding = self._device_binding()
+        index = binding.cube_body_index
+        cube = torch.cat((state.arrays['body_position'][:, index],
+                          state.arrays['body_orientation'][:, index]), dim=1).unsqueeze(1)
+        robot = binding.robot_view.robot
+        return {'state': robot.device_reference_observation(binding.robot_view, state),
+                'privileged_state': {'cube_v1_body_pose': cube}}
+
+    def evaluate_device(self, *, state, action, elapsed_steps, previous_state=None):
+        """Evaluate the existing PickCube lift, reach and grasp formula on device."""
+        import torch
+
+        del action, elapsed_steps, previous_state
+        binding = self._device_binding()
+        cube = state.arrays['body_position'][:, binding.cube_body_index]
+        eef = binding.robot_view.frame_pose(state, EEF)[:, :3]
+        opening = binding.robot_view.joint_positions(state, FINGERS).sum(dim=1)
+        p = self.semantics.parameters_si
+        lift = cube[:, 2] - p['rest_height']
+        distance = torch.linalg.vector_norm(eef - cube, dim=1)
+        reached = distance <= p['reach_distance']
+        grasped = reached & (opening <= p['gripper_closed_opening'])
+        lifted = lift >= p['lift_height']
+        terms = {'reach': .10 * (1. - torch.tanh(10. * distance)),
+                 'grasp': grasped.float() * .25,
+                 'lift': torch.clamp(lift / p['lift_height'], 0., 1.) * .40,
+                 'success': lifted.float()}
+        metrics = {'reached_cube': reached, 'grasped_cube': grasped, 'lifted_cube': lifted,
+                   'task_success': lifted, 'cube_x': cube[:, 0], 'cube_y': cube[:, 1],
+                   'cube_z': cube[:, 2], 'cube_lift': lift, 'eef_to_cube_dist': distance,
+                   'gripper_opening': opening, 'success_definition': torch.ones_like(lifted)}
+        return {'reward': sum(terms.values()),
+                'terminated': lifted if binding.terminate_on_success else torch.zeros_like(lifted),
+                'truncated': torch.zeros_like(lifted), 'metrics': metrics, 'reward_terms': terms}
 
     def evaluate(self, previous_snapshot=None, action=None, current_snapshot=None, *,
                  state=None, elapsed_steps=None, previous_state=None) -> TaskEvaluation:

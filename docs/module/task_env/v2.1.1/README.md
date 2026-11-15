@@ -1,10 +1,10 @@
 # TaskEnv v2.1.1 — 协议与实施
 
-更新时间：2026-11-14。**G01～G05 按各自范围有界接收，5c 诊断单元 1～9 收口；E11～E16 项目优化已获维护者有界接收，G06／G07 尚未开始。**
+更新时间：2026-11-15。**G01～G05 按各自范围有界接收，5c 诊断单元 1～9 收口；E11～E16 项目优化及 G06a 已获有界接收。G06b 有部分实现和待审证据；G06 整体与 G07 尚未接收。**
 
 从[唯一当前摘要](maintenance/current-state.md)恢复接收范围、启动输入、正式入口及下一停门；工作包状态在[编排索引](maintenance/orchestration.json)，实施顺序见[优化执行安排](planning/post-5c-optimization-execution.md)及[60 项台账](planning/post-5c-code-project-optimization-diagnostic-ledger.md)。[单元 9 综合主审](maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)保留原 5a／5b、四主体、同步 RGB 及跨组合的受测边界，维护者已确认功能接收。E00～E10已获维护者按各自范围接收；当前使用[E11～E16细化账本](planning/post-5c-e11-e16-remaining-ledger.md)。U4代码范围与U5有界证据归并已接收，五条完整运行采用同次联合completion口径；H5单文件不自含完整completion，旧Isaac失败保留。E15 历史输出及快照补集已按[最终清单执行并独立复核](maintenance/reviews/20261114_e15_final_disposition_execution.md)，维护者已[有界接收交付 `86921c62` 及其限制](maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)。
 
-优化及人工接收已完成，G06 由维护者另行启动；G07 的最终三 provider × 三 seed 门保留。renderer 创建时固定至 close；COM 原判据 FAIL、原 N08 FAIL、R05c NOT_REQUALIFIED、6.1 close 及历史执行偏差不改写。完整两任务 Solution 在本次优化按各自支持 provider 单 seed 验证，G07 仍保留其最终集成范围。
+优化及人工接收已完成；G06a 的有界范围和 G06b 当前限制见 [API](api/README.md)，G07 的最终三 provider × 三 seed 门保留。renderer 创建时固定至 close；COM 原判据 FAIL、原 N08 FAIL、R05c NOT_REQUALIFIED、6.1 close 及历史执行偏差不改写。完整两任务 Solution 在本次优化按各自支持 provider 单 seed 验证，G07 仍保留其最终集成范围。
 
 ## 版本目标
 

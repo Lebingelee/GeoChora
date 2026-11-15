@@ -83,6 +83,70 @@ def _ipc_handle(kind, payload):
     return value
 
 
+def _duplex_worker():
+    import torch
+    from task_env.runtime.transport.cuda_ipc import CudaIpcDuplexPublisher
+
+    publisher = CudaIpcDuplexPublisher({'output': ((2,), 'float32'),
+                                        'input': ((2,), 'float32'), 'mask': ((2,), 'bool')})
+    try:
+        publisher.publish({'output': torch.tensor([1., 2.], device='cuda')})
+        _send(sys.stdout, publisher.description())
+        publisher.bind_written_event(_receive(sys.stdin)['written'])
+        inputs = publisher.read_inputs(('input', 'mask'))
+        observed = inputs['input'].cpu().tolist()
+        mask = inputs['mask'].cpu().tolist()
+        if observed != [4., 7.] or mask != [True, False]:
+            raise AssertionError('CUDA duplex worker inputs differ')
+        publisher.publish({'output': torch.where(inputs['mask'], 2 * inputs['input'], inputs['input'])})
+        _send(sys.stdout, {'observed': observed, 'mask': mask})
+        _receive(sys.stdin)
+    finally:
+        publisher.close()
+    _send(sys.stdout, {'closed': True})
+
+
+def _duplex_parent():
+    import torch
+    from task_env.runtime.transport.cuda_ipc import CudaIpcConnection
+
+    process = subprocess.Popen([sys.executable, '-u', __file__, '--duplex-worker'],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
+    connection = None
+    try:
+        connection = CudaIpcConnection(_receive(process.stdout))
+        connection.wait_ready()
+        first = connection.read('output')
+        connection.synchronize()
+        if first.cpu().tolist() != [1., 2.]:
+            raise AssertionError('CUDA duplex initial output differs')
+        connection.write('input', torch.tensor([4., 7.], device='cuda'))
+        connection.write('mask', torch.tensor([True, False], device='cuda'))
+        connection.record_written()
+        _send(process.stdin, {'written': connection.written_handle})
+        result = _receive(process.stdout)
+        connection.wait_ready()
+        final = connection.read('output')
+        connection.synchronize()
+        if final.cpu().tolist() != [8., 7.]:
+            raise AssertionError('CUDA duplex final output differs')
+        connection.release_imports()
+        _send(process.stdin, {'close': True})
+        if not _receive(process.stdout)['closed'] or process.wait(timeout=20) != 0:
+            raise AssertionError('CUDA duplex worker did not close')
+        return {'scope': 'CUDA driver duplex IPC', 'initial': first.cpu().tolist(),
+                'worker_observed': result['observed'], 'mask': result['mask'],
+                'final': final.cpu().tolist(), 'closed': True}
+    finally:
+        if connection is not None:
+            connection.release_imports()
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=10)
+        if connection is not None:
+            connection.close()
+
+
 def _parent(worker_python):
     import torch
     from task_env.runtime.transport.cuda_ipc import CudaIpcConnection
@@ -410,16 +474,633 @@ def _session_physics(worker_python):
     return result
 
 
-def _formal_device(worker_python):
+def _pickcube_execution(provider, interpreter):
+    execution = {'physics_provider': provider, 'interpreter': interpreter}
+    if provider == 'geophys':
+        execution['geophys_contact_mode'] = 'discrete'
+    return execution
+
+
+def _pickcube_camera_configuration():
+    import math
+    cy, sy, cp, sp = (math.cos(.45 / 2), math.sin(.45 / 2),
+                      math.cos(.25 / 2), math.sin(.25 / 2))
+    return {'backend': 'rasterizer', 'camera_obs': True, 'cameras': [
+                  {'name': 'base', 'frame': 'body', 'parent': 'panda-v1/link0',
+                   'width': 128, 'height': 128, 'rgb_dtype': 'uint8', 'position': [-.35, -.4, .8],
+                   'quaternion_wxyz': [cy * cp, -sy * sp, cy * sp, sy * cp], 'near': .01, 'far': 3.},
+                  {'name': 'hand', 'frame': 'body', 'parent': 'panda-v1/hand',
+                   'width': 128, 'height': 128, 'rgb_dtype': 'uint8', 'position': [.075, 0., -.15],
+                   'quaternion_wxyz': [math.sqrt(.5), 0., -math.sqrt(.5), 0.], 'near': .01, 'far': 3.}]}
+
+
+def _pickcube_camera_probe(worker_python, *, provider='mujoco_warp'):
+    """Capture real source-mounted base and hand cameras for three worlds."""
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+
+    config = {'execution': _pickcube_execution(provider, worker_python),
+              'controller': {'profile_id': 'panda-direct-effort-v1'},
+              'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 20},
+              'render': _pickcube_camera_configuration()}
+    env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=3,
+                            backend='cuda', execution='device', worker_directory=os.getcwd())
+    try:
+        obs, _ = env.reset(seed=31)
+        first = env.read_device_state(('body_position', 'body_orientation'))
+        frames = {}
+        for name in ('base', 'hand'):
+            image = obs['cameras'][name]['rgb']
+            if image.device.type != 'cuda' or image.dtype != torch.uint8 or tuple(image.shape) != (3, 128, 128, 3):
+                raise AssertionError('camera image does not match declared device shape or dtype')
+            frames[name + '_initial'] = image.clone().cpu().numpy()
+        np.savez_compressed('pickcube_camera_initial.npz', **frames)
+        action = torch.zeros((3, 8), device='cuda')
+        action[:, 0] = torch.tensor([5., 0., -5.], device='cuda')
+        for _ in range(10):
+            obs, _, _, _, _ = env.step({'effort': action})
+        last = env.read_device_state(('body_position', 'body_orientation'))
+        if last.identity.native_step - first.identity.native_step != 50:
+            raise AssertionError('camera capture advanced the native physics clock')
+        for name in ('base', 'hand'):
+            frames[name + '_final'] = obs['cameras'][name]['rgb'].cpu().numpy().copy()
+            if any(len(np.unique(image.reshape(-1, 3), axis=0)) < 10
+                   for image in frames[name + '_initial']):
+                raise AssertionError(f'{name} camera image lacks visible scene detail')
+        frames.update(initial_body_position=first.arrays['body_position'].cpu().numpy(),
+                      initial_body_orientation=first.arrays['body_orientation'].cpu().numpy(),
+                      final_body_position=last.arrays['body_position'].cpu().numpy(),
+                      final_body_orientation=last.arrays['body_orientation'].cpu().numpy(),
+                      body_names=np.asarray(env.robot.body_names))
+        hand_index = env.robot.body_names.index('panda-v1/hand')
+        movement = np.linalg.norm(frames['final_body_position'][:, hand_index] -
+                                  frames['initial_body_position'][:, hand_index], axis=1)
+        if float(movement.max()) < 1e-4:
+            raise AssertionError('native hand did not move')
+        np.savez_compressed('pickcube_camera_probe.npz', **frames)
+        return {'scope': f'PickCube {provider} camera integration probe, not projection qualification',
+                'batch': 3, 'hand_motion_m': movement.tolist(), 'native_steps': 50,
+                'camera_names': ['base', 'hand'], 'image_shape': [3, 128, 128, 3]}
+    finally:
+        env.close()
+
+
+def _pickcube_window_probe(worker_python, *, provider, sensor):
+    """Check window lifetime independently from optional task cameras."""
+    import torch
+    from task_env import make_parallel_env
+
+    config = {'execution': _pickcube_execution(provider, worker_python),
+              'controller': {'profile_id': 'panda-direct-effort-v1'},
+              'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 20}}
+    if sensor:
+        config['render'] = _pickcube_camera_configuration()
+    env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=3,
+                            backend='cuda', execution='device', render_mode='human',
+                            worker_directory=os.getcwd())
+    try:
+        observation, _ = env.reset(seed=31)
+        env.set_parallel_render_num(3)
+        initial = env.read_device_state(('qpos',)).identity
+        env.render()
+        env.render()
+        if env.read_device_state(('qpos',)).identity != initial:
+            raise AssertionError('window presentation advanced physics')
+        env.close_render()
+        if env.read_device_state(('qpos',)).identity != initial:
+            raise AssertionError('closing the window advanced physics')
+        action = torch.zeros((3, *env.single_action_space['effort'].shape), device='cuda')
+        action[:, 0] = torch.tensor([5., 0., -5.], device='cuda')
+        observation, _, _, _, _ = env.step({'effort': action})
+        after = env.read_device_state(('qpos',)).identity
+        if after.native_step - initial.native_step != 5:
+            raise AssertionError('physics did not continue after window close')
+        if sensor:
+            for camera in ('base', 'hand'):
+                rgb = observation['cameras'][camera]['rgb']
+                if tuple(rgb.shape) != (3, 128, 128, 3) or rgb.dtype != torch.uint8 or rgb.device.type != 'cuda':
+                    raise AssertionError('task camera stopped after closing the window')
+        elif 'cameras' in observation:
+            raise AssertionError('window-only configuration added cameras to the observation')
+        return {'scope': f'{provider} PickCube real window close and continued physics',
+                'sensor_enabled': sensor, 'native_step_before': initial.native_step,
+                'displayed_envs': 3,
+                'native_step_after': after.native_step, 'sensor_continued_after_close': sensor,
+                'window_presented_twice_without_step': True}
+    finally:
+        env.close()
+
+
+def _geophys_pickcube_plan(*, contact_mode='provider_default', world_count=3):
+    """Inspect real source-to-rigid-batch admission without starting physics."""
+    from task_env.assembly import compile_task_scene
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+    from task_env.runtime.sessions.geophys_source import GeoPhysSourceComposer
+    from task_env.runtime.sessions.source import close_source_and_task_resources
+    from solvers.rigid.config import RigidSolverConfig
+    from solvers.rigid.planning.batch_plan import build_rigid_batch_plan
+
+    task = ENV_REGISTRY.get('pick-cube-p16-reference-v1')
+    execution = {'physics_provider': 'geophys'}
+    if contact_mode != 'provider_default':
+        execution['geophys_contact_mode'] = contact_mode
+    config = resolve_task_env_config(task, {'execution': execution,
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+        'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 20}},
+        execution_scope='device_batch')
+    binding = task._build_selected_binding(config)
+    built = binding.build_for_request('geophys', 'cuda', 31, 20)
+    source = built['source']
+    composer = GeoPhysSourceComposer(source.scene_source, scene_definition=source.scene_definition,
+        source_closure_digest=source.source_closure_digest, execution_source_receipt=source.execution_source_receipt)
+    try:
+        compiled = compile_task_scene(composition=source.composition, scene=source.scene,
+            agents=source.agents, objects=source.objects, scene_composer=composer)
+        options = {'dt': built['artifact'].timebase.physics_dt, 'gravity': config.environment.runtime.gravity,
+                   'integrator': 'euler', 'enable_ground_contact': False,
+                   'enable_domain_boundary_contact': False,
+                   'broadphase': config.environment.runtime.broadphase}
+        if contact_mode != 'provider_default':
+            options['enable_ccd'] = contact_mode == 'continuous'
+        plan = build_rigid_batch_plan(compiled.scene_model, world_count=world_count,
+                                     config=RigidSolverConfig.from_legacy_kwargs(options))
+        data = compiled.scene_model.joint_data
+        return {'scope': 'GeoPhys registered PickCube source and batch planning; no physics',
+                'contact_mode_requested': contact_mode,
+                'source_id': source.source_id, 'source_closure': source.source_closure_digest,
+                'joint_names': dict(compiled.references.names.joints),
+                'body_names': dict(compiled.references.names.bodies),
+                'qpos_addresses': data['jnt_qposadr'].tolist(),
+                'dof_addresses': data['jnt_dofadr'].tolist(),
+                'joint_types': data['jnt_type'].tolist(), 'plan': plan.describe()}
+    finally:
+        composer.close()
+        close_source_and_task_resources(source, binding)
+
+
+def _geophys_pendulum_source_probe():
+    """Probe native BRS with the registered source, before factory admission."""
+    from dataclasses import replace
+    import numpy as np
+    import torch
+    from task_env.assembly import compile_task_scene
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+    from task_env.runtime.provider_bootstrap import init_task_env_backend
+    from task_env.runtime.providers.geophys.rigid_batch import GeoPhysRigidBatchRuntime
+    from task_env.runtime.sessions.geophys_source import GeoPhysSourceComposer
+    from task_env.runtime.sessions.source import close_source_and_task_resources
+
+    task = ENV_REGISTRY.get('pendulum-v1')
+    config = resolve_task_env_config(task, {'execution': {'physics_provider': 'geophys'},
+                                          'episode': {'seed': 73, 'horizon': 20}})
+    binding = task._build_selected_binding(config)
+    built = binding.build_for_request('geophys', 'cpu', 73, 20)
+    source = built['source']
+    composer = GeoPhysSourceComposer(source.scene_source, scene_definition=source.scene_definition,
+        source_closure_digest=source.source_closure_digest, execution_source_receipt=source.execution_source_receipt)
+    runtime = None
+    try:
+        init_task_env_backend('cuda')
+        compiled = compile_task_scene(composition=source.composition, scene=source.scene,
+            agents=source.agents, objects=source.objects, scene_composer=composer)
+        euler_config = replace(source.config, runtime=replace(source.config.runtime,
+            backend='cuda', integrator='euler', prewarm=False))
+        runtime = GeoPhysRigidBatchRuntime.from_compiled_scene(compiled_scene=compiled,
+            config=euler_config, num_envs=3, backend='cuda')
+        initial = runtime.read_device_state(('qpos', 'qvel', 'body_position', 'body_orientation'))
+        position = torch.tensor([[.2], [.5], [-.4]], dtype=torch.float32, device='cuda')
+        velocity = torch.zeros_like(position)
+        body_position, body_orientation = initial.arrays['body_position'], initial.arrays['body_orientation']
+        runtime.reset_device_state(mask=torch.ones(3, dtype=torch.bool, device='cuda'),
+            qpos=position, qvel=velocity, body_position=body_position, body_orientation=body_orientation,
+            body_linear_velocity=torch.zeros_like(body_position), body_angular_velocity=torch.zeros_like(body_position))
+        forces = torch.tensor([[1.], [0.], [-1.]], dtype=torch.float32, device='cuda')
+        runtime.write_device_qfrc(forces)
+        runtime.step_substeps()
+        state = runtime.read_device_state(('qpos', 'qvel', 'body_position', 'body_orientation'))
+        actual_q = state.arrays['qpos'][:, 0].cpu().numpy()
+        actual_v = state.arrays['qvel'][:, 0].cpu().numpy()
+        expected_q = np.array([.2, .5, -.4])
+        expected_v = np.zeros(3)
+        for _ in range(25):
+            expected_v += .002 * (np.array([1., 0., -1.]) + 9.81 * .25 * np.sin(expected_q)
+                                  - .05 * expected_v) / .1125
+            expected_q += .002 * expected_v
+        if np.max(np.abs(actual_q - expected_q)) > .01 or np.max(np.abs(actual_v - expected_v)) > .05:
+            raise AssertionError(f'GeoPhys source diverges from frozen hinge oracle: q={actual_q}, v={actual_v}')
+        return {'scope': 'GeoPhys registered Pendulum source, CUDA BRS diagnostic; not factory admission',
+                'batch': 3, 'source_integrator': source.config.runtime.integrator,
+                'native_integrator': 'euler', 'q': actual_q.tolist(), 'qdot': actual_v.tolist(),
+                'expected_q': expected_q.tolist(), 'expected_qdot': expected_v.tolist()}
+    finally:
+        if runtime is not None:
+            runtime.close()
+        composer.close()
+        close_source_and_task_resources(source, binding)
+
+
+def _pickcube_record(worker_python, *, provider='mujoco_warp', sensor=False):
+    """Save every public boundary independently of the vector recorder."""
+    from dataclasses import asdict
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+    from task_env.recorders import VectorTransitionRecorder
+
+    config = {'execution': _pickcube_execution(provider, worker_python),
+              'controller': {'profile_id': 'panda-direct-effort-v1'},
+              'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 4}}
+    if sensor:
+        config['render'] = _pickcube_camera_configuration()
+    env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=3,
+                            backend='cuda', execution='device', worker_directory=os.getcwd())
+    recorder = None
+    traces = {}
+    contexts = {}
+    actions = torch.zeros((3, 8), device='cuda')
+
+    def boundary(slot, observation, info):
+        episode = int(info['episode_id'][slot].item())
+        name = f'trajectory_slot_{slot:03d}_episode_{episode - 1:06d}'
+        entry = traces.setdefault(name, {'ee_pose': [], 'joint_position': [], 'hand_pose': [],
+                                         'cube_v1_body_pose': [], 'action': [], 'reward': [],
+                                         'terminated': [], 'truncated': []})
+        for key in ('ee_pose', 'joint_position', 'hand_pose'):
+            entry[key].append(observation['state'][key][slot].cpu().numpy().copy())
+        entry['cube_v1_body_pose'].append(
+            observation['privileged_state']['cube_v1_body_pose'][slot].cpu().numpy().copy())
+        if sensor:
+            for camera in ('base', 'hand'):
+                entry.setdefault(camera + '_rgb', []).append(
+                    observation['cameras'][camera]['rgb'][slot].cpu().numpy().copy())
+        context = {'schema_version': 'device-batch-boundary-v1',
+            'env_id': int(info['env_id'][slot].item()), 'episode_id': episode,
+            'episode_step': int(info['episode_step'][slot].item()), **asdict(info['boundary'])}
+        if 'native_world_time' in info:
+            context['native_world_time_s'] = float(info['native_world_time'][slot].item())
+        contexts.setdefault(name, []).append(context)
+        return entry
+
+    try:
+        recorder = VectorTransitionRecorder(env, path=os.getcwd(), env_ids=(0, 1))
+        obs, info = recorder.reset(seed=31)
+        for slot in (0, 1):
+            boundary(slot, obs, info)
+        for tick in range(5):
+            if tick == 2:
+                obs, info = recorder.reset(mask=torch.tensor([False, True, False], device='cuda'))
+                boundary(1, obs, info)
+            obs, reward, terminated, truncated, info = recorder.step({'effort': actions})
+            for slot in (0, 1):
+                ended = bool(terminated[slot] or truncated[slot])
+                entry = boundary(slot, info['final_observation'] if ended else obs,
+                                 info['final_info'] if ended else info)
+                entry['action'].append(actions[slot].cpu().numpy().copy())
+                entry['reward'].append(float(reward[slot].item()))
+                entry['terminated'].append(bool(terminated[slot].item()))
+                entry['truncated'].append(bool(truncated[slot].item()))
+                if ended:
+                    boundary(slot, obs, info['reset_info'])
+        np.savez_compressed('pickcube_public_traces.npz', **{
+            name + '__' + key: np.asarray(value) for name, trace in traces.items()
+            for key, value in trace.items() if value})
+        Path('pickcube_public_contexts.json').write_text(json.dumps(contexts, indent=2) + '\n')
+    finally:
+        if recorder is None:
+            env.close()
+        else:
+            recorder.close()
+    return {'scope': 'PickCube device state recorder probe', 'recorded_env_ids': [0, 1],
+            'files': [path.name for path in recorder.saved_paths], 'closed': True,
+            'action_components': list(env.metadata['action_schema']['components']),
+            'cameras_recorded': ['base', 'hand'] if sensor else []}
+
+
+def _pickcube_scalar_effort():
+    """Compare the source's scalar physical response without a trajectory oracle."""
+    import numpy as np
+    from task_env import make_env
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+        'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 20}})
+    try:
+        initial, info = env.reset(seed=31)
+        if set(initial['state']) != {'ee_pose', 'joint_position', 'hand_pose'}:
+            raise AssertionError('canonical scalar physical observation differs from device fields')
+        if 'state_boundary_identity' not in info or 'state_sample_clock' not in info:
+            raise AssertionError('scalar boundary metadata is missing')
+        action = np.zeros(8, dtype=np.float32)
+        env.step(action)
+        action[0], action[-1] = 5., -4.
+        for _ in range(10):
+            observation, _, _, _, info = env.step(action)
+        return {'scope': 'scalar PickCube motion comparison', 'seed': 31,
+                'initial_cube': initial['privileged_state']['cube_v1_body_pose'][0].tolist(),
+                'final_finger_positions': observation['state']['joint_position'][-2:].tolist(),
+                'final_cube': observation['privileged_state']['cube_v1_body_pose'][0].tolist(),
+                'control_step': info['control_step'], 'simulation_time_s': info['simulation_time_s'],
+                'state_fields': sorted(observation['state'])}
+    finally:
+        env.close()
+
+
+def _scale_correctness(worker_python, *, provider, pickcube, count=16):
+    """Check a batch row permutation and the Pendulum's independent ODE."""
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+
+    if count < 1:
+        raise ValueError('scale correctness requires a positive batch')
+    task = 'pick-cube-p16-reference-v1' if pickcube else 'pendulum-v1'
+    seed = 31 if pickcube else 73
+    config = {'execution': {'physics_provider': provider,
+                            'interpreter': sys.executable if provider == 'geophys' else worker_python},
+              'episode': {'seed': seed, 'horizon': 20}}
+    if pickcube:
+        config.update(controller={'profile_id': 'panda-direct-effort-v1'},
+                      robot={'native_drive': 'disabled'})
+        if provider == 'geophys':
+            config['execution']['geophys_contact_mode'] = 'discrete'
+    env = make_parallel_env(task, env_config=config, num_env=count, backend='cuda',
+                            execution='device', worker_directory=os.getcwd())
+    try:
+        env.reset(seed=[seed] * count)
+        initial = env.read_device_state(('qpos', 'qvel'))
+        for name in ('qpos', 'qvel'):
+            if not torch.allclose(initial.arrays[name], initial.arrays[name][:1].expand_as(initial.arrays[name]),
+                                  atol=1e-6, rtol=0):
+                raise AssertionError(f'B={count} initial {name} differs by row')
+        key = 'effort' if pickcube else 'torque'
+        action = torch.zeros((count, *env.single_action_space[key].shape), device='cuda')
+        action[:, 0] = torch.linspace(-5., 5., count, device='cuda') if pickcube else torch.linspace(-1.5, 1.5, count, device='cuda')
+        if pickcube:
+            action[:, -1] = torch.linspace(-4., 4., count, device='cuda')
+        env.step({key: action})
+        first = env.read_device_state(('qpos', 'qvel'))
+        if any(not bool(torch.isfinite(value).all()) for value in first.arrays.values()):
+            raise AssertionError(f'B={count} physical state is nonfinite')
+        ode_error = None
+        if not pickcube:
+            q = initial.arrays['qpos'][:, 0].cpu().numpy().astype(float)
+            velocity = initial.arrays['qvel'][:, 0].cpu().numpy().astype(float)
+            effort = action[:, 0].cpu().numpy().astype(float)
+            for _ in range(25):
+                velocity += .002 * (effort + 9.81 * .25 * np.sin(q) - .05 * velocity) / .1125
+                q += .002 * velocity
+            ode_error = {'qpos': float(np.max(np.abs(first.arrays['qpos'][:, 0].cpu().numpy() - q))),
+                         'qvel': float(np.max(np.abs(first.arrays['qvel'][:, 0].cpu().numpy() - velocity)))}
+            if ode_error['qpos'] > .01 or ode_error['qvel'] > .05:
+                raise AssertionError(f'B={count} Pendulum disagrees with frozen source ODE: {ode_error}')
+        env.reset(seed=[seed] * count)
+        reset = env.read_device_state(('qpos', 'qvel'))
+        if reset.identity.native_step != first.identity.native_step:
+            raise AssertionError(f'B={count} reset advanced physics')
+        for name in ('qpos', 'qvel'):
+            if not torch.allclose(reset.arrays[name], initial.arrays[name], atol=1e-6, rtol=0):
+                raise AssertionError(f'B={count} reset did not restore initial {name}')
+        order = torch.arange(count - 1, -1, -1, device='cuda')
+        env.step({key: action.index_select(0, order).contiguous()})
+        second = env.read_device_state(('qpos', 'qvel'))
+        expected = {name: first.arrays[name].index_select(0, order).cpu().numpy() for name in ('qpos', 'qvel')}
+        actual = {name: second.arrays[name].cpu().numpy() for name in ('qpos', 'qvel')}
+        np.savez_compressed('scale_states.npz', **{f'{prefix}_{name}': values[name]
+            for prefix, values in (('expected', expected), ('actual', actual)) for name in values})
+        errors = {name: float(np.max(np.abs(actual[name] - expected[name]))) for name in expected}
+        if errors['qpos'] > 1e-4 or errors['qvel'] > 1e-3:
+            raise AssertionError(f'B={count} row permutation differs after reset: {errors}')
+        return {'scope': f'{provider} {task} B={count} state and reversed-action correctness',
+                'batch': count, 'permutation_errors': errors, 'pendulum_ode_errors': ode_error,
+                'native_step_reset_unchanged': True, 'source_states': 'scale_states.npz'}
+    finally:
+        env.close()
+
+
+def _action_permutation(worker_python, *, provider, pickcube):
+    """Reapply the same actions on permuted rows from identical source states."""
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+
+    task = 'pick-cube-p16-reference-v1' if pickcube else 'pendulum-v1'
+    seed = 31 if pickcube else 73
+    config = {'execution': {'physics_provider': provider,
+                            'interpreter': sys.executable if provider == 'geophys' else worker_python},
+              'episode': {'seed': seed, 'horizon': 20}}
+    if pickcube:
+        config.update(controller={'profile_id': 'panda-direct-effort-v1'},
+                      robot={'native_drive': 'disabled'})
+        if provider == 'geophys':
+            config['execution']['geophys_contact_mode'] = 'discrete'
+    env = make_parallel_env(task, env_config=config, num_env=3, backend='cuda',
+                            execution='device', worker_directory=os.getcwd())
+    try:
+        env.reset(seed=[seed] * 3)
+        initial = env.read_device_state(('qpos', 'qvel'))
+        for name in ('qpos', 'qvel'):
+            if not torch.allclose(initial.arrays[name], initial.arrays[name][:1].expand_as(initial.arrays[name]),
+                                  atol=1e-6, rtol=0):
+                raise AssertionError(f'permutation rows did not start from the same {name}')
+        key = 'effort' if pickcube else 'torque'
+        action = torch.zeros((3, *env.single_action_space[key].shape), device='cuda')
+        action[:, 0] = torch.tensor([-5., 0., 5.] if pickcube else [-1.5, 0., 1.5], device='cuda')
+        if pickcube:
+            action[:, -1] = torch.tensor([-4., 0., 4.], device='cuda')
+        env.step({key: action})
+        first = env.read_device_state(('qpos', 'qvel'))
+        env.reset(seed=[seed] * 3)
+        reset = env.read_device_state(('qpos', 'qvel'))
+        if reset.identity.native_step != first.identity.native_step:
+            raise AssertionError('permutation reset advanced native time')
+        for name in ('qpos', 'qvel'):
+            if not torch.allclose(reset.arrays[name], initial.arrays[name], atol=1e-6, rtol=0):
+                raise AssertionError(f'permutation reset changed the frozen initial {name}')
+        order = torch.tensor([2, 0, 1], dtype=torch.int64, device='cuda')
+        env.step({key: action.index_select(0, order).contiguous()})
+        second = env.read_device_state(('qpos', 'qvel'))
+        expected = {name: first.arrays[name].index_select(0, order).cpu().numpy()
+                    for name in ('qpos', 'qvel')}
+        actual = {name: second.arrays[name].cpu().numpy() for name in ('qpos', 'qvel')}
+        np.savez_compressed('permutation_states.npz', **{f'{prefix}_{name}': values[name]
+            for prefix, values in (('expected', expected), ('actual', actual)) for name in values})
+        errors = {name: float(np.max(np.abs(actual[name] - expected[name]))) for name in expected}
+        if errors['qpos'] > 1e-4 or errors['qvel'] > 1e-3:
+            raise AssertionError(f'permuted action response differs from same-state control: {errors}')
+        return {'scope': f'{provider} {task} action permutation from identical reset states',
+                'order': [2, 0, 1], 'qpos_max_error': errors['qpos'], 'qvel_max_error': errors['qvel'],
+                'qpos_tolerance': 1e-4, 'qvel_tolerance': 1e-3,
+                'reset_did_not_step': True, 'source_states': 'permutation_states.npz'}
+    finally:
+        env.close()
+
+
+def _pickcube_finger_contact(worker_python, *, provider, hold_arm=False):
+    """Compare a source-aligned cube against same-action empty-space controls."""
+    import numpy as np
+    import torch
+    from task_env import make_parallel_env
+
+    controlled_descent = hold_arm == 'source-bias-descend'
+    source_bias = isinstance(hold_arm, str) and hold_arm.startswith('source-bias')
+    config = {'execution': _pickcube_execution(provider, worker_python),
+              'controller': {'profile_id': 'panda-direct-effort-v1'},
+              'robot': {'native_drive': 'disabled'},
+              'episode': {'seed': 31, 'horizon': 100 if controlled_descent else 40}}
+    env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=3,
+                            backend='cuda', execution='device', worker_directory=os.getcwd())
+    traces = {'joint_position': [], 'hand_pose': [], 'ee_pose': [], 'cube_pose': []}
+
+    def retain(observation):
+        for key in ('joint_position', 'hand_pose', 'ee_pose'):
+            traces[key].append(observation['state'][key].cpu().numpy().copy())
+        traces['cube_pose'].append(observation['privileged_state']['cube_v1_body_pose'][:, 0].cpu().numpy().copy())
+
+    try:
+        observation, _ = env.reset(seed=[3706, 31, 3706])
+        retain(observation)
+        target = observation['state']['joint_position'][:, :7].clone()
+        previous = target.clone()
+        if controlled_descent:
+            target[:, 3] -= .08
+        actions = torch.zeros((3, *env.single_action_space['effort'].shape), device='cuda')
+        finger_efforts = torch.tensor([-4., -4., 0.], device='cuda')
+        limits = torch.tensor([87., 87., 87., 87., 12., 12., 12.], device='cuda')
+        bias = (torch.tensor([0., -29.3559534, 0., 22.0492107, .6695478, 2.3063896, 0.], device='cuda')
+                if source_bias else 0.)
+        actions[:, -1] = finger_efforts
+        steps = 60 if controlled_descent else 20
+        for tick in range(steps):
+            if hold_arm:
+                current = observation['state']['joint_position'][:, :7]
+                velocity = (current - previous) / .01
+                previous = current.clone()
+                actions[:, :7] = torch.clamp(bias + 200. * (target - current) - 20. * velocity,
+                                             min=-limits, max=limits)
+                if controlled_descent:
+                    actions[:, -1] = finger_efforts if tick >= 35 else 0.
+            observation, _, terminated, truncated, _ = env.step({'effort': actions})
+            retain(observation)
+            if bool(terminated.any() or truncated.any()):
+                raise AssertionError('contact probe ended before its frozen horizon')
+        arrays = {name: np.asarray(value) for name, value in traces.items()}
+        np.savez_compressed('finger_contact_traces.npz', **arrays)
+        initial_xy = arrays['cube_pose'][0, :, :2]
+        initial_ee = arrays['ee_pose'][0, :, :2]
+        offsets = np.linalg.norm(initial_xy - initial_ee, axis=1)
+        openings = arrays['joint_position'][-1, :, -2:].sum(axis=1)
+        finger_error = np.max(np.abs(arrays['joint_position'][:, :, -2] - arrays['joint_position'][:, :, -1]))
+        displacement = np.linalg.norm(arrays['cube_pose'][-1, :, :2] - initial_xy, axis=1)
+        if offsets[0] > .002 or offsets[1] < .05 or offsets[2] > .002:
+            raise AssertionError(f'frozen cube/hand alignment differs: {offsets.tolist()}')
+        if openings[1] >= .02 or openings[0] <= openings[1] + .01 or finger_error >= .003:
+            raise AssertionError(f'finger contact response differs: openings={openings.tolist()}, '
+                                 f'coupling_error={finger_error}')
+        if displacement[0] < .0005:
+            raise AssertionError(f'aligned cube did not move observably: {displacement.tolist()}')
+        return {'scope': f'{provider} same-action aligned/offset cube contact witness',
+                'initial_xy_distance_m': offsets.tolist(), 'final_finger_openings_m': openings.tolist(),
+                'finger_coupling_max_error_m': float(finger_error),
+                'cube_xy_displacement_m': displacement.tolist(), 'steps': steps,
+                'arm_control': ('sampled position hold with independently compiled source bias' if source_bias
+                                else 'sampled position hold' if hold_arm else 'zero effort'),
+                'source_trajectory': 'finger_contact_traces.npz'}
+    finally:
+        env.close()
+
+
+def _pickcube_device_probe(worker_python, *, motion=False, provider='mujoco_warp'):
+    """Bounded first integration probe of the registered PickCube route."""
+    import torch
+    from task_env import make_parallel_env
+
+    config = {'execution': _pickcube_execution(provider, worker_python),
+              'controller': {'profile_id': 'panda-direct-effort-v1'},
+              'robot': {'native_drive': 'disabled'},
+              'episode': {'seed': 31, 'horizon': 20}}
+    env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=3,
+                            backend='cuda', execution='device', worker_directory=os.getcwd())
+    try:
+        observation, info = env.reset(seed=31)
+        if set(observation['state']) != {'ee_pose', 'joint_position', 'hand_pose'}:
+            raise AssertionError('unexpected PickCube Robot observation fields')
+        if tuple(observation['privileged_state']['cube_v1_body_pose'].shape) != (3, 1, 7):
+            raise AssertionError('invalid cube observation shape')
+        cube = observation['privileged_state']['cube_v1_body_pose'][:, 0, :3].clone()
+        if torch.unique(cube[:, :2], dim=0).shape[0] != 3:
+            raise AssertionError('reset samples did not differ by row')
+        action_space = env.single_action_space['effort']
+        action = {'effort': torch.zeros((3, *action_space.shape), device='cuda')}
+        next_observation, reward, terminated, truncated, next_info = env.step(action)
+        if not bool(torch.isfinite(reward).all()) or bool(terminated.any() or truncated.any()):
+            raise AssertionError('invalid first PickCube task transition')
+        if not torch.equal(cube, observation['privileged_state']['cube_v1_body_pose'][:, 0, :3]):
+            raise AssertionError('reset observation was not owned')
+        result = {'scope': f'initial PickCube {provider} integration probe', 'batch': 3,
+                'seed': 31, 'cube_initial': cube.cpu().tolist(),
+                'reward': reward.cpu().tolist(), 'episode_step': next_info['episode_step'].cpu().tolist(),
+                'action_shape': list(action['effort'].shape), 'observation_owned': True,
+                'initial_joint_position': observation['state']['joint_position'].cpu().tolist(),
+                'initial_ee_pose': observation['state']['ee_pose'].cpu().tolist(),
+                'initial_hand_pose': observation['state']['hand_pose'].cpu().tolist(),
+                'first_joint_position': next_observation['state']['joint_position'].cpu().tolist(),
+                'first_cube_pose': next_observation['privileged_state']['cube_v1_body_pose'][:, 0].cpu().tolist()}
+        if motion:
+            action['effort'][:, 0] = torch.tensor([5., 0., -5.], device='cuda')
+            action['effort'][:, -1] = torch.tensor([-4., 0., 4.], device='cuda')
+            for _ in range(10):
+                next_observation, _, _, _, _ = env.step(action)
+                heights = next_observation['privileged_state']['cube_v1_body_pose'][:, 0, 2]
+                if not bool(torch.all(torch.abs(heights - .488) < .02)):
+                    raise AssertionError('cube did not remain near authored table rest height')
+            fingers = next_observation['state']['joint_position'][:, -2:]
+            openings = fingers.sum(dim=1)
+            if not bool(openings[0] + .0001 < openings[2]):
+                raise AssertionError('signed tendon effort did not produce distinct opening')
+            if not bool(torch.all(torch.abs(fingers[:, 0] - fingers[:, 1]) < .003)):
+                raise AssertionError('coupled fingers do not retain the declared constraint')
+            before = env.read_device_state(('qpos', 'qvel'))
+            before_values = {name: value.clone() for name, value in before.arrays.items()}
+            env.reset(mask=torch.tensor([True, False, True], dtype=torch.bool, device='cuda'))
+            after = env.read_device_state(('qpos', 'qvel'))
+            if after.identity.native_step != before.identity.native_step:
+                raise AssertionError('masked reset advanced the native physics clock')
+            for name in ('qpos', 'qvel'):
+                if not torch.equal(before_values[name][1], after.arrays[name][1]):
+                    raise AssertionError('masked reset altered the unselected row')
+            result.update(scope=f'PickCube {provider} motion and masked-reset probe',
+                          finger_openings=openings.cpu().tolist(),
+                          final_cube_heights=heights.cpu().tolist(),
+                          unselected_state_unchanged=True, reset_did_not_step=True)
+        return result
+    finally:
+        primary = sys.exception()
+        try:
+            env.close()
+        except BaseException as cleanup_error:
+            if primary is None:
+                raise
+            primary.add_note(f'PickCube probe cleanup also failed: {cleanup_error!r}')
+
+
+def _formal_device(worker_python, *, provider='mujoco_warp', contact_mode='provider_default'):
     """Exercise the ordinary registered factory and same-step device lifecycle."""
     import numpy as np
     import torch
     from task_env import make_parallel_env
 
-    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+    config = {'execution': {'physics_provider': provider,
+                            'interpreter': sys.executable if provider == 'geophys' else worker_python},
               'episode': {'seed': 73, 'horizon': 20}}
+    if contact_mode != 'provider_default':
+        config['execution']['geophys_contact_mode'] = contact_mode
     env = make_parallel_env('pendulum-v1', env_config=config, num_env=3, backend='cuda',
                             execution='device', worker_directory=os.getcwd())
+    robot = env.robot
     try:
         observation, info = env.reset(seed=73)
         leaf = observation['state']['proprioception']
@@ -487,6 +1168,16 @@ def _formal_device(worker_python):
                         or current.episode_steps.tolist() != [1, 1, 1]
                         or not torch.equal(initial.arrays['qpos'], retained_initial_q)):
                     raise AssertionError('native clock or retained state snapshot is incorrect')
+                joint_positions = robot.joint_positions(current)
+                if (len(robot.subjects) != 1 or len(robot.controlled_joints) != 1
+                        or not torch.equal(joint_positions[:, 0], current.arrays['qpos'][:, 0])):
+                    raise AssertionError('Robot view does not resolve its declared joint on this runtime')
+                try:
+                    robot.joint_positions(initial)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError('Robot view admitted a stale state boundary')
                 if (np.max(np.abs(first_q - predicted_q)) > .01
                         or np.max(np.abs(first_v - predicted_v)) > .05):
                     raise AssertionError('first interval disagrees with the independent hinge oracle')
@@ -494,6 +1185,9 @@ def _formal_device(worker_python):
                 body_names = env.metadata['runtime_resource_summary']['device_transition']['body_names']
                 link = body_names.index('pendulum-v1/pendulum_link')
                 measured_quat = poses.arrays['body_orientation'][:, link].cpu().numpy()
+                robot_pose = robot.frame_pose(poses, 'pendulum-v1/pendulum_link')
+                if not torch.equal(robot_pose[:, 3:], poses.arrays['body_orientation'][:, link]):
+                    raise AssertionError('Robot view frame mapping differs from the runtime publication')
                 expected_quat = np.stack((np.cos(first_q / 2), np.zeros(3),
                                           np.sin(first_q / 2), np.zeros(3)), axis=1)
                 if (np.max(np.abs(measured_quat - expected_quat)) > 1e-5
@@ -521,9 +1215,14 @@ def _formal_device(worker_python):
             raise AssertionError('per-row clocks do not match the staggered reset')
         expected_final = np.stack((np.cos(terminal_q), np.sin(terminal_q), terminal_v), axis=1)[[0, 2]]
         actual_final = final[[0, 2]].cpu().numpy().copy()
+        Path('formal_terminal_oracle.json').write_text(json.dumps({
+            'actual': actual_final.tolist(), 'expected': expected_final.tolist(),
+            'previous_q_rad': terminal_q_before.tolist(),
+            'previous_qd_rad_s': terminal_v_before.tolist()}, indent=2) + '\n')
         if (np.max(np.abs(actual_final[:, :2] - expected_final[:, :2])) > .01
                 or np.max(np.abs(actual_final[:, 2] - expected_final[:, 2])) > .05):
-            raise AssertionError('saved terminal observations do not describe the old transition')
+            raise AssertionError('saved terminal observations do not describe the old transition: '
+                                 f'actual={actual_final.tolist()}, expected={expected_final.tolist()}')
         if torch.equal(final[[0, 2]], observation['state']['proprioception'][[0, 2]]):
             raise AssertionError('done observations did not switch to the new episode')
         env.step(action)
@@ -542,10 +1241,25 @@ def _formal_device(worker_python):
                   'terminal_previous_qd_rad_s': terminal_v_before.tolist(),
                   'post_reset_observation': observation['state']['proprioception'][[0, 2]].cpu().tolist(),
                   'manual_mask_nonselected_unchanged': True, 'render_mode': env.render_mode,
+                  'robot_controlled_joints': list(robot.controlled_joints),
+                  'robot_subject_count': len(robot.subjects), 'robot_stale_state_rejected': True,
                   'control_intervals': 21, 'native_batch_steps': 525, 'world_steps': 1575}
+        if provider == 'geophys':
+            layout = env.resource_summary()['device_transition']['physical_layout_facts']
+            result['contact_mode_requested'] = layout['contact_mode_requested']
+            result['contact_mode_resolved'] = layout['contact_mode_resolved']
+            if result['contact_mode_requested'] != contact_mode:
+                raise AssertionError('GeoPhys did not retain the explicitly selected contact mode')
     finally:
         env.close()
     env.close()
+    try:
+        robot.read_device_state(('qpos',))
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('Robot view remained live after runtime close')
+    result['robot_closed_state_rejected'] = True
     result['worker_closed'] = True
     return result
 
@@ -663,12 +1377,13 @@ def _x11_geochora_windows():
     return clients, lines
 
 
-def _formal_window(worker_python):
+def _formal_window(worker_python, *, provider='mujoco_warp'):
     """Exercise a real display and close its renderer independently of physics."""
     import torch
     from task_env import make_parallel_env
 
-    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+    config = {'execution': {'physics_provider': provider,
+                            'interpreter': sys.executable if provider == 'geophys' else worker_python},
               'episode': {'seed': 73, 'horizon': 200}}
     env = make_parallel_env('pendulum-v1', env_config=config, num_env=3, backend='cuda',
                             execution='device', render_mode='human', worker_directory=os.getcwd())
@@ -711,7 +1426,7 @@ def _formal_window(worker_python):
         env.close()
 
 
-def _record_device(worker_python, *, camera=False):
+def _record_device(worker_python, *, camera=False, provider='mujoco_warp'):
     """Record selected rows from the ordinary five-tuple device environment."""
     from dataclasses import asdict
     import numpy as np
@@ -719,7 +1434,8 @@ def _record_device(worker_python, *, camera=False):
     from task_env import make_parallel_env
     from task_env.recorders import VectorTransitionRecorder
 
-    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+    config = {'execution': {'physics_provider': provider,
+                            'interpreter': sys.executable if provider == 'geophys' else worker_python},
               'episode': {'seed': 73, 'horizon': 20}}
     if camera:
         config['render'] = {'backend': 'rasterizer', 'camera_obs': True,
@@ -737,11 +1453,14 @@ def _record_device(worker_python, *, camera=False):
         name = f'trajectory_slot_{slot:03d}_episode_{episode - 1:06d}'
         trace = witnesses.setdefault(name, {'contexts': [], 'states': [], 'images': [],
                                             'terminated': [], 'truncated': []})
-        trace['contexts'].append({'schema_version': 'device-batch-boundary-v1',
+        context = {'schema_version': 'device-batch-boundary-v1',
                                   'env_id': int(info['env_id'][slot].item()),
                                   'episode_id': episode,
                                   'episode_step': int(info['episode_step'][slot].item()),
-                                  **asdict(info['boundary'])})
+                                  **asdict(info['boundary'])}
+        if 'native_world_time' in info:
+            context['native_world_time_s'] = float(info['native_world_time'][slot].item())
+        trace['contexts'].append(context)
         trace['states'].append(observation['state']['proprioception'][slot].cpu().numpy().copy())
         if camera:
             trace['images'].append(observation['cameras']['base']['rgb'][slot].cpu().numpy().copy())
@@ -1423,6 +2142,246 @@ def _raster(worker_python):
         ti.reset()
 
 
+def _mjwarp_world_clock_probe(worker_python):
+    """Read native per-world time through masked reset and same-step reset."""
+    import torch
+    from task_env import make_parallel_env
+
+    env = make_parallel_env('pendulum-v1', env_config={
+        'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+        'episode': {'seed': 73, 'horizon': 3}}, num_env=3, backend='cuda',
+        execution='device', worker_directory=os.getcwd())
+    try:
+        _, info = env.reset(seed=73)
+        samples = [info['native_world_time'].cpu().tolist()]
+        action = {'torque': torch.zeros((3, 1), device='cuda')}
+        _, _, _, _, info = env.step(action)
+        samples.append(info['native_world_time'].cpu().tolist())
+        _, info = env.reset(mask=torch.tensor([False, True, False], dtype=torch.bool, device='cuda'))
+        samples.append(info['native_world_time'].cpu().tolist())
+        env.step(action)
+        _, _, _, truncated, info = env.step(action)
+        samples.append(info['final_info']['native_world_time'].cpu().tolist())
+        samples.append(info['native_world_time'].cpu().tolist())
+        expected = [[0., 0., 0.], [.05, .05, .05], [.05, 0., .05],
+                    [.15, .10, .15], [0., .10, 0.]]
+        if truncated.tolist() != [True, False, True] or not torch.allclose(
+                torch.tensor(samples), torch.tensor(expected), atol=1e-6, rtol=0):
+            raise AssertionError(f'native world clocks differ from the frozen boundaries: {samples}')
+        direct = env.read_device_state(('native_world_time',)).arrays['native_world_time']
+        if not torch.allclose(direct, info['native_world_time'], atol=0, rtol=0):
+            raise AssertionError('public native world clock differs from returned info')
+        return {'scope': 'MJWarp native per-world clocks across masked and same-step reset',
+                'samples_s': samples, 'truncated': truncated.cpu().tolist(),
+                'source': 'MJWarp Data.time', 'maximum_error_s': float(
+                    torch.max(torch.abs(torch.tensor(samples) - torch.tensor(expected))))}
+    finally:
+        env.close()
+
+
+def _device_sha_probe(worker_python, *, pickcube, sensor=False):
+    """Count SHA-256 calls in a public step, including same-step autoreset."""
+    import hashlib
+    import traceback
+    import torch
+    from task_env import make_parallel_env
+
+    task = 'pick-cube-p16-reference-v1' if pickcube else 'pendulum-v1'
+    config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
+              'episode': {'seed': 31 if pickcube else 73, 'horizon': 1}}
+    if pickcube:
+        config.update(controller={'profile_id': 'panda-direct-effort-v1'},
+                      robot={'native_drive': 'disabled'})
+    if sensor:
+        if not pickcube:
+            raise ValueError('this SHA probe only declares PickCube cameras')
+        config['render'] = _pickcube_camera_configuration()
+    env = make_parallel_env(task, env_config=config, num_env=3, backend='cuda',
+                            execution='device', worker_directory=os.getcwd())
+    try:
+        env.reset(seed=31 if pickcube else 73)
+        key = 'effort' if pickcube else 'torque'
+        shape = env.single_action_space[key].shape
+        action = {key: torch.zeros((3, *shape), dtype=torch.float32, device='cuda')}
+        real_sha256 = hashlib.sha256
+        calls = []
+        def capture(*args, **kwargs):
+            calls.append(traceback.extract_stack(limit=5)[-2].name)
+            return real_sha256(*args, **kwargs)
+        try:
+            hashlib.sha256 = capture
+            _, _, _, truncated, _ = env.step(action)
+        finally:
+            hashlib.sha256 = real_sha256
+        if not bool(truncated.all()):
+            raise AssertionError('probe did not exercise same-step autoreset')
+        return {'task': task, 'sensor_enabled': sensor, 'step_sha256_call_count': len(calls), 'callers': calls,
+                'same_step_autoreset': True}
+    finally:
+        env.close()
+
+
+def _pickcube_performance(worker_python, *, provider, sensor, window, count=16):
+    """Measure complete public PickCube steps with all requested render rows."""
+    import math
+    import time
+    import torch
+    from task_env import make_parallel_env
+
+    horizon = 1000 if provider == 'isaacsim' else 2000
+    config = {'execution': _pickcube_execution(provider, worker_python),
+              'controller': {'profile_id': 'panda-direct-effort-v1'},
+              'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': horizon}}
+    if sensor:
+        config['render'] = _pickcube_camera_configuration()
+    else:
+        config['render'] = {}
+    config['render']['parallel'] = {'columns': math.ceil(math.sqrt(count))}
+    started = time.monotonic()
+    env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=count,
+                            backend='cuda', execution='device', render_mode='human' if window else None,
+                            worker_directory=os.getcwd())
+    try:
+        env.reset(seed=31)
+        layout_facts = env.resource_summary()['device_transition']['physical_layout_facts']
+        if window:
+            env.set_parallel_render_num(count)
+        values = torch.zeros((count, *env.single_action_space['effort'].shape), device='cuda')
+        values[:, 0] = torch.linspace(-5., 5., count, device='cuda')
+        values[:, -1] = torch.linspace(-4., 4., count, device='cuda')
+        action = {'effort': values}
+        torch.cuda.synchronize()
+        init_seconds = time.monotonic() - started
+        for _ in range(20):
+            env.step(action)
+            if window:
+                env.render()
+        torch.cuda.synchronize()
+        if window:
+            from PIL import Image
+            before = env.read_device_state(('qpos',)).identity
+            frame = env.render(mode='rgb_array')
+            Image.fromarray(frame.cpu().numpy()).save('observer-warmup.png')
+            env.render(mode='human')
+            if env.read_device_state(('qpos',)).identity != before:
+                raise AssertionError('observer witness capture advanced physics')
+        started = time.monotonic()
+        steps = 0
+        step_seconds = presentation_seconds = 0.
+        while steps < horizon - 20:
+            step_started = time.monotonic()
+            env.step(action)
+            torch.cuda.synchronize()
+            step_seconds += time.monotonic() - step_started
+            if window:
+                presentation_started = time.monotonic()
+                env.render()
+                torch.cuda.synchronize()
+                presentation_seconds += time.monotonic() - presentation_started
+            steps += 1
+            elapsed = time.monotonic() - started
+            if steps >= 100 and elapsed >= 10:
+                break
+        final = env.read_device_state(('qpos', 'qvel'))
+        if any(not bool(torch.isfinite(value).all()) for value in final.arrays.values()):
+            raise AssertionError('PickCube performance sample ended in a nonfinite physical state')
+        return {'scope': 'full public PickCube transitions with configured cameras and observer',
+                'provider': provider, 'batch': count, 'sensor': sensor, 'window': window,
+                'selected_render_envs': count if window else 0,
+                'visibly_distinguishable_envs': None if window else 0,
+                'sensor_envs': count if sensor else 0,
+                'render_grid_columns': math.ceil(math.sqrt(count)),
+                'sensor_cameras': ['base', 'hand'] if sensor else [],
+                'warmup_steps': 20, 'measured_steps': steps, 'measurement_seconds': elapsed,
+                'initialization_seconds': init_seconds, 'sample_sufficient': steps >= 100 and elapsed >= 10,
+                'public_step_seconds': step_seconds, 'public_step_hz': steps / step_seconds,
+                'control_hz_including_present': steps / elapsed,
+                'env_transitions_per_second': count * steps / elapsed,
+                'presentation_seconds': presentation_seconds,
+                'window_fps': steps / elapsed if window else None,
+                'sensor_hz': steps / elapsed if sensor else None,
+                'gpu_aggregate_pair_capacity': layout_facts.get('gpu_aggregate_pair_capacity'),
+                'source_collision_shapes_all_worlds': layout_facts.get('source_collision_shapes_all_worlds'),
+                'final_state_finite': True,
+                'native_substeps_per_control': 5, 'physics_dt': .002}
+    finally:
+        env.close()
+
+
+def _pendulum_performance(worker_python, *, window, provider='mujoco_warp', count=16):
+    """Measure complete public transitions, with an optional observer."""
+    import math
+    import time
+    import torch
+    from task_env import make_parallel_env
+
+    started = time.monotonic()
+    env = make_parallel_env('pendulum-v1', env_config={
+        'execution': {'physics_provider': provider,
+                      'interpreter': sys.executable if provider == 'geophys' else worker_python},
+        'render': {'parallel': {'columns': math.ceil(math.sqrt(count))}},
+        'episode': {'seed': 73, 'horizon': 2000}}, num_env=count, backend='cuda',
+        execution='device', render_mode='human' if window else None, worker_directory=os.getcwd())
+    try:
+        env.reset(seed=73)
+        if window:
+            env.set_parallel_render_num(count)
+        action = {'torque': torch.linspace(-1.5, 1.5, count, device='cuda').reshape(count, 1)}
+        torch.cuda.synchronize()
+        init_seconds = time.monotonic() - started
+        for _ in range(20):
+            env.step(action)
+            if window:
+                env.render()
+        torch.cuda.synchronize()
+        if window:
+            from PIL import Image
+            before_capture = env.read_device_state(('qpos',)).identity
+            frame = env.render(mode='rgb_array')
+            Image.fromarray(frame.cpu().numpy()).save('observer-warmup.png')
+            env.render(mode='human')
+            if env.read_device_state(('qpos',)).identity != before_capture:
+                raise AssertionError('observer witness capture advanced physics')
+        started = time.monotonic()
+        steps = 0
+        presentation_seconds = 0.0
+        step_seconds = 0.0
+        while steps < 1980:
+            step_started = time.monotonic()
+            env.step(action)
+            torch.cuda.synchronize()
+            step_seconds += time.monotonic() - step_started
+            if window:
+                presentation_started = time.monotonic()
+                env.render()
+                torch.cuda.synchronize()
+                presentation_seconds += time.monotonic() - presentation_started
+            steps += 1
+            elapsed = time.monotonic() - started
+            if steps >= 100 and elapsed >= 10:
+                break
+        final = env.read_device_state(('qpos', 'qvel'))
+        if any(not bool(torch.isfinite(value).all()) for value in final.arrays.values()):
+            raise AssertionError('Pendulum performance sample ended in a nonfinite physical state')
+        return {'scope': 'full public Pendulum transitions with optional window presentation',
+                'provider': provider, 'batch': count, 'window': window,
+                'selected_render_envs': count if window else 0,
+                'visibly_distinguishable_envs': None if window else 0,
+                'render_grid_columns': math.ceil(math.sqrt(count)),
+                'sensor': False, 'warmup_steps': 20, 'measured_steps': steps,
+                'measurement_seconds': elapsed, 'initialization_seconds': init_seconds,
+                'sample_sufficient': steps >= 100 and elapsed >= 10,
+                'public_step_seconds': step_seconds, 'public_step_hz': steps / step_seconds,
+                'control_hz_including_present': steps / elapsed,
+                'env_transitions_per_second': count * steps / elapsed,
+                'presentation_seconds': presentation_seconds,
+                'window_fps': steps / elapsed if window else None,
+                'final_state_finite': True,
+                'native_substeps_per_control': 25, 'physics_dt': .002}
+    finally:
+        env.close()
+
+
 def _gpu_group_mib(group):
     processes = subprocess.check_output(['ps', '-eo', 'pid=,pgid='], text=True)
     members = {int(pid) for pid, pgid in (line.split() for line in processes.splitlines())
@@ -1433,7 +2392,13 @@ def _gpu_group_mib(group):
                for pid, memory in [line.split(',', 1)] if int(pid.strip()) in members)
 
 
-def _run(worker_python, output, case):
+def _gpu_used_mib():
+    values = subprocess.check_output(['nvidia-smi', '--query-gpu=memory.used',
+                                      '--format=csv,noheader,nounits'], text=True)
+    return sum(int(line.strip()) for line in values.splitlines() if line.strip())
+
+
+def _run(worker_python, output, case, *, batch_size=16):
     import fcntl
     import signal
     import time
@@ -1444,6 +2409,14 @@ def _run(worker_python, output, case):
         example = Path(__file__).resolve().parents[5] / 'examples/parallel/pendulum_device.py'
         command = [sys.executable, '-u', str(example), '--interpreter', worker_python,
                    '--output', str(output / 'result.json')]
+    elif case in ('pickcube-example', 'pickcube-example-sensor', 'geophys-pickcube-example'):
+        example = Path(__file__).resolve().parents[5] / 'examples/parallel/pick_cube_device.py'
+        command = [sys.executable, '-u', str(example), '--interpreter', worker_python,
+                   '--steps', '2', '--output', str(output / 'result.json')]
+        if case == 'pickcube-example-sensor':
+            command.append('--sensor')
+        if case == 'geophys-pickcube-example':
+            command.extend(['--provider', 'geophys', '--geophys-contact-mode', 'discrete'])
     elif case in ('framebuffer-device', 'geophys-camera'):
         filename = ('test_framebuffer_device_rgb.py' if case == 'framebuffer-device'
                     else 'test_raster_task_camera_binding.py')
@@ -1455,6 +2428,84 @@ def _run(worker_python, output, case):
     elif case == 'core-semantics':
         test = Path(__file__).resolve().parent / 'test_device_semantics.py'
         command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'scalar-effort-regression':
+        root = Path(__file__).resolve().parents[5] / 'task_env/diagnostics/tasks/v2.1.1'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(root / 'test_panda_effort_source.py') + '::test_formal_env_releases_its_source_once',
+                   str(root / 'test_panda_effort_profiles.py') + '::test_effort_reset_rebuilds_plan_for_requested_seed[False]']
+    elif case == 'geophys-batch-cuda':
+        root = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(root / 'test_rigid_batch_no_contact.py') + '::test_public_three_world_construction_and_selected_reset',
+                   str(root / 'test_rigid_batch_contact.py') + '::test_contact_worlds_are_isolated_and_selected_reset_clears_cache']
+    elif case == 'geophys-batch-plan-regression':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_plan.py'
+        command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'geophys-actuator-isolation':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_tendons.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_native_actuator_isolation_includes_affine_bias_and_survives_reset']
+    elif case == 'geophys-device-layout':
+        test = Path(__file__).resolve().parent / 'test_geophys_device_layout.py'
+        command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'geophys-contact-mode-comparison':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_ccd.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_public_discrete_and_continuous_modes_expose_tunneling_limit']
+    elif case == 'geophys-mesh-contact':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_mesh_contact.py'
+        command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'geophys-table-stability':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_table_stability.py'
+        command = [sys.executable, '-m', 'pytest', '-q', '-s', str(test)]
+    elif case == 'geophys-efc-regression':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_efc_batch_preparation.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_public_coupled_step_with_damping_and_current_control[off]']
+    elif case == 'geophys-torsion-constraints':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_equalities.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_contact_limit_equality_share_one_world_iteration']
+    elif case == 'geophys-torsion-direct':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_mixed.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_condim4_torsion_applies_to_direct_body_endpoint']
+    elif case == 'geophys-torsion':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_contact.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_condim4_torsion_changes_spin_and_respects_normal_impulse',
+                   str(test) + '::test_condim4_combined_sliding_and_spin_stay_inside_friction_cone',
+                   str(test) + '::test_condim3_and_condim4_contacts_are_world_local_in_one_batch',
+                   str(test) + '::test_condim4_box_contact_has_bounded_torsional_impulse']
+    elif case == 'geophys-static-contact-filter':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_plan.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_contact_pairs_exclude_distinct_fixed_roots_but_keep_kinematic_roots',
+                   str(test) + '::test_pair_material_priority_margin_and_mask_are_frozen_host_facts',
+                   str(test) + '::test_source_offsets_are_pair_facts_and_explicit_pair_remains_authoritative',
+                   str(test) + '::test_condim4_material_priority_and_unqualified_routes_fail_closed',
+                   str(test) + '::test_mixed_partition_identity_and_split_workspace_budget',
+                   str(test) + '::test_joint_limit_preflight_frozen_facts_and_resource_contract']
+    elif case == 'geophys-free-damping':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_no_contact.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_free_joint_damping_and_armature_match_mujoco_per_world']
+    elif case == 'geophys-device-state':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_no_contact.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_cuda_device_state_is_owned_and_matches_public_readback',
+                   str(test) + '::test_cuda_device_state_supports_zero_dof_worlds']
+    elif case == 'geophys-device-effort':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_no_contact.py'
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_cuda_device_qfrc_has_independent_world_response']
+    elif case == 'geophys-device-reset':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_no_contact.py'
+        contact_test = test.with_name('test_rigid_batch_contact.py')
+        command = [sys.executable, '-m', 'pytest', '-q',
+                   str(test) + '::test_cuda_device_partial_reset_refreshes_selected_kinematics',
+                   str(test) + '::test_cuda_device_reset_free_body_and_velocity_are_row_local',
+                   str(contact_test) + '::test_cuda_device_reset_clears_only_selected_contact_cache']
     elif case == 'geophys-aot-core':
         test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering/test_raster_lighting_component.py'
         command = [sys.executable, '-m', 'pytest', '-q', str(test) + '::test_raster_lighting_component[constant]']
@@ -1503,11 +2554,99 @@ def _run(worker_python, output, case):
             'task_env/diagnostics/tasks/test_phase_ii_c05a_structured_recording.py',
         ]
         command = [sys.executable, '-m', 'pytest', '-q', *(str(root / name) for name in tests)]
+    elif case == 'isaac-batch-probe':
+        command = [worker_python, '-u', __file__, '--isaac-batch-probe']
+    elif case == 'isaac-filter-probe':
+        command = [worker_python, '-u', __file__, '--isaac-filter-probe']
+    elif case == 'isaac-robot-filter-probe':
+        command = [worker_python, '-u', __file__, '--isaac-robot-filter-probe']
+    elif case == 'isaac-cross-filter-probe':
+        command = [worker_python, '-u', __file__, '--isaac-cross-filter-probe']
+    elif case == 'isaac-cross-filter-weak':
+        command = [worker_python, '-u', __file__, '--isaac-cross-filter-weak']
+    elif case == 'isaac-filter-cleanup-error':
+        command = [worker_python, '-u', __file__, '--isaac-filter-cleanup-error']
+    elif case.startswith('performance-pickcube-'):
+        combinations = {
+            f'performance-pickcube-{provider}-{mode}': (provider, mode)
+            for provider in ('mujoco_warp', 'geophys', 'isaacsim')
+            for mode in ('off', 'window', 'sensor', 'sensor-window')
+        }
+        provider, mode = combinations[case]
+        command = [sys.executable, '-u', __file__, '--performance-pickcube',
+                   '--worker-python', worker_python, '--performance-provider', provider]
+        if 'sensor' in mode:
+            command.append('--performance-sensor')
+        if 'window' in mode:
+            command.append('--performance-window')
+    elif case.startswith('scale-check-'):
+        combinations = {f'scale-check-{provider}-{task}': (provider, task)
+                        for provider in ('mujoco_warp', 'geophys', 'isaacsim')
+                        for task in ('pendulum', 'pickcube')}
+        provider, task = combinations[case]
+        command = [sys.executable, '-u', __file__, '--scale-check', '--worker-python', worker_python,
+                   '--scale-provider', provider]
+        if task == 'pickcube':
+            command.append('--scale-pickcube')
     elif case == 'physics':
         command = [worker_python, '-u', __file__, '--physics']
     else:
         role = {'ipc': '--parent', 'raster': '--raster', 'transport-physics': '--transport-physics',
                 'session-physics': '--session-physics', 'formal-device': '--formal-device',
+                'pickcube-device-probe': '--pickcube-device-probe',
+                'geophys-pickcube-device-probe': '--geophys-pickcube-device-probe',
+                'geophys-pickcube-motion-probe': '--geophys-pickcube-motion-probe',
+                'isaac-pickcube-device-probe': '--isaac-pickcube-device-probe',
+                'isaac-pickcube-motion-probe': '--isaac-pickcube-motion-probe',
+                'pickcube-motion-probe': '--pickcube-motion-probe',
+                'pickcube-scalar-effort': '--pickcube-scalar-effort',
+                'pickcube-record': '--pickcube-record',
+                'pickcube-camera-record': '--pickcube-camera-record',
+                'isaac-pickcube-record': '--isaac-pickcube-record',
+                'isaac-pickcube-camera-record': '--isaac-pickcube-camera-record',
+                'geophys-pickcube-camera-record': '--geophys-pickcube-camera-record',
+                'pickcube-finger-contact': '--pickcube-finger-contact',
+                'isaac-pickcube-finger-contact': '--isaac-pickcube-finger-contact',
+                'geophys-pickcube-finger-contact': '--geophys-pickcube-finger-contact',
+                'geophys-pickcube-hold-contact': '--geophys-pickcube-hold-contact',
+                'geophys-pickcube-source-bias-contact': '--geophys-pickcube-source-bias-contact',
+                'geophys-pickcube-controlled-contact': '--geophys-pickcube-controlled-contact',
+                'permutation-mjwarp-pickcube': '--permutation-mjwarp-pickcube',
+                'permutation-isaac-pickcube': '--permutation-isaac-pickcube',
+                'permutation-geophys-pickcube': '--permutation-geophys-pickcube',
+                'permutation-mjwarp-pendulum': '--permutation-mjwarp-pendulum',
+                'permutation-geophys-pendulum': '--permutation-geophys-pendulum',
+                'permutation-isaac-pendulum': '--permutation-isaac-pendulum',
+                'pickcube-window': '--pickcube-window',
+                'pickcube-sensor-window': '--pickcube-sensor-window',
+                'isaac-pickcube-window': '--isaac-pickcube-window',
+                'isaac-pickcube-sensor-window': '--isaac-pickcube-sensor-window',
+                'geophys-pickcube-window': '--geophys-pickcube-window',
+                'geophys-pickcube-sensor-window': '--geophys-pickcube-sensor-window',
+                'geophys-pendulum-source': '--geophys-pendulum-source',
+                'pickcube-camera-probe': '--pickcube-camera-probe',
+                'isaac-pickcube-camera-probe': '--isaac-pickcube-camera-probe',
+                'geophys-pickcube-camera-probe': '--geophys-pickcube-camera-probe',
+                'duplex-ipc': '--duplex-parent',
+                'geophys-pendulum-formal': '--geophys-pendulum-formal',
+                'geophys-pendulum-formal-discrete': '--geophys-pendulum-formal-discrete',
+                'geophys-pendulum-window': '--geophys-pendulum-window',
+                'geophys-pendulum-record': '--geophys-pendulum-record',
+                'isaac-pendulum-formal': '--isaac-pendulum-formal',
+                'isaac-pendulum-window': '--isaac-pendulum-window',
+                'isaac-pendulum-record': '--isaac-pendulum-record',
+                'geophys-pickcube-plan': '--geophys-pickcube-plan',
+                'geophys-pickcube-plan-discrete': '--geophys-pickcube-plan-discrete',
+                'performance-pendulum-off': '--performance-pendulum-off',
+                'performance-pendulum-window': '--performance-pendulum-window',
+                'performance-geophys-off': '--performance-geophys-off',
+                'performance-geophys-window': '--performance-geophys-window',
+                'performance-isaac-off': '--performance-isaac-off',
+                'performance-isaac-window': '--performance-isaac-window',
+                'device-sha-pendulum': '--device-sha-pendulum',
+                'device-sha-pickcube': '--device-sha-pickcube',
+                'device-sha-pickcube-camera': '--device-sha-pickcube-camera',
+                'mjwarp-world-clock': '--mjwarp-world-clock',
                 'transport-frames': '--transport-frames',
                 'formal-render': '--formal-render',
                 'formal-camera': '--formal-camera',
@@ -1527,28 +2666,42 @@ def _run(worker_python, output, case):
                 'scalar': '--scalar', 'scalar-camera-schema': '--scalar-camera-schema'}[case]
         command = [sys.executable, '-u', __file__, role,
                    '--worker-python', worker_python]
+    if case.startswith(('performance-', 'scale-check-')):
+        command.extend(['--batch-size', str(batch_size)])
     start = time.monotonic()
+    baseline_gpu_mib = _gpu_used_mib()
+    environment = os.environ.copy()
+    if case in ('isaac-batch-probe', 'isaac-filter-probe', 'isaac-robot-filter-probe',
+                'isaac-cross-filter-probe', 'isaac-cross-filter-weak', 'isaac-filter-cleanup-error'):
+        import sysconfig
+        environment['GEOCHORA_DIAGNOSTIC_CORE_SITE'] = sysconfig.get_path('purelib')
     with harness._open_shared_native_lock() as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         legacy = harness.LEGACY_LOCK.exists()
         if not harness._lock_matches_legacy(lock, require_legacy=legacy):
             raise RuntimeError('native lock alias differs')
         with (output / 'stdout.log').open('wb') as out, (output / 'stderr.log').open('wb') as err:
-            with harness._supervised_worker(command, environment=os.environ, stdout=out, stderr=err,
+            with harness._supervised_worker(command, environment=environment, stdout=out, stderr=err,
                     cwd=output, lock_fd=lock.fileno()) as (proc, state):
                 violation = None
+                peak_rss = peak_gpu_mib = 0
+                peak_card_mib = baseline_gpu_mib
                 while proc.poll() is None:
+                    rss = harness._proc_rss_tree(proc.pid)
+                    gpu_mib = _gpu_group_mib(proc.pid)
+                    peak_card_mib = max(peak_card_mib, _gpu_used_mib())
+                    peak_rss, peak_gpu_mib = max(peak_rss, rss), max(peak_gpu_mib, gpu_mib)
                     if not harness._lock_matches_legacy(lock, require_legacy=legacy):
                         violation = 'shared lock changed'
                     elif time.monotonic() - start > 900:
                         violation = '900 second wall timeout'
                     elif harness._mem_available_bytes() < 1024**3:
                         violation = 'less than 1 GiB host memory available'
-                    elif harness._proc_rss_tree(proc.pid) > 10 * 1024**3:
+                    elif rss > 10 * 1024**3:
                         violation = 'process tree exceeds 10 GiB RSS'
                     elif harness._gpu_free_mib() < 512:
                         violation = 'less than 512 MiB GPU memory available'
-                    elif _gpu_group_mib(proc.pid) > 6144:
+                    elif gpu_mib > 6144:
                         violation = 'process group exceeds 6144 MiB GPU memory'
                     elif harness._directory_bytes(output) > 256 * 1024**2:
                         violation = 'evidence exceeds 256 MiB'
@@ -1559,7 +2712,27 @@ def _run(worker_python, output, case):
                 code = proc.wait(timeout=10)
             receipt = {'exit_code': code, 'violation': violation,
                        'forced_retirement': state['forced_retirement'],
-                       'wall_seconds': time.monotonic() - start}
+                       'wall_seconds': time.monotonic() - start,
+                       'sampled_peak_process_tree_rss_bytes': peak_rss,
+                       'sampled_peak_process_group_gpu_mib': peak_gpu_mib,
+                       'baseline_card_gpu_mib': baseline_gpu_mib,
+                       'sampled_peak_card_gpu_mib': peak_card_mib}
+    # PhysX can return zero while reporting that a fixed GPU buffer overflow
+    # caused missed interactions. Such a run cannot qualify as physics evidence.
+    with (output / 'stderr.log').open('rb') as native_log:
+        if any(b'simulation will miss interactions' in line for line in native_log):
+            violation = violation or 'PhysX reported missed interactions'
+            receipt['violation'] = violation
+    if case in ('isaac-filter-probe', 'isaac-robot-filter-probe',
+                'isaac-cross-filter-probe', 'isaac-cross-filter-weak', 'isaac-filter-cleanup-error') and code == 0:
+        lines = (output / 'stdout.log').read_text(errors='replace').splitlines()
+        try:
+            outcome = json.loads(lines[-1])
+        except (IndexError, json.JSONDecodeError):
+            outcome = {}
+        if outcome.get('status') != 'PASS':
+            violation = violation or 'Isaac collision control did not pass'
+            receipt['violation'] = violation
     (output / 'supervisor.json').write_text(json.dumps(receipt, indent=2) + '\n')
     if code != 0 or violation or state['forced_retirement']:
         raise RuntimeError(f'IPC probe failed: {receipt}')
@@ -1568,6 +2741,8 @@ def _run(worker_python, output, case):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--worker', action='store_true')
+    parser.add_argument('--duplex-worker', action='store_true')
+    parser.add_argument('--duplex-parent', action='store_true')
     parser.add_argument('--parent', action='store_true')
     parser.add_argument('--run', action='store_true')
     parser.add_argument('--physics', action='store_true')
@@ -1578,6 +2753,73 @@ def main():
     parser.add_argument('--transport-frames', action='store_true')
     parser.add_argument('--session-physics', action='store_true')
     parser.add_argument('--formal-device', action='store_true')
+    parser.add_argument('--pickcube-device-probe', action='store_true')
+    parser.add_argument('--geophys-pickcube-device-probe', action='store_true')
+    parser.add_argument('--geophys-pickcube-motion-probe', action='store_true')
+    parser.add_argument('--isaac-pickcube-device-probe', action='store_true')
+    parser.add_argument('--isaac-pickcube-motion-probe', action='store_true')
+    parser.add_argument('--pickcube-motion-probe', action='store_true')
+    parser.add_argument('--pickcube-scalar-effort', action='store_true')
+    parser.add_argument('--pickcube-record', action='store_true')
+    parser.add_argument('--pickcube-camera-record', action='store_true')
+    parser.add_argument('--isaac-pickcube-record', action='store_true')
+    parser.add_argument('--isaac-pickcube-camera-record', action='store_true')
+    parser.add_argument('--geophys-pickcube-camera-record', action='store_true')
+    parser.add_argument('--pickcube-finger-contact', action='store_true')
+    parser.add_argument('--isaac-pickcube-finger-contact', action='store_true')
+    parser.add_argument('--geophys-pickcube-finger-contact', action='store_true')
+    parser.add_argument('--geophys-pickcube-hold-contact', action='store_true')
+    parser.add_argument('--geophys-pickcube-source-bias-contact', action='store_true')
+    parser.add_argument('--geophys-pickcube-controlled-contact', action='store_true')
+    parser.add_argument('--permutation-mjwarp-pickcube', action='store_true')
+    parser.add_argument('--permutation-isaac-pickcube', action='store_true')
+    parser.add_argument('--permutation-geophys-pickcube', action='store_true')
+    parser.add_argument('--permutation-mjwarp-pendulum', action='store_true')
+    parser.add_argument('--permutation-geophys-pendulum', action='store_true')
+    parser.add_argument('--permutation-isaac-pendulum', action='store_true')
+    parser.add_argument('--pickcube-window', action='store_true')
+    parser.add_argument('--pickcube-sensor-window', action='store_true')
+    parser.add_argument('--isaac-pickcube-window', action='store_true')
+    parser.add_argument('--isaac-pickcube-sensor-window', action='store_true')
+    parser.add_argument('--geophys-pickcube-window', action='store_true')
+    parser.add_argument('--geophys-pickcube-sensor-window', action='store_true')
+    parser.add_argument('--geophys-pendulum-source', action='store_true')
+    parser.add_argument('--geophys-pendulum-formal', action='store_true')
+    parser.add_argument('--geophys-pendulum-formal-discrete', action='store_true')
+    parser.add_argument('--geophys-pendulum-window', action='store_true')
+    parser.add_argument('--geophys-pendulum-record', action='store_true')
+    parser.add_argument('--geophys-pickcube-plan', action='store_true')
+    parser.add_argument('--geophys-pickcube-plan-discrete', action='store_true')
+    parser.add_argument('--geophys-pickcube-camera-probe', action='store_true')
+    parser.add_argument('--performance-pendulum-off', action='store_true')
+    parser.add_argument('--performance-pendulum-window', action='store_true')
+    parser.add_argument('--performance-geophys-off', action='store_true')
+    parser.add_argument('--performance-geophys-window', action='store_true')
+    parser.add_argument('--performance-isaac-off', action='store_true')
+    parser.add_argument('--performance-isaac-window', action='store_true')
+    parser.add_argument('--performance-pickcube', action='store_true')
+    parser.add_argument('--performance-provider', choices=('mujoco_warp', 'geophys', 'isaacsim'), default='mujoco_warp')
+    parser.add_argument('--performance-sensor', action='store_true')
+    parser.add_argument('--performance-window', action='store_true')
+    parser.add_argument('--scale-check', action='store_true')
+    parser.add_argument('--scale-provider', choices=('mujoco_warp', 'geophys', 'isaacsim'))
+    parser.add_argument('--scale-pickcube', action='store_true')
+    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--device-sha-pendulum', action='store_true')
+    parser.add_argument('--device-sha-pickcube', action='store_true')
+    parser.add_argument('--device-sha-pickcube-camera', action='store_true')
+    parser.add_argument('--mjwarp-world-clock', action='store_true')
+    parser.add_argument('--isaac-batch-probe', action='store_true')
+    parser.add_argument('--isaac-filter-probe', action='store_true')
+    parser.add_argument('--isaac-robot-filter-probe', action='store_true')
+    parser.add_argument('--isaac-cross-filter-probe', action='store_true')
+    parser.add_argument('--isaac-cross-filter-weak', action='store_true')
+    parser.add_argument('--isaac-filter-cleanup-error', action='store_true')
+    parser.add_argument('--isaac-pendulum-formal', action='store_true')
+    parser.add_argument('--isaac-pendulum-window', action='store_true')
+    parser.add_argument('--isaac-pendulum-record', action='store_true')
+    parser.add_argument('--pickcube-camera-probe', action='store_true')
+    parser.add_argument('--isaac-pickcube-camera-probe', action='store_true')
     parser.add_argument('--formal-render', action='store_true')
     parser.add_argument('--formal-camera', action='store_true')
     parser.add_argument('--formal-frames', action='store_true')
@@ -1595,15 +2837,50 @@ def main():
     parser.add_argument('--isaac-sensor-record', action='store_true')
     parser.add_argument('--scalar', action='store_true')
     parser.add_argument('--scalar-camera-schema', action='store_true')
-    parser.add_argument('--case', choices=('ipc', 'physics', 'raster', 'transport-physics', 'transport-frames', 'session-physics',
-                                           'formal-device', 'formal-render', 'formal-camera', 'formal-frames', 'formal-window', 'record-device', 'record-camera', 'record-render-fixture', 'clip-cuda', 'isaac-device', 'isaac-render', 'isaac-window', 'isaac-mount', 'isaac-sensor', 'isaac-sensor-window', 'isaac-sensor-record', 'example', 'scalar', 'scalar-camera-schema', 'framebuffer-device',
-                                           'geophys-camera', 'geophys-aot-core', 'geophys-merge-regression', 'geophys-merge-clip', 'geophys-merge-focused', 'geophys-merge-lighting', 'geophys-merge-mjcf-light', 'geophys-merge-rigid', 'geophys-merge-robot', 'transport-regression', 'core-semantics', 'core-regression'),
-                        default='ipc')
+    parser.add_argument(
+        '--case',
+        choices=(
+            'ipc', 'physics', 'raster', 'transport-physics', 'geophys-pickcube-device-probe', 'geophys-pickcube-motion-probe',
+            'geophys-pickcube-camera-probe', 'geophys-pickcube-camera-record', 'geophys-pickcube-finger-contact', 'geophys-pickcube-hold-contact', 'geophys-pickcube-source-bias-contact', 'geophys-pickcube-controlled-contact', 'permutation-geophys-pickcube', 'geophys-table-stability',
+            'transport-frames', 'session-physics', 'formal-device', 'pickcube-device-probe',
+            'pickcube-motion-probe', 'pickcube-scalar-effort', 'pickcube-record', 'geophys-pendulum-source',
+            'geophys-pendulum-formal', 'geophys-pendulum-formal-discrete', 'geophys-pendulum-window', 'geophys-pendulum-record', 'geophys-pickcube-plan', 'geophys-pickcube-plan-discrete',
+            'pickcube-camera-probe', 'duplex-ipc', 'isaac-batch-probe', 'isaac-pendulum-formal',
+            'isaac-pendulum-window', 'isaac-pendulum-record', 'formal-render', 'formal-camera',
+            'formal-frames', 'formal-window', 'record-device', 'record-camera',
+            'record-render-fixture', 'clip-cuda', 'isaac-device', 'isaac-render',
+            'isaac-window', 'isaac-mount', 'isaac-sensor', 'isaac-sensor-window',
+            'isaac-sensor-record', 'example', 'scalar', 'scalar-camera-schema',
+            'framebuffer-device', 'geophys-camera', 'geophys-aot-core', 'geophys-merge-regression',
+            'geophys-merge-clip', 'geophys-merge-focused', 'geophys-merge-lighting', 'geophys-merge-mjcf-light',
+            'geophys-merge-rigid', 'geophys-merge-robot', 'geophys-batch-cuda', 'geophys-device-state',
+            'geophys-device-effort', 'geophys-device-reset', 'geophys-free-damping', 'geophys-static-contact-filter', 'geophys-torsion', 'geophys-torsion-direct', 'geophys-torsion-constraints', 'geophys-efc-regression', 'geophys-batch-plan-regression', 'geophys-actuator-isolation', 'geophys-device-layout', 'geophys-contact-mode-comparison', 'geophys-mesh-contact', 'transport-regression', 'core-semantics',
+            'scalar-effort-regression', 'core-regression', 'performance-pendulum-off', 'performance-pendulum-window',
+            'performance-geophys-off', 'performance-geophys-window', 'performance-isaac-off', 'performance-isaac-window',
+            'device-sha-pendulum', 'device-sha-pickcube', 'device-sha-pickcube-camera', 'mjwarp-world-clock',
+            'isaac-pickcube-device-probe', 'isaac-pickcube-motion-probe', 'isaac-pickcube-record', 'isaac-pickcube-camera-probe',
+            'isaac-pickcube-camera-record', 'isaac-filter-probe', 'isaac-robot-filter-probe', 'isaac-cross-filter-probe', 'isaac-cross-filter-weak', 'isaac-filter-cleanup-error', 'pickcube-camera-record', 'pickcube-finger-contact',
+            'isaac-pickcube-finger-contact', 'pickcube-example', 'pickcube-example-sensor', 'geophys-pickcube-example', 'permutation-mjwarp-pickcube',
+            'permutation-isaac-pickcube', 'permutation-mjwarp-pendulum', 'permutation-geophys-pendulum', 'permutation-isaac-pendulum',
+            'pickcube-window', 'pickcube-sensor-window', 'isaac-pickcube-window', 'isaac-pickcube-sensor-window', 'geophys-pickcube-window', 'geophys-pickcube-sensor-window',
+            *(f'performance-pickcube-{provider}-{mode}'
+              for provider in ('mujoco_warp', 'geophys', 'isaacsim')
+              for mode in ('off', 'window', 'sensor', 'sensor-window')),
+            *(f'scale-check-{provider}-{task}'
+              for provider in ('mujoco_warp', 'geophys', 'isaacsim')
+              for task in ('pendulum', 'pickcube')),
+        ),
+        default='ipc',
+    )
     parser.add_argument('--worker-python')
     parser.add_argument('--output')
     args = parser.parse_args()
     if args.worker:
         _worker()
+    elif args.duplex_worker:
+        _duplex_worker()
+    elif args.duplex_parent:
+        print(json.dumps(_duplex_parent()))
     elif args.render_worker:
         _render_worker()
     elif args.parent:
@@ -1620,6 +2897,144 @@ def main():
         print(json.dumps(_session_physics(args.worker_python)))
     elif args.formal_device:
         print(json.dumps(_formal_device(args.worker_python)))
+    elif args.pickcube_device_probe:
+        print(json.dumps(_pickcube_device_probe(args.worker_python)))
+    elif args.isaac_pickcube_device_probe:
+        print(json.dumps(_pickcube_device_probe(args.worker_python, provider='isaacsim')))
+    elif args.isaac_pickcube_motion_probe:
+        print(json.dumps(_pickcube_device_probe(args.worker_python, motion=True, provider='isaacsim')))
+    elif args.pickcube_motion_probe:
+        print(json.dumps(_pickcube_device_probe(args.worker_python, motion=True)))
+    elif args.pickcube_scalar_effort:
+        print(json.dumps(_pickcube_scalar_effort()))
+    elif args.pickcube_record:
+        print(json.dumps(_pickcube_record(args.worker_python)))
+    elif args.pickcube_camera_record:
+        print(json.dumps(_pickcube_record(args.worker_python, sensor=True)))
+    elif args.isaac_pickcube_record:
+        print(json.dumps(_pickcube_record(args.worker_python, provider='isaacsim')))
+    elif args.isaac_pickcube_camera_record:
+        print(json.dumps(_pickcube_record(args.worker_python, provider='isaacsim', sensor=True)))
+    elif args.geophys_pickcube_camera_record:
+        print(json.dumps(_pickcube_record(args.worker_python, provider='geophys', sensor=True)))
+    elif args.pickcube_finger_contact:
+        print(json.dumps(_pickcube_finger_contact(args.worker_python, provider='mujoco_warp')))
+    elif args.isaac_pickcube_finger_contact:
+        print(json.dumps(_pickcube_finger_contact(args.worker_python, provider='isaacsim')))
+    elif args.geophys_pickcube_finger_contact:
+        print(json.dumps(_pickcube_finger_contact(args.worker_python, provider='geophys')))
+    elif args.geophys_pickcube_hold_contact:
+        print(json.dumps(_pickcube_finger_contact(args.worker_python, provider='geophys', hold_arm=True)))
+    elif args.geophys_pickcube_source_bias_contact:
+        print(json.dumps(_pickcube_finger_contact(args.worker_python, provider='geophys', hold_arm='source-bias')))
+    elif args.geophys_pickcube_controlled_contact:
+        print(json.dumps(_pickcube_finger_contact(args.worker_python, provider='geophys', hold_arm='source-bias-descend')))
+    elif args.permutation_mjwarp_pickcube:
+        print(json.dumps(_action_permutation(args.worker_python, provider='mujoco_warp', pickcube=True)))
+    elif args.permutation_isaac_pickcube:
+        print(json.dumps(_action_permutation(args.worker_python, provider='isaacsim', pickcube=True)))
+    elif args.permutation_geophys_pickcube:
+        print(json.dumps(_action_permutation(args.worker_python, provider='geophys', pickcube=True)))
+    elif args.permutation_mjwarp_pendulum:
+        print(json.dumps(_action_permutation(args.worker_python, provider='mujoco_warp', pickcube=False)))
+    elif args.permutation_geophys_pendulum:
+        print(json.dumps(_action_permutation(args.worker_python, provider='geophys', pickcube=False)))
+    elif args.permutation_isaac_pendulum:
+        print(json.dumps(_action_permutation(args.worker_python, provider='isaacsim', pickcube=False)))
+    elif args.pickcube_window:
+        print(json.dumps(_pickcube_window_probe(args.worker_python, provider='mujoco_warp', sensor=False)))
+    elif args.pickcube_sensor_window:
+        print(json.dumps(_pickcube_window_probe(args.worker_python, provider='mujoco_warp', sensor=True)))
+    elif args.isaac_pickcube_window:
+        print(json.dumps(_pickcube_window_probe(args.worker_python, provider='isaacsim', sensor=False)))
+    elif args.isaac_pickcube_sensor_window:
+        print(json.dumps(_pickcube_window_probe(args.worker_python, provider='isaacsim', sensor=True)))
+    elif args.geophys_pickcube_window:
+        print(json.dumps(_pickcube_window_probe(args.worker_python, provider='geophys', sensor=False)))
+    elif args.geophys_pickcube_sensor_window:
+        print(json.dumps(_pickcube_window_probe(args.worker_python, provider='geophys', sensor=True)))
+    elif args.geophys_pendulum_source:
+        print(json.dumps(_geophys_pendulum_source_probe()))
+    elif args.geophys_pendulum_formal:
+        print(json.dumps(_formal_device(args.worker_python, provider='geophys')))
+    elif args.geophys_pendulum_formal_discrete:
+        print(json.dumps(_formal_device(args.worker_python, provider='geophys', contact_mode='discrete')))
+    elif args.geophys_pendulum_window:
+        print(json.dumps(_formal_window(args.worker_python, provider='geophys')))
+    elif args.geophys_pendulum_record:
+        print(json.dumps(_record_device(args.worker_python, provider='geophys')))
+    elif args.geophys_pickcube_plan:
+        print(json.dumps(_geophys_pickcube_plan()))
+    elif args.geophys_pickcube_device_probe:
+        print(json.dumps(_pickcube_device_probe(args.worker_python, provider='geophys')))
+    elif args.geophys_pickcube_motion_probe:
+        print(json.dumps(_pickcube_device_probe(args.worker_python, provider='geophys', motion=True)))
+    elif args.geophys_pickcube_plan_discrete:
+        print(json.dumps(_geophys_pickcube_plan(contact_mode='discrete')))
+    elif args.geophys_pickcube_camera_probe:
+        print(json.dumps(_pickcube_camera_probe(args.worker_python, provider='geophys')))
+    elif args.performance_pendulum_off:
+        print(json.dumps(_pendulum_performance(args.worker_python, window=False, count=args.batch_size)))
+    elif args.performance_pendulum_window:
+        print(json.dumps(_pendulum_performance(args.worker_python, window=True, count=args.batch_size)))
+    elif args.performance_geophys_off:
+        print(json.dumps(_pendulum_performance(args.worker_python, window=False, provider='geophys', count=args.batch_size)))
+    elif args.performance_geophys_window:
+        print(json.dumps(_pendulum_performance(args.worker_python, window=True, provider='geophys', count=args.batch_size)))
+    elif args.performance_isaac_off:
+        print(json.dumps(_pendulum_performance(args.worker_python, window=False, provider='isaacsim', count=args.batch_size)))
+    elif args.performance_isaac_window:
+        print(json.dumps(_pendulum_performance(args.worker_python, window=True, provider='isaacsim', count=args.batch_size)))
+    elif args.performance_pickcube:
+        print(json.dumps(_pickcube_performance(args.worker_python, provider=args.performance_provider,
+                                               sensor=args.performance_sensor, window=args.performance_window,
+                                               count=args.batch_size)))
+    elif args.scale_check:
+        print(json.dumps(_scale_correctness(args.worker_python, provider=args.scale_provider,
+                                            pickcube=args.scale_pickcube, count=args.batch_size)))
+    elif args.device_sha_pendulum:
+        print(json.dumps(_device_sha_probe(args.worker_python, pickcube=False)))
+    elif args.device_sha_pickcube:
+        print(json.dumps(_device_sha_probe(args.worker_python, pickcube=True)))
+    elif args.device_sha_pickcube_camera:
+        print(json.dumps(_device_sha_probe(args.worker_python, pickcube=True, sensor=True)))
+    elif args.mjwarp_world_clock:
+        print(json.dumps(_mjwarp_world_clock_probe(args.worker_python)))
+    elif args.isaac_batch_probe:
+        from isaac_batch_probe import run
+        print(json.dumps(run()), flush=True)
+        # Match the existing isolated Isaac worker's terminal boundary after
+        # successful App, stage and source cleanup; Kit's later CPython
+        # finalization is unsafe in this profile.
+        from task_env.runtime.sessions.worker import _exit_after_isaac_cleanup
+        _exit_after_isaac_cleanup(0)
+    elif args.isaac_filter_probe:
+        from isaac_batch_probe import run_pickcube_collision_filter
+        print(json.dumps(run_pickcube_collision_filter()), flush=True)
+    elif args.isaac_robot_filter_probe:
+        from isaac_batch_probe import run_pickcube_collision_filter
+        print(json.dumps(run_pickcube_collision_filter(participant='robot')), flush=True)
+    elif args.isaac_cross_filter_probe:
+        from isaac_batch_probe import run_pickcube_collision_filter
+        print(json.dumps(run_pickcube_collision_filter(participant='cross')), flush=True)
+    elif args.isaac_cross_filter_weak:
+        from isaac_batch_probe import run_pickcube_collision_filter
+        print(json.dumps(run_pickcube_collision_filter(participant='cross', cross_cube_height=.5661)), flush=True)
+    elif args.isaac_filter_cleanup_error:
+        from isaac_batch_probe import run_pickcube_collision_filter
+        print(json.dumps(run_pickcube_collision_filter(participant='cross', inject_failure=True)), flush=True)
+        from task_env.runtime.sessions.worker import _exit_after_isaac_cleanup
+        _exit_after_isaac_cleanup(0)
+    elif args.isaac_pendulum_formal:
+        print(json.dumps(_formal_device(args.worker_python, provider='isaacsim')))
+    elif args.isaac_pendulum_window:
+        print(json.dumps(_formal_window(args.worker_python, provider='isaacsim')))
+    elif args.isaac_pendulum_record:
+        print(json.dumps(_record_device(args.worker_python, provider='isaacsim')))
+    elif args.pickcube_camera_probe:
+        print(json.dumps(_pickcube_camera_probe(args.worker_python)))
+    elif args.isaac_pickcube_camera_probe:
+        print(json.dumps(_pickcube_camera_probe(args.worker_python, provider='isaacsim')))
     elif args.formal_render:
         print(json.dumps(_formal_render(args.worker_python)))
     elif args.formal_camera:
@@ -1659,7 +3074,7 @@ def main():
     elif args.physics:
         print(json.dumps(_physics()))
     elif args.run:
-        _run(args.worker_python, args.output, args.case)
+        _run(args.worker_python, args.output, args.case, batch_size=args.batch_size)
     else:
         parser.error('choose --run, --parent or --worker')
 

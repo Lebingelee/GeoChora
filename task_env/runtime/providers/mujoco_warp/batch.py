@@ -1,6 +1,7 @@
 """Native MJWarp homogeneous data owned by the isolated provider worker."""
 import base64
-import xml.etree.ElementTree as ET
+
+from ...transport.device_batch_session import DevicePhysicalBatchSession
 
 
 def _encoded(value):
@@ -13,55 +14,54 @@ class MuJoCoWarpNativeBatch:
     def __init__(self, request):
         import mujoco
         import mujoco_warp as mjw
+        import numpy as np
         import warp as wp
-        from ...sessions.mujoco_physical import resolve_physical_joint, validate_direct_motor
+        from ...sessions.mujoco_physical import validate_physical_joint_mapping
         from ....artifacts import JointDefinition
-        from ....controllers.canonical.physical_commands import PhysicalJointChannelV1
+        from ....controllers.canonical.physical_commands import PhysicalControlBindingV1
 
         wp.init()
         device = wp.get_device(request['device'])
         if not device.is_cuda or not device.is_ipc_supported:
             raise RuntimeError('MJWarp device must support CUDA IPC')
         xml = request['source_xml']
-        root = ET.fromstring(xml)
-        if any(node.get('file') for node in root.findall('./asset/*')):
-            raise ValueError('MJWarp profile does not yet support external source files')
-        model = mujoco.MjModel.from_xml_string(xml)
+        assets = {name: base64.b64decode(payload, validate=True)
+                  for name, payload in request['source_assets'].items()}
+        model = mujoco.MjModel.from_xml_string(xml, assets=assets)
         if float(model.opt.timestep) != float(request['physics_dt']):
             raise ValueError('MJWarp model timestep differs from the Task timebase')
-        channels = [PhysicalJointChannelV1.from_mapping(value['channel'])
-                    for value in request['channels']]
-        definitions = [JointDefinition.from_mapping(value['joint']) for value in request['channels']]
-        if not channels or len(channels) != int(model.nu):
-            raise ValueError('MJWarp direct effort requires every actuator to be declared')
-        dofs, qpos_indices, actuators, signs = [], [], set(), []
-        for channel, definition in zip(channels, definitions, strict=True):
-            if (channel.native_drive != 'disabled' or channel.transmission_coefficient != 1.0
-                    or len(channel.owner_ids) != 1):
-                raise ValueError('MJWarp direct effort requires exclusive unit joint transmissions')
-            joint_id, dof = resolve_physical_joint(model, mujoco, request['source_joints'],
-                                                   definition, channel)
-            actuator = int(model.actuator(channel.native_actuator).id)
-            validate_direct_motor(model, mujoco, actuator, channel)
-            if (dof in dofs or actuator in actuators
-                    or int(model.actuator_trntype[actuator]) != int(mujoco.mjtTrn.mjTRN_JOINT)
-                    or int(model.actuator_trnid[actuator, 0]) != joint_id):
-                raise ValueError('MJWarp named joints, DOFs or actuator transmissions conflict')
-            dofs.append(dof)
-            qpos_indices.append(int(model.jnt_qposadr[joint_id]))
-            actuators.add(actuator)
-            signs.append(channel.sign)
-        if actuators != set(range(model.nu)):
-            raise ValueError('MJWarp must isolate every source actuator')
-        if (model.nq != len(channels) or model.nv != len(channels)
-                or dofs != list(range(model.nv)) or qpos_indices != list(range(model.nq))):
-            raise ValueError('MJWarp profile requires source-ordered scalar joint coordinates')
-        model.opt.disableflags |= int(mujoco.mjtDisableBit.mjDSBL_ACTUATION)
+        binding = PhysicalControlBindingV1.from_mapping(request['binding'])
+        channels = binding.channels
+        definitions = {(channel.entity_id, channel.joint_id): JointDefinition.from_mapping(value)
+                       for channel, value in zip(channels, request['joint_definitions'], strict=True)}
+        layout_facts = {}
+        dof_by_key, _ = validate_physical_joint_mapping(
+            model, mujoco, binding, definitions, source_joints=request['source_joints'],
+            torque_actuators=request['torque_actuators'], position_actuators=request['position_actuators'],
+            joint_targets=request['joint_targets'], open_actuators=request['open_actuators'],
+            gripper_force_limit=request['gripper_force_limit'], fixed_roots=request['fixed_roots'],
+            build_layout_facts=layout_facts)
+        dofs = [dof_by_key[channel.target_key] for channel in channels]
+        signs = [channel.sign for channel in channels]
         count = int(request['num_envs'])
         if count < 1:
             raise ValueError('MJWarp num_envs must be positive')
         self._wp, self._mjw, self._mujoco, self._device, self._model = wp, mjw, mujoco, device, model
+        self._layout_facts = {**layout_facts, 'native_world_clock': 'MJWarp Data.time in seconds'}
         self.num_envs, self.substeps = count, int(request['control_substeps'])
+        self._joint_qpos = {}
+        for semantic, native in request['source_joints'].items():
+            joint_id = int(mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, native))
+            if joint_id < 0 or int(model.jnt_type[joint_id]) not in (
+                    int(mujoco.mjtJoint.mjJNT_HINGE), int(mujoco.mjtJoint.mjJNT_SLIDE)):
+                raise ValueError('MJWarp named joint mapping requires a native scalar joint')
+            self._joint_qpos[semantic] = int(model.jnt_qposadr[joint_id])
+        self._free_qpos = {}
+        for semantic, native in request['source_free_joints'].items():
+            joint_id = int(mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, native))
+            if joint_id < 0 or int(model.jnt_type[joint_id]) != int(mujoco.mjtJoint.mjJNT_FREE):
+                raise ValueError('MJWarp free-joint mapping requires a native free joint')
+            self._free_qpos[semantic] = int(model.jnt_qposadr[joint_id])
         self._body_names = tuple(request.get('source_bodies', {}))
         body_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, native)
                     for native in request.get('source_bodies', {}).values()]
@@ -74,12 +74,21 @@ class MuJoCoWarpNativeBatch:
             raise ValueError('MJWarp source frame mapping contains an unknown native site')
         if self.substeps < 1:
             raise ValueError('control substeps must be positive')
+        # MJWarp's generic default of 64 constraint rows is insufficient for
+        # contact-rich articulated sources. Size from the source's collidable
+        # geometry and retain the native overflow flags as a hard error.
+        collidable = int(np.count_nonzero((model.geom_contype != 0) | (model.geom_conaffinity != 0)))
+        nconmax = max(48, 4 * collidable)
+        njmax = max(64, 8 * nconmax + 6 * model.neq + model.njnt + model.nv)
+        self._capacities = {'contacts_per_world': nconmax, 'constraint_rows_per_world': njmax}
         with wp.ScopedMempool(device, False):
             self._model_device = mjw.put_model(model)
-            self._data = mjw.put_data(model, mujoco.MjData(model), nworld=count)
+            self._data = mjw.put_data(model, mujoco.MjData(model), nworld=count,
+                                     nconmax=nconmax, njmax=njmax)
             self._buffers = {
                 'qpos': wp.zeros((count, model.nq), dtype=wp.float32, device=device),
                 'qvel': wp.zeros((count, model.nv), dtype=wp.float32, device=device),
+                'native_world_time': wp.zeros(count, dtype=wp.float32, device=device),
                 'reset_qpos': wp.zeros((count, model.nq), dtype=wp.float32, device=device),
                 'reset_qvel': wp.zeros((count, model.nv), dtype=wp.float32, device=device),
                 'reset_mask': wp.zeros(count, dtype=wp.bool, device=device),
@@ -158,7 +167,9 @@ class MuJoCoWarpNativeBatch:
                 'module_paths': {'mujoco': self._mujoco.__file__, 'mujoco_warp': self._mjw.__file__,
                                  'warp': self._wp.__file__},
                 'nq': self._model.nq, 'nv': self._model.nv, 'body_names': list(self._body_names),
-                'frame_names': list(self._frame_names)}
+                'frame_names': list(self._frame_names), 'physical_layout_facts': self._layout_facts,
+                'native_capacities': self._capacities,
+                'joint_qpos_indices': self._joint_qpos, 'free_joint_qpos_indices': self._free_qpos}
 
     def bind_written_event(self, encoded):
         if self._written is not None:
@@ -176,6 +187,7 @@ class MuJoCoWarpNativeBatch:
     def _publish(self):
         self._wp.copy(self._buffers['qpos'], self._data.qpos)
         self._wp.copy(self._buffers['qvel'], self._data.qvel)
+        self._wp.copy(self._buffers['native_world_time'], self._data.time)
         if self._body_ids is not None:
             self._wp.launch(self._copy_body_pose, dim=(self.num_envs, len(self._body_names)),
                 inputs=[self._body_ids, self._data.xpos, self._data.xquat,
@@ -188,16 +200,19 @@ class MuJoCoWarpNativeBatch:
 
     def reset(self):
         self._wait_input()
+        self._data.overflow.zero_()
         mask = self._buffers['reset_mask']
         self._mjw.reset_data(self._model_device, self._data, reset=mask)
         self._wp.launch(self._apply_reset, dim=(self.num_envs, max(self._model.nq, self._model.nv)),
             inputs=[mask, self._buffers['reset_qpos'], self._buffers['reset_qvel'],
                     self._data.qpos, self._data.qvel], device=self._device)
         self._mjw.forward(self._model_device, self._data)
+        self._check_overflow()
         self._publish()
 
     def step(self):
         self._wait_input()
+        self._data.overflow.zero_()
         self._data.qfrc_applied.zero_()
         self._wp.launch(self._apply_effort, dim=(self.num_envs, len(self._dofs)),
             inputs=[self._buffers['effort'], self._dofs, self._signs, self._data.qfrc_applied],
@@ -208,10 +223,17 @@ class MuJoCoWarpNativeBatch:
         # MJWarp's step integrates qpos after its derived-pose computation.
         # Refresh kinematics at the published boundary without advancing time.
         self._mjw.forward(self._model_device, self._data)
+        self._check_overflow()
         self._publish()
 
+    def _check_overflow(self):
+        """Reject a corrupted native transition using only per-world status bits."""
+        flags = self._data.overflow.numpy()
+        if flags.any():
+            raise RuntimeError(f'MJWarp native capacity overflow by world: {flags.tolist()}')
+
     def close(self):
-        if self._closed and self._ipc is None and self._worker is None:
+        if self._closed:
             return
         self._wp.synchronize_device(self._device)
         self._written = None
@@ -221,16 +243,23 @@ class MuJoCoWarpNativeBatch:
         self._closed = True
 
 
-class MuJoCoWarpBatchSession:
+class MuJoCoWarpBatchSession(DevicePhysicalBatchSession):
     """Source-bound session proxy for one isolated native MJWarp batch."""
 
-    def __init__(self, built, *, num_envs, device, interpreter, working_directory=None):
+    _provider_label = "MJWarp"
+
+    def __init__(self, built, *, num_envs, device, interpreter, runtime_config=None,
+                 contact_mode='provider_default', working_directory=None):
         import math
         import uuid
-        from ....controllers.canonical.physical_controller import DirectJointEffortControllerV1
+        from ....controllers.canonical.physical_controller import DirectJointEffortControllerV1, LinearEffortControllerV1
         from ...sessions.physical_control import PhysicalControlExecutionV1
+        from ...sessions.source import lower_mujoco_scene_source
         from ...transport.cuda_ipc import CudaIpcConnection
         from ...transport.worker import RuntimeWorker
+
+        if contact_mode != 'provider_default':
+            raise ValueError('MJWarp does not consume the GeoPhys contact mode')
 
         source, artifact, execution = built['source'], built['artifact'], built['physical_execution']
         if type(execution) is not PhysicalControlExecutionV1:
@@ -238,15 +267,14 @@ class MuJoCoWarpBatchSession:
         execution.validate_source(scene=source.scene_definition, artifact_sha256=artifact.identity_hash,
             source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
         if (len(execution.controllers) != 1
-                or type(execution.controllers[0]) is not DirectJointEffortControllerV1):
+                or type(execution.controllers[0]) not in (DirectJointEffortControllerV1, LinearEffortControllerV1)):
             raise ValueError('MJWarp currently requires one direct joint-effort Controller')
         controller = execution.controllers[0]
         binding = execution.compiled.binding
         channels = binding.channels
         if (binding.bodies or controller.channel_keys != tuple(channel.target_key for channel in channels)
-                or any(channel.owner_ids != (controller.writer_id,) for channel in channels)
-                or {f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in channels}
-                != dict(source.torque_actuators) or source.joint_targets or source.open_actuators):
+                or any(channel.owner_ids != (controller.writer_id,) or channel.native_drive != 'disabled'
+                       for channel in channels)):
             raise ValueError('MJWarp requires exclusive declared source joint-effort channels')
         count = int(num_envs)
         if isinstance(num_envs, bool) or count != num_envs or count < 1:
@@ -257,16 +285,27 @@ class MuJoCoWarpBatchSession:
             raise ValueError('Task timebase has inconsistent control cadence')
         if str(device) != 'cuda:0':
             raise ValueError('MJWarp profile currently admits cuda:0 only')
-        request = {'provider': 'mujoco_warp', 'device': str(device), 'source_xml': source.scene_source.xml,
+        source_xml, source_assets = lower_mujoco_scene_source(
+            source.scene_source, source.scene_definition, source.source_closure_digest)
+        gripper = getattr(getattr(source.config, 'robot', None), 'gripper', None)
+        request = {'provider': 'mujoco_warp', 'device': str(device), 'source_xml': source_xml,
+                   'source_assets': {name: _encoded(content) for name, content in source_assets.items()},
                    'source_bodies': dict(source.bodies), 'source_frames': dict(source.frames),
-                   'source_joints': dict(source.joints), 'num_envs': count,
+                   'source_joints': dict(source.joints), 'source_free_joints': dict(source.free_joints),
+                   'num_envs': count,
                    'physics_dt': timebase.physics_dt, 'control_substeps': timebase.control_substeps,
-                   'channels': [{'channel': channel.to_mapping(),
-                                 'joint': execution.joint_bindings[
-                                     f'{channel.entity_id}/{channel.joint_id}'].to_mapping()}
-                                for channel in channels]}
+                   'binding': binding.to_mapping(),
+                   'joint_definitions': [execution.joint_bindings[
+                       f'{channel.entity_id}/{channel.joint_id}'].to_mapping() for channel in channels],
+                   'torque_actuators': dict(source.torque_actuators),
+                   'position_actuators': dict(source.position_actuators),
+                   'joint_targets': dict(source.joint_targets), 'open_actuators': list(source.open_actuators),
+                   'gripper_force_limit': getattr(gripper, 'force_limit_N', None),
+                   'fixed_roots': [subject.root_frame.frame_id for subject in execution.subjects
+                                   if subject.root_mode == 'fixed']}
         self.num_envs, self.device = count, str(device)
         self._source, self._artifact, self._execution = source, artifact, execution
+        self._source_identity = (source.source_id, source.source_closure_digest, artifact.identity_hash)
         self._binding, self._controller = binding, controller
         self._binding_hash = binding.identity_hash
         self._materialization_id = 'mjwarp-' + uuid.uuid4().hex
@@ -291,7 +330,12 @@ class MuJoCoWarpBatchSession:
             self._ipc = CudaIpcConnection(description)
             self._body_names = tuple(description['body_names'])
             self._frame_names = tuple(description['frame_names'])
+            self._joint_qpos = dict(description['joint_qpos_indices'])
+            self._free_qpos = dict(description['free_joint_qpos_indices'])
+            self._layout_facts = dict(description['physical_layout_facts'])
+            self._capacities = dict(description['native_capacities'])
             self._state_shapes = {'qpos': (int(description['nq']),), 'qvel': (int(description['nv']),)}
+            self._state_shapes['native_world_time'] = ()
             if self._body_names:
                 self._state_shapes.update(body_position=(len(self._body_names), 3),
                                           body_orientation=(len(self._body_names), 4))
@@ -306,118 +350,6 @@ class MuJoCoWarpBatchSession:
                 error.add_note(f'MJWarp construction cleanup failed: {cleanup_error!r}')
             raise
 
-    def _require_live(self):
-        if self._closed:
-            raise RuntimeError('MJWarp batch session is closed')
-        if self._faulted:
-            raise RuntimeError('MJWarp batch session is faulted')
-
-    def _identity(self):
-        from ...contracts import DeviceStateIdentity
-        return DeviceStateIdentity(self._source.source_id, self._source.source_closure_digest,
-            self._artifact.identity_hash, self._materialization_id, self._generation,
-            self._revision, self._native_steps, self._native_steps * self._physics_dt, self._control_dt)
-
-    def _read_publication(self):
-        from ...contracts import DeviceBatchState
-        self._ipc.wait_ready()
-        arrays = {name: self._ipc.read(name) for name in self._state_shapes}
-        self._ipc.synchronize()
-        self._last_state = DeviceBatchState(arrays, self.device, self.num_envs,
-                                            self._identity(), 'owned_snapshot')
-        return self._last_state
-
-    def read_device_state(self, names):
-        from ...contracts import DeviceBatchState
-        self._require_live()
-        if self._last_state is None:
-            raise RuntimeError('MJWarp batch must be reset before state is read')
-        requested = tuple(names)
-        if not requested or len(requested) != len(set(requested)):
-            raise ValueError('device state requires unique named fields')
-        unknown = set(requested) - set(self._last_state.arrays)
-        if unknown:
-            raise KeyError(f'unsupported MJWarp state fields: {sorted(unknown)}')
-        return DeviceBatchState({name: self._last_state.arrays[name].clone() for name in requested},
-                                self.device, self.num_envs, self._last_state.identity, 'owned_snapshot')
-
-    def reset_device(self, state, mask, *, selection=None):
-        import torch
-        from ...contracts import validate_device_reset_selection
-        self._require_live()
-        if selection is not None:
-            validate_device_reset_selection(selection, mask=mask, num_envs=self.num_envs,
-                                            device=self.device, require_data_pointer=True)
-        if (not isinstance(mask, torch.Tensor) or str(mask.device) != self.device
-                or mask.dtype != torch.bool or tuple(mask.shape) != (self.num_envs,)):
-            raise ValueError('MJWarp reset mask must be CUDA bool with shape (B,)')
-        if set(state) != {'qpos', 'qvel'}:
-            raise ValueError('MJWarp reset requires named qpos and qvel')
-        for name in ('qpos', 'qvel'):
-            value = state[name]
-            expected = (self.num_envs, *self._state_shapes[name])
-            if (not isinstance(value, torch.Tensor) or str(value.device) != self.device
-                    or value.dtype != torch.float32 or tuple(value.shape) != expected
-                    or not bool(torch.isfinite(value).all())):
-                raise ValueError(f'MJWarp reset {name} must be finite CUDA float32 with shape {expected}')
-        if not bool(mask.any()):
-            if self._last_state is None:
-                raise ValueError('initial MJWarp reset must select at least one row')
-            return self.read_device_state(tuple(self._state_shapes))
-        if self._last_state is None and not bool(mask.all()):
-            raise ValueError('initial MJWarp reset must select every row')
-        try:
-            for name in ('qpos', 'qvel'):
-                value = state[name]
-                self._ipc.write('reset_' + name, value.contiguous())
-            self._ipc.write('reset_mask', mask.contiguous())
-            self._ipc.record_written()
-            self._worker.call('reset')
-            self._revision += 1
-            return self._read_publication()
-        except BaseException:
-            self._faulted = True
-            raise
-
-    def step_device(self, command):
-        import torch
-        from ....controllers.canonical.physical_commands import DeviceJointEffortCommand
-        self._require_live()
-        if self._last_state is None:
-            raise RuntimeError('MJWarp batch must be reset before step')
-        if (type(command) is not DeviceJointEffortCommand or command.boundary != self._identity()
-                or command.binding_sha256 != self._binding_hash
-                or command.writer_id != self._controller.writer_id
-                or command.channel_keys != self._controller.channel_keys):
-            raise ValueError('MJWarp effort command is stale or differs from its source binding')
-        values = command.values
-        if (not isinstance(values, torch.Tensor) or str(values.device) != self.device
-                or values.dtype != torch.float32
-                or tuple(values.shape) != (self.num_envs, len(self._binding.channels))
-                or str(command.episode_ids.device) != self.device
-                or command.episode_ids.dtype != torch.int64
-                or str(command.episode_steps.device) != self.device
-                or command.episode_steps.dtype != torch.int32
-                or not bool(torch.isfinite(values).all())):
-            raise ValueError('MJWarp effort command has an invalid device, shape, dtype or value')
-        if self._device_limits is None:
-            self._device_limits = (
-                torch.tensor([channel.effort_range[0] for channel in self._binding.channels], device=values.device),
-                torch.tensor([channel.effort_range[1] for channel in self._binding.channels], device=values.device))
-        low, high = self._device_limits
-        if bool(((values < low) | (values > high)).any()):
-            raise ValueError('MJWarp effort command exceeds its admitted range')
-        try:
-            self._ipc.write('effort', values.contiguous())
-            self._ipc.record_written()
-            self._worker.call('step')
-            self._native_steps += self._control_substeps
-            self._revision += 1
-            return self._read_publication()
-        except BaseException:
-            self._faulted = True
-            raise
-
     def resource_summary(self):
         return {'num_envs': self.num_envs, 'provider': 'mujoco_warp',
                 'dependency_profile': dict(self._profile),
@@ -425,38 +357,8 @@ class MuJoCoWarpBatchSession:
                     'transport': 'cuda_ipc', 'state_readback_fields': list(self._state_shapes),
                     'state_shapes': self._state_shapes,
                     'body_names': self._body_names, 'frame_names': self._frame_names,
+                    'joint_qpos_indices': dict(self._joint_qpos),
+                    'free_joint_qpos_indices': dict(self._free_qpos),
+                    'physical_layout_facts': dict(self._layout_facts),
+                    'native_capacities': dict(self._capacities),
                     'pose_layout': 'world_body_xyz_wxyz_env_local'}}
-
-    def close(self):
-        if self._closed:
-            return
-        self._closed = True
-        error = None
-        if self._ipc is not None:
-            try:
-                self._ipc.release_imports()
-            except BaseException as caught:
-                error = caught
-        if self._worker is not None:
-            try:
-                self._worker.close()
-            except BaseException as caught:
-                if error is None:
-                    error = caught
-                else:
-                    error.add_note(f'worker close also failed: {caught!r}')
-            if self._worker.closed:
-                self._worker = None
-        if self._ipc is not None and self._worker is None:
-            try:
-                self._ipc.close()
-                self._ipc = None
-            except BaseException as caught:
-                if error is None:
-                    error = caught
-                else:
-                    error.add_note(f'IPC close also failed: {caught!r}')
-        self._last_state = None
-        self._device_limits = None
-        if error is not None:
-            raise error

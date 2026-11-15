@@ -329,6 +329,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
             config.setdefault('robot', {})['native_drive'] = supplied.native_drive
         if supplied.reset_profile is not None:
             config["execution"]["reset_profile"] = supplied.reset_profile
+        if supplied.geophys_contact_mode != 'provider_default':
+            config['execution']['geophys_contact_mode'] = supplied.geophys_contact_mode
         if supplied.controller_profile is not None:
             config['controller']['profile_id'] = supplied.controller_profile
         if supplied.robot_uid is not None:
@@ -393,6 +395,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
         "episode": {"horizon", "seed", "ignore_done"},
         "task": set(environment_type.selected_parameter_limits),
     }
+    if execution_scope == 'device_batch':
+        allowed_sections['execution'].add('geophys_contact_mode')
     for name, section in sections.items():
         unknown = set(section) - allowed_sections[name]
         if unknown:
@@ -423,10 +427,30 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
             raise KeyError(f"unsupported {source_name} fields: {sorted(unknown)}")
         execution_defaults.update(source)
 
+    if execution_scope == 'device_batch':
+        # Task YAML execution defaults describe the scalar route.  A device
+        # batch has its own CUDA default, while an explicit caller selection
+        # still takes precedence and is checked by the admission below.
+        for name, default in (('physics_backend', 'cuda'), ('physics_device', 'cuda:0')):
+            if name not in sections['execution']:
+                execution_defaults[name] = default
+        if 'batch_layout' not in sections['execution']:
+            execution_defaults['batch_layout'] = 'native_batch'
+        if execution_defaults['physics_provider'] == 'geophys' and 'interpreter' not in sections['execution']:
+            import os
+            import sys
+            execution_defaults['interpreter'] = os.environ.get('GEOCHORA_GEOPHYS_PYTHON') or sys.executable
+
     provider = execution_defaults["physics_provider"]
+    contact_mode = execution_defaults.get('geophys_contact_mode', 'provider_default')
+    if contact_mode not in ('provider_default', 'discrete', 'continuous'):
+        raise ValueError('execution.geophys_contact_mode must be provider_default, discrete or continuous')
+    if contact_mode != 'provider_default' and provider != 'geophys':
+        raise ValueError('explicit GeoPhys contact mode requires the GeoPhys provider')
     backend = execution_defaults["physics_backend"]
     device = execution_defaults["physics_device"]
-    admitted_routes = ({('mujoco_warp', 'cuda', 'cuda:0')} if execution_scope == 'device_batch' else
+    admitted_routes = ({('mujoco_warp', 'cuda', 'cuda:0'), ('geophys', 'cuda', 'cuda:0'),
+                        ('isaacsim', 'cuda', 'cuda:0')} if execution_scope == 'device_batch' else
                        {('geophys', 'cpu', 'cpu'), ('mujoco', 'cpu', 'cpu'),
                         ('isaacsim', 'cuda', 'cuda:0')})
     if (provider, backend, device) not in admitted_routes:
@@ -523,7 +547,7 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
         raise ValueError(f'static_config: selected execution requires {expected_layout} layout')
     if execution_scope == 'device_batch' and (
             selection.deployment != 'isolated_worker' or not selection.interpreter):
-        raise ValueError('MJWarp device batch requires an explicit isolated-worker interpreter')
+        raise ValueError('device batch requires an isolated-worker interpreter')
     if selection.deployment == "in_process":
         import sys
         if selection.interpreter is None or Path(selection.interpreter).resolve() != Path(sys.executable).resolve():
@@ -546,6 +570,7 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
         reset_profile=reset_profile,
         robot_uid=robot_uid,
         native_drive=native_drive, controller_parameters_json=controller_parameters_json,
+        geophys_contact_mode=contact_mode,
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,
@@ -568,11 +593,14 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
             original['controller']['gravity_compensation'] = True
         if result.native_drive is not None:
             original.setdefault('robot', {})['native_drive'] = result.native_drive
+        if result.geophys_contact_mode != 'provider_default':
+            original['execution']['geophys_contact_mode'] = result.geophys_contact_mode
         if result.controller_profile is not None:
             original['controller']['profile_id'] = result.controller_profile
         reconstructed = _resolve_selected_config(environment_type, original, execution_scope=execution_scope)
         if (reconstructed.environment != result.environment
                 or reconstructed.execution_spec_v2 != result.execution_spec_v2
+                or reconstructed.geophys_contact_mode != result.geophys_contact_mode
                 or reconstructed.source_delivery_manifest != result.source_delivery_manifest):
             raise ValueError("resolved selected requested execution does not match its selection")
     return result

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+import copy
 import inspect
 import math
 from typing import Any
@@ -264,6 +265,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         # every device transition.
         self._device_elapsed_steps = None
         self._device_rng_state = None
+        self._device_pcg_states = None
         self._device_episode_ids = None
         self._device_fault = None
         self._last_state = None
@@ -730,6 +732,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                 infos=transition_infos,
                 device=device_state.device,
                 boundary=device_state.identity,
+                native_world_time=device_state.arrays.get('native_world_time'),
             )
         finally:
             if profile is not None:
@@ -1050,30 +1053,36 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         else:
             validate_device_reset_selection(selection, mask=mask, num_envs=self.num_envs,
                                             device=device, require_data_pointer=True)
-        if seed is None and self._device_rng_state is None:
+        pcg = getattr(self.task_definition, 'device_random_algorithm', None) == 'pcg64-v0'
+        if seed is None and (self._device_pcg_states if pcg else self._device_rng_state) is None:
             seed = self.base_seed
         rng_state = self._device_rng_state
+        pcg_states = copy.deepcopy(self._device_pcg_states) if pcg else None
         if seed is not None:
             if (isinstance(seed, int) and not isinstance(seed, bool)
                     and 0 <= seed <= 2**63 - self.num_envs):
-                seeds = torch.arange(self.num_envs, dtype=torch.int64, device=device) + seed
+                seed_values = [seed + row for row in range(self.num_envs)]
             elif isinstance(seed, (tuple, list)) and len(seed) == self.num_envs and all(
                     isinstance(value, int) and not isinstance(value, bool) and 0 <= value < 2**63
                     for value in seed):
-                seeds = torch.tensor(seed, dtype=torch.int64, device=device)
+                seed_values = list(seed)
             else:
                 raise ValueError('device reset seed must be nonnegative or contain B nonnegative integers')
-            # Bijectively mix seeds into distinct 63-bit stream states.
-            limit = 0x7fffffffffffffff
-            mixed = seeds ^ (seeds >> 30)
-            mixed = (mixed * 6364136223846793005) & limit
-            mixed = mixed ^ (mixed >> 27)
-            mixed = (mixed * 6364136223846793005) & limit
-            seeded = mixed ^ (mixed >> 31)
-            if rng_state is None:
-                rng_state = seeded
+            if pcg:
+                if pcg_states is None:
+                    pcg_states = [None] * self.num_envs
+                for row in selection.selected_slots:
+                    pcg_states[row] = np.random.PCG64(seed_values[row]).state
             else:
-                rng_state = torch.where(mask, seeded, rng_state)
+                seeds = torch.tensor(seed_values, dtype=torch.int64, device=device)
+                # Bijectively mix seeds into distinct 63-bit stream states.
+                limit = 0x7fffffffffffffff
+                mixed = seeds ^ (seeds >> 30)
+                mixed = (mixed * 6364136223846793005) & limit
+                mixed = mixed ^ (mixed >> 27)
+                mixed = (mixed * 6364136223846793005) & limit
+                seeded = mixed ^ (mixed >> 31)
+                rng_state = seeded if rng_state is None else torch.where(mask, seeded, rng_state)
         if not selection.selected_count:
             if self._last_device_state is None:
                 raise ValueError('initial device reset must select every row')
@@ -1091,20 +1100,36 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         if (not isinstance(random_domains, Mapping) or not random_domains or not fields
                 or len(fields) != len(set(fields)) or any(name not in shapes for name in fields)):
             raise ValueError('device reset declaration contains invalid domains or state fields')
-        # Full-period 63-bit LCG; high 24 bits give exactly representable
-        # float32 uniforms. Masking leaves unselected streams unchanged.
+        # PCG64 is sampled only for selected reset rows on the host; no live
+        # physics state crosses the device boundary. Other tasks retain their
+        # existing device LCG stream. Commit either stream only after reset.
         limit = 0x7fffffffffffffff
         uniforms = {}
+        generators = {}
+        if pcg:
+            for row in selection.selected_slots:
+                bit_generator = np.random.PCG64()
+                bit_generator.state = pcg_states[row]
+                generators[int(row)] = np.random.Generator(bit_generator)
         for name, domain_shape in random_domains.items():
             if (not isinstance(name, str) or not name or not isinstance(domain_shape, tuple)
                     or any(type(size) is not int or size < 1 for size in domain_shape)):
                 raise ValueError('device reset random domain requires a name and positive shape')
             count = math.prod(domain_shape)
-            draws = []
-            for _ in range(count):
-                rng_state = (rng_state * 6364136223846793005 + 1442695040888963407) & limit
-                draws.append((rng_state >> 39).float() / 16777216.0)
-            uniforms[name] = torch.stack(draws, dim=1).reshape(self.num_envs, *domain_shape)
+            if pcg:
+                values = np.zeros((self.num_envs, *domain_shape), dtype=np.float32)
+                for row, generator in generators.items():
+                    values[row] = generator.random(domain_shape)
+                uniforms[name] = torch.as_tensor(values, device=device)
+            else:
+                draws = []
+                for _ in range(count):
+                    rng_state = (rng_state * 6364136223846793005 + 1442695040888963407) & limit
+                    draws.append((rng_state >> 39).float() / 16777216.0)
+                uniforms[name] = torch.stack(draws, dim=1).reshape(self.num_envs, *domain_shape)
+        if pcg:
+            for row, generator in generators.items():
+                pcg_states[row] = generator.bit_generator.state
         template = {name: torch.zeros((self.num_envs, *shapes[name]), dtype=torch.float32, device=device)
                     for name in fields}
         sampled = sampler(uniforms, template)
@@ -1121,12 +1146,15 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
             self._device_episode_ids = torch.zeros(self.num_envs, dtype=torch.int64, device=device)
         try:
             state = self.reset_device(sampled, mask, selection=selection)
-            self._device_rng_state = torch.where(mask, rng_state,
-                self._device_rng_state if self._device_rng_state is not None else rng_state)
             self._device_episode_ids = self._device_episode_ids + mask.to(torch.int64)
             state = self._with_device_episode_metadata(state)
             self._last_device_state = state
             observation = self._build_device_observation(state)
+            if pcg:
+                self._device_pcg_states = pcg_states
+            else:
+                self._device_rng_state = torch.where(mask, rng_state,
+                    self._device_rng_state if self._device_rng_state is not None else rng_state)
         except BaseException as error:
             self.latch_device_fault(error)
             raise
@@ -1136,9 +1164,12 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
     def _device_reset_info(self, state):
         import torch
 
-        return {'env_id': torch.arange(self.num_envs, dtype=torch.int64, device=state.device),
+        info = {'env_id': torch.arange(self.num_envs, dtype=torch.int64, device=state.device),
                 'episode_id': self.device_episode_ids, 'episode_step': self.device_episode_steps,
                 'boundary': state.identity}
+        if 'native_world_time' in state.arrays:
+            info['native_world_time'] = state.arrays['native_world_time'].clone()
+        return info
 
     def resource_summary(self) -> dict[str, Any]:
         summary = dict(self.runtime.resource_summary())
@@ -1174,6 +1205,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                         else:
                             error.add_note(f'device owner cleanup also failed: {cleanup_error!r}')
             self._last_device_state = self._device_rng_state = None
+            self._device_pcg_states = None
             self._device_elapsed_steps = self._device_episode_ids = None
             self._device_fault = None
         if self._source_resources is not None:

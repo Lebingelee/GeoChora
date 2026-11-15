@@ -68,6 +68,111 @@ def preflight_physical_mujoco(execution, artifact, source):
         raise StageUnavailableError('physical MuJoCo route requires the checked 3.8.1 dependency')
 
 
+def validate_physical_joint_mapping(model, mj, binding, definitions, *, source_joints,
+                                    torque_actuators, position_actuators, joint_targets,
+                                    open_actuators, gripper_force_limit, fixed_roots,
+                                    build_layout_facts):
+    """Check compiled named joints, transmissions, equality and drive isolation.
+
+    This source-bound validation is shared by the scalar port and native batch
+    worker. The supplied layout facts receive the exact public model overrides.
+    """
+    drive_mode = uniform_native_drive_mode(binding)
+    direct_motor = (bool(torque_actuators) and not position_actuators
+                    and all(c.native_drive == 'disabled' for c in binding.channels))
+    if direct_motor:
+        if ({f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in binding.channels}
+                != dict(torque_actuators) or joint_targets or open_actuators):
+            raise ValueError('physical motor bindings must exactly cover the source actuators')
+        for frame_id in fixed_roots:
+            root_id = int(model.body(frame_id).id)
+            if root_id <= 0 or int(model.body_parentid[root_id]) != 0 or int(model.body_jntnum[root_id]) != 0:
+                raise ValueError('physical motor subject root is not a fixed world child')
+    groups, dofs, actuator_ids, equality_ids = {}, {}, set(), []
+    for channel in binding.channels:
+        definition = definitions[(channel.entity_id, channel.joint_id)]
+        joint_id, dof = resolve_physical_joint(model, mj, source_joints, definition, channel)
+        if dof in dofs.values():
+            raise ValueError('physical channels alias one native DOF')
+        dofs[channel.target_key] = dof
+        groups.setdefault((channel.entity_id, channel.transmission_id), []).append((channel, joint_id))
+    for group in groups.values():
+        actuator = int(model.actuator(group[0][0].native_actuator).id)
+        if actuator in actuator_ids:
+            raise ValueError('physical transmissions alias one native actuator')
+        actuator_ids.add(actuator)
+        first = group[0][0]
+        if (not direct_motor and bool(model.actuator_forcelimited[actuator])
+                and not _same(model.actuator_forcerange[actuator], first.native_range)):
+            limit = gripper_force_limit
+            source_range = tuple(float(value) for value in model.actuator_forcerange[actuator])
+            if (len(group) != 2 or first.native_drive != 'disabled'
+                    or first.native_actuator not in open_actuators
+                    or any(channel.kind != 'prismatic' for channel, _ in group)
+                    or not all(math.isfinite(value) for value in source_range)
+                    or not source_range[0] < 0 < source_range[1]
+                    or not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0
+                    or not _same(first.native_range, (-limit, limit))):
+                raise ValueError('physical force cap differs from the declared gripper configuration')
+            model.actuator_forcerange[actuator] = first.native_range
+            build_layout_facts['physical_gripper_force_cap'] = {
+                'schema_version': 'physical-gripper-cap-v1', 'native_actuator': first.native_actuator,
+                'source_range_N': list(source_range), 'configured_range_N': list(first.native_range),
+                'source_mjcf_modified': False}
+        if direct_motor:
+            validate_direct_motor(model, mj, actuator, first)
+        elif (not bool(model.actuator_forcelimited[actuator])
+                or not _same(model.actuator_forcerange[actuator], first.native_range)
+                or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))
+                or int(model.actuator_biastype[actuator]) != int(mj.mjtBias.mjBIAS_AFFINE)
+                or int(model.actuator_gaintype[actuator]) != int(mj.mjtGain.mjGAIN_FIXED)
+                or int(model.actuator_dyntype[actuator]) != int(mj.mjtDyn.mjDYN_NONE)
+                or float(model.actuator_gainprm[actuator, 0]) <= 0
+                or float(model.actuator_biasprm[actuator, 1]) >= 0
+                or float(model.actuator_biasprm[actuator, 2]) > 0
+                or any(channel.native_drive != drive_mode for channel, _ in group)):
+            raise ValueError('compiled actuator range, gear or position drive differs')
+        trn = int(model.actuator_trntype[actuator])
+        target = int(model.actuator_trnid[actuator][0])
+        if trn == int(mj.mjtTrn.mjTRN_JOINT):
+            if len(group) != 1 or target != group[0][1] or first.transmission_coefficient != 1:
+                raise ValueError('compiled joint transmission differs')
+        elif trn == int(mj.mjtTrn.mjTRN_TENDON):
+            start, count = int(model.tendon_adr[target]), int(model.tendon_num[target])
+            actual = [(int(model.wrap_objid[i]), float(model.wrap_prm[i]))
+                      for i in range(start, start + count)
+                      if int(model.wrap_type[i]) == int(mj.mjtWrap.mjWRAP_JOINT)]
+            expected = [(joint, channel.transmission_coefficient) for channel, joint in group]
+            if len(actual) != count or sorted(actual) != sorted(expected):
+                raise ValueError('compiled tendon transmission differs')
+            if len(group) != 2:
+                raise ValueError('physical port requires the declared paired tendon')
+            joint_pair = {joint for _, joint in group}
+            matches = [i for i in range(model.neq)
+                if int(model.eq_type[i]) == int(mj.mjtEq.mjEQ_JOINT)
+                and {int(model.eq_obj1id[i]), int(model.eq_obj2id[i])} == joint_pair
+                and bool(model.eq_active0[i])
+                and _same(model.eq_data[i, :5], (0, 1, 0, 0, 0))]
+            if len(matches) != 1:
+                raise ValueError('compiled paired-joint equality differs')
+            equality_ids.append(matches[0])
+        else:
+            raise ValueError('unsupported compiled physical transmission')
+    if drive_mode == 'disabled':
+        if actuator_ids != set(range(int(model.nu))):
+            raise ValueError('global drive isolation requires every actuator to be declared')
+        bit = int(mj.mjtDisableBit.mjDSBL_ACTUATION)
+        before = int(model.opt.disableflags)
+        model.opt.disableflags = before | bit
+        if not int(model.opt.disableflags) & bit:
+            raise ValueError('MuJoCo public option did not disable source actuation')
+        build_layout_facts['physical_drive_override'] = {
+            'schema_version': 'mujoco-public-drive-isolation-v1', 'actuator_ids': sorted(actuator_ids),
+            'before_disableflags': before, 'after_disableflags': int(model.opt.disableflags),
+            'source_mjcf_modified': False, 'api': 'mjOption.disableflags/mjDSBL_ACTUATION'}
+    return dofs, equality_ids
+
+
 class MuJoCoPhysicalPort:
     """One materialization's checked named mapping and single batch authority."""
 
@@ -83,103 +188,19 @@ class MuJoCoPhysicalPort:
         model, mj, source = session._model, session._mj, session._source
         if session._provider != 'mujoco' or session._mixed_actuator_plan is not None:
             raise ValueError('physical port requires a scalar MuJoCo session')
-        definitions = {(a.entity_id, j.joint_id): j for a in execution.scene.articulations or () for j in a.joints}
-        drive_mode = uniform_native_drive_mode(binding)
-        direct_motor = (bool(getattr(source, 'torque_actuators', {})) and not getattr(source, 'position_actuators', {})
-                        and all(c.native_drive == 'disabled' for c in binding.channels))
-        if direct_motor:
-            if ({f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in binding.channels}
-                    != dict(source.torque_actuators) or source.joint_targets or source.open_actuators):
-                raise ValueError('physical motor bindings must exactly cover the source actuators')
-            for subject in execution.subjects:
-                if subject.root_mode == 'fixed':
-                    root_id = int(model.body(subject.root_frame.frame_id).id)
-                    if root_id <= 0 or int(model.body_parentid[root_id]) != 0 or int(model.body_jntnum[root_id]) != 0:
-                        raise ValueError('physical motor subject root is not a fixed world child')
-        groups, dofs, actuator_ids, equality_ids = {}, {}, set(), []
-        for channel in binding.channels:
-            definition = definitions[(channel.entity_id, channel.joint_id)]
-            joint_id, dof = resolve_physical_joint(model, mj, source.joints, definition, channel)
-            if dof in dofs.values():
-                raise ValueError('physical channels alias one native DOF')
-            dofs[channel.target_key] = dof
-            groups.setdefault((channel.entity_id, channel.transmission_id), []).append((channel, joint_id))
-        for group in groups.values():
-            actuator = int(model.actuator(group[0][0].native_actuator).id)
-            if actuator in actuator_ids:
-                raise ValueError('physical transmissions alias one native actuator')
-            actuator_ids.add(actuator)
-            first = group[0][0]
-            if (not direct_motor and bool(model.actuator_forcelimited[actuator])
-                    and not _same(model.actuator_forcerange[actuator], first.native_range)):
-                config = getattr(source, 'config', None)
-                gripper = getattr(getattr(config, 'robot', None), 'gripper', None)
-                limit = getattr(gripper, 'force_limit_N', None)
-                source_range = tuple(float(value) for value in model.actuator_forcerange[actuator])
-                if (len(group) != 2 or first.native_drive != 'disabled'
-                        or first.native_actuator not in source.open_actuators
-                        or any(channel.kind != 'prismatic' for channel, _ in group)
-                        or not all(math.isfinite(value) for value in source_range)
-                        or not source_range[0] < 0 < source_range[1]
-                        or not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0
-                        or not _same(first.native_range, (-limit, limit))):
-                    raise ValueError('physical force cap differs from the declared gripper configuration')
-                model.actuator_forcerange[actuator] = first.native_range
-                session._build_layout_facts['physical_gripper_force_cap'] = {
-                    'schema_version': 'physical-gripper-cap-v1', 'native_actuator': first.native_actuator,
-                    'source_range_N': list(source_range), 'configured_range_N': list(first.native_range),
-                    'source_mjcf_modified': False}
-            if direct_motor:
-                validate_direct_motor(model, mj, actuator, first)
-            elif (not bool(model.actuator_forcelimited[actuator])
-                    or not _same(model.actuator_forcerange[actuator], first.native_range)
-                    or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))
-                    or int(model.actuator_biastype[actuator]) != int(mj.mjtBias.mjBIAS_AFFINE)
-                    or int(model.actuator_gaintype[actuator]) != int(mj.mjtGain.mjGAIN_FIXED)
-                    or int(model.actuator_dyntype[actuator]) != int(mj.mjtDyn.mjDYN_NONE)
-                    or float(model.actuator_gainprm[actuator, 0]) <= 0
-                    or float(model.actuator_biasprm[actuator, 1]) >= 0
-                    or float(model.actuator_biasprm[actuator, 2]) > 0
-                    or any(channel.native_drive != drive_mode for channel, _ in group)):
-                raise ValueError('compiled actuator range, gear or position drive differs')
-            trn = int(model.actuator_trntype[actuator])
-            target = int(model.actuator_trnid[actuator][0])
-            if trn == int(mj.mjtTrn.mjTRN_JOINT):
-                if len(group) != 1 or target != group[0][1] or first.transmission_coefficient != 1:
-                    raise ValueError('compiled joint transmission differs')
-            elif trn == int(mj.mjtTrn.mjTRN_TENDON):
-                start, count = int(model.tendon_adr[target]), int(model.tendon_num[target])
-                actual = [(int(model.wrap_objid[i]), float(model.wrap_prm[i]))
-                          for i in range(start, start + count)
-                          if int(model.wrap_type[i]) == int(mj.mjtWrap.mjWRAP_JOINT)]
-                expected = [(joint, channel.transmission_coefficient) for channel, joint in group]
-                if len(actual) != count or sorted(actual) != sorted(expected):
-                    raise ValueError('compiled tendon transmission differs')
-                if len(group) != 2:
-                    raise ValueError('physical port requires the declared paired tendon')
-                joint_pair = {joint for _, joint in group}
-                matches = [i for i in range(model.neq)
-                    if int(model.eq_type[i]) == int(mj.mjtEq.mjEQ_JOINT)
-                    and {int(model.eq_obj1id[i]), int(model.eq_obj2id[i])} == joint_pair
-                    and bool(model.eq_active0[i])
-                    and _same(model.eq_data[i, :5], (0, 1, 0, 0, 0))]
-                if len(matches) != 1:
-                    raise ValueError('compiled paired-joint equality differs')
-                equality_ids.append(matches[0])
-            else:
-                raise ValueError('unsupported compiled physical transmission')
-        if drive_mode == 'disabled':
-            if actuator_ids != set(range(int(model.nu))):
-                raise ValueError('global drive isolation requires every actuator to be declared')
-            bit = int(mj.mjtDisableBit.mjDSBL_ACTUATION)
-            before = int(model.opt.disableflags)
-            model.opt.disableflags = before | bit
-            if not int(model.opt.disableflags) & bit:
-                raise ValueError('MuJoCo public option did not disable source actuation')
-            session._build_layout_facts['physical_drive_override'] = {
-                'schema_version': 'mujoco-public-drive-isolation-v1', 'actuator_ids': sorted(actuator_ids),
-                'before_disableflags': before, 'after_disableflags': int(model.opt.disableflags),
-                'source_mjcf_modified': False, 'api': 'mjOption.disableflags/mjDSBL_ACTUATION'}
+        definitions = {(a.entity_id, j.joint_id): j
+                       for a in execution.scene.articulations or () for j in a.joints}
+        fixed_roots = tuple(subject.root_frame.frame_id for subject in execution.subjects
+                            if subject.root_mode == 'fixed')
+        config = getattr(source, 'config', None)
+        gripper = getattr(getattr(config, 'robot', None), 'gripper', None)
+        dofs, equality_ids = validate_physical_joint_mapping(
+            model, mj, binding, definitions, source_joints=source.joints,
+            torque_actuators=getattr(source, 'torque_actuators', {}),
+            position_actuators=getattr(source, 'position_actuators', {}),
+            joint_targets=source.joint_targets, open_actuators=source.open_actuators,
+            gripper_force_limit=getattr(gripper, 'force_limit_N', None), fixed_roots=fixed_roots,
+            build_layout_facts=session._build_layout_facts)
         bodies = {}
         body_frames = {}
         for body in binding.bodies:

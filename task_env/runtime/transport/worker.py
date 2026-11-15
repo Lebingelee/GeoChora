@@ -33,6 +33,7 @@ class RuntimeWorker:
 
     def __init__(self, interpreter, request, *, working_directory=None):
         self._temporary_directory = None
+        self._close_timeout = 180 if request.get('provider') == 'isaacsim' else 10
         if working_directory is None:
             self._temporary_directory = tempfile.TemporaryDirectory(prefix='geochora-mjwarp-')
             directory = self._temporary_directory.name
@@ -41,6 +42,8 @@ class RuntimeWorker:
         root = Path(__file__).resolve().parents[3]
         environment = os.environ.copy()
         environment['PYTHONPATH'] = str(root)
+        if request.get('provider') == 'geophys':
+            environment['PYTHONPATH'] += os.pathsep + str(root / 'GeoPhys' / 'src')
         environment['PYTHONNOUSERSITE'] = '1'
         self._process = None
         try:
@@ -80,7 +83,7 @@ class RuntimeWorker:
             if process.poll() is None:
                 try:
                     _send(process.stdin, {'command': 'close'})
-                    _receive(process.stdout, timeout=10)
+                    _receive(process.stdout, timeout=self._close_timeout)
                 except BaseException as caught:
                     record(caught, 'worker close request')
                 try:
@@ -121,6 +124,11 @@ class RuntimeWorker:
 
 
 def main():
+    # Native libraries may write directly to file descriptor 1, bypassing
+    # redirect_stdout. Keep a private duplicate for protocol replies and send
+    # all library output to stderr so it cannot corrupt the JSON stream.
+    protocol = os.fdopen(os.dup(sys.stdout.fileno()), 'w', buffering=1)
+    os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
     native = None
     phase = 'construction'
     try:
@@ -130,7 +138,7 @@ def main():
             native_type = load_device_provider(request['provider'], worker=True)
             native = native_type(request)
             description = native.description()
-        _send(sys.stdout, description)
+        _send(protocol, description)
         while True:
             message = _receive(sys.stdin, timeout=None)
             phase = message['command']
@@ -146,13 +154,18 @@ def main():
                     native = None
                 else:
                     raise ValueError(f'unsupported worker command: {phase}')
-            _send(sys.stdout, {'ok': True})
+            _send(protocol, {'ok': True})
             if phase == 'close':
+                if request['provider'] == 'isaacsim':
+                    protocol.close()
+                    from ..sessions.worker import _exit_after_isaac_cleanup
+                    _exit_after_isaac_cleanup(0)
                 return
     except BaseException as error:
-        _send(sys.stdout, {'phase': phase, 'error': f'{type(error).__name__}: {error}'})
+        _send(protocol, {'phase': phase, 'error': f'{type(error).__name__}: {error}'})
         raise
     finally:
+        protocol.close()
         if native is not None:
             with contextlib.redirect_stdout(sys.stderr):
                 native.close()

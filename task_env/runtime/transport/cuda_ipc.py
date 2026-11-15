@@ -78,6 +78,117 @@ class CudaIpcPublisher:
             self._ready = None
 
 
+class CudaIpcDuplexPublisher:
+    """Own fixed CUDA buffers for an isolated native worker using Torch streams.
+
+    Input and output arrays stay device-resident. The producer owns every
+    allocation until the consumer has unmapped it, and synchronization uses
+    the same ready/written IPC events as :class:`CudaIpcConnection`.
+    """
+
+    def __init__(self, fields, *, device='cuda:0'):
+        import math
+        import torch
+        from cuda.bindings import driver as cu
+
+        self._torch, self._cu = torch, cu
+        self._device = torch.device(device)
+        if self._device.type != 'cuda' or self._device.index is None:
+            raise ValueError('CUDA publisher requires an indexed CUDA device')
+        torch.cuda.init()
+        if self._device.index != torch.cuda.current_device():
+            raise ValueError('CUDA publisher device must be current')
+        torch.cuda.current_stream(self._device)
+        self._buffers = {}
+        self._ready = self._written = None
+        try:
+            for name, (shape, dtype) in fields.items():
+                shape = tuple(int(value) for value in shape)
+                if not name or not shape or any(value < 1 for value in shape) or dtype not in {'float32', 'bool'}:
+                    raise ValueError('CUDA IPC field needs a name, positive shape, and supported dtype')
+                size = math.prod(shape) * (4 if dtype == 'float32' else 1)
+                pointer = _check(cu.cuMemAlloc(size))
+                self._buffers[name] = (pointer, shape, dtype, size)
+            self._ready = _check(cu.cuEventCreate(6))
+        except BaseException as error:
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'CUDA duplex publisher cleanup failed: {cleanup_error!r}')
+            raise
+
+    def _stream(self):
+        return self._cu.CUstream(self._torch.cuda.current_stream(self._device).cuda_stream)
+
+    def description(self):
+        def encoded(handle):
+            return base64.b64encode(ctypes.string_at(handle.getPtr(), 64)).decode('ascii')
+        return {'device': str(self._device), 'ready': encoded(_check(self._cu.cuIpcGetEventHandle(self._ready))),
+                'buffers': {name: {'handle': encoded(_check(self._cu.cuIpcGetMemHandle(pointer))),
+                                   'shape': list(shape), 'dtype': dtype}
+                            for name, (pointer, shape, dtype, _) in self._buffers.items()}}
+
+    def bind_written_event(self, encoded):
+        if self._written is not None:
+            raise RuntimeError('CUDA publisher input event is already bound')
+        self._written = _check(self._cu.cuIpcOpenEventHandle(
+            _decode_handle(self._cu.CUipcEventHandle, encoded)))
+
+    def read_inputs(self, names):
+        if self._written is None:
+            raise RuntimeError('CUDA publisher input event is not bound')
+        _check(self._cu.cuStreamWaitEvent(self._stream(), self._written, 0))
+        values = {}
+        for name in names:
+            pointer, shape, dtype, size = self._buffers[name]
+            tensor = self._torch.empty(shape, dtype={'float32': self._torch.float32,
+                                                      'bool': self._torch.bool}[dtype], device=self._device)
+            _check(self._cu.cuMemcpyDtoDAsync(tensor.data_ptr(), pointer, size, self._stream()))
+            values[name] = tensor
+        self._torch.cuda.current_stream(self._device).synchronize()
+        return values
+
+    def publish(self, values):
+        for name, value in values.items():
+            pointer, shape, dtype, size = self._buffers[name]
+            expected = {'float32': self._torch.float32, 'bool': self._torch.bool}[dtype]
+            if (not isinstance(value, self._torch.Tensor) or value.device != self._device
+                    or tuple(value.shape) != shape or value.dtype != expected or not value.is_contiguous()):
+                raise ValueError(f'CUDA publication field {name!r} differs from its declaration')
+            _check(self._cu.cuMemcpyDtoDAsync(pointer, value.data_ptr(), size, self._stream()))
+        _check(self._cu.cuEventRecord(self._ready, self._stream()))
+
+    def close(self):
+        error = None
+        if self._buffers or self._ready is not None or self._written is not None:
+            try:
+                self._torch.cuda.current_stream(self._device).synchronize()
+            except BaseException as caught:
+                error = caught
+        for name, (pointer, _, _, _) in tuple(self._buffers.items()):
+            try:
+                _check(self._cu.cuMemFree(pointer))
+                del self._buffers[name]
+            except BaseException as caught:
+                if error is None:
+                    error = caught
+                else:
+                    error.add_note(f'CUDA publisher {name} cleanup failed: {caught!r}')
+        for name in ('_written', '_ready'):
+            event = getattr(self, name)
+            if event is not None:
+                try:
+                    _check(self._cu.cuEventDestroy(event))
+                    setattr(self, name, None)
+                except BaseException as caught:
+                    if error is None:
+                        error = caught
+                    else:
+                        error.add_note(f'CUDA publisher {name} cleanup failed: {caught!r}')
+        if error is not None:
+            raise error
+
+
 class CudaIpcConnection:
     """Import one worker's buffers and synchronize copies on a Torch stream."""
 

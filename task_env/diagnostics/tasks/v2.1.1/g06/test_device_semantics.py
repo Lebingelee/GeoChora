@@ -6,6 +6,90 @@ import numpy as np
 import pytest
 import torch
 
+
+def test_geophys_site_pose_composition_uses_each_world_and_source_rotation():
+    from task_env.runtime.providers.geophys.device_batch import _compose_site_poses
+
+    half = 2 ** -0.5
+    position = torch.tensor([[[1., 2., 3.]], [[-2., 1., 4.]]])
+    rotation = torch.tensor([[[half, 0., 0., half]], [[half, 0., 0., -half]]])
+    local_position = torch.tensor([[1., 0., 0.]])
+    local_rotation = torch.tensor([[half, half, 0., 0.]])
+    actual_position, actual_rotation = _compose_site_poses(position, rotation, local_position, local_rotation)
+    torch.testing.assert_close(actual_position, torch.tensor([[[1., 3., 3.]], [[-2., 0., 4.]]]), atol=2e-7, rtol=0)
+    torch.testing.assert_close(actual_rotation, torch.tensor([[[.5, .5, .5, .5]], [[.5, .5, -.5, -.5]]]),
+                               atol=2e-7, rtol=0)
+
+
+def test_device_coupled_transmission_rejects_unrepresentable_effort_per_world():
+    from task_env.runtime.transport.device_batch_session import _coupled_effort_groups, _validate_coupled_efforts
+
+    channels = (SimpleNamespace(entity_id='rig', transmission_id='coupled', sign=1, transmission_coefficient=.5),
+                SimpleNamespace(entity_id='rig', transmission_id='single', sign=1, transmission_coefficient=1.),
+                SimpleNamespace(entity_id='rig', transmission_id='coupled', sign=-1, transmission_coefficient=.25))
+    groups = _coupled_effort_groups(channels)
+    values = torch.tensor([[1., 3., -.5], [-2., 0., 1.], [0., -1., 0.]])
+    _validate_coupled_efforts(values, groups)
+    values[1, 2] = .8
+    with pytest.raises(ValueError, match='coupled transmission'):
+        _validate_coupled_efforts(values, groups)
+
+
+def test_implicitfast_equivalence_rejects_unqualified_velocity_effects():
+    import xml.etree.ElementTree as ET
+    from task_env.runtime.providers.geophys.device_batch import _validate_implicitfast_smooth_equivalence
+
+    data = {'jnt_type': [0], 'jnt_child_body': [0], 'body_parentid': [-1],
+            'body_ipos': [[0., 0., 0.]], 'tendon_damping': [0.],
+            'jnt_frictionloss': [0.], 'jnt_stiffness': [0.],
+            'body_linear_damping': [0.], 'body_angular_damping': [0.]}
+    model = SimpleNamespace(joint_data=data, objects=[SimpleNamespace(body_inertia=[1., 1., 1.])])
+    _validate_implicitfast_smooth_equivalence(model, ET.fromstring('<option/>'))
+    for changed in ({'tendon_damping': [1.]}, {'body_ipos': [[.1, 0., 0.]]},
+                    {'body_parentid': [-1, 0]}):
+        with pytest.raises(ValueError, match='implicitfast equivalence'):
+            _validate_implicitfast_smooth_equivalence(SimpleNamespace(joint_data={**data, **changed},
+                objects=model.objects), ET.fromstring('<option/>'))
+    with pytest.raises(ValueError, match='isotropic'):
+        _validate_implicitfast_smooth_equivalence(SimpleNamespace(joint_data=data,
+            objects=[SimpleNamespace(body_inertia=[1., 2., 3.])]), ET.fromstring('<option/>'))
+    with pytest.raises(ValueError, match='fluid'):
+        _validate_implicitfast_smooth_equivalence(model, ET.fromstring('<option viscosity="1"/>'))
+
+
+def test_geophys_close_attempts_every_owner_and_retries_only_failures():
+    from task_env.runtime.providers.geophys.device_batch import GeoPhysNativeBatch
+
+    calls = []
+
+    class Resource:
+        def __init__(self, name, failures):
+            self.name, self.failures = name, failures
+
+        def close(self):
+            calls.append(self.name)
+            if self.failures:
+                self.failures -= 1
+                raise RuntimeError(self.name)
+
+    adapter = GeoPhysNativeBatch.__new__(GeoPhysNativeBatch)
+    adapter._closed = False
+    adapter._publisher = Resource('publisher', 1)
+    adapter._runtime = Resource('runtime', 2)
+    with pytest.raises(RuntimeError, match='publisher') as first:
+        adapter.close()
+    assert calls == ['publisher', 'runtime']
+    assert any('runtime' in note for note in first.value.__notes__)
+    assert not adapter._closed
+    with pytest.raises(RuntimeError, match='runtime'):
+        adapter.close()
+    assert calls == ['publisher', 'runtime', 'publisher', 'runtime']
+    assert adapter._publisher is None
+    adapter.close()
+    adapter.close()
+    assert calls == ['publisher', 'runtime', 'publisher', 'runtime', 'runtime']
+    assert adapter._closed and adapter._runtime is None
+
 from task_env.runtime.contracts import DeviceBatchState, DeviceBatchTransition
 from task_env.tasks.pendulum import PendulumTaskDefinition, PendulumTaskSemantics
 from task_env.vectorization.homogeneous import HomogeneousVectorTaskEnv
@@ -343,6 +427,128 @@ def test_device_camera_render_config_roundtrips_without_changing_scalar_admissio
         resolve_task_env_config(task, request)
 
 
+def test_device_scope_overrides_scalar_task_yaml_defaults_but_respects_explicit_request():
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+
+    task = ENV_REGISTRY.get('pick-cube-p16-reference-v1')
+    execution = {'physics_provider': 'mujoco_warp', 'interpreter': '/tmp/profile-python'}
+    request = {'execution': execution, 'controller': {'profile_id': 'r1'}}
+    resolved = resolve_task_env_config(task, request, execution_scope='device_batch')
+    assert (resolved.environment.runtime.backend, resolved.physics_device) == ('cuda', 'cuda:0')
+    assert resolve_task_env_config(task, resolved, execution_scope='device_batch') == resolved
+
+    with pytest.raises(ValueError, match='unsupported selected physics'):
+        resolve_task_env_config(task, {**request, 'execution': {**execution, 'physics_backend': 'cpu'}},
+                                execution_scope='device_batch')
+
+
+def test_geophys_contact_mode_is_explicit_source_independent_and_roundtrips():
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+
+    task = ENV_REGISTRY.get('pendulum-v1')
+    execution = {'physics_provider': 'geophys', 'interpreter': '/tmp/profile-python'}
+    default = resolve_task_env_config(task, {'execution': execution}, execution_scope='device_batch')
+    assert default.geophys_contact_mode == 'provider_default'
+    for mode in ('provider_default', 'discrete', 'continuous'):
+        resolved = resolve_task_env_config(task, {'execution': {**execution, 'geophys_contact_mode': mode}},
+                                           execution_scope='device_batch')
+        assert resolved.geophys_contact_mode == mode
+        assert resolved.environment == default.environment
+        assert resolved.execution_spec_v2 == default.execution_spec_v2
+        assert resolve_task_env_config(task, resolved, execution_scope='device_batch') == resolved
+        if mode != 'provider_default':
+            assert mode in resolved.requested_execution_json
+    with pytest.raises(ValueError, match='contact_mode'):
+        resolve_task_env_config(task, {'execution': {**execution, 'geophys_contact_mode': 'automatic'}},
+                                execution_scope='device_batch')
+    with pytest.raises(ValueError, match='requires the GeoPhys provider'):
+        resolve_task_env_config(task, {'execution': {**execution, 'physics_provider': 'mujoco_warp',
+                                                       'geophys_contact_mode': 'discrete'}},
+                                execution_scope='device_batch')
+
+
+def test_pickcube_device_source_uses_declared_effort_transmissions():
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+    from task_env.runtime.sessions.source import close_source_and_task_resources
+
+    task = ENV_REGISTRY.get('pick-cube-p16-reference-v1')
+    request = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': '/tmp/profile-python'},
+               'controller': {'profile_id': 'panda-direct-effort-v1'},
+               'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 20}}
+    config = resolve_task_env_config(task, request, execution_scope='device_batch')
+    binding = task._build_selected_binding(config)
+    built = binding.build_for_request(config.physics_provider, config.environment.runtime.backend, 31, 20)
+    try:
+        execution = built['physical_execution']
+        execution.validate_source(scene=built['source'].scene_definition,
+            artifact_sha256=built['artifact'].identity_hash, source_id=built['source'].source_id,
+            source_closure_sha256=built['source'].source_closure_digest, source=built['source'])
+        channels = execution.compiled.binding.channels
+        pair = [channel for channel in channels if channel.native_actuator in built['source'].open_actuators]
+        assert len(pair) == 2
+        assert pair[0].transmission_id == pair[1].transmission_id
+        assert [channel.transmission_coefficient for channel in pair] == [.5, .5]
+        assert all(channel.native_drive == 'disabled' for channel in channels)
+        assert 'cube-v1' in built['source'].free_joints
+        space = built['controller'].device_action_space().spaces['effort']
+        assert space.shape == (len(built['controller'].profile.action_names),)
+        # The last input is total tendon effort; each finger receives one half.
+        assert float(space.low[-1]) == -5.0
+        assert float(space.high[-1]) == 5.0
+        assert all(float(value) == 250.0 for value in space.high[:-1])
+    finally:
+        close_source_and_task_resources(built['source'], binding)
+
+    with pytest.raises(ValueError, match='isolated native drives'):
+        resolve_task_env_config(task, {**request, 'robot': {'native_drive': 'position'}},
+                                execution_scope='device_batch')
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA device required')
+def test_pickcube_device_linear_effort_respects_tendon_and_row_identity():
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+    from task_env.runtime.contracts import DeviceStateIdentity
+    from task_env.runtime.sessions.source import close_source_and_task_resources
+
+    task = ENV_REGISTRY.get('pick-cube-p16-reference-v1')
+    config = resolve_task_env_config(task, {
+        'execution': {'physics_provider': 'mujoco_warp', 'interpreter': '/tmp/profile-python'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+        'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 20},
+    }, execution_scope='device_batch')
+    binding = task._build_selected_binding(config)
+    built = binding.build_for_request(config.physics_provider, config.environment.runtime.backend, 31, 20)
+    controller = built['controller']
+    try:
+        physical = controller.binding
+        identity = DeviceStateIdentity(physical.source_id, physical.source_closure_sha256,
+            physical.artifact_sha256, 'fixture', 0, 0, 0, 0., .01)
+        state = DeviceBatchState({'qpos': torch.zeros((3, 1), device='cuda')}, 'cuda:0', 3,
+            identity, 'owned_snapshot', torch.tensor([1, 2, 3], device='cuda', dtype=torch.int64),
+            torch.tensor([0, 4, 7], device='cuda', dtype=torch.int32))
+        action = torch.tensor([[1., -2., 3., -4., 5., -6., 7., 4.],
+                               [-1., 2., -3., 4., -5., 6., -7., -4.],
+                               [0., 0., 0., 0., 0., 0., 0., 0.]], device='cuda')
+        expected = torch.tensor([[1., -2., 3., -4., 5., -6., 7., 2., 2.],
+                                 [-1., 2., -3., 4., -5., 6., -7., -2., -2.],
+                                 [0., 0., 0., 0., 0., 0., 0., 0., 0.]], device='cuda')
+        command = controller.convert_device_batch({'effort': action}, state)
+        torch.testing.assert_close(command.values, expected, rtol=0, atol=0)
+        assert torch.equal(command.episode_ids, state.episode_ids)
+        assert torch.equal(command.episode_steps, state.episode_steps)
+        with pytest.raises(ValueError, match='exceeds'):
+            controller.convert_device_batch({'effort': action + 251.}, state)
+        with pytest.raises(ValueError, match='action tree'):
+            controller.convert_device_batch({'other': action}, state)
+    finally:
+        controller.close_device()
+        close_source_and_task_resources(built['source'], binding)
+
+
 def test_device_camera_observation_preserves_terminal_and_reset_frames():
     from task_env.environment.config import CameraSpec
     from task_env.render.providers.parallel import ParallelRenderProvider
@@ -540,7 +746,8 @@ def test_device_final_columns_preserve_rows_metrics_and_old_boundary(terminated,
     env.close()
 
 
-def test_device_reset_sampling_accepts_task_declared_domains_and_other_state_fields():
+@pytest.mark.parametrize('algorithm', [None, 'pcg64-v0'])
+def test_device_reset_sampling_accepts_task_declared_domains_and_other_state_fields(algorithm):
     """The common sampler does not assume Pendulum's two random values or qpos/qvel."""
     from task_env.vectorization.task_definition import BatchTaskLifecycleAdapter
 
@@ -564,6 +771,7 @@ def test_device_reset_sampling_accepts_task_declared_domains_and_other_state_fie
 
     class Task:
         device_state_required_fields = ('position',)
+        device_random_algorithm = algorithm
         def device_reset_spec(self):
             return {'random': {'point': (3,), 'offset': ()}, 'state_fields': ('position',)}
         def sample_device_reset(self, uniforms, template):
@@ -590,8 +798,13 @@ def test_device_reset_sampling_accepts_task_declared_domains_and_other_state_fie
                       'runtime_resource_summary': runtime.resource_summary()}, horizon=20, ignore_done=False)
 
     first, second = build(), build()
-    first.reset_sampled_device(seed=19)
+    initial = first.reset_sampled_device(seed=19).state.arrays['position'].clone()
     second.reset_sampled_device(seed=19)
+    if algorithm == 'pcg64-v0':
+        for row in range(3):
+            rng = np.random.Generator(np.random.PCG64(19 + row))
+            expected = rng.random(3).astype(np.float32) + np.float32(rng.random())
+            np.testing.assert_array_equal(initial[row].numpy(), expected)
     first.reset_sampled_device(mask=torch.tensor([False, True, False]))
     select = torch.tensor([True, False, True])
     a = first.reset_sampled_device(mask=select).state.arrays['position']
@@ -1146,3 +1359,181 @@ def test_camera_sensor_device_pose_composes_wxyz_parent_and_one_grid_offset():
     pose = sensor.resolve_device_pose(state, world_offsets=torch.tensor([[10., 0., 0.], [0., 5., 0.]]))
     torch.testing.assert_close(pose[0], torch.tensor([[11., 3., 3.], [11., 4., 3.], [0., 0., 1.]]), atol=2e-6, rtol=0.)
     torch.testing.assert_close(pose[1], torch.tensor([[5., 10., 6.], [6., 10., 6.], [0., 0., 1.]]), atol=2e-6, rtol=0.)
+
+
+def test_pick_cube_device_semantics_match_scalar_threshold_oracle():
+    from task_env.tasks.pick_cube.task import (
+        PickCubeTaskDefinition, _DeviceTaskBinding, _evaluate_values, semantic_definition,
+    )
+
+    semantics = semantic_definition()
+    p = semantics.parameters_si
+    # Values on both sides of the reach, opening, and lift boundaries. The
+    # scalar evaluator sees the actual float32 inputs, not separately rounded
+    # literals, so this also checks the threshold classifications.
+    z = p['rest_height']
+    cube = torch.tensor([[.4, .1, z], [.4, .1, z + p['lift_height'] - .002],
+                         [.4, .1, z + p['lift_height'] + .002], [.4, .1, z]], dtype=torch.float32)
+    eef = cube.clone()
+    eef[:, 0] += torch.tensor([p['reach_distance'] - .002, p['reach_distance'] + .002,
+                               .01, .01])
+    openings = torch.tensor([p['gripper_closed_opening'] - .002,
+                             p['gripper_closed_opening'] - .002,
+                             p['gripper_closed_opening'] + .002, .0])
+
+    class View:
+        def frame_pose(self, state, name):
+            assert name == 'panda-v1/ee'
+            return torch.cat((eef, torch.zeros((4, 4))), dim=1)
+        def joint_positions(self, state, names):
+            return torch.stack((openings / 2, openings / 2), dim=1)
+
+    binding = _DeviceTaskBinding(View(), (), 0, 0, (0.,) * 7, ((0., 1.), (0., 1.)), True)
+    definition = PickCubeTaskDefinition(semantics, binding)
+    state = SimpleNamespace(arrays={'body_position': cube[:, None, :]})
+    actual = definition.evaluate_device(state=state, action=None, elapsed_steps=None)
+    for row in range(4):
+        expected = _evaluate_values(tuple(map(float, cube[row])), tuple(map(float, eef[row])),
+                                    float(openings[row]), semantics)
+        assert actual['reward'][row].item() == pytest.approx(expected.reward, abs=2e-6)
+        assert bool(actual['terminated'][row]) == expected.success
+        for key in ('reached_cube', 'grasped_cube', 'lifted_cube', 'task_success'):
+            assert bool(actual['metrics'][key][row]) == expected.metrics[key]
+        for key, value in expected.reward_terms.items():
+            assert actual['reward_terms'][key][row].item() == pytest.approx(value, abs=2e-6)
+
+
+def test_panda_canonical_scalar_and_device_observation_declarations_match():
+    from task_env.robots.panda import PandaAgent
+
+    robot = PandaAgent()
+    env = SimpleNamespace(position_profile=False, dual_entity_position=False)
+    scalar = robot.reference_observation_spaces(env, include_robot_state=True)
+    device = robot.device_reference_observation_space().spaces
+    assert set(scalar) == set(device) == {'ee_pose', 'joint_position', 'hand_pose'}
+    for name in scalar:
+        assert scalar[name].shape == device[name].shape
+        assert scalar[name].dtype == device[name].dtype
+    # The old Position profile is an explicit compatibility declaration.
+    legacy = robot.reference_observation_spaces(
+        SimpleNamespace(position_profile=True, dual_entity_position=False))
+    assert legacy['boundary_identity_sha256'].shape == (32,)
+
+
+def test_isaac_source_damping_is_explicit_and_rejects_unknown_passives():
+    from task_env.robots.pendulum import PENDULUM_MJCF_XML
+    from task_env.runtime.providers.isaac.batch import _declared_single_joint_damping
+
+    source = SimpleNamespace(joints={'pendulum-v1/pendulum_hinge': 'pendulum_hinge'},
+                             scene_source=SimpleNamespace(xml=PENDULUM_MJCF_XML))
+    assert _declared_single_joint_damping(source) == .05
+    source.scene_source.xml = PENDULUM_MJCF_XML.replace('damping="0.05"', 'damping="0.05" frictionloss="1"')
+    with pytest.raises(ValueError, match='other passive'):
+        _declared_single_joint_damping(source)
+    source.scene_source.xml = PENDULUM_MJCF_XML.replace('<worldbody>', '<default/><worldbody>')
+    with pytest.raises(ValueError, match='default inheritance'):
+        _declared_single_joint_damping(source)
+
+
+def test_device_session_close_retries_worker_after_partial_cleanup():
+    from task_env.runtime.transport.device_batch_session import DevicePhysicalBatchSession
+
+    class Worker:
+        closed = False
+        calls = 0
+        def close(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError('worker close failed')
+            self.closed = True
+
+    class IPC:
+        releases = 0
+        closed = False
+        def release_imports(self):
+            self.releases += 1
+        def close(self):
+            self.closed = True
+
+    session = object.__new__(DevicePhysicalBatchSession)
+    session._closed = False
+    session._worker, session._ipc = Worker(), IPC()
+    session._last_state = session._device_limits = None
+    worker, ipc = session._worker, session._ipc
+    with pytest.raises(RuntimeError, match='worker close failed'):
+        session.close()
+    assert session._worker is worker and session._ipc is ipc and not ipc.closed
+    session.close()
+    assert worker.closed and ipc.closed and session._worker is None and session._ipc is None
+    session.close()
+
+
+def test_isaac_articulation_reads_inherited_passive_terms_and_joint_equality():
+    from types import SimpleNamespace
+    from task_env.runtime.providers.isaac.batch import _declared_articulation_dynamics
+
+    xml = b'''<mujoco><default><joint damping="1" armature=".1"/></default>
+      <worldbody><body><joint name="one" type="hinge"/><geom type="sphere" size=".1" mass="1"/>
+      <body pos="0 0 .2"><joint name="two" type="hinge"/>
+      <geom type="sphere" size=".1" mass="1"/></body></body></worldbody>
+      <equality><joint joint1="one" joint2="two" polycoef="0 1 0 0 0"/></equality></mujoco>'''
+    delivery = SimpleNamespace(source_entry_file='robot.xml')
+    loaded = SimpleNamespace(delivery=delivery, source_input_bytes={'robot.xml': xml})
+    source = SimpleNamespace(joints={'robot/one': 'one', 'robot/two': 'two'},
+                             scene_source=SimpleNamespace(loaded_delivery=loaded))
+    dynamics, equalities = _declared_articulation_dynamics(source)
+    assert dynamics == {'one': {'damping': 1., 'armature': .1},
+                        'two': {'damping': 1., 'armature': .1}}
+    assert equalities == [('one', 'two')]
+    loaded.source_input_bytes = {'robot.xml': xml.replace(b'armature=".1"', b'armature=".1" frictionloss=".2"')}
+    with pytest.raises(ValueError, match='friction loss'):
+        _declared_articulation_dynamics(source)
+
+
+def test_free_body_velocity_mapping_matches_mujoco_with_rotated_offset_com():
+    import mujoco
+    import numpy as np
+    import torch
+    from task_env.runtime.providers.isaac.articulation_layout import _rotate
+
+    model = mujoco.MjModel.from_xml_string('''<mujoco><worldbody><body><freejoint/>
+      <geom type="box" size=".1 .1 .1" pos=".2 0 0" mass="1"/>
+      </body></worldbody></mujoco>''')
+    data = mujoco.MjData(model)
+    data.qpos[3:7] = [2**-.5, 2**-.5, 0., 0.]
+    data.qvel[:] = [.3, -.1, .2, 0., 0., 1.]
+    mujoco.mj_forward(model, data)
+    reference = np.zeros(6)
+    mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_BODY, 1, reference, 0)
+    quat = torch.as_tensor(data.qpos[3:7], dtype=torch.float64).unsqueeze(0)
+    angular = _rotate(quat, torch.as_tensor(data.qvel[3:6], dtype=torch.float64).unsqueeze(0))
+    offset = _rotate(quat, torch.as_tensor(model.body_ipos[1], dtype=torch.float64).unsqueeze(0))
+    origin_velocity = torch.as_tensor(data.qvel[:3], dtype=torch.float64).unsqueeze(0)
+    com_velocity = origin_velocity + torch.linalg.cross(angular, offset)
+    np.testing.assert_allclose(angular.numpy()[0], reference[:3], atol=1e-12)
+    np.testing.assert_allclose(com_velocity.numpy()[0], reference[3:], atol=1e-12)
+
+
+def test_panda_device_action_component_names_are_transmission_independent():
+    from types import SimpleNamespace
+    from task_env.robots.panda import PandaAgent
+
+    arms = tuple(f'arm-effort-{index}' for index in range(1, 8))
+    def controller(key, finger):
+        return SimpleNamespace(profile=SimpleNamespace(action_key=key, action_names=arms + (finger,)))
+    assert PandaAgent.device_effort_action_components(controller(None, 'finger-pair-effort')) == arms + ('finger-pair-effort',)
+    assert PandaAgent.device_effort_action_components(controller('effort', 'finger-tendon-effort')) == arms + ('finger-pair-effort',)
+    with pytest.raises(ValueError, match='declared effort'):
+        PandaAgent.device_effort_action_components(controller('other', 'finger-pair-effort'))
+
+
+def test_isaac_collision_capacity_covers_overlapping_clones():
+    from task_env.runtime.providers.isaac.batch import _aggregate_pair_capacity
+
+    shapes = 16 * 28
+    capacity = _aggregate_pair_capacity(shapes, 1024)
+    assert capacity >= shapes * (shapes - 1)
+    assert capacity & (capacity - 1) == 0
+    assert _aggregate_pair_capacity(1, 4096) >= 4096
+    with pytest.raises(ValueError, match='integer range'):
+        _aggregate_pair_capacity(100_000, 1024)

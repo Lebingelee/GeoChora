@@ -115,6 +115,14 @@ class HomogeneousVectorTaskEnv:
         return str(self._task_spec.uid)
 
     @property
+    def robot(self):
+        """Return the source-bound Robot view owned by the active batch."""
+        robot = getattr(self._task_spec, 'robot', None)
+        if robot is None:
+            raise RuntimeError('this batch does not expose a Robot view')
+        return robot
+
+    @property
     def device_field_plan(self):
         """返回 task 声明的不可变公共 device capability plan（如果存在）。"""
 
@@ -261,7 +269,7 @@ class HomogeneousVectorTaskEnv:
         task_info = {} if transition.infos is None else transition.infos
         if not isinstance(task_info, Mapping):
             raise TypeError('device transition task infos must be a mapping')
-        reserved = {'env_id', 'episode_id', 'episode_step', 'boundary', 'final_observation',
+        reserved = {'env_id', 'episode_id', 'episode_step', 'boundary', 'native_world_time', 'final_observation',
                     '_final_observation', 'final_mask', 'final_info', '_final_info',
                     'reset_info', '_reset_info', 'final_episode_id', 'final_episode_step'}
         if reserved.intersection(task_info):
@@ -278,6 +286,13 @@ class HomogeneousVectorTaskEnv:
                       'final_info': final_info, '_final_info': valid,
                       'reset_info': {}, '_reset_info': valid,
                       'final_episode_id': old_episode.clone(), 'final_episode_step': old_step.clone()})
+        if transition.native_world_time is not None:
+            native_time = transition.native_world_time
+            if (not isinstance(native_time, torch.Tensor) or native_time.dtype != torch.float32
+                    or str(native_time.device) != transition.device or tuple(native_time.shape) != (self.num_envs,)):
+                raise ValueError('native world time must be device float32 with shape (B,)')
+            final_info['native_world_time'] = native_time.clone()
+            infos['native_world_time'] = native_time.clone()
         observation = transition.observation
         if selection.selected_count:
             reset = self._task_spec.reset_sampled_device(mask=done, selection=selection)
@@ -288,6 +303,9 @@ class HomogeneousVectorTaskEnv:
             infos['reset_info'] = {'env_id': env_id, 'episode_id': infos['episode_id'],
                                    'episode_step': infos['episode_step'],
                                    'boundary': infos['boundary'], 'task': dict(reset.infos)}
+            if 'native_world_time' in reset.infos:
+                infos['native_world_time'] = reset.infos['native_world_time'].clone()
+                infos['reset_info']['native_world_time'] = reset.infos['native_world_time'].clone()
         return observation, transition.reward, transition.terminated, transition.truncated, infos
 
     def _validate_action(self, actions: Any) -> None:

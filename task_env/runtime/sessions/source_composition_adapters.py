@@ -36,9 +36,14 @@ def validate_effort_source_route(*, provider, backend, deployment, source_delive
     """Admit the source and reset capabilities before native materialization."""
     from ...controllers.canonical.r3_effort import PANDA_SWITCHABLE_EFFORT_KINDS
 
-    if deployment != 'in_process':
+    device_effort = (provider in {'mujoco_warp', 'geophys', 'isaacsim'}
+                     and backend == 'cuda' and deployment == 'isolated_worker')
+    if device_effort:
+        if drive != 'disabled' or kind != 'direct' or reset_selection:
+            raise ValueError('device batch effort requires direct control with isolated native drives')
+    elif deployment != 'in_process':
         raise ValueError('physical profile currently requires explicit in_process execution')
-    if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
+    if not device_effort and (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
         raise ValueError('physical control requires an admitted CPU or Isaac CUDA route')
     if provider == 'isaacsim':
         if source_delivery_manifest is None:
@@ -244,6 +249,11 @@ _ROBOT_SOURCE_ADAPTERS = {
     ),
     ('mujoco', 'cpu'): SourceCompositionAdapterV1(
         'mujoco', 'cpu', 'robot-source-composition-v1',
+        'task_env.runtime.sessions.mujoco_composition',
+        'compose_robot_source',
+    ),
+    ('mujoco_warp', 'cuda'): SourceCompositionAdapterV1(
+        'mujoco_warp', 'cuda', 'robot-source-composition-v1',
         'task_env.runtime.sessions.mujoco_composition',
         'compose_robot_source',
     ),
