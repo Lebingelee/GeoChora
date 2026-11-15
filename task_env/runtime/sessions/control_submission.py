@@ -1099,7 +1099,10 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
     if consumed is None:
         consumed = set()
         session._control_submission_consumed = consumed
-    replay_key = (episode_id, boundary.boundary_id)
+    # The immutable typed boundary already contains its complete owner,
+    # episode, step and revision identity.  Retain it directly for replay
+    # prevention rather than hashing that identity again on every submission.
+    replay_key = (episode_id, boundary)
     if replay_key in consumed:
         raise ValueError('control interval already has a logical submission')
     consumed.add(replay_key)

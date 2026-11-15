@@ -2944,7 +2944,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         context = PhysicalCommandContextV1('physical-command-context-v1', plan.source_id,
             plan.source_closure_sha256, plan.artifact_sha256, view.boundary, view.sample_clock,
             0, profile.generation, self.artifact.timebase.control_dt, self.artifact.timebase.control_dt)
-        if getattr(self, '_last_physical_submission', None) == context.identity_hash:
+        if getattr(self, '_last_physical_submission', None) == context:
             raise ValueError('physical command interval was already submitted')
         assessment = assess(plan)
         if getattr(assessment, 'phase', None) not in {'native_build', 'runtime'}:
@@ -3004,7 +3004,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             nonlocal attempted, ack
             # The shared commit owner marks this boundary before calling the
             # provider so a partial failure cannot be replayed.
-            self._last_physical_submission = context.identity_hash
+            self._last_physical_submission = context
             attempted = True
             from ..runtime.sessions.control_submission import submit_control_command
             contributions = (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)

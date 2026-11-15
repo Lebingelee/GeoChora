@@ -186,6 +186,29 @@ def test_shared_commit_rejects_replay_stale_identity_generation_and_resource_con
     assert not hasattr(conflict, '_control_submission_consumed')
 
 
+def test_shared_commit_distinguishes_revised_boundaries_at_the_same_step(monkeypatch):
+    import task_env.controllers.canonical.contracts as contracts
+    monkeypatch.setattr(contracts, 'PositionControlTargetV1', _Command)
+    session = _Session()
+    writes = []
+
+    def lower(label):
+        writes.append(label)
+        return _ack()
+
+    _submit(session, lower=lambda: lower('initial'))
+
+    session.boundary = _Boundary(state_revision=1, boundary_id='boundary-next')
+    revised = _Command()
+    revised.source_boundary = session.boundary
+    _submit(session, revised, lower=lambda: lower('revised'))
+    # A separately constructed but equal boundary is still the same interval.
+    session.boundary = _Boundary(state_revision=1, boundary_id='boundary-next')
+    with pytest.raises(ValueError, match='already has a logical submission'):
+        _submit(session, revised, lower=lambda: writes.append('duplicate'))
+    assert writes == ['initial', 'revised']
+
+
 def test_shared_commit_validation_failure_never_writes_and_lowering_failure_cannot_replay(monkeypatch):
     import task_env.controllers.canonical.contracts as contracts
     monkeypatch.setattr(contracts, 'PositionControlTargetV1', _Command)
@@ -476,6 +499,7 @@ def test_split_subject_commit_rejects_forged_component_before_consuming_boundary
     from dataclasses import replace
     from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
     from task_env.controllers.canonical.kinematics import ARM
+    from task_env.controllers.canonical.position_outputs import PositionOutputBundleV1, PositionWriterOutputV1
     from task_env.controllers.canonical.split_panda_position import (
         ARM_WRITER, HAND_WRITER, SplitPositionBundleV1, split_identity,
     )
@@ -489,6 +513,10 @@ def test_split_subject_commit_rejects_forged_component_before_consuming_boundary
     target = CanonicalControlTarget('canonical-control-v0', 'b' * 64, split_identity(arm_id, hand_id),
                                     ARM, positions, positions, hand)
     bundle = SplitPositionBundleV1(arm_id, hand_id, (0.,) * 7, (0.,) * 7, hand, target.identity_hash)
+    outputs = PositionOutputBundleV1(target.identity_hash, target.controller_identity, (
+        PositionWriterOutputV1(ARM_WRITER, arm_id, bundle.arm_hash, 'arm-position-target', ('rad',)),
+        PositionWriterOutputV1(HAND_WRITER, hand_id, bundle.hand_hash, 'hand-position-target', ('m',)),
+    ))
     binding = SubjectBinding(); binding.identity_hash = 'f' * 64
     binding.plan = SimpleNamespace(_compiled=True, scene_identity_hash='e' * 64,
         artifact_identity_hash='b' * 64, source_closure_digest='a' * 64,
@@ -509,11 +537,13 @@ def test_split_subject_commit_rejects_forged_component_before_consuming_boundary
     kwargs = dict(command_sha256=target.identity_hash, controller_identities=(target.controller_identity,),
                   writer_ids=(ARM_WRITER, HAND_WRITER), resource_ids=('arm/motor', 'hand/motor'),
                   resource_owners=owners, subject_execution_mode='boundary-hold')
-    bad = fresh(replace(bundle, hand_identity='d' * 64)); writes=[]
+    bad_outputs = replace(outputs, outputs=(outputs.outputs[0],
+                          replace(outputs.outputs[1], controller_identity='d' * 64)))
+    bad = fresh(bad_outputs); writes=[]
     with pytest.raises(ValueError, match='source-bound plan'):
         _submit(bad, target, lower=lambda: writes.append(1), **kwargs)
     assert not writes and not getattr(bad, '_control_submission_consumed', set())
-    good = fresh(bundle); _submit(good, target, **kwargs)
+    good = fresh(outputs); _submit(good, target, **kwargs)
     first, second = good._last_scene_control_submission['interval']['contributions']
     assert (first['writer_id'], first['command_sha256']) == (ARM_WRITER, bundle.arm_hash)
     assert (second['writer_id'], second['command_sha256']) == (HAND_WRITER, bundle.hand_hash)

@@ -494,6 +494,90 @@ def _pickcube_camera_configuration():
                    'quaternion_wxyz': [math.sqrt(.5), 0., -math.sqrt(.5), 0.], 'near': .01, 'far': 3.}]}
 
 
+def _isaac_production_failure_cleanup(worker_python):
+    """Exercise construction and camera failures with a real Isaac worker."""
+    from unittest.mock import patch
+
+    import torch
+    from task_env import make_parallel_env
+    from task_env.runtime.transport import cuda_ipc, worker as worker_module
+
+    config = {'execution': _pickcube_execution('isaacsim', worker_python),
+              'controller': {'profile_id': 'panda-direct-effort-v1'},
+              'robot': {'native_drive': 'disabled'}, 'episode': {'seed': 31, 'horizon': 20},
+              'render': _pickcube_camera_configuration()}
+    workers = []
+    real_worker = worker_module.RuntimeWorker
+
+    class TrackedWorker(real_worker):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            workers.append((self, self._process))
+
+    construction_error = RuntimeError('diagnostic IPC construction failure')
+    with patch.object(worker_module, 'RuntimeWorker', TrackedWorker), \
+            patch.object(cuda_ipc, 'CudaIpcConnection', side_effect=construction_error):
+        try:
+            make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=3,
+                              backend='cuda', execution='device', worker_directory=os.getcwd())
+        except RuntimeError as error:
+            if error is not construction_error:
+                raise
+        else:
+            raise AssertionError('construction failure was not propagated')
+    if len(workers) != 1:
+        raise AssertionError('construction did not start exactly one real worker')
+    worker, process = workers[0]
+    if not worker.closed or process.poll() != 0:
+        raise AssertionError(f'construction worker did not close cleanly: {process.poll()}')
+    construction_pid = process.pid
+
+    env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=3,
+                            backend='cuda', execution='device', worker_directory=os.getcwd())
+    runtime = env._task_spec.runtime
+    process = runtime._worker._process
+    provider = env._task_spec.parallel_render_provider
+    capture_error = RuntimeError('diagnostic camera capture failure')
+    try:
+        env.reset(seed=31)
+        before = runtime._native_steps
+        action = {'effort': torch.zeros((3, 8), device='cuda')}
+        action['effort'][:, 0] = torch.tensor([5., 0., -5.], device='cuda')
+        with patch.object(provider, 'capture_cameras', side_effect=capture_error):
+            try:
+                env.step(action)
+            except RuntimeError as error:
+                if error is not capture_error:
+                    raise
+            else:
+                raise AssertionError('camera failure was not propagated')
+        after_failure = runtime._native_steps
+        if after_failure - before != runtime._control_substeps:
+            raise AssertionError('capture failure did not follow exactly one physical interval')
+        try:
+            env.step(action)
+        except RuntimeError as error:
+            if error.__cause__ is not capture_error:
+                raise
+        else:
+            raise AssertionError('faulted environment accepted another action')
+        if runtime._native_steps != after_failure:
+            raise AssertionError('faulted environment advanced physics')
+    finally:
+        env.close()
+    env.close()
+    if (process.poll() != 0 or runtime._worker is not None or runtime._ipc is not None
+            or runtime._source_lease is not None or not provider._closed):
+        raise AssertionError('capture failure left native or renderer ownership open')
+    return {'status': 'PASS', 'scope': 'Isaac PickCube production construction and capture faults',
+            'batch': 3, 'seed': 31, 'construction_worker_pid': construction_pid,
+            'construction_worker_exit': 0, 'capture_worker_pid': process.pid,
+            'capture_worker_exit': process.returncode, 'native_steps_before': before,
+            'native_steps_after_failure': after_failure, 'native_steps_after_retry': runtime._native_steps,
+            'ipc_released': True, 'source_lease_released': True, 'renderer_closed': True,
+            'repeat_close': True}
+
+
 def _pickcube_camera_probe(worker_python, *, provider='mujoco_warp'):
     """Capture real source-mounted base and hand cameras for three worlds."""
     import numpy as np
@@ -2713,6 +2797,9 @@ def _run(worker_python, output, case, *, batch_size=16):
         command = [worker_python, '-u', __file__, '--isaac-cross-filter-weak']
     elif case == 'isaac-filter-cleanup-error':
         command = [worker_python, '-u', __file__, '--isaac-filter-cleanup-error']
+    elif case == 'isaac-production-failure-cleanup':
+        command = [sys.executable, '-u', __file__, '--isaac-production-failure-cleanup',
+                   '--worker-python', worker_python]
     elif case.startswith('performance-pickcube-'):
         combinations = {
             f'performance-pickcube-{provider}-{mode}': (provider, mode)
@@ -2974,6 +3061,7 @@ def main():
     parser.add_argument('--isaac-cross-filter-probe', action='store_true')
     parser.add_argument('--isaac-cross-filter-weak', action='store_true')
     parser.add_argument('--isaac-filter-cleanup-error', action='store_true')
+    parser.add_argument('--isaac-production-failure-cleanup', action='store_true')
     parser.add_argument('--isaac-pendulum-formal', action='store_true')
     parser.add_argument('--isaac-pendulum-window', action='store_true')
     parser.add_argument('--isaac-pendulum-record', action='store_true')
@@ -3018,7 +3106,7 @@ def main():
             'performance-geophys-off', 'performance-geophys-window', 'performance-isaac-off', 'performance-isaac-window',
             'device-sha-pendulum', 'device-sha-pickcube', 'device-sha-pickcube-camera', 'mjwarp-world-clock',
             'isaac-pickcube-device-probe', 'isaac-pickcube-motion-probe', 'isaac-pickcube-record', 'isaac-pickcube-camera-probe',
-            'isaac-pickcube-camera-record', 'isaac-filter-probe', 'isaac-robot-filter-probe', 'isaac-cross-filter-probe', 'isaac-cross-filter-weak', 'isaac-filter-cleanup-error', 'pickcube-camera-record', 'pickcube-finger-contact',
+            'isaac-pickcube-camera-record', 'isaac-filter-probe', 'isaac-robot-filter-probe', 'isaac-cross-filter-probe', 'isaac-cross-filter-weak', 'isaac-filter-cleanup-error', 'isaac-production-failure-cleanup', 'pickcube-camera-record', 'pickcube-finger-contact',
             'isaac-pickcube-finger-contact', 'pickcube-example', 'pickcube-example-sensor', 'geophys-pickcube-example', 'permutation-mjwarp-pickcube',
             'permutation-isaac-pickcube', 'permutation-mjwarp-pendulum', 'permutation-geophys-pendulum', 'permutation-isaac-pendulum',
             'pickcube-window', 'pickcube-sensor-window', 'isaac-pickcube-window', 'isaac-pickcube-sensor-window', 'geophys-pickcube-window', 'geophys-pickcube-sensor-window',
@@ -3187,6 +3275,8 @@ def main():
     elif args.isaac_cross_filter_weak:
         from isaac_batch_probe import run_pickcube_collision_filter
         print(json.dumps(run_pickcube_collision_filter(participant='cross', cross_cube_height=.5661)), flush=True)
+    elif args.isaac_production_failure_cleanup:
+        print(json.dumps(_isaac_production_failure_cleanup(args.worker_python)), flush=True)
     elif args.isaac_filter_cleanup_error:
         from isaac_batch_probe import run_pickcube_collision_filter
         print(json.dumps(run_pickcube_collision_filter(participant='cross', inject_failure=True)), flush=True)
