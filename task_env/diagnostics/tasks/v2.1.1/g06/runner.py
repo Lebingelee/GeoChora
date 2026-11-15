@@ -2763,6 +2763,11 @@ def _run(worker_python, output, case, *, batch_size=16, action_file=None, iterat
     elif case == 'geophys-iteration-budget':
         test = Path(__file__).resolve().parent / 'test_geophys_iteration_budget.py'
         command = [sys.executable, '-m', 'pytest', '-q', '-s', str(test)]
+    elif case in ('geophys-mixed-contact-minimal', 'geophys-mixed-contact-regression'):
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/development/rigid/g06b_mixed_contact_minimal.py'
+        command = [sys.executable, '-u', str(test)]
+        if case == 'geophys-mixed-contact-regression':
+            command.append('--require-coupled-contact')
     elif case == 'geophys-renamed-layout':
         test = Path(__file__).resolve().parent / 'test_geophys_device_layout.py'
         command = [sys.executable, '-m', 'pytest', '-q', str(test), '-k', 'True-Euler-True']
@@ -3237,7 +3242,7 @@ def main():
             'isaac-sensor-record', 'example', 'scalar', 'scalar-camera-schema',
             'framebuffer-device', 'geophys-camera', 'geophys-aot-core', 'geophys-merge-regression',
             'geophys-merge-clip', 'geophys-merge-focused', 'geophys-merge-lighting', 'geophys-merge-mjcf-light',
-            'geophys-merge-rigid', 'geophys-merge-robot', 'geophys-batch-cuda', 'geophys-device-state', 'geophys-iteration-budget',
+            'geophys-merge-rigid', 'geophys-merge-robot', 'geophys-batch-cuda', 'geophys-device-state', 'geophys-iteration-budget', 'geophys-mixed-contact-minimal', 'geophys-mixed-contact-regression',
             'geophys-device-effort', 'geophys-device-reset', 'geophys-free-damping', 'geophys-static-contact-filter', 'geophys-torsion', 'geophys-torsion-direct', 'geophys-torsion-constraints', 'geophys-efc-regression', 'geophys-batch-plan-regression', 'geophys-actuator-isolation', 'geophys-device-layout', 'geophys-renamed-layout', 'geophys-contact-mode-comparison', 'geophys-mesh-contact', 'geophys-framebuffer-resize', 'transport-regression', 'core-semantics',
             'scalar-effort-regression', 'core-regression', 'performance-pendulum-off', 'performance-pendulum-window',
             'performance-geophys-off', 'performance-geophys-window', 'performance-isaac-off', 'performance-isaac-window',
