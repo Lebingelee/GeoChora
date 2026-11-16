@@ -1847,7 +1847,23 @@
           "blockers": [
             "Final affected provider/render/record evidence and matching performance index are not closed.",
             "Isaac B16 rendered cases require current resource assessment or an explicit maintainer scope decision."
-          ]
+          ],
+          "supplement": {
+            "attempt": 2,
+            "status": "PREPARED_NOT_DISPATCHED",
+            "package_path": "work-packages/20261116_g06b_attempt002_supplement.md",
+            "package_sha256": "199fb5d5956eb185e97126cab95f6825084a017febe19cacb434c3d3b94a088c",
+            "input_head": "b2ea985c63534cb8c0f49dfdcfddb0d8c9efd438",
+            "geophys_pin": "dd393187983798abac0e8d99c2426d64d4a8aa5e",
+            "expected_duration_minutes": [
+              45,
+              90
+            ],
+            "timebox_minutes": 90,
+            "additional_native_budget_minutes": 20,
+            "output_directory": "workspace/maintenance/v211_g06b_attempt002/supplement001",
+            "scope": "Evidence handoff and bounded missing B1 replay only; no implementation or cleanup mutation. Maintainer forwards to original executor; await final supplement before attempt003 planning."
+          }
         },
         {
           "id": "6c",
