@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7A_PARTIALLY_ACCEPTED_ATTEMPT002_READY",
+  "status": "G07_7A_ATTEMPT002_IN_PROGRESS",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -20,13 +20,8 @@
     "reason": "Maintainer approved revision003 7a dispatch: case-driven code review and minimal necessary integration; preserve original gates and one stage branch."
   },
   "active_packages": [],
-  "next_candidate": {
-    "substage": "7a",
-    "attempt": 2,
-    "package_id": "V211_G07_7A_ATTEMPT002",
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED"
-  },
-  "next_action": "Maintainer forwards attempt002 Goal prompt; executor verifies actual docs-successor HEAD and starts the 240-minute A3/A4 plus frozen developer-branch integration window. Increment 7a attempt_count to 2 only at actual start. 7b/7c remain PLANNED/0.",
+  "next_candidate": null,
+  "next_action": "Execute attempt002 within its frozen 240-minute window.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1967,8 +1962,8 @@
             "5c",
             "6c"
           ],
-          "status": "MAINTAINER_PARTIALLY_ACCEPTED_A3_A4_PENDING_ATTEMPT002",
-          "attempt_count": 1,
+          "status": "IN_PROGRESS",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -2060,9 +2055,31 @@
                 "historical_work_estimate_before_reset": 182098,
                 "old_unknown_consumption_retained": true
               }
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G07_7A_ATTEMPT002",
+              "status": "IN_PROGRESS",
+              "started_at": "2026-11-17T01:30:15.013786+08:00",
+              "hard_deadline": "2026-11-17T05:30:15.013786+08:00",
+              "input_head": "eeaa16192db950c29c93993ed9d15385f92ea03f",
+              "output_root": "workspace/maintenance/v211_g07a_attempt002",
+              "budget": {
+                "wall_minutes": 240,
+                "wall_includes_implementation_validation_waiting_questions_reporting_commits": true,
+                "native_wall_minutes": 120,
+                "explicit_substeps": 200000,
+                "per_run_wall_seconds": 900,
+                "cpu_tree_rss_bytes": 6442450944,
+                "image_cuda_tree_rss_bytes": 10737418240,
+                "gpu_card_mib": 6144,
+                "per_run_output_bytes": 1073741824,
+                "total_new_evidence_target_bytes": 4294967296,
+                "native_threads": 1
+              }
             }
           ],
-          "assigned_agent": null,
+          "assigned_agent": "Codex current thread 01a1e4b7-d90e-7fd0-9e04-bb5ef18eb964",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_attempt002_20261117/work-package.md",
           "package_sha256": "de8414bfd82bd7c2fe4a7c2f7c655d0f5ba25ff2eb74ee2a5a97bf781b31703b",
           "input_head": "7862433cafef91800e7b0321b774dcb64b22c777",
@@ -2114,7 +2131,7 @@
             "title": "v.2.1.1 G06ab subagent (terra)",
             "status": "USER_INTERRUPTED"
           },
-          "package_status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+          "package_status": "IN_PROGRESS",
           "historical_recovery": {
             "resume_package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/7a-resume-package.md",
             "resume_package_sha256": "a69f9791b3ab2d6c7e1c45bf7449171f1dda3f1c1d2567a6d3e2b0ba5b2e2f13",
@@ -2136,7 +2153,7 @@
           "planned_next_attempt": {
             "attempt": 2,
             "package_id": "V211_G07_7A_ATTEMPT002",
-            "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+            "status": "IN_PROGRESS",
             "assigned_agent": null,
             "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_attempt002_20261117/work-package.md",
             "package_sha256": "de8414bfd82bd7c2fe4a7c2f7c655d0f5ba25ff2eb74ee2a5a97bf781b31703b",
@@ -2684,7 +2701,7 @@
     "recorded_at": "2026-11-17T01:22:26.946647+08:00",
     "attempt": 2,
     "package_id": "V211_G07_7A_ATTEMPT002",
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "status": "IN_PROGRESS",
     "assigned_agent": null,
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_attempt002_20261117/work-package.md",
     "package_sha256": "de8414bfd82bd7c2fe4a7c2f7c655d0f5ba25ff2eb74ee2a5a97bf781b31703b",
@@ -2724,6 +2741,7 @@
       "merge_into": "codex/v211-stage7-integration",
       "future_tip_or_other_branches_not_automatically_included": true
     },
-    "attempt_count_increments_on_actual_start": true
+    "attempt_count_increments_on_actual_start": true,
+    "started_at": "2026-11-17T01:30:15.013786+08:00"
   }
 }
