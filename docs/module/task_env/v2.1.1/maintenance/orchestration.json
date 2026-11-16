@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-16",
-  "status": "G06B_PARTIAL_NOT_ACCEPTED",
+  "status": "G06B_TECHNICAL_PASS_PENDING_SOL_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -1804,7 +1804,7 @@
           "dependencies": [
             "6a"
           ],
-          "status": "PARTIAL_NOT_ACCEPTED",
+          "status": "TECHNICAL_PASS_PENDING_SOL_REVIEW",
           "attempt_count": 3,
           "attempts": [
             {
@@ -1824,19 +1824,19 @@
             },
             {
               "attempt": 3,
-              "status": "PARTIAL_NOT_ACCEPTED",
+              "status": "TECHNICAL_PASS_PENDING_SOL_REVIEW",
               "input_head": "120281a1ed787bcb351840bf9f5f6622ec89152c",
-              "output_head": null,
+              "output_head": "eae80abb437f47eb5dbac965962d7734391b9e06",
               "geophys_pin": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
               "report_ref": "../../../../../workspace/maintenance/v211_g06b_attempt003/report.md",
-              "output_head_note": "See local commit containing this execution record and the ignored report closeout."
+              "output_head_note": "Execution code and pins at completion; subsequent documentation-only record commit is the containing commit."
             }
           ],
           "assigned_agent": null,
           "package_path": "work-packages/20261116_g06b_attempt003_goal.md",
           "package_sha256": "1fd893c5340a1aadd1e1a061405243f5e353ecee37e437bd1505ce9a3dac0ac0",
           "input_head": "120281a1ed787bcb351840bf9f5f6622ec89152c",
-          "output_head": null,
+          "output_head": "eae80abb437f47eb5dbac965962d7734391b9e06",
           "expected_duration_minutes": [
             180,
             300
@@ -1845,7 +1845,7 @@
             "wall_minutes_max": 360,
             "supervised_native_minutes_max": 120
           },
-          "last_observation": "Attempt003 partial: GeoPhys B1 lifecycle/scalar smooth comparison, cleanup, renderer/record and seven affected performance samples done. Isaac Pendulum B16 window remains resource limited without an approved exception; no new final-renderer Isaac PickCube B3 native run. Direct initial pytest included unsupervised CUDA and is recorded in the execution report.",
+          "last_observation": "Maintainer-requested continuation of attempt003 completed Isaac Pendulum B16 window, Isaac PickCube B3 final renderer H5 and window checks, and all three B16 rendered modes. Eleven measured and seven historical performance entries; no resource exception used. Execution meets bounded conditions pending independent Sol review. Initial unsupervised CUDA pytest and supervised rerun remain documented.",
           "evidence_refs": [
             "reviews/20261116_g06b_attempt001_review.md",
             "../../../../../workspace/maintenance/v211_g06b_attempt001/report.md",
@@ -1854,16 +1854,17 @@
             "reviews/20261116_g06b_attempt002_supplement_review.md",
             "../../../../../workspace/maintenance/v211_g06b_attempt003/report.md"
           ],
-          "commits": [],
-          "review_decision": {
-            "status": "PARTIAL_NOT_ACCEPTED",
-            "date": "2026-11-16",
-            "review_ref": "reviews/20261116_g06b_attempt002_scope_reassessment.md",
-            "scope": "original G06b gate reassessment, source/diff review and offline evidence verification; implementation remains paused"
-          },
-          "blockers": [
-            "Isaac Pendulum B16 window affected measurement needs safe resources; historical and targeted evidence for Isaac PickCube B3 final renderer must be assessed without claiming a new native run."
+          "commits": [
+            "eae80abb437f47eb5dbac965962d7734391b9e06",
+            "GeoPhys:198d30ac64ce873a1467f55d2adfc471db18fbc5"
           ],
+          "review_decision": {
+            "status": "PENDING_SOL_REVIEW",
+            "date": null,
+            "review_ref": null,
+            "scope": "Independent review of attempt003 delivery is pending; prior attempt002 decision remains linked in its attempt record."
+          },
+          "blockers": [],
           "supplement": {
             "attempt": 2,
             "status": "REVIEWED_HANDOFF_COMPLETE",

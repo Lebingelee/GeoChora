@@ -16,7 +16,7 @@
 
 G06b attempt002 在 Core `f8c43d61`／GeoPhys `dd393187` 经[范围重估主审](reviews/20261116_g06b_attempt002_scope_reassessment.md)保持 **PARTIAL_NOT_ACCEPTED**。真实六格主链、GeoPhys显式discrete／32次预算的有界接触及reset、MJWarp B16双传感器与窗口800步已有证据。Sol此前将单次受控轨迹2mm界限扩大为通用门，现重估为不应沿用；scalar mixed缺陷和跨引擎接触力差异不自动阻断batch出口。窗口外观仍由维护者人工验收，AOT等既定暂缓事项保持。
 
-2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已执行，普通 attempt 计数为3；执行证据见[交接报告](../../../../../workspace/maintenance/v211_g06b_attempt003/report.md)。GeoPhys B1/B3 指定完整状态、Task及reset时钟对照、同源 Pendulum 无接触 scalar/B1 对照、诊断清理，以及 GeoPhys/MJWarp 七项受影响性能补测已完成。维护者已批准仅 Isaac PickCube 三个 B16 渲染组合的资源例外，B3 正确性不豁免；本次安全内存复核不足以启动 Isaac，Pendulum B16 窗口补测及最终 renderer 下 Isaac PickCube B3 的直接运行未闭合。G06b 仍为 **PARTIAL_NOT_ACCEPTED**，等待独立主审；没有宣布维护者接收。
+2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已执行，普通 attempt 计数为3；执行证据见[交接报告](../../../../../workspace/maintenance/v211_g06b_attempt003/report.md)。GeoPhys B1/B3 指定完整状态、Task及reset时钟对照、同源 Pendulum 无接触 scalar/B1 对照和诊断清理已完成。维护者调整内存后，同一 attempt 续跑完成 Isaac Pendulum B16 窗口、Isaac PickCube B3 最终 renderer 记录与关窗、以及此前三个受资源限制的 B16 渲染模式；18项性能中11项本轮实测、7项历史复用，没有使用资源例外。执行者报告满足有界接收条件，**等待独立主审；尚未获得维护者接收**。先前直接 pytest 中一次未监督 CUDA 执行及其后监督复验均在交接报告中保留。
 
 ## 启动输入与工作归属
 
