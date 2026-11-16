@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-16",
-  "status": "G06B_TECHNICAL_PASS_PENDING_SOL_REVIEW",
+  "status": "G06B_SOL_ACCEPTED_BOUNDED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -19,15 +19,8 @@
     "reason": "Existing G06 implementation branch; review and documentation closeout only."
   },
   "active_packages": [],
-  "next_candidate": {
-    "package_id": "V211_G06_6b_attempt003",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "package_path": "work-packages/20261116_g06b_attempt003_goal.md",
-    "input_head": "a2ebc2efcaf937cd4a0d9b85de1be8501060658c",
-    "prompt_sha256": "1fd893c5340a1aadd1e1a061405243f5e353ecee37e437bd1505ce9a3dac0ac0",
-    "manual_forward_only": true
-  },
-  "next_action": "Maintainer may forward attempt003 bounded canonical closure package. Isaac PickCube three B16 rendered combinations have an explicitly approved resource exception; B3 correctness remains required. No dispatch.",
+  "next_candidate": null,
+  "next_action": "G06b independently accepted within reviewed configuration; await maintainer confirmation and separate G06c planning. No execution dispatched.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1804,7 +1797,7 @@
           "dependencies": [
             "6a"
           ],
-          "status": "TECHNICAL_PASS_PENDING_SOL_REVIEW",
+          "status": "SOL_ACCEPTED_BOUNDED_6B",
           "attempt_count": 3,
           "attempts": [
             {
@@ -1824,19 +1817,20 @@
             },
             {
               "attempt": 3,
-              "status": "TECHNICAL_PASS_PENDING_SOL_REVIEW",
+              "status": "SOL_ACCEPTED_BOUNDED_6B",
               "input_head": "120281a1ed787bcb351840bf9f5f6622ec89152c",
-              "output_head": "eae80abb437f47eb5dbac965962d7734391b9e06",
+              "output_head": "8d0fd75615c707d1f461c0c0fae5e86ebd3da700",
               "geophys_pin": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
               "report_ref": "../../../../../workspace/maintenance/v211_g06b_attempt003/report.md",
-              "output_head_note": "Execution code and pins at completion; subsequent documentation-only record commit is the containing commit."
+              "output_head_note": "Execution code and pins at completion; subsequent documentation-only record commit is the containing commit.",
+              "review_ref": "reviews/20261116_g06b_attempt003_acceptance.md"
             }
           ],
           "assigned_agent": null,
           "package_path": "work-packages/20261116_g06b_attempt003_goal.md",
           "package_sha256": "1fd893c5340a1aadd1e1a061405243f5e353ecee37e437bd1505ce9a3dac0ac0",
           "input_head": "120281a1ed787bcb351840bf9f5f6622ec89152c",
-          "output_head": "eae80abb437f47eb5dbac965962d7734391b9e06",
+          "output_head": "8d0fd75615c707d1f461c0c0fae5e86ebd3da700",
           "expected_duration_minutes": [
             180,
             300
@@ -1845,24 +1839,25 @@
             "wall_minutes_max": 360,
             "supervised_native_minutes_max": 120
           },
-          "last_observation": "Maintainer-requested continuation of attempt003 completed Isaac Pendulum B16 window, Isaac PickCube B3 final renderer H5 and window checks, and all three B16 rendered modes. Eleven measured and seven historical performance entries; no resource exception used. Execution meets bounded conditions pending independent Sol review. Initial unsupervised CUDA pytest and supervised rerun remain documented.",
+          "last_observation": "Independent review closed B1 lifecycle, cleanup, final renderer/record and performance gates. Eleven measured and seven historical samples; no resource exceptions used. Unsupervised CUDA deviation retained with supervised rerun evidence.",
           "evidence_refs": [
             "reviews/20261116_g06b_attempt001_review.md",
             "../../../../../workspace/maintenance/v211_g06b_attempt001/report.md",
             "reviews/20261116_g06b_attempt002_scope_reassessment.md",
             "../../../../../workspace/maintenance/v211_g06b_attempt002/brief-for-sol.md",
             "reviews/20261116_g06b_attempt002_supplement_review.md",
-            "../../../../../workspace/maintenance/v211_g06b_attempt003/report.md"
+            "../../../../../workspace/maintenance/v211_g06b_attempt003/report.md",
+            "reviews/20261116_g06b_attempt003_acceptance.md"
           ],
           "commits": [
             "eae80abb437f47eb5dbac965962d7734391b9e06",
             "GeoPhys:198d30ac64ce873a1467f55d2adfc471db18fbc5"
           ],
           "review_decision": {
-            "status": "PENDING_SOL_REVIEW",
-            "date": null,
-            "review_ref": null,
-            "scope": "Independent review of attempt003 delivery is pending; prior attempt002 decision remains linked in its attempt record."
+            "status": "SOL_ACCEPTED_BOUNDED_6B",
+            "date": "2026-11-16",
+            "review_ref": "reviews/20261116_g06b_attempt003_acceptance.md",
+            "scope": "Canonical six cells within explicit configurations; independent offline review, no new native execution; maintainer acceptance not asserted."
           },
           "blockers": [],
           "supplement": {
@@ -1887,7 +1882,8 @@
             "date": "2026-11-16",
             "scope": "Isaac PickCube B16 sensor/window/sensor+window only when resources insufficient",
             "result_status": "RESOURCE_LIMIT",
-            "b3_correctness_waived": false
+            "b3_correctness_waived": false,
+            "used": false
           }
         },
         {
