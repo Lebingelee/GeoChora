@@ -74,3 +74,5 @@ E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务�
 2026-11-14阶段性记录：维护者批准三处停用工作树的[集中清单及具体例外](reviews/20261114_e11_e16_three_worktree_decision.md)，完成 camera、core-baseline 和旧版 clean checkout 的 Git 移除；保留主checkout与冻结archive。该时点尚待T35收敛和快照处置，后续状态见下；各次测量及恢复限制保留在[原执行结果](reviews/20261114_e11_e16_three_worktree_execution.md)。
 
 E15 项目停门时：[E15 最终清理与独立复核](reviews/20261114_e15_final_disposition_execution.md)已完成维护者批准清单；同序含 U5 和分类日志的范围下降 29,109,616,640 B，保留两项原位例外。U4/U5 不重开；维护者已接收 [项目接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)所列边界及交付 `86921c62`。旧 Git 管理元数据损失、历史精确净额 UNKNOWN、同次 completion 及不可见进程限制保留；其时 G06 尚未启动。
+
+2026-11-16后续公共控制修复：默认GeoPhys canonical worker、共享物理端口和MuJoCo受约束source dynamics／physical reset切换已完成定向实施与验证，见[worker记录](20261116_worker_physical_followup.md)。本项不启动G07，不改变原G06 abc接收范围。

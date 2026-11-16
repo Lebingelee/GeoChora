@@ -845,12 +845,50 @@
       ],
       "limitations": [
         "Scalar named multicamera not implemented and rejected",
-        "GeoPhys Pendulum direct-effort worker remains rejected; explicit in_process example tested",
+        "At ae545976 only; superseded by worker_physical_followup: GeoPhys Pendulum direct-effort worker remains rejected; explicit in_process example tested",
         "RayTracer compatibility not implemented",
         "Isaac human window not rerun this maintenance",
         "Worker camera RGB-only host-copy transport retains 16MiB limit"
       ],
-      "g07_started": false
+      "g07_started": false,
+      "control_boundary_superseded_by": "worker_physical_followup"
+    },
+    "worker_physical_followup": {
+      "date": "2026-11-16",
+      "status": "IMPLEMENTED_TESTED_BOUNDED",
+      "production_head": "e88fdaa7cf26d07411f92362bd2b55990b819fe3",
+      "report_ref": "../maintenance/20261116_worker_physical_followup.md",
+      "evidence_index_ref": "../maintenance/g06/worker-physical-evidence-index.json",
+      "native_verified": [
+        "GeoPhys CPU default worker, nonzero action, two resets",
+        "GeoPhys CPU matching in-process deployment",
+        "GeoPhys CPU two-wheel physical canonical; child Controller execution forbidden",
+        "GeoPhys physical worker RGB, reset, close",
+        "GeoPhys physical worker automatic human, reset, close",
+        "Existing GeoPhys R3 worker / human / second reset",
+        "Existing MuJoCo R3 worker / RGB / second reset",
+        "Selected physical R3 / GeoPhys CPU worker",
+        "Selected physical R3 / MuJoCo CPU worker",
+        "MuJoCo source model / parameterized reset / in_process",
+        "MuJoCo source model / parameterized reset / worker after Controller-owner restoration",
+        "MuJoCo source model / parameterized reset / worker / RGB",
+        "Real child native-port construction failure; one session close and worker reaped",
+        "Real native ACK lost at caller; fault/no-retry/worker reaped"
+      ],
+      "controller_owner": "Robot/Controller/common binding; physical Controller state and compute in parent; worker consumes resolved capabilities",
+      "model_capability": "MuJoCo CPU existing source dynamics scratch mass_matrix/bias; value-only proxy; no physics step",
+      "reset_verified": "joint -> parameterized r3-pose -> joint; generations 1/2/3; stale actions and remote model rejected",
+      "same_backend_deployment_max_abs_difference": 0.0,
+      "regression_passed": 309,
+      "qualification_claim": false,
+      "g07_started": false,
+      "limitations": [
+        "BodyWrench / physical sequence scalar IPC",
+        "GeoPhys/Isaac dynamics proxy",
+        "Arbitrary SDK object or ndarray RPC",
+        "Live Controller switching",
+        "Full G06 native matrix / full Solution success / Qualification"
+      ]
     }
   }
 }

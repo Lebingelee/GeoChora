@@ -20,7 +20,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Read G07 handoff together with scalar render maintenance report and use the post-maintenance HEAD; G07 remains planned and not executing.",
+  "next_action": "Read G07 handoff with scalar render and physical worker followups; use post-maintenance HEAD. G07 remains planned, attempt counts unchanged.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2405,11 +2405,11 @@
     "status": "PREPARED_NOT_EXECUTING",
     "date": "2026-11-16",
     "document": "20261116_g07_agent_handoff.md",
-    "sha256": "3a937d578e91ba782864029aff63319369671ec0225a40910a84ba79e3140d02",
+    "sha256": "e686150157d37024d8a626e190c0489a79e76c3ab115244a7c170a96b04ab161",
     "input_head": "0c4fb5ded6fc2bf0e79eae246269096545d4ec8d",
     "first_substage": "7a",
     "implementation_started": false,
-    "maintenance_successor_head": "ae54597695e65968928458a8c9d42a80858e7315"
+    "maintenance_successor_head": "e88fdaa7cf26d07411f92362bd2b55990b819fe3"
   },
   "scalar_render_followup": {
     "date": "2026-11-16",
@@ -2418,6 +2418,16 @@
     "report_ref": "20261116_scalar_render_followup.md",
     "evidence_index_ref": "g06/scalar-render-evidence-index.json",
     "authority": "Maintainer authorized repair and testing before G07; confirmed CPU uint8, automatic human, scalar sensor rejection, worker default unchanged.",
+    "g07_started": false,
+    "submodule_changes": false
+  },
+  "worker_physical_followup": {
+    "date": "2026-11-16",
+    "status": "IMPLEMENTED_TESTED_BOUNDED",
+    "production_head": "e88fdaa7cf26d07411f92362bd2b55990b819fe3",
+    "report_ref": "20261116_worker_physical_followup.md",
+    "evidence_index_ref": "g06/worker-physical-evidence-index.json",
+    "authority": "Maintainer authorized implementation; explicitly added bounded MuJoCo model proxy and physical worker reset; required capability rather than profile dispatch.",
     "g07_started": false,
     "submodule_changes": false
   }

@@ -20,7 +20,7 @@ v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会�
 - 观测合同独立：已有scalar `task_rgb`保留CPU float32 0～1，device具名相机保留CUDA uint8 `[B,H,W,3]`；不从UI导出重建训练观测，也不修改same-step终止帧。
 - scalar与batch共同接受顶层`render` mapping／YAML，并保留在resolved配置往返中。scalar native observer缺省backend：GeoPhys为`rasterizer`、MuJoCo为`mujoco_reference`、Isaac为`isaac_rtx`；device scalar／batch使用`rasterizer`。显式不支持的展示backend在native构建前拒绝，不静默替换。
 - scalar observer仍须显式`observer_camera=CameraSpec(...)`，世界挂载，HWC float32 RGB的**内部捕获**声明；其尺寸决定最终视口并写回resolved配置。`render.width/height`是共享视口字段，显式observer尺寸优先；相机姿态遵守原`+X forward/+Z up`安装坐标，不是光学坐标。
-- GeoPhys scalar保留worker默认；`GEOCHORA_GEOPHYS_PYTHON`未设置时使用当前解释器作为worker解释器。直接effort路线仍不准入scalar worker，Pendulum／双轮等相应caller须显式`execution.deployment='in_process'`并指定当前`interpreter`；本轮按维护者决定仅修正示例，不扩建该worker能力。PickCube原R3 worker的observer／RGB已实测。
+- GeoPhys scalar保留worker默认；`GEOCHORA_GEOPHYS_PYTHON`未设置时使用当前解释器作为worker解释器。后续[physical worker修复](#scalar-worker-control)已接通Pendulum／双轮canonical和所测PickCube physical R3；原R3 worker的observer／RGB也已回归。Pendulum RGB示例保留显式进程内配置，但它已不是绕过worker能力缺口的必要条件。
 - scalar的`render.camera_obs/cameras`尚未形成具名多相机观测，本轮按维护者决定明确拒绝；使用`task_rgb_camera/task_renderer`保留已有单任务相机能力。device的同名字段仍配置具名观测相机。
 - `execution.render_default`是执行合同中的renderer身份声明，现行selected路线仍使用`none`；它不替代上述独立observer／任务相机声明。
 - batch的`close_render()`同时停止自动窗口展示，物理可继续；有传感器时保留其renderer。原batch显式`render(mode=...)`兼容调用只导出/展示本次请求，不改变构造时的`render_mode`；普通新caller使用无参`render()`。scalar原固定mode限制保留。
@@ -43,6 +43,36 @@ try:
 finally:
     env.close()
 ```
+
+<a id="scalar-worker-control"></a>
+
+## Scalar worker 的控制与模型能力
+
+2026-11-16 [worker实施记录](../maintenance/20261116_worker_physical_followup.md)替代上一轮“direct effort一律拒绝worker”的当前限制。Controller选择、匹配及reset声明恢复由Robot／Controller和共同绑定流程负责；`worker.py`不识别Controller profile、任务名或Robot名。两种部署调用同一原生session装配函数，部署只改变原生资源所在进程；保留既有source／provider准入。
+
+- physical Controller的有效实例、可变状态、初始化和动作计算留在主进程。worker重建声明并核对source、编译资源、writer、Controller版本与generation；只建立真实物理端口，核验并写入已解析joint effort，推进一次。未把整个Controller或SDK对象传入IPC，也不先启动canonical物理世界再替换所选Controller。
+- 原有G05提交owner继续检查资源、时钟和重复提交；RemoteSession仅在worker实际绑定确认后发布本地执行声明供它消费。现有typed状态、reset、相机、ACK、fault和close继续复用，通信不确定时不自动重发。
+- 模型能力目前限**MuJoCo CPU既有source dynamics的mass_matrix／bias、纯查询、physics_steps=0**。worker持有原scratch model，主进程的受约束值代理只传joint state／boundary与数值结果；外来episode拒绝，重建后旧代理不可再调用旧worker。它不是任意SDK远程调用，不扩大GeoPhys／Isaac的source-model能力，也不证明任意Robot的模型实现。
+- MuJoCo CPU physical reset选择已测`joint → 参数化r3-pose → joint`；kind／参数／generation的声明编码和恢复属于Controller reset capability。旧动作失效，worker按最终选择建立端口，主进程基于实际初态初始化。未新增运行中热切换。
+- 新Controller若使用上述已有端口和模型能力，只需在Robot／Controller与共同绑定流程声明／匹配；不新增worker profile分派或provider构造分支。BodyWrench、physical sequence和任意扩展载荷尚未接入本次scalar物理IPC，不因方法名存在获得准入。
+- 这条scalar路径显式传输CPU值，并有逐次RPC成本；没有将它描述成CUDA训练热路径或零复制。G06 device batch合同不变。
+
+普通GeoPhys Pendulum已可直接使用默认worker：
+
+```python
+import numpy as np
+from task_env import make_env
+
+env = make_env('pendulum-v1', config={'execution': {'physics_provider': 'geophys'}})
+try:
+    observation, info = env.reset(seed=73)
+    observation, reward, terminated, truncated, info = env.step(
+        {'torque': np.array([.2], dtype=np.float32)})
+finally:
+    env.close()
+```
+
+模型／reset范例可用普通`make_env('pick-cube-p16-reference-v1', ...)`，选择MuJoCo CPU、`deployment='isolated_worker'`、实际worker解释器、`profile_id='panda-joint-effort-reference-v1'`及`parameters={'reset_selection': True}`。后续`env.reset(options={'controller': {'kind': 'r3-pose', 'parameters': {'kp': 90., 'kd': 12.}}}, seed=31)`经过同一绑定；每轮用`env.bind_physical_action(values)`绑定当前generation。具体短程证据、同后端部署对照、渲染与失败检查见实施记录；不宣称完整抓取或完整Solution通过。
 
 G06 的 PickCube canonical physical observation 不再包含 `state.boundary_identity_sha256`；单环境和设备批量的 `state` 均为 `ee_pose`、`joint_position`、`hand_pose`，后者只增加 B 轴。边界元数据在 `info` 中：设备路径按 `env_id`、`episode_id`、`episode_step`，以及 `boundary` 的 source、materialization、generation、revision、native step／time 组合识别；同一步的部分 reset 会改变 revision 和选中行 episode，不会倒退 native clock。显式设备记录使用这些字段和实际状态独立核对；不为 observation 计算或填充 SHA。旧 Position profile 的 digest 和对应历史 H5 读取器保留为兼容路径。已有 scalar physical 控制提交合同仍使用摘要，完全移除 scalar 默认 step 中的摘要计算尚未完成，不能将其写成设备热路径之外的全部路径均已迁移。
 
@@ -103,7 +133,7 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 ### 正式 PickCube 的 MJCF 物理配置
 
-以下配置进入相同的正式 factory／Runtime owner；本批已在 MuJoCo 3.8.1 CPU 各完成非零 action、reset 重建和 close。它们仍限原 source／模型范围，未取得完整任务成功或任意 provider 组合的接收。physical profile 当前要求 `execution.deployment="in_process"`；GeoPhys 的具体交集仍由 adapter 判断，未在本批新增实测。
+以下配置进入相同的正式 factory／Runtime owner；本批已在 MuJoCo 3.8.1 CPU 各完成非零 action、reset 重建和 close。它们仍限原 source／模型范围，未取得完整任务成功或任意 provider 组合的接收。该段原批次使用进程内执行；当前worker和模型交集以后续[scalar worker合同](#scalar-worker-control)为准，不能用原批次的部署限制覆盖新实测。GeoPhys的具体交集仍由adapter判断。
 
 | `controller.profile_id` | 输入与模型 | native drive 默认选择 |
 | --- | --- | --- |

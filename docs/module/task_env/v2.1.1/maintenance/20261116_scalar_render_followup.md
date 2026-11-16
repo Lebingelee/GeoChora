@@ -1,5 +1,7 @@
 # G06结案后 scalar／batch render 收尾
 
+后续更新：[physical worker修复](20261116_worker_physical_followup.md)已替代本文输入版本的direct-effort worker拒绝限制；本文保留原渲染修复时的实测与决策，不把后续能力反写成当时已通过。
+
 日期：2026-11-16。维护者要求在G07前修复公开scalar render断线，并授权代码与测试。输入Core `bff786e6ab21a1d5a5c7da0f28237c8db28f0a1f`，沿用`codex/v211-stage6-parallel`；GeoPhys `198d30ac64ce873a1467f55d2adfc471db18fbc5`、Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`均未改。本维护修复不启动G07，不重置已接收阶段的attempt，也不扩大为完整Solution、性能或求解器研究。
 
 ## 1. 事实、必要修复与owner

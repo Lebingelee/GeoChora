@@ -1,0 +1,1593 @@
+{
+  "schema_version": "worker-physical-maintenance-evidence-v1",
+  "date": "2026-11-16",
+  "status": "IMPLEMENTED_TESTED_BOUNDED",
+  "input_head": "704e3f094b0a69761cb272ded4b5d94be8ab378a",
+  "production_head": "e88fdaa7cf26d07411f92362bd2b55990b819fe3",
+  "report_ref": "../20261116_worker_physical_followup.md",
+  "raw_workspace": "workspace/maintenance/v211_worker_physical_followup_20261116",
+  "provenance": "Native runs exercised incremental dirty source over input_head. implementation.patch and production file hashes freeze delivered code; earlier passing inputs retain their own scope. Owner restoration was rechecked in final native model/reset/RGB runs and final regression.",
+  "raw_storage": "Ignored workspace retained in place; this tracked index stores exact receipts and hashes, not raw payloads.",
+  "authority": [
+    "Maintainer authorized repair/testing",
+    "Maintainer explicitly included bounded MuJoCo dynamics proxy and physical worker reset",
+    "Controller matching belongs to Robot/Controller/common binding; no worker/provider profile dispatch"
+  ],
+  "submodules": {
+    "GeoPhys": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
+    "mujoco_menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+  },
+  "protected_log": {
+    "path": "MUJOCO_LOG.TXT",
+    "sha256": "3b08b858f62dcbaa6521802455c76126f9876a3d6727c7586db90c94296ed6a8",
+    "modified": false
+  },
+  "cases": [
+    {
+      "id": "pendulum-default-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys CPU default worker, nonzero action, two resets",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical_probe.py",
+          "geophys",
+          "pendulum-v1",
+          "default"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 21.3072827688884,
+        "peak_tree_rss_bytes": 591777792,
+        "peak_card_gpu_mib": 1047
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/result.json"
+    },
+    {
+      "id": "pendulum-inprocess-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys CPU matching in-process deployment",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical_probe.py",
+          "geophys",
+          "pendulum-v1",
+          "in_process",
+          "none"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 19.16714160097763,
+        "peak_tree_rss_bytes": 798056448,
+        "peak_card_gpu_mib": 997
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001/result.json"
+    },
+    {
+      "id": "pendulum-worker-human-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys physical worker automatic human, reset, close",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical_probe.py",
+          "geophys",
+          "pendulum-v1",
+          "isolated_worker",
+          "human"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 23.4439732079627,
+        "peak_tree_rss_bytes": 654512128,
+        "peak_card_gpu_mib": 1001
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/result.json"
+    },
+    {
+      "id": "pendulum-worker-rgb-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys physical worker RGB, reset, close",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical_probe.py",
+          "geophys",
+          "pendulum-v1",
+          "isolated_worker",
+          "rgb_array",
+          "guard-child"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 23.427419110084884,
+        "peak_tree_rss_bytes": 651911168,
+        "peak_card_gpu_mib": 997
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/result.json"
+    },
+    {
+      "id": "physical-ackloss-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not passing evidence; cause and resolution in report",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/failure_probe.py",
+          "ackloss"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 9.57639013894368,
+        "peak_tree_rss_bytes": 587681792,
+        "peak_card_gpu_mib": 958
+      }
+    },
+    {
+      "id": "physical-ackloss-002",
+      "status": "PASS_EXPECTED_FAULT",
+      "scope": "Real native ACK lost at caller; fault/no-retry/worker reaped",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/failure_probe.py",
+          "ackloss"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 9.583591792965308,
+        "peak_tree_rss_bytes": 586915840,
+        "peak_card_gpu_mib": 1011
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/result.json"
+    },
+    {
+      "id": "physical-build-fault-001",
+      "status": "PASS_EXPECTED_FAULT",
+      "scope": "Real child native-port construction failure; one session close and worker reaped",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/failure_probe.py",
+          "build"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 9.596299247001298,
+        "peak_tree_rss_bytes": 588386304,
+        "peak_card_gpu_mib": 958
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/result.json"
+    },
+    {
+      "id": "physical-model-reject-001",
+      "status": "HISTORICAL_NEGATIVE_BEFORE_MODEL_EXTENSION",
+      "scope": "Superseded for MuJoCo by maintainer-authorized model proxy; not current rejection evidence",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/model_rejection_probe.py"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 2.128788915928453,
+        "peak_tree_rss_bytes": 97644544,
+        "peak_card_gpu_mib": 1009
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001/result.json"
+    },
+    {
+      "id": "physical-reset-inprocess-001",
+      "status": "EARLIER_PASS_INPUT_SCOPE",
+      "scope": "Preserved incremental evidence; final owner-sensitive model result uses reset-model-worker-002",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_selection_probe.py",
+          "in_process"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 3.1884470359655097,
+        "peak_tree_rss_bytes": 455086080,
+        "peak_card_gpu_mib": 1010
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001/result.json"
+    },
+    {
+      "id": "physical-reset-worker-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not passing evidence; cause and resolution in report",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_selection_probe.py"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 2.1441194540821016,
+        "peak_tree_rss_bytes": 97558528,
+        "peak_card_gpu_mib": 958
+      }
+    },
+    {
+      "id": "physical-reset-worker-002",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not passing evidence; cause and resolution in report",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_selection_probe.py"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-002",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 2.1257830110844225,
+        "peak_tree_rss_bytes": 97570816,
+        "peak_card_gpu_mib": 958
+      }
+    },
+    {
+      "id": "physical-reset-worker-003",
+      "status": "EARLIER_PASS_INPUT_SCOPE",
+      "scope": "Preserved incremental evidence; final owner-sensitive model result uses reset-model-worker-002",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_selection_probe.py"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 8.55089020403102,
+        "peak_tree_rss_bytes": 564170752,
+        "peak_card_gpu_mib": 1006
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/result.json"
+    },
+    {
+      "id": "r3-geophys-worker-human-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "Existing GeoPhys R3 worker / human / second reset",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/r3_probe.py",
+          "geophys",
+          "pickcube",
+          "human"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 37.15819783590268,
+        "peak_tree_rss_bytes": 1128099840,
+        "peak_card_gpu_mib": 1056
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/result.json"
+    },
+    {
+      "id": "r3-mujoco-worker-rgb-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "Existing MuJoCo R3 worker / RGB / second reset",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/r3_probe.py",
+          "mujoco",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 7.454503642977215,
+        "peak_tree_rss_bytes": 1014931456,
+        "peak_card_gpu_mib": 1170
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/result.json"
+    },
+    {
+      "id": "r3-physical-geophys-worker-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "Selected physical R3 / GeoPhys CPU worker",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/panda_physical_probe.py",
+          "geophys"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 39.41857073397841,
+        "peak_tree_rss_bytes": 928378880,
+        "peak_card_gpu_mib": 1052
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/result.json"
+    },
+    {
+      "id": "r3-physical-mujoco-worker-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "Selected physical R3 / MuJoCo CPU worker",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/panda_physical_probe.py",
+          "mujoco"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 6.391945323906839,
+        "peak_tree_rss_bytes": 563666944,
+        "peak_card_gpu_mib": 1005
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/result.json"
+    },
+    {
+      "id": "regression-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not passing evidence; cause and resolution in report",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_selected_runtime_builders.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_g03_3a_transport.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/regression-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 12.855621399939992,
+        "peak_tree_rss_bytes": 243949568,
+        "peak_card_gpu_mib": 992
+      }
+    },
+    {
+      "id": "regression-002",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not passing evidence; cause and resolution in report",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_selected_runtime_builders.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_g03_3a_transport.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_physical.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_physical_control_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_physical_reset_selection.py",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/regression-002",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 12.801715777022764,
+        "peak_tree_rss_bytes": 259153920,
+        "peak_card_gpu_mib": 1034
+      }
+    },
+    {
+      "id": "regression-003",
+      "status": "EARLIER_PASS_INPUT_SCOPE",
+      "scope": "Preserved incremental evidence; final owner-sensitive model result uses reset-model-worker-002",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-003/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_selected_runtime_builders.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_g03_3a_transport.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_physical.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_physical_control_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_physical_reset_selection.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_formal_configuration.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_resources.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/regression-003",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 17.060801719897427,
+        "peak_tree_rss_bytes": 293347328,
+        "peak_card_gpu_mib": 1058
+      }
+    },
+    {
+      "id": "regression-final-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not passing evidence; cause and resolution in report",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_selected_runtime_builders.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_g03_3a_transport.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_physical.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_physical_control_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_physical_reset_selection.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_formal_configuration.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_resources.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_dynamic_mass_effort.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_panda_effort_profiles.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_device_semantics.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_reconfiguration.py",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 54.54557626193855,
+        "peak_tree_rss_bytes": 1525444608,
+        "peak_card_gpu_mib": 1226
+      }
+    },
+    {
+      "id": "regression-final-002",
+      "status": "PASS_FINAL_REGRESSION",
+      "scope": "309 passed; includes one real MuJoCo Solution reset/step, not purely fake tests",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_selected_runtime_builders.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_g03_3a_transport.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_physical.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_physical_control_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_physical_reset_selection.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_formal_configuration.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_resources.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_dynamic_mass_effort.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_panda_effort_profiles.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_device_semantics.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_reconfiguration.py",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-002",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 53.361763869063,
+        "peak_tree_rss_bytes": 1546891264,
+        "peak_card_gpu_mib": 1191
+      }
+    },
+    {
+      "id": "reset-model-inprocess-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MuJoCo source model / parameterized reset / in_process",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_model_probe.py",
+          "in_process"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 4.25707396294456,
+        "peak_tree_rss_bytes": 640790528,
+        "peak_card_gpu_mib": 1021
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001/result.json"
+    },
+    {
+      "id": "reset-model-worker-001",
+      "status": "EARLIER_PASS_INPUT_SCOPE",
+      "scope": "Preserved incremental evidence; final owner-sensitive model result uses reset-model-worker-002",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_model_probe.py",
+          "isolated_worker"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 9.60500790097285,
+        "peak_tree_rss_bytes": 561065984,
+        "peak_card_gpu_mib": 1021
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/result.json"
+    },
+    {
+      "id": "reset-model-worker-002",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MuJoCo source model / parameterized reset / worker after Controller-owner restoration",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_model_probe.py",
+          "isolated_worker"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 9.605388432042673,
+        "peak_tree_rss_bytes": 559828992,
+        "peak_card_gpu_mib": 1008
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/result.json"
+    },
+    {
+      "id": "reset-model-worker-rgb-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MuJoCo source model / parameterized reset / worker / RGB",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset_model_probe.py",
+          "isolated_worker",
+          "rgb"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 10.620723473024555,
+        "peak_tree_rss_bytes": 1059704832,
+        "peak_card_gpu_mib": 1177
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/result.json"
+    },
+    {
+      "id": "twowheel-worker-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys CPU two-wheel physical canonical; child Controller execution forbidden",
+      "supervisor": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/physical_probe.py",
+          "geophys",
+          "two-wheel-balance-v1",
+          "isolated_worker",
+          "none",
+          "guard-child"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 25.588892500963993,
+        "peak_tree_rss_bytes": 704262144,
+        "peak_card_gpu_mib": 1023
+      },
+      "result_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/result.json"
+    }
+  ],
+  "deployment_comparison_ref": "workspace/maintenance/v211_worker_physical_followup_20261116/deployment-comparison.json",
+  "comparison_max_abs_difference": 0.0,
+  "final_regression_passed": 309,
+  "scope_exclusions": [
+    "BodyWrench / physical sequence scalar IPC",
+    "GeoPhys/Isaac dynamics proxy",
+    "Arbitrary SDK object or ndarray RPC",
+    "Live Controller switching",
+    "Full G06 native matrix / full Solution success / Qualification"
+  ],
+  "production_files": [
+    {
+      "path": "task_env/controllers/canonical/reset_selection.py",
+      "sha256": "d7d986cb4c4836728a704b8f12f32317b9d9527f0443cab87fb4a0b029397560"
+    },
+    {
+      "path": "task_env/diagnostics/tasks/test_v211_physical_reset_selection.py",
+      "sha256": "70a443727a8d006bce7bd8b6a4f058c78d94648d5b21c2ceb44e86770ad4372e"
+    },
+    {
+      "path": "task_env/diagnostics/tasks/test_v211_selected_runtime_builders.py",
+      "sha256": "ec6031c3cc490f728587699846abe7220503d5a14a0b7a35622fe3c7bf0a5686"
+    },
+    {
+      "path": "task_env/diagnostics/tasks/v2.1.1/test_panda_effort_profiles.py",
+      "sha256": "7fed0ded9abb355d8fb0de7d38aeb90132081e2dddbfb34610528a978498f210"
+    },
+    {
+      "path": "task_env/diagnostics/tasks/v2.1.1/test_physical_control_contract.py",
+      "sha256": "a6278f5663a268b2631a26364948deaf326ff72c0ccb2060d8081358c14dcc2e"
+    },
+    {
+      "path": "task_env/diagnostics/tasks/v2.1.1/test_worker_physical.py",
+      "sha256": "52c60681aefa2b35c62cfc191ca8267c57e0574c38ae4c512dbb0710d7523a90"
+    },
+    {
+      "path": "task_env/environment/reference_env.py",
+      "sha256": "c0d73e5ebba3c89d4e473936cf33d4f5a1f5cbcb3d5d6f680916de241513e5eb"
+    },
+    {
+      "path": "task_env/runtime/sessions/api.py",
+      "sha256": "0befcf1b7a97230aaec7cda9d0f98669d1a7aee2a85f35b43ada3c6a2eb2e6cd"
+    },
+    {
+      "path": "task_env/runtime/sessions/control_submission.py",
+      "sha256": "3999e9872dfc9e2c7fb15390c6a227044939fc8228555837882dde8d4c61db8f"
+    },
+    {
+      "path": "task_env/runtime/sessions/selected_materialization.py",
+      "sha256": "e73179ed16766420bbee531437d47ad330a6331c03a9df464df778f7cb26ef72"
+    },
+    {
+      "path": "task_env/runtime/sessions/source_composition_adapters.py",
+      "sha256": "1187c5f7492c89248e69118cd112d2b35304cec4129a8c2114b7d214cf242d18"
+    },
+    {
+      "path": "task_env/runtime/sessions/transport.py",
+      "sha256": "a02b706ba8184934fc45afc206c5961439e7ebf2c4a386ab905b2b30020b33ae"
+    },
+    {
+      "path": "task_env/runtime/sessions/worker.py",
+      "sha256": "6ca4b4ba82000add7aae3a113b90110216284b4d272d9b7326b73f35905c540b"
+    }
+  ],
+  "raw_files": [
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/deployment-comparison.json",
+      "bytes": 1403,
+      "sha256": "9aaebc6d3d4f02bfdc65d723587644bc314f078421c53135833e91246806a097"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/doc-validation.log",
+      "bytes": 18808,
+      "sha256": "e2eb39e18bcc7ece94048a0b32037939281fa0babe60dffee0ed04adb5bb82e7"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/failure_probe.py",
+      "bytes": 3212,
+      "sha256": "bb3df70b359a20bcc9e1644637899f139e58514c906887e6a035bf27aabd1440"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/final-verification.json",
+      "bytes": 336,
+      "sha256": "e7586063f04d16a4fa66878af7e1e1041119b2d60edc112776c39003d9cb406e"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/finalize_evidence.py",
+      "bytes": 8554,
+      "sha256": "8bad4d25e477eb0a3debf6e93e3c373bac66c13ea7c604b4f5bbe4ba83e54f41"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/implementation.patch",
+      "bytes": 44945,
+      "sha256": "f870c4e7f5687a2a8f3809124763905c9987c6efee2197099e24e10d4856594b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/input-head.txt",
+      "bytes": 41,
+      "sha256": "15357ed2c9e473b908b73c3d8933965b71dba96665b91bab57d17e949dd2d365"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/investigation.md",
+      "bytes": 1887,
+      "sha256": "66ec405d788552c97ebdfd142c18e5806ba3f1391b6a69db44f1a616eaf0509b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/model_rejection_probe.py",
+      "bytes": 1213,
+      "sha256": "3b4fd1b9a841dc1f0df6a6b31e1155e5691e94f2b2e89466a3cc8c6feeb6c844"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/panda_physical_probe.py",
+      "bytes": 1466,
+      "sha256": "23fb7ef9cca8aaf2f9cc9c2c7770ecad10d1b02a9bf6bdb955649932547aab30"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/result.json",
+      "bytes": 3154,
+      "sha256": "6098477d1ac86cfa8b2b8cb0537ca2710d6b898af55a05bb263bc115854dfafd"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/stdout.log",
+      "bytes": 38,
+      "sha256": "432aacac25eade04fe4994c17ea9dbaead9e1a3411ee65c3c3b5c3a6d7644c65"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/supervisor.json",
+      "bytes": 540,
+      "sha256": "299ce37d9bc2714f0d1c7cf3be9da6b34e9e489c1e917dc79bea2274bec00720"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/temp_outputs/logs/geophys-20261116T124746-997005-4ff6b3e62b3d.jsonl",
+      "bytes": 7603,
+      "sha256": "ba88ee0c94c20201cf806be3698cea30ba64ce2b0ac62c06a4154ffd80fde589"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-default-001/temp_outputs/logs/geophys-20261116T124757-997209-fc19f766f634.jsonl",
+      "bytes": 7603,
+      "sha256": "2ba70e1ff05931ecddef453507611257893b09808a3ccf8e640c1a5418980195"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001/result.json",
+      "bytes": 3144,
+      "sha256": "f94ddfa4c62cd224bb05b22a0a3b30a9e096d6906aa0dd207f43862858053fa6"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001/stdout.log",
+      "bytes": 1019,
+      "sha256": "445709ad46edf02abb42d28757a0135363c67704e6d6a17284e1690b76bd0d1b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001/supervisor.json",
+      "bytes": 557,
+      "sha256": "94319d081b4e041cbaefc53f7e1bd7e6d929754a40cac87debc99d1062934a1b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-inprocess-001/temp_outputs/logs/geophys-20261116T124930-998156-59fdc6fc5a95.jsonl",
+      "bytes": 13842,
+      "sha256": "9a344ee8e536899fb832cca44a66a59d046f287e31f56aa261186959375e3db5"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/result.json",
+      "bytes": 3157,
+      "sha256": "9aa5e76edd8470a9f05615e35f234d9c234bfa5712ba91b782ce5db4b55047a8"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/stdout.log",
+      "bytes": 47,
+      "sha256": "18d74e69cd20d300b9ccf3a70b66e9f1eb79ecfe611824e0e831a1b36a101c3a"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/supervisor.json",
+      "bytes": 566,
+      "sha256": "1ffc42c44c647c4c63cda13d0a5c116fc4e88a425a38ada57c74c84cfcd33cac"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/temp_outputs/logs/geophys-20261116T125040-999564-e1ac9376a49f.jsonl",
+      "bytes": 19886,
+      "sha256": "484aeb79f9673d68251759eaafdce46ebc6d923ac93995913060c5ce6e2dfe10"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-human-001/temp_outputs/logs/geophys-20261116T125051-999852-de791304c42c.jsonl",
+      "bytes": 19882,
+      "sha256": "4fec7701c57d205ba0e2d90f14bf249b295281756ad59249781ba0eec26acf18"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/frame-73.npy",
+      "bytes": 20864,
+      "sha256": "a7584085c9bee9b2390f94e78be8c2d7c1c4b291e4e9e764b801152708fa91d1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/frame-74.npy",
+      "bytes": 20864,
+      "sha256": "984f1ac4419be3467979f1bfd7fc4865224f8404178f69a008792ae805e2ed7b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/result.json",
+      "bytes": 3161,
+      "sha256": "548c50d4dc78a6eee4beff4330c1b799cd140d5485eb55f2f9ed155f34e8eaf6"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/stdout.log",
+      "bytes": 51,
+      "sha256": "a35e3a6def27dcf606c15c1ce17109971a951d467460ff0867fe0c2ed6caf376"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/supervisor.json",
+      "bytes": 588,
+      "sha256": "79c30e176862cee1d180d55762b9ca873b54630a6e84e003c55e6e03b38620d1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/temp_outputs/logs/geophys-20261116T125016-999061-24a7d60b4409.jsonl",
+      "bytes": 13443,
+      "sha256": "14dc0eda25b1fd150ae11c51659f7d608ac661158942385f4aa116f53cafba2b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/pendulum-worker-rgb-001/temp_outputs/logs/geophys-20261116T125027-999287-9c403ccc2761.jsonl",
+      "bytes": 13444,
+      "sha256": "31ce42db9c1871b5de00d442134c0d9018cb8a3641ebc6dff3f073fecff5ddd5"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-001/stderr.log",
+      "bytes": 1257,
+      "sha256": "764ff0232a592073562011cf831ddabccf896eb7d4549bcb1ab5a6c1dba14759"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-001/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-001/supervisor.json",
+      "bytes": 504,
+      "sha256": "3f35d35e34b6f67a32740a9116ef6133720d13a9fb8e5e74570247344aae8056"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-001/temp_outputs/logs/geophys-20261116T125517-1002996-110c5a0a4ef2.jsonl",
+      "bytes": 7601,
+      "sha256": "32f6049091d305ff57b4602088031a80c22b6072d092090b1ad0f1ea10885de4"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/lost-native-ack.json",
+      "bytes": 2021,
+      "sha256": "f1d6ebf20a2fea248e792d9c257e6c4e43bd417ec3e8ca23fc9e3590da74cf61"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/result.json",
+      "bytes": 200,
+      "sha256": "66c0264292abae9d8f9250ffc7497f97dc285d40246c839a47ba82d8cb461994"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/stdout.log",
+      "bytes": 22,
+      "sha256": "e750a41201979a9a327a7157ef3ae0dc95cea7bc93cefd9e98af9e44585c8853"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/supervisor.json",
+      "bytes": 506,
+      "sha256": "3ca319699cba42289cc3a07ee6b6cec6cbeeb3df6ff9a28d6c1f6c920a51a221"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-ackloss-002/temp_outputs/logs/geophys-20261116T125802-1005484-f5f44f991ef7.jsonl",
+      "bytes": 7602,
+      "sha256": "bb16dbb2274140c1c70d689002060bb1ccd085b634cab889159a8bac64567d89"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/child-cleanup.log",
+      "bytes": 14,
+      "sha256": "6c829f287d77abdbdae2acfd349f20aae362c0325384ee0100f145d7ade063c8"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/result.json",
+      "bytes": 240,
+      "sha256": "47cd1cf8a6665a16c087a3bb809f5b61aefffe9fc1062233307608cd9cf0abaa"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/stdout.log",
+      "bytes": 20,
+      "sha256": "e15aa5f9e9ff55eca1a9566200db2017d9395d59d226cb60922f84832f1d9070"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/supervisor.json",
+      "bytes": 507,
+      "sha256": "f5518186291542be24e6e7727153266a2b649fb7a13371b8b4d18546ee74a508"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-build-fault-001/temp_outputs/logs/geophys-20261116T125507-1002802-96a79c0d31a7.jsonl",
+      "bytes": 7602,
+      "sha256": "4f7ae854cc8d4e3624aeb9b419efd0321414a14c6d0d1dbf2061d022dd2c99a8"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001/result.json",
+      "bytes": 93823,
+      "sha256": "51c4684ddf3fb054fbfaf5f9193028db8f91efff9d8b8429164d0ed4f01ccb7e"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001/stdout.log",
+      "bytes": 453,
+      "sha256": "63409035e11bc9e5b3afe2ffce7ea9baef497c73361544b088ca0b25b2d0bf4f"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001/supervisor.json",
+      "bytes": 503,
+      "sha256": "c6bff822401bfc4eadcd277e8aaaba0a1819607bb5765918ccb91278a02cf266"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-model-reject-001/temp_outputs/logs/geophys-20261116T130049-1007740-97c650b14e54.jsonl",
+      "bytes": 3801,
+      "sha256": "fea2d5551fc0cc83c0db234a9ade812cb6e903fb8b5049cbc0eec88802a2aaa0"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001/result.json",
+      "bytes": 1257,
+      "sha256": "9c7600dc125ce23a2cfa2188a7ad1a370bda2855621a128a9eb051d600814e15"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001/stdout.log",
+      "bytes": 438,
+      "sha256": "42207faee0c1a509e1b5668d87b5b380833616f066924505650be0c6faebba09"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001/supervisor.json",
+      "bytes": 526,
+      "sha256": "03a931354a14320a1a1f7ac4c70f775902d701587ba577006b385598f69adf7e"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-inprocess-001/temp_outputs/logs/geophys-20261116T130045-1007636-f7fd80084842.jsonl",
+      "bytes": 3801,
+      "sha256": "4be1d1ac1c4a876885a803148f41486a850e26b819a5fcb4701891fd27e94a80"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-001/stderr.log",
+      "bytes": 1726,
+      "sha256": "7396df5eb9cdbe17ddaddf2361e5d8dc0493bfc0ee2fa88a51ad94456f7a23a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-001/stdout.log",
+      "bytes": 407,
+      "sha256": "6507ea9edab48f4161b1cb467a4834af75c3ee84f20f930dfac836a77b8fa357"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-001/supervisor.json",
+      "bytes": 503,
+      "sha256": "3781fb7b9e4ea9305c155128b9468ee27d87748672dc6bebc13f95d2677b57b6"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-001/temp_outputs/logs/geophys-20261116T125352-1002049-7463d3341664.jsonl",
+      "bytes": 3801,
+      "sha256": "771affc3b9d9bce7dd33886dc8294a6cbb9e315571b57059f8c00ad8250ea8f8"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-002/failure-receipt.json",
+      "bytes": 89594,
+      "sha256": "003ac50b374e9d9c9d5ccfaa0df86bb3aaefd915f01b0f3512fb6936b3d29bfe"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-002/stderr.log",
+      "bytes": 1726,
+      "sha256": "7396df5eb9cdbe17ddaddf2361e5d8dc0493bfc0ee2fa88a51ad94456f7a23a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-002/stdout.log",
+      "bytes": 407,
+      "sha256": "ca4594af64dcb23325deab187094015d753fb78209ab08e0fed73bc818a0cbdd"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-002/supervisor.json",
+      "bytes": 503,
+      "sha256": "924ae732371b2e107dca4a8938bdcc03d006cbf6be32f90a1f5a3666649b392e"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-002/temp_outputs/logs/geophys-20261116T125503-1002727-0b80f4078e95.jsonl",
+      "bytes": 3801,
+      "sha256": "e1f9fc2804f9681ee407daf0f939497a14620dc242f3794c8ad07dbfdfdecd12"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/result.json",
+      "bytes": 1257,
+      "sha256": "9c7600dc125ce23a2cfa2188a7ad1a370bda2855621a128a9eb051d600814e15"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/stdout.log",
+      "bytes": 438,
+      "sha256": "b86bc53c1ea5c3226266ee079394d921be425ce04f7ca621e5fef9cd7ce7da60"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/supervisor.json",
+      "bytes": 503,
+      "sha256": "705ca6bea2537673cc340f17e3d0fb811a9976dedd37cea08287bfd366b900b7"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/temp_outputs/logs/geophys-20261116T130247-1008819-4c28dc034244.jsonl",
+      "bytes": 3801,
+      "sha256": "537f68443a30a1e18007f62c0c771e9d0e38a27ec16fd2b56e4967e040800b49"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/temp_outputs/logs/geophys-20261116T130248-1008846-4375bb0841be.jsonl",
+      "bytes": 3801,
+      "sha256": "b57162bf222bb05ee1370ff9b9d1adc983f2536761dd509837870ac75a803831"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/temp_outputs/logs/geophys-20261116T130251-1008890-277f4b530717.jsonl",
+      "bytes": 3801,
+      "sha256": "9b3669aa76859d3a4fe1582815e9c284c83125ffe001c7f87d9c87149d7c7e46"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical-reset-worker-003/temp_outputs/logs/geophys-20261116T130253-1008941-f58f6c9aca57.jsonl",
+      "bytes": 3801,
+      "sha256": "7fb24fe2d15ebde3848a013bacd82859cc723beb2a3bb403ab68ccc64152e9d7"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/physical_probe.py",
+      "bytes": 3817,
+      "sha256": "12bc04478de290ee7cd414c865659e0256d08ebc46860ddf019e0938b7082e21"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/result.json",
+      "bytes": 5809,
+      "sha256": "f0c4d2178b2f89b713a8f101d58f6788332f17ce77b85657bfa0a448e87fd712"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/stdout.log",
+      "bytes": 1563,
+      "sha256": "0962179712f661f8956d647c3607a2b61df982e3082057264f83febccf0db5b9"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/supervisor.json",
+      "bytes": 538,
+      "sha256": "05b015d83acc0a42937e9462e425b50dc1b512580c0a5b263446ac24c349746e"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/temp_outputs/logs/geophys-20261116T125526-1003206-211aeff60951.jsonl",
+      "bytes": 11406,
+      "sha256": "e1040fe0e3be70f04bec362684f46f67d8b675de56440f7ea17d92c37648308e"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/temp_outputs/logs/geophys-20261116T125527-1003247-79ca82b25d53.jsonl",
+      "bytes": 28985,
+      "sha256": "6fdce3d74fd7e6dd60a9a821011e251453aa6e92cd5a6a9835e6e9f8ec63adf9"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-geophys-worker-human-001/temp_outputs/logs/geophys-20261116T125552-1003845-f720a346128c.jsonl",
+      "bytes": 17947,
+      "sha256": "9775f0d7d62c340fbe669665bbe5dc9ae5d562106329f52fda1489554e628ded"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/final-rgb.npy",
+      "bytes": 20864,
+      "sha256": "1efbecfc4478190fdbb961bb98753806b6fb506be1aa1459ffb71928eac9d480"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "9e019f4583d36271561ea799215e4ef84dc23c3862fa478481f048aed2387d61"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/result.json",
+      "bytes": 5598,
+      "sha256": "25495fca75aa2c2eda90ad4bece4cd8133c9b83a74173fbbfbef08708d057864"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/stdout.log",
+      "bytes": 1553,
+      "sha256": "f0b4f96b49e04eb8441de2620199b179ad1588990c4f6a9179d08623f26b48c6"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/supervisor.json",
+      "bytes": 538,
+      "sha256": "83ec0486e73fef1032686845cc377f1090e43eb8710ef7a1fc0bbff17ab51dee"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/temp_outputs/logs/geophys-20261116T125603-1004068-4b19864f8789.jsonl",
+      "bytes": 11406,
+      "sha256": "3a6c8a55e58bbf1ddf388cec6fa83133280d364849056190f8d0300cd8dad390"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/temp_outputs/logs/geophys-20261116T125605-1004096-77a8c76ab318.jsonl",
+      "bytes": 3801,
+      "sha256": "4dfcc0661b58304811787ea103c644f275ae54ef1155b9a0d9b625958e438831"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-mujoco-worker-rgb-001/temp_outputs/logs/geophys-20261116T125608-1004167-ebf9ba3d4229.jsonl",
+      "bytes": 3801,
+      "sha256": "8de295c79eeaf63006f290856608d5b6d55aa6592a8324d7b3494829b0d0ab7e"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/result.json",
+      "bytes": 1618,
+      "sha256": "da5989186b347062bcb0206abce7bc6b0e4a438207e045f863179896eda0ba54"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/stdout.log",
+      "bytes": 441,
+      "sha256": "a75da5f0023d8d5fc3e79c611802901698cebbb8a77d7d7d25413d57c63385c2"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/supervisor.json",
+      "bytes": 523,
+      "sha256": "ce7d519dc44d631ce7c9300873049ec7d26fb86543e870b9b61ab798d6daa881"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/temp_outputs/logs/geophys-20261116T125818-1005804-f2eb9ec3ffa6.jsonl",
+      "bytes": 3801,
+      "sha256": "7ccb084100012da0f77c27906ad5bf7b9e85d528104f38f80a271d040165f5ac"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/temp_outputs/logs/geophys-20261116T125819-1005832-399ad32027e0.jsonl",
+      "bytes": 9000,
+      "sha256": "79d71b4a640aa211516de20af68356f73c7384400e767dbe9a36b0177ad3241b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-geophys-worker-001/temp_outputs/logs/geophys-20261116T125838-1006150-1a4f1c60566b.jsonl",
+      "bytes": 9000,
+      "sha256": "7e2a734bb5f7e4e248c1ef69786efcab72d06d4fd00f48ad6aef36a06fc36d2d"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/result.json",
+      "bytes": 1617,
+      "sha256": "5b7ee9da7391c5dd2b2f6a5e165096fd3866c13683d285a4b3aea289bd61c11a"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/stdout.log",
+      "bytes": 440,
+      "sha256": "2c621c7bba71f6c0fa71fd8d55ecf4a57be084b64f8b1bd19f72f4bc8384f907"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/supervisor.json",
+      "bytes": 521,
+      "sha256": "e940787c2af2f55f4e368d24bc412b9f19b4e5ae09f843fd0c8ea861f8899f3a"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/temp_outputs/logs/geophys-20261116T125811-1005663-b4f3cadec6d2.jsonl",
+      "bytes": 3801,
+      "sha256": "777906e5f73bd7ee91091fdc011b7d665730633faf76be609f0d45b512366e61"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/temp_outputs/logs/geophys-20261116T125813-1005691-903673798493.jsonl",
+      "bytes": 3801,
+      "sha256": "b1b58046d8469e86631b5e11c5db3a09ab828b73e31a672199143b98acd7fd46"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3-physical-mujoco-worker-001/temp_outputs/logs/geophys-20261116T125815-1005735-8baf1c1c74b6.jsonl",
+      "bytes": 3801,
+      "sha256": "a1a623889ee5b498e8ed9605d7494e08eba3e2a0cbb6857ac611f7297b3d58e4"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/r3_probe.py",
+      "bytes": 3867,
+      "sha256": "df80bf85088b41c58c5ee486681d9d64c3ba23bbbd89b8fc403537a5ef11f886"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-001/stdout.log",
+      "bytes": 20303,
+      "sha256": "e833055dfe907d48a611e997e30ed13bb9ca1f9beba9f8d69f01fd60f520408b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-001/supervisor.json",
+      "bytes": 743,
+      "sha256": "38667e304a8f1032ade4ca330fe88ccd0eda49cff572b6fbf8fc318133169982"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-001/temp_outputs/logs/geophys-20261116T124554-995393-8844b7a82d83.jsonl",
+      "bytes": 15211,
+      "sha256": "4bab62bf743288a5725194d9689e1ff0c75ea31f42fb704a684a9dd7af0ba862"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-001/temp_outputs/logs/geophys-20261116T124602-995679-70206bc3dcc7.jsonl",
+      "bytes": 3801,
+      "sha256": "b65301b74956356e88efc77c74acceb804003de702289bfdcc9868ec8806529d"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-002/stdout.log",
+      "bytes": 10077,
+      "sha256": "d9afc1b9099fa3adaa1dbf8bde11cac3d95cf7fd0b9261ec787a2f722f2bc5d7"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-002/supervisor.json",
+      "bytes": 950,
+      "sha256": "769909ac4037054ccefa69d5c3c21d6124c47e0a889b10a7fcfa3ed2826bcdbb"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-002/temp_outputs/logs/geophys-20261116T125216-1000928-e80d646212da.jsonl",
+      "bytes": 15211,
+      "sha256": "8c45ca31e63ebd5ff01af822f925551ecfcf0df2f1bd20928ab81b5087b98669"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-002/temp_outputs/logs/geophys-20261116T125224-1001154-d4596d5bc01b.jsonl",
+      "bytes": 3801,
+      "sha256": "380a45f77cc5f63d5f43c9750bd5288b3aee37de294b559309ad56f83be0c3aa"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-003/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-003/stdout.log",
+      "bytes": 261,
+      "sha256": "d959d873b3e2a6b8e81ab22fd6cd90f9cf55efe98ee8cef7b50f43439952c043"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-003/supervisor.json",
+      "bytes": 1257,
+      "sha256": "b47ed2598e4397263346cb8637d1fda83ed815941f33584e66e4307955b463f2"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-003/temp_outputs/logs/geophys-20261116T125746-1005128-aab3eb112c91.jsonl",
+      "bytes": 41846,
+      "sha256": "766528a2391ec1acc8ffc3f6e5ab4b92947667992f22c0a93d48c9b0d3cf8c82"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-003/temp_outputs/logs/geophys-20261116T125753-1005321-32cff092b090.jsonl",
+      "bytes": 3801,
+      "sha256": "380fba633c07c6f05244b92fa2621e94e4b4ed2d5d8f6fe36900b144b15635a9"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-001/stdout.log",
+      "bytes": 2809,
+      "sha256": "c1c20602705849732ebd47d04bab58689546d811e0679063b42e601453dca6a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-001/supervisor.json",
+      "bytes": 1672,
+      "sha256": "1a637b754e1e7092e1499aab6e2fe28453a75ed9ca5d2d8b8026e023708c0906"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-001/temp_outputs/logs/geophys-20261116T130625-1011037-9c8df999c687.jsonl",
+      "bytes": 220814,
+      "sha256": "4b0f8339eba0a2401fb3ffb37af73ae4796958fbc3a471e5bf4a6effb963319b"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-001/temp_outputs/logs/geophys-20261116T130633-1011266-d7e6a245d7de.jsonl",
+      "bytes": 3801,
+      "sha256": "9629ce4ed35fee863713b547d1b13ef87622c281d9d251b75de099f11f7e1618"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-002/stdout.log",
+      "bytes": 421,
+      "sha256": "0e95d276ca3eab1805aa45ca2afe70c328425f74c93f088846718d8b9a350c3c"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-002/supervisor.json",
+      "bytes": 1670,
+      "sha256": "7ba9aac881f66d70269cee57840fb61dc27c653371082b3f4a6cc0f264679884"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-002/temp_outputs/logs/geophys-20261116T131132-1014646-8256ff283f7d.jsonl",
+      "bytes": 220814,
+      "sha256": "f57548a9120fe66c514f6fc7f2b937b0af1e39c0f86d376cce5c3e25256225e1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/regression-final-002/temp_outputs/logs/geophys-20261116T131140-1014940-f430d3578572.jsonl",
+      "bytes": 3801,
+      "sha256": "553dd60c40ce126c4dd8d2863e10ff5b0c877fc1e30c058767504c2db3bf5799"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001/result.json",
+      "bytes": 28173,
+      "sha256": "981f5803816af481d6e875f89383da4a676ebd9aec61c7c038e64d9ed286d6c1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001/stdout.log",
+      "bytes": 435,
+      "sha256": "9cfe83be25d3edf3d5ae888361f8a03ca457de83d97b86c55d6c9c81e29671dc"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001/supervisor.json",
+      "bytes": 517,
+      "sha256": "ea95d134fecb219645556f51708ac90686856fba8e15254f39a3ffb3ec9e1568"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-inprocess-001/temp_outputs/logs/geophys-20261116T130456-1010058-314a35bacfa4.jsonl",
+      "bytes": 3801,
+      "sha256": "d3ede38da77890f05d0758899a3ff9e084dc9ad4b91b9d49846da8b975595d24"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/result.json",
+      "bytes": 28178,
+      "sha256": "5d7b0afff1f9dbdc2b2c60ca019638a938d98a4b17c0d59c9f66c536dd2b57a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/stdout.log",
+      "bytes": 440,
+      "sha256": "bc5c0bb876f5feea00482feeec8cce2979266ed0e88bc41e1e1ef19935665015"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/supervisor.json",
+      "bytes": 519,
+      "sha256": "115f7f6b90fa1ccb20a6df55d480188b390ec0ac10e36a450c3448a7741cfb59"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/temp_outputs/logs/geophys-20261116T130501-1010169-51a3b793a689.jsonl",
+      "bytes": 3801,
+      "sha256": "8a8eb4a7ffe1e8e612e9221fe8d4cd1c2de8eb24f007e0784aee9c71e4a7c97a"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/temp_outputs/logs/geophys-20261116T130502-1010203-8d48cb350025.jsonl",
+      "bytes": 3801,
+      "sha256": "a7d6fe92b005b314a5f82ffd88e34ef00b45e89f1ce7dfc0288e8917cf04e3d9"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/temp_outputs/logs/geophys-20261116T130505-1010246-7ae3abae19e9.jsonl",
+      "bytes": 3801,
+      "sha256": "072d85422e20fe4343cddbfa6f9a0fe065292d6ed459a0f4e89a6148ec78c209"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-001/temp_outputs/logs/geophys-20261116T130507-1010301-f818ef71b387.jsonl",
+      "bytes": 3801,
+      "sha256": "57fafb9a3fd07b3f1ff9fe711e795611486947f5472707dfdf00fd7655fa85fc"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/result.json",
+      "bytes": 28178,
+      "sha256": "5d7b0afff1f9dbdc2b2c60ca019638a938d98a4b17c0d59c9f66c536dd2b57a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/stdout.log",
+      "bytes": 440,
+      "sha256": "2cfa9b7f98205766d5311fbc22318bc289196d93a4dfb4c70a3323bcbd183799"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/supervisor.json",
+      "bytes": 520,
+      "sha256": "e459eddcafc813a1b4f60d154157e4327dc68a86522e5ed11c79a17520e7bb24"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/temp_outputs/logs/geophys-20261116T131046-1014171-028d0fb2088f.jsonl",
+      "bytes": 3801,
+      "sha256": "2fecc69a1d00b4050dc48380f3d8c6baa2b22878e2cad89fce46150469ee0e7c"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/temp_outputs/logs/geophys-20261116T131048-1014201-072db55e11a1.jsonl",
+      "bytes": 3801,
+      "sha256": "d1887781de3fa4720a494bcb86879679311b1e22cf16e8ff8baf785d87269c31"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/temp_outputs/logs/geophys-20261116T131050-1014249-9b9097c835a4.jsonl",
+      "bytes": 3801,
+      "sha256": "a3b889b47147d18659e82cd8807505e22d3d4835c8f51f3309ecb2dd4b3b48ad"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-002/temp_outputs/logs/geophys-20261116T131053-1014310-189fa8fae55a.jsonl",
+      "bytes": 3801,
+      "sha256": "02678d988f5d7fd1fa00db101494b0ec861a0c85240d97b436fc7e14d6b5b151"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/frame-1.npy",
+      "bytes": 20864,
+      "sha256": "9e019f4583d36271561ea799215e4ef84dc23c3862fa478481f048aed2387d61"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/frame-2.npy",
+      "bytes": 20864,
+      "sha256": "d4621b0e09cf03f788bfa57675ec6b3386a4e94904f310c9a3ba1be0788d0b89"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/frame-3.npy",
+      "bytes": 20864,
+      "sha256": "9e019f4583d36271561ea799215e4ef84dc23c3862fa478481f048aed2387d61"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/result.json",
+      "bytes": 28178,
+      "sha256": "5d7b0afff1f9dbdc2b2c60ca019638a938d98a4b17c0d59c9f66c536dd2b57a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/stdout.log",
+      "bytes": 440,
+      "sha256": "87f713d0ad770db6bf3f460dfb98d4fe99bd2324183d2425379a4206ac9e0b50"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/supervisor.json",
+      "bytes": 537,
+      "sha256": "635b053b69554bd50874ed568105379e9d29219dbaaa74e7a2bb49a2856f8ec5"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/temp_outputs/logs/geophys-20261116T131332-1016385-8986189497d6.jsonl",
+      "bytes": 3801,
+      "sha256": "a7ce40f0dacd3323ec8793b9afdecbdf6c112f3bb1a00a9601201fad37ca3b69"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/temp_outputs/logs/geophys-20261116T131334-1016413-29ac9c6ecc15.jsonl",
+      "bytes": 3801,
+      "sha256": "4c172aa2de5d4319f39f3d98d38b495701b3273fe014afc28909b8c003a6918a"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/temp_outputs/logs/geophys-20261116T131337-1016481-e35f2d06b4a6.jsonl",
+      "bytes": 3801,
+      "sha256": "8760e43ade36a34403c74b6df6a7d3ad8b501ace85ce6375475b501245abd3aa"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset-model-worker-rgb-001/temp_outputs/logs/geophys-20261116T131340-1016546-bf6fa0f07461.jsonl",
+      "bytes": 3801,
+      "sha256": "6af2c7b0af99608eb779fcb050a1b397bbb677c0ec3e5802c6ab73aaa0698035"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset_model_probe.py",
+      "bytes": 4874,
+      "sha256": "fa7712b428a4cccba02306d288312a8edd8fd577f510d4e5e98aebbfbab2fde1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/reset_selection_probe.py",
+      "bytes": 1724,
+      "sha256": "dc1041a582b7e1f430a8eafc4d2572c5b82b56fc1730a59d74ed8430017a4754"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/supervise.py",
+      "bytes": 3108,
+      "sha256": "d0fd1d79e4816351b1ba2fcd09a600e30f72ed3dbf16b2ce09869de4cd295c95"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/result.json",
+      "bytes": 4302,
+      "sha256": "3d7b941fb31da7116015d0a027b92434fefc7da2a6d28fcd8bc0518c959cb86d"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/stdout.log",
+      "bytes": 55,
+      "sha256": "ef9b31dc01ce93b7b074c4ba8fe575f04d9c1c7a48053314580ef170aa464499"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/supervisor.json",
+      "bytes": 589,
+      "sha256": "7bd865b6dd742f2be3c1a60923675c6fbc85f60c127a9d398d61aeba91b506a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/temp_outputs/logs/geophys-20261116T124950-998552-b230a2ae85ef.jsonl",
+      "bytes": 8584,
+      "sha256": "e296e8838007fb613fddf11c555a3cf2e0bfb71e57b3df607fcf21b61bb9f1da"
+    },
+    {
+      "path": "workspace/maintenance/v211_worker_physical_followup_20261116/twowheel-worker-001/temp_outputs/logs/geophys-20261116T125004-998825-a269f464bc4d.jsonl",
+      "bytes": 7641,
+      "sha256": "b23bc0d3bd082a0e563de53a581f388988a7c0dda65505531e570449cec632cc"
+    }
+  ],
+  "final_checks": {
+    "production_head": "e88fdaa7cf26d07411f92362bd2b55990b819fe3",
+    "protected_sha256": "3b08b858f62dcbaa6521802455c76126f9876a3d6727c7586db90c94296ed6a8",
+    "submodule_tracked_changes": false,
+    "owned_runtime_workers_remaining": [],
+    "doc_errors": [
+      "protected local input changed: MUJOCO_LOG.TXT"
+    ],
+    "diff_check": "PASS"
+  }
+}
