@@ -48,7 +48,7 @@ runtime.
 | `harness_spec_schema.py` | Strict candidate JSON/YAML, findings and reports |
 | `catalog_query.py` | Registry/provider catalog and source identity |
 | `asset_check.py` | Asset UIDs, supplied bytes and capability vocabulary |
-| `harness_compiler.py` | Strict `pick-lift-v0` policy plus shared PandaBox Artifact/source compiler; the internal candidate binding stays Harness-owned |
+| `harness_compiler.py` | Strict `pick-lift-v0` policy; MJCF candidates are built by Core's PickCube construction entry (selected-config recipe overlay, `make_reference_binding`, Robot source composer) with the `r3_continuous_v1` controller |
 | `semantic_check.py` | Declared lift goal and positive/negative endpoint examples |
 | `feasibility_probe.py` | Separate solved/invalid/expert_failed/unknown outcomes |
 | `completion_facts.py` | Versioned raw completion facts and independent row/report validation |
@@ -132,8 +132,11 @@ path does not create a `CandidateSpec`, run the candidate/Oracle/Judge flow, or
 weaken the separate `pick-lift-v0` 20-seed all-solved requirement. Runtime
 validity and Task/Expert outcome are reported separately.
 
-The strict candidate compiler and public example both use the shared Core
-PandaBox declaration/compiler for Artifact and source construction. Candidate
+The strict candidate compiler applies the candidate recipe as an overlay on
+`PickCubeReferenceEnv`'s selected task configuration and builds through the same
+Core construction entry as `pick-cube-v1`; candidate identity is carried by the
+spec hash. The external asset contributes its collision and mass contract; its
+visual shell is not written into the scene. Candidate
 semantic checks, reset policy and strict feasibility gates remain in the
 Harness; the built-in runtime example resolves its selected config once and
 returns facts from the same `make_env` instance the worker will run.
