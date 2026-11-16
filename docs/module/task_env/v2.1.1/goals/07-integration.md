@@ -10,7 +10,7 @@
 - 沿原/装配Panda的PickCube、Nut和受影响caller核对实际构造、控制、状态、模型、记录与关闭。已有owner组合满足的直接复用；只修复由真实调用或运行证实、原门必需的缺口。owner定位表不要求每项产生diff。
 - 将“案例、实际问题/消费者、原owner、复用或最小修改、总账条目、验证”记在同一份包内结案表。执行中发现有产品意义的边界结论时，及时更新本节及该表；不另建审计schema、validator、能力注册或证据平台。
 - Task保留任务语义与薄binding；Robot/source拥有recipe、TCP/具名通道/传动；Controller拥有选择、状态与计算；session/provider/render/Recorder保留各自唯一owner。复用现有source composition、shared worker装配/物理端口/模型代理，不新增第二Env/Runtime/factory/调度器、通用RPC、profile分派或仅为缩短文件的Manager/mixin/helper层。
-- 装配本体模型/补偿仅作原用例中这一套recipe与代表路线所需适配，不扩大为任意Robot/装配树/provider动力学。原R3已正确包含的贡献用证据证明，不再重复施加。原Solution算法/策略与任务成功、严格完成语义保持。
+- 装配本体模型/补偿仅作原用例中这一套recipe与代表路线所需适配，不扩大为任意Robot/装配树/provider动力学。原R3已正确包含的贡献用证据证明，不再重复施加。任务成功与严格完成语义保持；维护者 2026-11-16 针对 Nut 夹爪触桌明确授权调整 Solution 的释放高度，须保留同运行完成、读回和 close 的验证，不将该例外扩大为其他策略修改。
 - 装配替换的R3模型须来自同一source组合及实际装配后的具名本体，并与session核对来源；位置驱动重力补偿须核对实际施加与ACK。任务原有驱动参数须随具名执行器保留，不能仅开放profile就声称装配行为等同。
 - 既有装配`r1_split`的MuJoCo CPU进程内控制可用；隔离worker首个提交会因远端缺少同一存活Controller的分路输出而拒绝。保留该边界，不以本包装配接线声称多Position writer的worker支持。
 - 原／装配Robot的正式Task必须沿共同构建、source和Controller绑定；默认Controller只在已声明的canonical通道、writer、单位和传动下绑定，Task显式选择不得被替换。普通reset验证选择、参数、绑定和状态重建；显式切换仍遵循已有能力范围，不由此扩充装配切换矩阵。

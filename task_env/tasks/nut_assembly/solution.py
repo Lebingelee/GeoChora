@@ -418,6 +418,7 @@ class NutAssemblySolutionConfig:
     opening_range_m: float = 0.08
     table_top_z_m: float = 0.462
     nut_contact_margin_m: float = 0.001
+    release_table_clearance_m: float = 0.001
     approach_height_m: float = 0.12
     translation_speed_m_s: float = 0.06
     translation_acceleration_m_s2: float = 0.45
@@ -453,6 +454,8 @@ class NutAssemblySolutionConfig:
             raise ValueError("selected solution configuration must be finite")
         if not 0.0 <= self.grasp_opening_m < self.opening_range_m:
             raise ValueError("selected grasp opening is outside range")
+        if not 0.0 < self.release_table_clearance_m < 2.0 * NUT_HALF_HEIGHT:
+            raise ValueError("release clearance must remain within the seated-nut height")
         normalize_quat_wxyz(self.grasp_quaternion_wxyz)
 
 
@@ -612,6 +615,7 @@ class NutAssemblyOutcomeSolutionV1:
             "strict_height_tolerance_m": cls.stable_height_tolerance_m,
             "capture_translation_slip_m": config.capture_translation_slip_m,
             "capture_rotation_slip_rad": config.capture_rotation_slip_rad,
+            "release_table_clearance_m": config.release_table_clearance_m,
             "close_authorization_policy_identity": policy_identity,
             "force_target_and_cap_N": 10.0, "action_budget_s": config.action_budget_s,
             "ordered_stages": list(cls.STAGES),
@@ -878,7 +882,7 @@ class NutAssemblyOutcomeSolutionV1:
                 PEG_HALF_HEIGHT + NUT_HALF_HEIGHT + config.nut_contact_margin_m])
                 pose[:3] = target - nut_to_ee
             elif stage == "lower_nut_to_table":
-                target = np.asarray([peg[0], peg[1], config.table_top_z_m + NUT_HALF_HEIGHT + config.nut_contact_margin_m])
+                target = np.asarray([peg[0], peg[1], config.table_top_z_m + NUT_HALF_HEIGHT + config.release_table_clearance_m])
                 pose[:3] = target - nut_to_ee
             elif stage == "open_gripper":
                 pose = ee.copy(); gripper = 1.0

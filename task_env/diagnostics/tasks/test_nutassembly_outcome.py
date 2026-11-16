@@ -103,6 +103,40 @@ class Ideal:
         raise AssertionError('unbounded fixture')
 
 
+def test_release_target_preserves_table_clearance_and_requires_insertion():
+    f = Ideal()
+    f.until('lower_nut_to_table')
+    assert not f.solution.failed
+    f.until('open_gripper')
+    assert not f.solution.failed
+    _, info = f.boundary(f.solution._emitted)
+    assert info['task_metrics']['inserted_on_peg']
+    expected = (f.solution.config.table_top_z_m + .01
+                + f.solution.config.release_table_clearance_m)
+    assert f.nut[2] == pytest.approx(expected, abs=1e-6)
+    assert not info['is_success']
+
+
+@pytest.mark.parametrize('clearance', [0.0, -.001, .02])
+def test_release_clearance_must_fit_seated_height(clearance):
+    with pytest.raises(ValueError, match='release clearance'):
+        NutAssemblySolutionConfig(release_table_clearance_m=clearance)
+
+
+def test_reference_binding_selects_and_preserves_provider_release_clearance():
+    bindings = {provider: build_reference(provider=provider)
+                for provider in ('mujoco', 'geophys')}
+    for provider, expected in (('mujoco', .001), ('geophys', .008)):
+        binding = bindings[provider]
+        solution = binding['solution']
+        assert solution.config.release_table_clearance_m == pytest.approx(expected)
+        assert binding['resolved_configuration']['solution_config']['release_table_clearance_m'] == expected
+        rebuilt = binding['solution_factory']()
+        assert rebuilt.config == solution.config
+        assert rebuilt.identity == solution.identity == binding['solution_identity']
+    assert bindings['mujoco']['solution_identity'] != bindings['geophys']['solution_identity']
+
+
 def test_tracking_rmse_gate_blocks_close_when_height_error_remains_above_limit():
     f=Ideal(residual=-.00022); f.until('close_gripper'); s=f.solution
     assert s.failed and s.failure_reason=='preclose_motion_stability_timeout'

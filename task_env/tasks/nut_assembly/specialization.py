@@ -311,6 +311,10 @@ def _bind_reference_controller(compiled, context, execution_controller, request,
     settings["grasp_offset"] = tuple(settings["grasp_offset"])
     settings["table_top_z_m"] = float(recipe["scene"]["table_top_z"])
     settings["nut_contact_margin_m"] = float(recipe["asset"]["nut_contact_margin_m"])
+    # The two supported providers require different release clearances. Keep
+    # MuJoCo's original route and the measured GeoPhys clearance source-bound.
+    settings["release_table_clearance_m"] = (
+        0.008 if provider == "geophys" else settings["nut_contact_margin_m"])
     solution_config = NutAssemblySolutionConfig(**settings)
     base_controller_identity = controller.identity
     solution_arguments = dict(config=solution_config,
