@@ -89,6 +89,18 @@ The 4b PickCube physical candidates use the existing `task_env.make_env` → Sel
 
 The bounded 4a Position candidate can select source-bound direct effort, split-arm/hand, or effort-plus-wrench declarations. Its MuJoCo CPU physical port recomputes admitted spatial wrench frames and Jacobian at each substep for the checked A05 `implicitfast` route; other wrench integrators reject before writing. The bounded short runs cover an effort batch and an effort-plus-hand-wrench batch, not measured force, independent physical effect, other providers, or Controller reset switching. Consult the [v2.1.1 API status](../../../docs/module/task_env/v2.1.1/api/README.md) for the exact source, total moment reference, concurrent buffer restriction, and evidence boundary. Sol has independently accepted the 4a control-contract scope; see the [003 Sol review](../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261106_4a_attempt003_sol_review.md). Construction, a fake terminal, and a write ACK do not establish physics qualification.
 
+For the 2026-11-04 PickCube Isaac Position repair, follow the dated troubleshooting
+entry: public-boundary-bound stable pad geometry authorizes only a lift attempt;
+it does not change `close_ready` or prove contact/task success. Keep the measured
+TCP gates, reset distribution and budgets intact. Native validation at commit
+`30cf89e6` subsequently passed seeds 0–19 and seed 0 / seed 2 Oracles under the
+original spec. Use the separate `HARNESS-PICKLIFT-ISAAC-20SEED` matrix row and
+[dated native record](../../../docs/module/task_env/v2.1.0/maintenance/validation/f_route/20261104_isaac_pickcube_20seed_oracle.md).
+Preserve v3 external-stop recording semantics, known shutdown diagnostics and
+the distinction from the earlier F06 matrix; do not claim Qualification.
+
+## Development and migration
+
 Before proposing behavior, identify the public facade, owner, callers, tests, and limitation; classify work as fix/extend/compose/new. Use CodeGraph when the index is current. Run only the smallest affected offline/API or bounded route checks authorized by the task. The repository has no root packaging metadata; use `task_env/requirements.txt` and explicit `PYTHONPATH`, not `pip install -e .`.
 
 The v2.1.0 API handoff, pre-stage3 maintenance reports, v2.1.1 [execution table](../../../docs/module/task_env/v2.1.1/planning/execution-and-acceptance.md), [recovery page](../../../docs/module/task_env/v2.1.1/maintenance/recovery.md) and [3a Sol review](../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_3a_diagnostic_attempt001_sol_review.md) retain their dated scope; use the current-state page above for current ownership and the work queue. G03/3a is accepted for selection/admission, existing declaration intersection, concrete build-check wiring and same-request receipts; 3b attempt003 is independently accepted within its frozen three-backend readback and bounded Panda MuJoCo gravity scope. Common 6.1/6.2 consumers have offline coverage; the separate real 6.1 App verified version/startup but close timed out, and a full Env loop remains untested. See the 003 Sol review for scope and limitations. The [3c Sol review](../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261106_3c_attempt001_sol_review.md) accepts the explicit PickCube reset-switch profile and records its measured limits; do not infer later-stage acceptance. Ordinary3 and diagnostic1 histories stay separate. Keep LIBERO benchmark semantics in `bench_deploy/libero`.

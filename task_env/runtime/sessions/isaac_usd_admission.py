@@ -9,7 +9,22 @@ F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 F06_PICKCUBE_CONTROLLER_PROFILE = 'r3_continuous_v1'
 _F06_DELIVERY_MANIFEST_SHA256_V1 = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2'
 _F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
+_F06_ASSET_OBJECT_MANIFEST_SHA256_V1 = '40b0dd2226d49e22d8d4ad03de5440ea454bbb7d4b4e2eabea3abbe732565d3e'
+_F06_ASSET_OBJECT_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-asset-object-v1'
 _F06_TASK_POLICY_SHA256_V1 = '153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb'
+
+
+def f06_delivery_identity():
+    """Return the exact reviewed delivery identity for bounded consumers."""
+    return _F06_DELIVERY_MANIFEST_SHA256_V1, _F06_REPRESENTATION_V1
+
+
+def f06_admitted_delivery_identities():
+    """Return the exact reviewed desktop and asset-object manifest identities."""
+    return {
+        _F06_DELIVERY_MANIFEST_SHA256_V1: _F06_REPRESENTATION_V1,
+        _F06_ASSET_OBJECT_MANIFEST_SHA256_V1: _F06_ASSET_OBJECT_REPRESENTATION_V1,
+    }
 
 
 def validate_f06_controller_profile(profile):
@@ -41,8 +56,7 @@ def f06_capability_manifest(artifact, capabilities):
 def _validate_f06_isaac_delivery(delivery, manifest_sha256):
     """Keep the exact local delivery boundary in the provider admission owner."""
     if (delivery.manifest_bytes_sha256 != manifest_sha256
-            or manifest_sha256 != _F06_DELIVERY_MANIFEST_SHA256_V1
-            or delivery.delivery.representation_id != _F06_REPRESENTATION_V1
+            or f06_admitted_delivery_identities().get(manifest_sha256) != delivery.delivery.representation_id
             or not delivery.locally_validated or delivery.source_verified):
         raise ValueError('F06 requires its exact locally validated, non-upstream Isaac desktop USD')
 

@@ -681,23 +681,21 @@ def test_worker_action_trace_records_failed_proposal_boundary(tmp_path):
     assert trace['rows'][0]['error']['message'] == 'diagnostic interval failure'
 
 
-def test_pickcube_r3_profile_is_task_versioned_and_records_rate_bound():
-    from task_env.tasks.pick_cube.task import build_reference
+def test_pickcube_r3_profile_is_task_versioned_and_records_rate_bound(monkeypatch):
+    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.specialization import PICKCUBE_R3_CONTINUOUS_PROFILE_V1, panda_effort_task_settings
 
-    built = build_reference(controller_profile='r3_continuous_v1')
-    task_profile = built['resolved_configuration']['task_controller_profile']
-    controller_profile = built['controller'].rate_profile_mapping()
-    assert task_profile == {
+    assert PICKCUBE_R3_CONTINUOUS_PROFILE_V1 == {
         'schema_version': 'pick-cube-r3-nut-aligned-profile-v2',
-        'joint_velocity_limit_rad_s': 2.0,
-        'gripper_force_limit_N': 10.0,
-        'gripper_close_transition_s': 1.0 / 3.0,
-        'gripper_close_settle_s': 0.5,
+        'joint_velocity_limit_rad_s': 2.0, 'gripper_force_limit_N': 10.0,
+        'gripper_close_transition_s': 1.0 / 3.0, 'gripper_close_settle_s': 0.5,
         'postclose_hold_s': 0.1,
-        'posture_path_profile': 'original',
     }
-    assert controller_profile['joint_velocity_limit_rad_s'] == 2.0
-    assert built['resolved_configuration']['controller_profile'] == 'r3_continuous_v1'
+    profile = object()
+    monkeypatch.setattr(specialization, '_r3_dynamic_profile', lambda: (profile, None))
+    settings = panda_effort_task_settings('r3-pose')
+    assert settings['r3_profile'] is profile
+    assert settings['joint_velocity_limit_rad_s'] == 2.0
 
 
 def test_isaac_core_site_overlay_excludes_conflicting_openusd_package(tmp_path):
@@ -856,10 +854,12 @@ def test_isaac_worker_refuses_preloaded_usd_without_opening_app(tmp_path, monkey
 
 
 def test_isaac_interpreter_selection_without_launch(monkeypatch, tmp_path):
-    from builtin_example_validation import ISAAC_PYTHON, _isaac_python
+    import pytest
+    from builtin_example_validation import _isaac_python
 
     monkeypatch.delenv('ISAAC_SIM_PYTHON', raising=False)
-    assert _isaac_python() == ISAAC_PYTHON
+    with pytest.raises(ValueError, match='Isaac requires'):
+        _isaac_python()
     monkeypatch.setenv('ISAAC_SIM_PYTHON', str(tmp_path / 'environment-python'))
     assert _isaac_python() == tmp_path / 'environment-python'
     assert _isaac_python(tmp_path / 'explicit-python') == tmp_path / 'explicit-python'
@@ -879,3 +879,19 @@ def test_worker_core_interpreter_and_geophys_source_overrides(monkeypatch, tmp_p
     (source / 'scene').mkdir(parents=True)
     (source / 'scene' / '__init__.py').write_text('')
     assert _geophys_source() == source
+
+def test_extra_diagnostic_seed_keeps_fixed_f06_prefix():
+    import pytest
+    from builtin_example_schema import BuiltinPickCubeExampleV1
+    base = {
+        'schema_version': 'harness-builtin-pickcube-example-v1',
+        'example_id': 'pickcube-harness-example-v1',
+        'task_uid': 'pick-cube-p16-reference-v1', 'provider': 'mujoco',
+        'backend': 'cpu', 'device': 'cpu', 'controller_profile': 'r3_continuous_v1',
+        'horizon_control_ticks': 1000, 'physics_dt_s': 0.002, 'control_substeps': 5,
+        'source_delivery_manifest': None,
+    }
+    assert BuiltinPickCubeExampleV1.from_dict({**base, 'seeds': [31, 32, 33, 0]}).seeds == (31, 32, 33, 0)
+    for seeds in ([0, 31, 32, 33], [31, 32, 33, 31], [31, 32, 33, -1], [31, 32]):
+        with pytest.raises(ValueError):
+            BuiltinPickCubeExampleV1.from_dict({**base, 'seeds': seeds})

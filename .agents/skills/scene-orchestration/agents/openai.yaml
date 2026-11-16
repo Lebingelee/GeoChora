@@ -1,0 +1,4 @@
+interface:
+  display_name: "可仿真场景创建"
+  short_description: "明确场景需求与设计确认范围，按约定需求统一验收、反馈并交付可仿真场景"
+  default_prompt: "使用 $scene-orchestration 明确需求并确认设计，使用相应技能完成制作与技术验证，按约定需求验收完整场景，集中反馈、修复并交付可仿真的 USD。"

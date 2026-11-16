@@ -1,0 +1,4 @@
+interface:
+  display_name: "资产材质创建"
+  short_description: "创建与修复表面材质，完成贴图、烘焙、USD 绑定及实际渲染检查"
+  default_prompt: "使用 $asset-material-creation 按需求创建或修复材质，保留有效几何与 PBR，完成贴图、必要烘焙和 USD 绑定，并通过 Isaac Sim 实际渲染检查。"

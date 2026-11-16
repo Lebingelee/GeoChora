@@ -56,8 +56,14 @@ class BuiltinPickCubeExampleV1:
                 raise ValueError("F06 Isaac requires an explicit source delivery manifest path")
         elif self.source_delivery_manifest is not None:
             raise ValueError("source_delivery_manifest is admitted only for the exact Isaac route")
-        if (not isinstance(self.seeds, (tuple, list)) or tuple(self.seeds) != (31, 32, 33)):
+        if (not isinstance(self.seeds, (tuple, list)) or tuple(self.seeds)[:3] != (31, 32, 33)):
             raise ValueError("F06 example runs the fixed seed set 31/32/33")
+        # Extra seeds after the fixed F06 set are labeled diagnostic runs; they
+        # never replace or reorder the required 31/32/33 set.
+        extra_seeds = tuple(self.seeds)[3:]
+        if (any(type(seed) is not int or not 0 <= seed < 2 ** 31 for seed in extra_seeds)
+                or len(set(self.seeds)) != len(self.seeds)):
+            raise ValueError("extra diagnostic seeds must be distinct non-negative 31-bit integers")
         if (type(self.horizon_control_ticks) is not int
                 or not 1 <= self.horizon_control_ticks <= 1000):
             raise ValueError("F06 example horizon must be between 1 and 1000 control ticks")

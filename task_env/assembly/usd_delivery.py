@@ -38,6 +38,10 @@ _LOCAL_REPORT_CHECKS = frozenset({
     "selected-scene-structure", "panda-dof-units-limits", "physx-drive-profile",
     "free-body-and-support", "source-losses-recorded",
 })
+_ASSET_SCENE_REPORT_CHECKS = frozenset({
+    "source-bytes", "derived-output-bytes", "usd-composition", "dependency-closure",
+    "asset-scene-structure", "rigid-object-geometry", "source-losses-recorded",
+})
 
 
 def _strict_object(pairs):
@@ -341,8 +345,13 @@ def load_usd_asset_delivery(
         if _source_closure_digest(source_file_bytes) != delivery.source_closure_sha256:
             raise ValueError("local USD original source closure does not match exact source bytes")
         source_inventory = _strict_json_bytes(source_manifest_raw, label="local USD source inventory")
+        inventory_schema = (
+            "asset-scene-source-inventory-v1"
+            if delivery.closure_policy == "asset-scene-selected-derived-v1"
+            else "f04-local-source-inventory-v1"
+        )
         expected_inventory = {
-            "schema_version": "f04-local-source-inventory-v1",
+            "schema_version": inventory_schema,
             "files": [item.to_mapping() for item in delivery.source_files],
             "source_closure_sha256": delivery.source_closure_sha256,
         }
@@ -368,7 +377,13 @@ def load_usd_asset_delivery(
             and report.recipe_sha256 == delivery.recipe_sha256
             and report.options_sha256 == delivery.options_sha256
             and report.checker_sha256 == delivery.checker_sha256
-            and _LOCAL_REPORT_CHECKS.issubset(report.checks)
+            and (
+                (
+                    _ASSET_SCENE_REPORT_CHECKS
+                    if delivery.closure_policy == "asset-scene-selected-derived-v1"
+                    else _LOCAL_REPORT_CHECKS
+                ).issubset(report.checks)
+            )
         )
     else:
         source_file_bytes = {}

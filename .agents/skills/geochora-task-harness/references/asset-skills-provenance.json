@@ -1,0 +1,31 @@
+{
+  "schema_version": "geochora-skill-package-adaptation-v1",
+  "date": "2026-11-04",
+  "source_archive_sha256": "86855fb83b4225846913a10efcaad9181cf013baa29d9ea9f0c8c529fe4987c5",
+  "source_manifest_preserved": true,
+  "missing_source_files": [
+    "asset-material-creation/references/drink-ring.md"
+  ],
+  "changes": [
+    "Add GeoChora routing note to three skill entrypoints.",
+    "Mark missing optional drink-ring reference unavailable; no fabricated replacement.",
+    "Connect the three creation skills to repository-local MCP services."
+  ],
+  "files": {
+    "asset-creation/SKILL.md": "dfb2d8a5e522e6142367f742f62fc6491c300fe38cd6ce6bd2c31ff117bd55fc",
+    "asset-creation/agents/openai.yaml": "3cd727bbe4ce0cc34b1c08b8d8ed1737103944a13403c4006c43b2130f6bcf18",
+    "asset-creation/references/asset-routing-cases.md": "673e16eeb0e92858fa333e4b902f57c0585bca23903bdfde49b1f591d70a5b69",
+    "asset-creation/references/claims.md": "7749fea94dd2f11b2bd161c5729f1d9432775c0bfa50727a4896fcdf4832fd90",
+    "asset-creation/references/lighting.md": "ee36be6d5391d048f4f832e0e8143163620ab3be8135a7da35e70a46f8ab19aa",
+    "asset-creation/scripts/verify_claims.py": "f05b4a1c35a9906ec3432b8e33beeb541451e18c0e6f1e20e1945bb9ac894e2a",
+    "asset-material-creation/SKILL.md": "eea1476587e598733c61f431ed297c4343353bf81f176d0343ac19fb6d4a2c01",
+    "asset-material-creation/agents/openai.yaml": "85ef39eaaac0884b2ff205789407b14df3d97ea77af28fcd07c80708586a723e",
+    "asset-material-creation/references/material-preprocessing.md": "8506a962bcaf93cc1bb39ccce7dab478b9233f8984de39cb9cb9501801d049ac",
+    "scene-orchestration/SKILL.md": "a2b4297b040460dc953217d8f36a5c9c08ec1c3d1dc50d5568faae70ea63aa3a",
+    "scene-orchestration/agents/openai.yaml": "1b03bbc2e8a8e0e77bafaa5cac95e444bfb73bf3509e285e3a9369e59db2c9b4",
+    "scene-orchestration/references/config.json": "5c0e19163fa017caee758f1c7702d141229be4b9118c4750a1bbf73ffe80fdfd",
+    "scene-orchestration/references/embodied-integration.md": "b5ec1beeb65acb459db7c121140921e9a106ad13728546fdffc3f37cbb4fb215",
+    "scene-orchestration/references/scene_record.md": "1b8bc406b2f61d057c1ac973e9e7651bb883f5e1dd8bd6b964ce545d6e4bc0ae",
+    "scene-orchestration/scripts/check_usd_static.py": "d67f0d235d8ab1d0f1316c65b1d09325fdac5daac14a9eb6e202792a32f955dc"
+  }
+}

@@ -1,0 +1,35 @@
+{
+    "bindings": {
+        "moles": [
+            "/World/RobotFrame/Toy/Mole0",
+            "/World/RobotFrame/Toy/Mole1",
+            "/World/RobotFrame/Toy/Mole2",
+            "/World/RobotFrame/Toy/Mole3",
+            "/World/RobotFrame/Toy/Mole4",
+            "/World/RobotFrame/Toy/Mole5"
+        ],
+        "joints": [
+            "/World/RobotFrame/Toy/Slide0",
+            "/World/RobotFrame/Toy/Slide1",
+            "/World/RobotFrame/Toy/Slide2",
+            "/World/RobotFrame/Toy/Slide3",
+            "/World/RobotFrame/Toy/Slide4",
+            "/World/RobotFrame/Toy/Slide5"
+        ]
+    },
+    "parameters": {
+        "seed": 13
+    },
+    "prims": {
+        "robots": {
+            "left": "/World/LeftRobot",
+            "right": "/World/RightRobot"
+        },
+        "cameras": {
+            "head": "/World/RobotFrame/head",
+            "left_wrist": "/World/LeftRobot/Geometry/dummy_link/link1/link2/link3/link4/link5/link6/wrist_left",
+            "right_wrist": "/World/RightRobot/Geometry/dummy_link/link1/link2/link3/link4/link5/link6/wrist_right"
+        }
+    },
+    "instruction": "当地鼠从孔中伸出时，用机械臂末端向下敲击它，尽可能命中每次出现的地鼠。"
+}

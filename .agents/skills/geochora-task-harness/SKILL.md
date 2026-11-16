@@ -9,6 +9,13 @@ Deliver a checked Candidate Spec + Artifact, hash-bound construction history, Or
 
 Read [the CLI workflow](references/workflow.md). Resolve the supplied Core checkout, Python environment, runtime directory and task workspace. The runtime directory is `<Core>/task_env/script/agent/`; see its README for setup and input contracts. Core must be a clean known snapshot; regenerate the catalog when moving machines. Keep generated work in ignored `workspace/` or outside the checkout. Ordinary candidate construction does not authorize Core edits, task registration, engine installation, or artifact approval/freeze. A separate explicit maintainer maintenance package may authorize a bounded repair in an existing owner.
 
+When a task requires a real USD asset or authored scene before candidate
+construction, follow the [asset-scene preparation handoff](references/asset-scene-integration.md)
+and use the sibling `scene-orchestration`, `asset-creation`, and
+`asset-material-creation` skills as applicable. Their output is preparation
+evidence, not a runnable TaskEnv task or runtime admission; keep reset,
+semantics, execution, recording, and Judge evidence in their existing owners.
+
 The versioned built-in PickCube Harness example is an execution route, not
 candidate construction. For user requests to run or extend that example, follow
 the [TaskEnv module Skill](../geochora-task-env/SKILL.md)
@@ -29,6 +36,16 @@ authoring requirement. The built-in runtime example resolves the nested
 selected config once, calls public `make_env`, and returns facts from that same
 Env instance for the worker to reuse. See the [current TaskEnv public API](../../../docs/module/task_env/v2.1.0/api/public-api.md).
 
+The bounded `isaacsim` candidate route composes the existing F06 PickCube USD
+owners with CUDA PhysX and R3, a built-in cube, frozen table geometry and at
+most 1000 control ticks. Query the exact delivery with
+`--isaac-delivery-manifest`; unsupported geometry or MJCF proxy assets fail
+explicitly. The repository's supervised worker starts the Core App owner
+before USD compilation, then runs probe or Oracle recording. Configure the
+Core/Isaac interpreters and common native lock as documented in the CLI README;
+do not wrap the worker with an external startup script. Implementation and
+runtime-valid evidence do not establish solved candidates or Qualification.
+
 ## Construction decisions
 
 1. Read the upstream task and its referenced asset bundle / semantic examples. Query the requested provider and available templates. Catalog `available` means a manifest is readable, not that physics has run. Unknown capabilities/providers must fail explicitly.
@@ -45,7 +62,9 @@ the earlier ledger history and findings. Use `continue-owner-repair` only after
 the owner has supplied hashed diagnosis, source diff/commit and input
 before/after identities. The continuation reserves the next existing round;
 it does not reset the five-round budget, erase an earlier failure, or clear an
-open issue merely because a later round passes. Ordinary task-local revisions
+open issue merely because a later round passes. Use `export-issues` to hand
+issues to owners and `resolve-issue` to append their cited resolution; neither
+rewrites `open_issues` or reopens a stopped ledger. Ordinary task-local revisions
 remain available through `begin`; a v1 revision whose Core/catalog/input
 identity changes must provide its own context.
 
@@ -71,9 +90,11 @@ missing fields with success defaults or package it as a passing candidate.
 
 ## Oracle and Human review
 
-After candidate checks pass, use `oracle_candidate.py` with the same final spec/catalog/provider. It composes Core's selected recorder and completion helper, performs exact logical H5 save/load comparison and separately invokes the Core inspector. A successful recording requires the full expert route and task success, not merely an H5 file or its T+1 count.
+After candidate checks pass, use `oracle_candidate.py` with the same final spec/catalog/provider. It composes Core's selected recorder and completion helper, validates the actual schema (canonical exact comparison or v3 structured-control readback), and separately invokes the Core inspector. A successful recording requires the full expert route and task success, not merely an H5 file or its T+1 count.
 
 Before packaging, read the existing `<Core>/task_env/.agents/skills/task-env-experiment-evidence/SKILL.md`. That Skill owns Artifact/Judge procedure. Use `judge_package.py` to preserve final and historical evidence and create `judge_decision.yaml` with `decision: pending`. Record any unsupported video/render capability as a review gap. Do not create a Stage-2 Experiment from an unfrozen candidate.
+
+The exact built-in Isaac cube route may use the distinct pinned-USD source bundle documented in the CLI README. Preserve its local-validation provenance, native close receipts and v3 external-stop outcome; do not relabel it as a synthetic proxy or upstream-verified source.
 
 Completion is demonstrated by the ledger, checks, Oracle receipt and verified pending package. Report exactly what ran. One successful fresh session establishes that session's behavior only; it does not prove every Agent/LLM works. D0/D1/D2 and trajectory qualification remain independent work, and approval remains Human Judge's decision.
 

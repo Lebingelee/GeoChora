@@ -128,6 +128,22 @@ def _geophys_source():
     return path
 
 
+def core_python():
+    return _core_python()
+
+
+def isaac_python():
+    return _isaac_python()
+
+
+def native_lock_path():
+    return LOCK
+
+
+def native_cleanup_blocker_path(lock_path):
+    return Path(lock_path).with_name(Path(lock_path).name + '.unretired.json')
+
+
 def _write_json(path, value):
     path = Path(path)
     temporary = path.with_suffix(path.suffix + '.tmp')
@@ -475,6 +491,10 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         legacy_was_present = os.path.lexists(LEGACY_LOCK)
         if not _lock_matches_legacy(lock_stream, require_legacy=legacy_was_present):
             raise RuntimeError('native lock alias changed while acquiring lock')
+        blocker = native_cleanup_blocker_path(LOCK)
+        if blocker.exists():
+            return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
+                    'reason': f'unconfirmed native process retirement; inspect {blocker}'}
         _write_json(output / 'run_preflight.json', {
             'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
             'status': 'READY', 'mem_available_start_bytes': mem_start,
@@ -592,6 +612,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         'worker_stdout': str(stdout_path.relative_to(CORE)),
         'worker_stderr': str(stderr_path.relative_to(CORE)),
         'task_outcome': receipt.get('task_outcome') if receipt else None,
+        'compiled': receipt.get('compiled') if receipt else None,
         'runtime_valid': status == 'RUNTIME_VALID',
         'isaac_app_launch_profile_id': (
             receipt.get('isaac_app_launch_profile', {}).get('profile_id')
@@ -645,7 +666,16 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             isaac_python=isaac_python,
         )
         rows.append(row)
-        planned_action_count_total, planned_action_seed_ids = _planned_action_route_evidence(rows)
+        # The F06 route gate only counts the fixed seeds; diagnostic seeds are
+        # reported separately and never supply the required evidence.
+        planned_action_count_total, planned_action_seed_ids = _planned_action_route_evidence(
+            [item for item in rows if item.get('seed') in spec.seeds[:3]]
+        )
+        diagnostic_planned_action_count, diagnostic_planned_action_seed_ids = (
+            _planned_action_route_evidence(
+                [item for item in rows if item.get('seed') not in spec.seeds[:3]]
+            )
+        )
         compiled_values = [item.get('compiled') for item in rows]
         compiled_consistent = bool(compiled_values and all(
             isinstance(value, dict) and value == compiled_values[0] for value in compiled_values
@@ -658,17 +688,22 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             'compiled_consistent': compiled_consistent,
             'provider': spec.provider, 'backend': spec.backend, 'device': spec.device,
             'profile': spec.controller_profile, 'horizon': spec.horizon_control_ticks,
-            'seeds_required': list(spec.seeds), 'seeds_run': list(seeds),
+            'seeds_required': list(spec.seeds[:3]), 'seeds_diagnostic': list(spec.seeds[3:]),
+            'seeds_run': list(seeds),
             'rows': rows,
             'runtime_valid_count': sum(item.get('runtime_valid') is True for item in rows),
             'task_solved_count': sum(item.get('task_outcome') == 'SOLVED' for item in rows),
             'planned_action_count_total': planned_action_count_total,
             'planned_action_seed_ids': planned_action_seed_ids,
+            'diagnostic_planned_action_count': diagnostic_planned_action_count,
+            'diagnostic_planned_action_seed_ids': diagnostic_planned_action_seed_ids,
             'planned_action_route_gate': (
                 'PASS' if planned_action_count_total > 0 else 'MISSING_CORE_PLANNED_ACTION_EVIDENCE'
             ),
             'disposition': 'PASS' if (
-                len(rows) == 3 and all(item.get('runtime_valid') is True for item in rows)
+                sorted(item.get('seed') for item in rows if item.get('seed') in spec.seeds[:3])
+                == sorted(spec.seeds[:3])
+                and all(item.get('runtime_valid') is True for item in rows)
                 and compiled_consistent and planned_action_count_total > 0
             )
                            else 'PREFLIGHT' if only_seed is not None and compiled_consistent and all(item.get('runtime_valid') is True for item in rows)

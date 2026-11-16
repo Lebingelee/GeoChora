@@ -69,9 +69,17 @@ def record_candidate_preflight(spec_path, catalog_path, output):
 
     def preflight_env_class():
         compiled = candidate_holder['compiled']
-        value = compiled.binding.build('mujoco')
+        value = compiled.binding.reset_reconstruction_strategy('mujoco', 'cpu', compiled.horizon).initial(seed=31)
 
         class ProviderIoPreflightEnv(SelectedReferenceEnv):
+            @property
+            def controller(self):
+                return self._test_controller
+
+            @controller.setter
+            def controller(self, value):
+                self._test_controller = value
+
             def __init__(self, *, provider='mujoco', backend='cpu'):
                 self.uid = compiled.artifact.task_id
                 self.binding = compiled.binding
@@ -88,6 +96,7 @@ def record_candidate_preflight(spec_path, catalog_path, output):
                 self._closed = self._stopped = False
                 self._execution_fault = None
                 self._position_episode_end = None
+                self._mixed_episode_end = None
                 self.position_profile = False
                 self.recorder = None
                 self.recording_path = None

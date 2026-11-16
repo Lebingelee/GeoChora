@@ -1,4 +1,5 @@
 """Hash-bound attempt ledger. The host agent decides; this CLI never runs an LLM."""
+from dataclasses import asdict
 from pathlib import Path
 from datetime import datetime,timezone
 from copy import deepcopy
@@ -14,6 +15,11 @@ MAX_ROUNDS=5
 REQUIRED_TOOLS={'asset_check','harness_compiler','semantic_check','feasibility_probe'}
 V0='harness-attempt-ledger-v0'
 V1='harness-attempt-ledger-v1'
+ISSUE_RESOLUTION='harness-issue-resolution-v1'
+ISSUE_ESCALATION='harness-issue-escalation-v1'
+# An accepted limitation is a Human Judge decision, so it is not a disposition here.
+ISSUE_DISPOSITIONS=('owner_fixed','not_reproduced')
+ISSUE_OWNERS=('asset','core','provider','harness')
 
 
 def require(ok,message):
@@ -39,6 +45,107 @@ def verify_refs(value):
         for child in value:verify_refs(child)
 
 
+def _resolution_event(value,index,resolution,*,ledger=None):
+    """Build one resolution event from its hashed input file; shared by write and reload."""
+    issues=value.get('open_issues',[])
+    require(type(index) is int and 0<=index<len(issues),'issue index does not name a recorded issue')
+    issue=issues[index];change=read_ref(resolution)
+    require(isinstance(change,dict) and change.get('schema_version')==ISSUE_RESOLUTION,
+        'issue resolution schema required')
+    require(change.get('report_sha256')==issue['report']['sha256']
+        and change.get('finding_index')==issue['finding_index'],
+        'resolution cites a different report/finding than the issue')
+    require(change.get('disposition') in ISSUE_DISPOSITIONS,'unknown issue disposition')
+    require(change.get('owner') in ISSUE_OWNERS,'resolution must name the resolving owner')
+    require(isinstance(change.get('reason'),str) and change['reason'].strip(),'resolution reason required')
+    paths=change.get('evidence')
+    require(isinstance(paths,list) and paths and all(isinstance(x,str) and x for x in paths),
+        'resolution needs its own cited evidence files')
+    # The hashed resolution keeps these strings, so reload must not depend on the caller's cwd.
+    require(all(Path(x).is_absolute() for x in paths),'resolution evidence paths must be absolute')
+    evidence=[file_ref(path) for path in paths]
+    # Recording the event rewrites the ledger, which would immediately make such a ref stale.
+    require(ledger is None or all(Path(ref['path'])!=Path(ledger).resolve() for ref in evidence),
+        'the ledger being updated cannot be its own resolution evidence')
+    require(len({ref['sha256'] for ref in evidence})==len(evidence),'resolution evidence repeats a file')
+    require(all(ref['sha256'] not in (issue['report']['sha256'],resolution['sha256']) for ref in evidence),
+        'the failing report or the resolution itself is not independent evidence')
+    return {'kind':'resolution','issue_index':index,
+        'issue':{'report':issue['report'],'finding_index':issue['finding_index']},
+        'disposition':change['disposition'],'owner':change['owner'],'reason':change['reason'],
+        'input':resolution,'evidence':evidence}
+
+
+def _validate_issue_events(value):
+    """Issue events are append-only claims; ``open_issues`` itself is never rewritten."""
+    events=value.get('issue_events',[])
+    require(isinstance(events,list),'issue_events must be a list')
+    seen=set()
+    for event in events:
+        require(isinstance(event,dict) and isinstance(event.get('input'),dict)
+            and isinstance(event.get('recorded_at'),str),'malformed issue event')
+        expected=_resolution_event(value,event.get('issue_index'),event['input'])
+        require({k:v for k,v in event.items() if k!='recorded_at'}==expected,
+            'issue event does not match its hashed resolution input')
+        require(event['issue_index'] not in seen,'issue resolved twice')
+        seen.add(event['issue_index'])
+    return value
+
+
+def unresolved_issue_indices(value):
+    resolved={event['issue_index'] for event in value.get('issue_events',[])}
+    return [i for i in range(len(value.get('open_issues',[]))) if i not in resolved]
+
+
+def resolve_issue(*,ledger,issue_index,resolution):
+    """Record an owner's cited resolution claim. Does not change state, rounds or the budget."""
+    snapshot=file_ref(ledger);value=load(ledger)
+    require(issue_index in unresolved_issue_indices(value),
+        'issue index is out of range or already has a recorded resolution')
+    event=_resolution_event(value,issue_index,file_ref(resolution),ledger=ledger)
+    event['recorded_at']=datetime.now(timezone.utc).isoformat()
+    value.setdefault('issue_events',[]).append(event)
+    # Not a lock: like every ledger command this assumes one writer. It only
+    # refuses to overwrite a ledger that visibly changed since it was read.
+    require(file_ref(ledger)==snapshot,'ledger changed while recording the resolution; retry')
+    write(value,ledger);return value
+
+
+def export_issues(*,ledger,output_dir):
+    """Write one escalation file per recorded issue plus an index. The ledger is not modified."""
+    value=load(ledger)
+    root=Path(output_dir).resolve();root.mkdir(parents=True,exist_ok=False)
+    events={event['issue_index']:event for event in value.get('issue_events',[])}
+    index=[]
+    for i,issue in enumerate(value.get('open_issues',[])):
+        report=CheckReport.from_dict(read_ref(issue['report']))
+        finding=report.findings[issue['finding_index']]
+        round_=next((r for r in value['rounds'] if issue['report'] in r.get('reports',[])),None)
+        context=(round_ or {}).get('context') or {}
+        escalation={'schema_version':ISSUE_ESCALATION,'task_id':value['task_id'],'issue_index':i,
+            'status':'resolution_recorded' if i in events else 'open',
+            # Locality as reported; 'unknown' means ownership is not established.
+            'owner_hint':finding.locality,
+            'round':None if round_ is None else round_['number'],
+            'spec':None if round_ is None else round_['spec'],
+            'core_commit':context.get('core_commit',value['core_commit']),
+            'provider':context.get('provider',value['provider']),
+            'report':issue['report'],'report_tool':report.tool,'report_status':report.status,
+            'finding_index':issue['finding_index'],'finding':asdict(finding),
+            'resolution':events.get(i),
+            'resolution_template':{'schema_version':ISSUE_RESOLUTION,'report_sha256':issue['report']['sha256'],
+                'finding_index':issue['finding_index'],'disposition':None,'owner':None,'reason':'','evidence':[]},
+            'scope':('Escalation for the owner. A recorded resolution is the owner\'s cited claim for '
+                'Human review; it does not reopen the ledger, restore budget or approve the candidate.')}
+        name=f'issue-{i:02d}.escalation.json'
+        save_json(escalation,root/name)
+        index.append({'issue_index':i,'status':escalation['status'],'owner_hint':finding.locality,
+            'category':finding.category,'check':finding.check,'round':escalation['round'],'file':name})
+    save_json({'schema_version':'harness-issue-index-v1','ledger':file_ref(ledger),'issues':index,
+        'unresolved':unresolved_issue_indices(value)},root/'issues.json')
+    return value
+
+
 def _load_v0(value):
     require(value['max_rounds']==MAX_ROUNDS and len(value['rounds'])<=MAX_ROUNDS,'invalid attempt budget')
     verify_refs(value)
@@ -46,7 +153,7 @@ def _load_v0(value):
         require(r['number']==i+1,'round numbering mismatch')
         spec=CandidateSpec.from_dict(read_ref(r['spec']))
         require(spec.spec_sha256()==r['spec_sha256'],'round spec identity mismatch')
-    return value
+    return _validate_issue_events(value)
 
 
 def _context(value,round_):
@@ -219,6 +326,9 @@ def _load_v1(value):
     require(isinstance(historical_issues,list) and isinstance(current_issues,list)
         and current_issues[:len(historical_issues)]==historical_issues,
         'continuation cleared or altered historical open issues')
+    historical_events=legacy.get('issue_events',[])
+    require(value.get('issue_events',[])[:len(historical_events)]==historical_events,
+        'continuation cleared or altered historical issue resolutions')
     require(len(value['rounds'])>=len(legacy.get('rounds',[])),
         'continuation dropped historical rounds')
     historical_fields=('number','spec','spec_sha256','revision','status','reports',
@@ -293,7 +403,7 @@ def _load_v1(value):
     if value['state']=='running':require(value['rounds'][-1]['status']=='running','running state has no reservation')
     if value['state']=='candidate_ready':
         require(value['rounds'][-1]['status']=='pass','candidate_ready lacks passing final round')
-    return value
+    return _validate_issue_events(value)
 
 
 def load(path):
@@ -574,7 +684,7 @@ def finish(*,ledger,reports):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);s=p.add_subparsers(dest='command',required=True)
-    for name in ('init','begin','finish','status','continue-owner-repair'):
+    for name in ('init','begin','finish','status','continue-owner-repair','export-issues','resolve-issue'):
         a=s.add_parser(name);a.add_argument('--ledger',type=Path,required=True)
         if name=='init':
             for field in ('task','catalog'):a.add_argument('--'+field,type=Path,required=True)
@@ -584,6 +694,12 @@ def main():
             a.add_argument('--context',type=Path,
                 help='explicit round context JSON for v1 revisions that change Core/catalog/input identity')
         elif name=='finish':a.add_argument('--reports',type=Path,nargs='+',required=True)
+        elif name=='export-issues':
+            a.add_argument('--output-dir',type=Path,required=True,help='new directory for escalation files')
+        elif name=='resolve-issue':
+            a.add_argument('--issue-index',type=int,required=True)
+            a.add_argument('--resolution',type=Path,required=True,
+                help=f'{ISSUE_RESOLUTION} JSON citing the issue, owner, disposition, reason and evidence files')
         elif name=='continue-owner-repair':
             for field in ('legacy-ledger','history-archive','repair-receipt','task','catalog','spec'):
                 a.add_argument('--'+field,type=Path,required=True)
@@ -591,9 +707,11 @@ def main():
     args=vars(p.parse_args());command=args.pop('command')
     try:
         result={'init':initialize,'begin':begin,'finish':finish,'status':lambda ledger:load(ledger),
-            'continue-owner-repair':continue_owner_repair}[command](**args)
+            'continue-owner-repair':continue_owner_repair,'export-issues':export_issues,
+            'resolve-issue':resolve_issue}[command](**args)
         print(json.dumps({'state':result['state'],'rounds':len(result['rounds']),'max_rounds':MAX_ROUNDS,
-            'stop_reason':result.get('stop_reason'),'open_issues':len(result['open_issues'])}))
+            'stop_reason':result.get('stop_reason'),'open_issues':len(result['open_issues']),
+            'unresolved_issues':len(unresolved_issue_indices(result))}))
         return 1 if result['state']=='stopped' else 0
     except Exception as error:
         print(json.dumps({'status':'error','error':f'{type(error).__name__}: {error}'}));return 2

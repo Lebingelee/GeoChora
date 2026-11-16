@@ -33,7 +33,9 @@ def main():
                 save_json(compiled.artifact.to_mapping(),root/'candidate.artifact.json')
                 report=emit('compile.json',CheckReport(spec.spec_sha256(),compiled.artifact_hash,
                     ctx['core_commit'],ctx['core_dirty'],'harness_compiler','pass',details={
-                        'provider':args.provider,'artifact':compiled.artifact.to_mapping(),'source_xml_sha256':compiled.source_xml_sha256}))
+                        'provider':args.provider,'backend':compiled.backend,'device':compiled.device,
+                        'source_kind':compiled.source_kind,'artifact':compiled.artifact.to_mapping(),
+                        'source_xml_sha256':compiled.source_xml_sha256}))
             except CompilationRejected as error:report=emit('compile.json',error.report)
         if report.status=='pass':
             current_tool='semantic_check'

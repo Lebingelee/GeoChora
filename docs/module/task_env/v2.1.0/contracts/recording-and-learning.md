@@ -60,6 +60,14 @@ slot/batch size/backend/layout/profile/exact-capacity provenance；不把 batch 
 细节见[H5 reference](../../../../../task_env/doc/api/recording/h5_schema.md)和
 [wrapper reference](../../../../../task_env/doc/api/recording/wrapper_lifecycle.md)。
 
+For new F06 PickCube Isaac recordings, the existing v3 reference profile carries
+`pickcube-isaac-replay-provenance-v1`: the typed reset plan and ExecutionSpec,
+actual task seed, task recipe, Core revision and source digests. These declarations
+bind later Stage-1 verification to the recorded reset and committed source.
+Historical v3 recordings without this profile remain readable, but do not meet
+this stronger packaging provenance gate. This metadata does not establish D0,
+D1 or D2 replay.
+
 ## 回放与离线验证
 
 当前 root examples/recording 和 `task_env.script.trajectory.record` 使用 selected public UID；

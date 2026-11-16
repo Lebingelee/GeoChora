@@ -589,3 +589,18 @@ def test_retired_f04_profile_is_rejected_before_native_initialization(monkeypatc
     source = SimpleNamespace(assert_fresh=lambda: None)
     with pytest.raises(ValueError, match='unsupported Isaac native execution profile'):
         isaac_native_io.create_isaac_native_runtime_io(object(), execution, source)
+
+
+def test_f06_admits_exact_asset_object_pair_and_rejects_swapped_representation():
+    from task_env.runtime.sessions.isaac_usd_admission import (
+        _validate_f06_isaac_delivery, f06_admitted_delivery_identities,
+    )
+    pairs = f06_admitted_delivery_identities()
+    assert len(pairs) == 2
+    for digest, representation in pairs.items():
+        delivery = SimpleNamespace(manifest_bytes_sha256=digest, locally_validated=True,
+            source_verified=False, delivery=SimpleNamespace(representation_id=representation))
+        _validate_f06_isaac_delivery(delivery, digest)
+        delivery.delivery.representation_id = next(v for v in pairs.values() if v != representation)
+        with pytest.raises(ValueError, match='exact locally validated'):
+            _validate_f06_isaac_delivery(delivery, digest)
