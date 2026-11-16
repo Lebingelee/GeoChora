@@ -1805,7 +1805,7 @@
             "6a"
           ],
           "status": "PARTIAL_NOT_ACCEPTED",
-          "attempt_count": 1,
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -1814,30 +1814,39 @@
               "output_head": "1ad14dd82812ef69587e5ca6aabdb1a4e6cdc818",
               "geophys_pin": "9ef7768b4bd6c2b105c16f3d5fd75d2136b3ab2a",
               "review_ref": "reviews/20261116_g06b_attempt001_review.md"
+            },
+            {
+              "attempt": 2,
+              "status": "PARTIAL_NOT_ACCEPTED",
+              "output_head": "f8c43d61163e6774b3869875842337b427781fe4",
+              "geophys_pin": "dd393187983798abac0e8d99c2426d64d4a8aa5e",
+              "review_ref": "reviews/20261116_g06b_attempt002_scope_reassessment.md"
             }
           ],
           "assigned_agent": null,
-          "package_path": "work-packages/20261115_g06b_attempt001_goal.md",
-          "package_sha256": null,
+          "package_path": "work-packages/20261116_g06b_attempt002_goal.md",
+          "package_sha256": "3438b9fc1a4466beaee39c6bf455d991ea49ea8daba495b2176087550c7852a5",
           "input_head": null,
-          "output_head": "1ad14dd82812ef69587e5ca6aabdb1a4e6cdc818",
+          "output_head": "f8c43d61163e6774b3869875842337b427781fe4",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Focused source/evidence review: 46 device semantics tests and three existing PickCube H5 readbacks pass; contact stability and B16 renderer stall remain blocking. No new native run.",
+          "last_observation": "Maintainer paused implementation. Attempt002 scope reassessment: canonical batch contact/reset and MJWarp B16 render stall fixes have bounded evidence; no automatic scalar mixed repair or cross-engine force parity gate. Final affected render/record evidence, performance index and Isaac B16 resource disposition remain. Attempt003 not dispatched; no new native run in this review.",
           "evidence_refs": [
             "reviews/20261116_g06b_attempt001_review.md",
-            "../../../../../workspace/maintenance/v211_g06b_attempt001/report.md"
+            "../../../../../workspace/maintenance/v211_g06b_attempt001/report.md",
+            "reviews/20261116_g06b_attempt002_scope_reassessment.md",
+            "../../../../../workspace/maintenance/v211_g06b_attempt002/brief-for-sol.md"
           ],
           "commits": [],
           "review_decision": {
             "status": "PARTIAL_NOT_ACCEPTED",
             "date": "2026-11-16",
-            "review_ref": "reviews/20261116_g06b_attempt001_review.md",
-            "scope": "focused contact/render blocker review, not full six-cell requalification"
+            "review_ref": "reviews/20261116_g06b_attempt002_scope_reassessment.md",
+            "scope": "original G06b gate reassessment, source/diff review and offline evidence verification; implementation remains paused"
           },
           "blockers": [
-            "GeoPhys PickCube excessive penetration requires reproducible cause and fix; discrete approval does not waive it.",
-            "B16 sensor/window renderer stalls; corrected performance matrix incomplete."
+            "Final affected provider/render/record evidence and matching performance index are not closed.",
+            "Isaac B16 rendered cases require current resource assessment or an explicit maintainer scope decision."
           ]
         },
         {
