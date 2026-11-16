@@ -1,6 +1,6 @@
 # G06：并行执行、部分 reset 与整批切换
 
-当前进度（2026-11-15）：[G06a attempt002 独立主审](../maintenance/reviews/20261115_g06a_attempt002_acceptance.md)已给出 `SOL_ACCEPTED_BOUNDED_6A`；6b／6c 和后续 R3 未接收。以下规划门保持，旧 attempt001 状态仅作历史记录。
+当前进度（2026-11-16）：6a及[6b attempt003](../maintenance/reviews/20261116_g06b_attempt003_acceptance.md)已有界独立主审接收；[6c attempt001](../maintenance/work-packages/20261116_g06c_attempt001_goal.md)已准备未派发，6c与R3未接收。后文旧派发状态保留历史时点。
 
 规划标识：`V211_G06_PARALLEL`。3 个子阶段；复用既有 batch runtime、vector 调用、parallel render 和 Recorder。由[数据协议](../contracts/lifecycle-and-data.md)规定身份与时序，不为 batch 新建第二套任务生命周期。
 

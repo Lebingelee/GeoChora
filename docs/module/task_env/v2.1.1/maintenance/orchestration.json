@@ -19,8 +19,15 @@
     "reason": "Existing G06 implementation branch; review and documentation closeout only."
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "G06b independently accepted within reviewed configuration; await maintainer confirmation and separate G06c planning. No execution dispatched.",
+  "next_candidate": {
+    "package_id": "V211_G06_6c_attempt001",
+    "status": "PREPARED_NOT_DISPATCHED",
+    "package_path": "work-packages/20261116_g06c_attempt001_goal.md",
+    "input_head": "b0f27709eb2fa9a5974638d07eb1f9ca424af126",
+    "prompt_sha256": "a8a283dfdac876db7e50cefa7893fc598bcf86c98bc971347332f9aa8fc533e0",
+    "manual_forward_only": true
+  },
+  "next_action": "Maintainer requested preparation of 6c attempt001 after bounded 6b independent acceptance; package ready for manual forwarding, no execution started.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1896,13 +1903,19 @@
           "attempt_count": 0,
           "attempts": [],
           "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
+          "package_path": "work-packages/20261116_g06c_attempt001_goal.md",
+          "package_sha256": "a8a283dfdac876db7e50cefa7893fc598bcf86c98bc971347332f9aa8fc533e0",
           "input_head": null,
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
+          "expected_duration_minutes": [
+            240,
+            360
+          ],
+          "execution_budget": {
+            "wall_minutes_max": 480,
+            "supervised_native_minutes_max": 120
+          },
+          "last_observation": "Prepared same-Env fixed Rasterizer Isaac-MJWarp-Isaac rebuild for both tasks and three-provider partial reset; no dispatch.",
           "evidence_refs": [],
           "commits": [],
           "review_decision": null,
