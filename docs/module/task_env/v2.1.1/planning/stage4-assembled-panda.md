@@ -1,5 +1,7 @@
 # v2.1.1附加用例：装配Panda、空载跟踪与Solution复用
 
+2026-11-17当前状态：原AP-C1～C4的指定MuJoCo CPU/in_process有界用例已由维护者[接收](../maintenance/reviews/20261117_g07a_attempt001_partial_acceptance.md)；原Goal要求与下列历史规划保留。全部7a仍待A3/A4收尾，GeoPhys当前源码未复验及worker/default边界不扩大；实时用例状态见[用例JSON](assembled-panda-use-case.json)。
+
 2026-11-16交接校正：装配Robot类`panda-arm-hand-v1`及G05短程路线已经存在；完整AP用例仍待7a。当前分项状态以[用例JSON](assembled-panda-use-case.json)和[G07交接](../maintenance/20261116_g07_agent_handoff.md)为准，下文“未实施”等为原规划时点，不作为再次创建Robot的依据。
 
 2026-11-06维护者已采纳重新编排并要求交接阶段4。需求与排期状态为 **MAINTAINER_CONFIRMED_PLANNING**。此项是整个v2.1.1的附加集成用例，不能重新定义[G04](../goals/04-control.md)或替代其原门。当前未实施、未派包，4a–4c仍PLANNED／attempt0；G03接收不重开。文件沿用现有路径作为唯一用例说明，具体检查清单在[用例JSON](assembled-panda-use-case.json)，与原控制协议案例分开。

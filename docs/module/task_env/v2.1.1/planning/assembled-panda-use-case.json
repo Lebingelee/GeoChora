@@ -2,9 +2,9 @@
   "schema_version": "geochora-v211-auxiliary-use-case-plan-v1",
   "use_case_id": "V211_UC_ASSEMBLED_PANDA",
   "title": "装配Panda、空载跟踪与Solution复用",
-  "status": "PARTIAL_IMPLEMENTED_PENDING_7A",
+  "status": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO_7A_CASE",
   "requirements_authority": "Maintainer five-point correction: new Panda class under robots; task-feasible unloaded gripper-center TCP tracking; existing controller/gripper reuse; per-task original Solution; no integrated-Panda physical equivalence.",
-  "scheduling_status": "MAINTAINER_CONFIRMED_PLANNING",
+  "scheduling_status": "CASE_ACCEPTED_BOUNDED_OTHER_7A_WORK_PENDING",
   "planning_ref": "planning/stage4-assembled-panda.md",
   "scope_level": "v2.1.1 auxiliary integration use case, separate from original G04 exit gates",
   "original_g04_required_gate": false,
@@ -20,22 +20,27 @@
       "implementation_owner": "task_env/robots and existing task selected bindings/source construction",
       "proposed_schedule": "4b auxiliary work when packaged; complete by 7a",
       "expected": "New Panda class is actually consumed by normal task configuration; shared controller/gripper algorithms, source and TCP bindings reused. Registration alone cannot pass.",
-      "status": "PARTIAL_G05_SHORT_ROUTE",
-      "current_evidence": "Existing assembled class and PickCube MuJoCo short route; two-task full configuration/profile closure remains 7a."
+      "status": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO",
+      "current_evidence": "Specified MuJoCo CPU/in_process assembled source, own model/TCP/compensation/gripper and same-run full Solution/readback/close evidence; no arbitrary provider or Robot extension.",
+      "current_evidence_ref": "../maintenance/reviews/20261117_g07a_attempt001_partial_acceptance.md"
     },
     {
       "id": "AP-C2",
       "purpose": "空载跟踪及所选连通本体补偿",
       "proposed_schedule": "First representative check after 4b main capabilities stabilize; close remaining evidence at 7a",
       "expected": "Own-model gravity contribution is composed once and actual gripper-center tracking meets pre-frozen task requirements in a feasible region. No equality with old mass/friction/drive/initial-q/trajectory required; no automatic task-object payload.",
-      "status": "NOT_RUN"
+      "status": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO",
+      "current_evidence_ref": "../maintenance/reviews/20261117_g07a_attempt001_partial_acceptance.md",
+      "current_evidence": "Specified MuJoCo CPU/in_process assembled source, own model/TCP/compensation/gripper and same-run full Solution/readback/close evidence; no arbitrary provider or Robot extension."
     },
     {
       "id": "AP-C3",
       "purpose": "现有夹爪控制方式复用",
       "proposed_schedule": "With AP-C2; complete by 7a",
       "expected": "Normal open/close and representative grasp/release with correct opening/feedback and actual source constraints; no duplicate gripper control implementation.",
-      "status": "NOT_RUN"
+      "status": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO",
+      "current_evidence_ref": "../maintenance/reviews/20261117_g07a_attempt001_partial_acceptance.md",
+      "current_evidence": "Specified MuJoCo CPU/in_process assembled source, own model/TCP/compensation/gripper and same-run full Solution/readback/close evidence; no arbitrary provider or Robot extension."
     },
     {
       "id": "AP-C4",
@@ -48,18 +53,19 @@
         "NutAssembly / assembled Panda"
       ],
       "expected": "Per-task same Solution algorithm/strategy and success predicates, actual task success, independent same-run record readback and close in each covered intersection. Four coverage cells do not require four fresh native runs when existing evidence still matches.",
-      "status": "PARTIAL_ORIGINAL_REFERENCES_AVAILABLE",
-      "current_evidence_ref": "../maintenance/reviews/20261113_e11_e16_u4_joint_completion.md",
+      "status": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO",
+      "current_evidence_ref": "../maintenance/reviews/20261117_g07a_attempt001_partial_acceptance.md",
       "coverage_status": {
-        "PickCube / original Panda": "BOUNDED_SUCCESS_REFERENCE_REUSE_PENDING_INPUT_MATCH",
-        "NutAssembly / original Panda": "BOUNDED_SUCCESS_REFERENCE_REUSE_PENDING_INPUT_MATCH",
-        "PickCube / assembled Panda": "SHORT_ROUTE_ONLY_FULL_SOLUTION_NOT_VERIFIED",
-        "NutAssembly / assembled Panda": "FULL_ROUTE_AND_SOLUTION_NOT_VERIFIED"
-      }
+        "PickCube / original Panda": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO_SAME_RUN_SUCCESS",
+        "NutAssembly / original Panda": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO_SAME_RUN_SUCCESS",
+        "PickCube / assembled Panda": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO_SAME_RUN_SUCCESS",
+        "NutAssembly / assembled Panda": "MAINTAINER_ACCEPTED_BOUNDED_MUJOCO_SAME_RUN_SUCCESS"
+      },
+      "current_evidence": "Specified MuJoCo CPU/in_process assembled source, own model/TCP/compensation/gripper and same-run full Solution/readback/close evidence; no arbitrary provider or Robot extension."
     }
   ],
   "acceptance_policy": "Separate auxiliary-case decision. Original G04 commands, three-provider 7+2 effort, BodyWrench, input-spec reset and PickCube success gates remain unchanged. Shared-capability defects affect their original gate; case-specific adaptation or incomplete evidence remains explicit through proposed 7a closeout. Do not silently discard the case or claim full version completion from a G04 pass.",
-  "implementation_and_validation_authority": "Existing Robot and bounded G05 short native evidence are retained. Completing the auxiliary case requires a separately frozen 7a execution package; this handoff starts no execution.",
+  "implementation_and_validation_authority": "2026-11-17 maintainer accepted delivered before-A3 bounded scope; actual 7a attempt001 evidence retained. Further affected changes require their frozen attempt002 package.",
   "qualified_capability": false,
   "scheduling_authority": "2026-11-06 maintainer accepted the clarified version-level use-case arrangement and requested G03 closeout/G04 Sol handoff.",
   "historical_initial_planning": {
@@ -74,12 +80,30 @@
     "note": "Initial 2026-11-06 planning snapshot; later G05 partial implementation is reconciled below, without asserting full case acceptance."
   },
   "handoff_reconciliation": {
-    "date": "2026-11-16",
-    "handoff_ref": "../maintenance/20261116_g07_agent_handoff.md",
+    "date": "2026-11-17",
+    "handoff_ref": "../maintenance/reviews/20261117_g07a_attempt001_partial_acceptance.md",
     "robot_uid": "panda-arm-hand-v1",
     "implementation_ref": "task_env/robots/assembled_panda.py::AssembledPandaAgent",
-    "short_route_evidence_ref": "../maintenance/20261113_e05_e10_u7_delivery.md",
-    "full_case_accepted": false,
-    "note": "Class/recipes and PickCube short public construction exist; no full assembled-robot Solution success is inferred. Nut currently restricts original Panda/profile and requires 7a wiring."
+    "full_case_accepted": true,
+    "scope": "Specified MuJoCo CPU/in_process four intersections and pre-frozen unloaded/model/gripper evidence only. Whole 7a/A3/A4 not accepted; current GeoPhys source not re-run, worker R1-split/default native effort and arbitrary deployment limits retained."
+  },
+  "historical_before_g07a_acceptance": {
+    "date": "2026-11-16",
+    "status": "PARTIAL_IMPLEMENTED_PENDING_7A",
+    "checkpoint_statuses": {
+      "AP-C1": "PARTIAL_G05_SHORT_ROUTE",
+      "AP-C2": "NOT_RUN",
+      "AP-C3": "NOT_RUN",
+      "AP-C4": "PARTIAL_ORIGINAL_REFERENCES_AVAILABLE"
+    },
+    "handoff_reconciliation": {
+      "date": "2026-11-16",
+      "handoff_ref": "../maintenance/20261116_g07_agent_handoff.md",
+      "robot_uid": "panda-arm-hand-v1",
+      "implementation_ref": "task_env/robots/assembled_panda.py::AssembledPandaAgent",
+      "short_route_evidence_ref": "../maintenance/20261113_e05_e10_u7_delivery.md",
+      "full_case_accepted": false,
+      "note": "Class/recipes and PickCube short public construction exist; no full assembled-robot Solution success is inferred. Nut currently restricts original Panda/profile and requires 7a wiring."
+    }
   }
 }

@@ -15,7 +15,7 @@
 - 既有装配`r1_split`的MuJoCo CPU进程内控制可用；隔离worker首个提交会因远端缺少同一存活Controller的分路输出而拒绝。保留该边界，不以本包装配接线声称多Position writer的worker支持。
 - 原／装配Robot的正式Task必须沿共同构建、source和Controller绑定；默认Controller只在已声明的canonical通道、writer、单位和传动下绑定，Task显式选择不得被替换。普通reset验证选择、参数、绑定和状态重建；显式切换仍遵循已有能力范围，不由此扩充装配切换矩阵。
 - 保留正式source/provider能力、单位/三层映射、组合/冲突、generation/stale、partial-write fault、ACK与close检查。不为fixture恢复私有兼容桥、宽泛kwargs、getattr兜底链、吞异常、重复状态/hash或过严token保护；临时诊断与故障注入留外部。
-- 配置和普通caller只补案例实际需要的入口；现有入口足够则不新增CLI或SDK层。SB3/RSL保留固定空间与autoreset边界；LIBERO保留其source、predicate、OSC/gripper cadence。无受影响缺口可按调用/diff与匹配证据结案。
+- 配置和普通caller只补案例实际需要的入口；现有入口足够则不新增CLI或SDK层。SB3/RSL保留固定空间与autoreset边界；LIBERO保留原source、Task predicate与reset语义。2026-11-17维护者revision002改为canonical action／默认恒等Controller真实链优先，再配置合适Controller；允许复用、扩展或必要新Controller，不要求新路线完整复刻OSC或旧500Hz/gripper cadence，但须声明新算法/profile/时钟并以可信可比OSC参考证明空载精度不退步，不能冒称旧OSC/A123等价。共享算法/模型/servo/记录归TaskEnv对应模块，bench仅留来源、任务语义、配置/薄binding及任务oracle。无受影响缺口可按调用/diff与匹配证据结案。
 - 复用仍匹配的强证据，只跑会揭示实际错误的受影响检查。完整案例覆盖的smoke/开闭/抓放不重复运行，不加完整训练、全A123/G06矩阵、性能门或额外笛卡尔积。不按行数、文件数、删行数、PASS数或搬到新大文件评价架构。
 - 普通owner/可读性问题在同一窗口修正，不留给7c、不为每个小问题重新派包。超出原门的能力只登记，不自动开发；若原门确需超出最小适配的新能力，保全具体阻断供维护者决定，不自行删门或扩大范围。
 
@@ -29,6 +29,17 @@
 - **交付／出口：**代表性真实复用、受影响兼容结果和明确未迁列表；不宣布所有任务已统一，也不移除 2.x 承诺保留的 import 名称。
 
 附加用例收口安排（2026-11-06，维护者已采纳）：[装配Panda版本用例](../planning/stage4-assembled-panda.md)在4b主能力稳定后先做空载／夹爪／补偿代表检查，完整的新Robot两任务配置接线与Solution复用在本7a同包收口。原／新机器人×PickCube／Nut四种交集分别留有效成功和独立读回；精确匹配的4c参考直接复用，不固定重跑四次。该用例不替代G04三后端effort／BodyWrench／Controller reset，也不替代本节原有诊断耦合和调用者兼容工作；独立状态见[用例清单](../planning/assembled-panda-use-case.json)。
+
+<a id="g07a-attempt002"></a>
+### 2026-11-17维护者部分接收与attempt002
+
+[A3之前的有界交付已由维护者接收](../maintenance/reviews/20261117_g07a_attempt001_partial_acceptance.md)，保留当前源码GeoPhys未按限定重跑、worker R1-split、默认effort未native验证等限制；不据此宣布全部7a或7b通过。A3与A4进入[attempt002](../maintenance/work-packages/20261117_g07a_attempt002_goal.md)，准备不消耗attempt，实际启动才由1变2。
+
+本窗口另包含维护者指定的`public/v2.1.1-asset-skills`冻结`3da60b74fa8918f996d5abc4a3f93780c67b5d5f`向G07分支的本地整合。该来支含资产Skill/服务、TaskHarness及旧PickCube修补，须逐语义保全当前owner/已接收行为；不恢复退役Env/Isaac Task路径。外部资产工作流编排与TaskEnv物理Runtime须按真实状态/推进/关闭owner区分，不按名称批量删改。只整合适用源码与定向验证，不自动下载模型、安装/注册MCP、部署服务、追未来PR或合并其他未指定分支。合并/修复影响已有证据时才定向复验，不能整树选旧实现或机械重跑所有AP。
+
+A3默认Controller必须按声明通道真实绑定并执行非零canonical action，旧pose/gripper不能当effort透传；所选Controller经公共配置、typed提交和唯一Runtime推进。旧`controller_tracking_002`已恢复为joint-space PD-v6而非OSC，其12mm门不能作为新精度不退步标准；先恢复可信OSC身份/同输入oracle，必要最短参考也计入本窗口。A4按真实新payload保全正式Recorder/reader及当前门/身份/关闭关联。
+
+总连续wall硬上限240分钟，包含实现、合并、验证、实际阻塞问答/等待、报告及提交；不因subagent/换线程重置。维护者明确允许实施者/subagent就实际阻塞点向规划线程提问，规划者可在原范围回应，仍保持单writer、原共享锁和native累计预算；该授权取代旧“一律不发送执行中补充”的绝对限制，不允许无问叠加新任务或超范围默示批准。7b/7c与原9/9门不变，本窗口不自动启动后续阶段。
 
 <a id="7b"></a>
 ## 7b：稳定输入下的最终矩阵
@@ -50,4 +61,4 @@
 
 ## 发布边界
 
-当前文档与阶段接收不授权 push／merge／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。
+当前文档与阶段接收不自动授权发布操作。2026-11-17维护者仅授权上述冻结开发分支合入G07的本地merge；不授权合并回develop/main、push／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。

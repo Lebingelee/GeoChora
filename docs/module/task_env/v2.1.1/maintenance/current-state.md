@@ -1,12 +1,12 @@
 # v2.1.1 当前状态
 
-更新时间：2026-11-16。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
+更新时间：2026-11-17。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
 ## 当前停门
 
-G07／7a revision003已实际启动，但维护者于2026-11-16T22:02:29+08:00停止旧实施者，当前为USER_INTERRUPTED_AWAITING_MANUAL_HANDOFF／attempt001；7b/7c仍为PLANNED／attempt0。新对话由维护者自行转发[工作包索引](work-packages/20261116_g07a_attempt001_goal.md)中的续接包，不再自动派发旧线程；续接沿同一attempt001保留原启动记录、未完成工作和预算实耗。分支为`codex/v211-stage7-integration`，原执行输入HEAD `7862433c`；转交时实际文档后继HEAD与dirty字节以续接快照为准。已保留SB3/RSL提前拒绝及对应测试的4个未提交改动，尚无测试结果、AP通过或完整返包，不能视为接收。G07继续以案例驱动代码复审和集成收尾为主，按[本阶段代码约束](../goals/07-integration.md#g07-code-constraints)与已结案优化总账实施最小必要改动，原装配用例及7b九格不删减。实时状态见[编排索引](orchestration.json)。
+G07／7a attempt001的A3之前有界交付已于2026-11-17由维护者[部分接收](reviews/20261117_g07a_attempt001_partial_acceptance.md)，生产HEAD `73e5ea2f`，分支`codex/v211-stage7-integration`。原/装配Panda×PickCube/Nut的指定MuJoCo交集、预冻空载/本体补偿与共同绑定证据保留；GeoPhys当前源码未按限定重跑，旧8mm成功只证明旧身份，不能升为当前全后端通过。A3/A4与新增的冻结`public/v2.1.1-asset-skills`本地整合进入[attempt002工作包](work-packages/20261117_g07a_attempt002_goal.md)，当前READY_FOR_MANUAL_FORWARD_NOT_STARTED，执行者未指派，计数仍1；实际启动后才为2。总连续wall≤240分钟（含问答/等待与收尾），允许真实阻塞点向规划线程提问；不在准备阶段启动Goal/native/合并。A3采用canonical/default真实链优先、合适Controller及可信OSC空载不退步的新决定，共享能力归TaskEnv，持续按[本阶段代码约束](../goals/07-integration.md#g07-code-constraints)和已结案优化总账收尾。7b/7c仍PLANNED／attempt0，原九格未启动；实时状态见[编排索引](orchestration.json)。
 
-**G01～G06 canonical范围有界结案，G07与版本收口待实施。** 维护者在6c主审后要求收尾G06；[开发实施总结](g06/implementation-summary.md)与[证据索引](g06/evidence-index.json)统一记录基本要求、abc成果、测试/性能、submodule和未覆盖项。生产代码结案`4332844f`；GeoPhys pin`198d30ac`，Menagerie`b846dd12`。该次结案后继提交仅文档/索引、没有native重跑；其后维护者另行授权的scalar/batch render修复与当前结果见[渲染收尾](20261116_scalar_render_followup.md)。不自动启动R3/G07。
+**G01～G06 canonical范围有界结案；G07 7a部分接收，7b/7c与版本收口待实施。** 维护者在6c主审后要求收尾G06；[开发实施总结](g06/implementation-summary.md)与[证据索引](g06/evidence-index.json)统一记录基本要求、abc成果、测试/性能、submodule和未覆盖项。生产代码结案`4332844f`；GeoPhys pin`198d30ac`，Menagerie`b846dd12`。该次结案后继提交仅文档/索引、没有native重跑；其后维护者另行授权的scalar/batch render修复与当前结果见[渲染收尾](20261116_scalar_render_followup.md)。不自动启动R3/G07。
 
 6a、6b、6c独立主审分别为[6a](reviews/20261115_g06a_attempt002_acceptance.md)、[6b](reviews/20261116_g06b_attempt003_acceptance.md)、[6c](reviews/20261116_g06c_attempt001_acceptance.md)，普通attempt计数2/3/1。三后端×两任务CUDA native batch、canonical action、设备Task/state、相机/窗口独立、same-step终止帧、部分reset及两个任务固定Rasterizer的Isaac→MJWarp→Isaac已成立。GeoPhys限显式discrete/contact32/coupled32配置，跨provider未准入；shared scene不承诺视觉隔离。R3、旧scalar SHA迁移、AOT/上游反向合并等后续或暂缓边界不记通过。
 
