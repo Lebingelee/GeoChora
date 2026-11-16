@@ -365,6 +365,23 @@ def compose_declared_reference_source(compiled, *, robot, controller_profile,
                                    task_source, scene, projected, reset_plan)
 
 
+def panda_position_controller_options(compiled, *, request, robot, intent, profile_id,
+                                      dynamic_profile, force_limit_N, task_body_names,
+                                      task_site_transfers, joint_velocity_limit_rad_s=None):
+    """Resolve the selected source model before the common Position Controller build."""
+    options = dict(profile_id=profile_id, dynamic_profile=dynamic_profile,
+                   force_limit_N=force_limit_N)
+    if joint_velocity_limit_rad_s is not None:
+        options['joint_velocity_limit_rad_s'] = joint_velocity_limit_rad_s
+    if intent is not None and intent.mode == 'replace' and profile_id == 'r3_continuous_v1':
+        if (request.provider, request.backend) != ('mujoco', 'cpu'):
+            raise ValueError('fixed Robot R3 model requires MuJoCo CPU')
+        from .mujoco_composition import fixed_robot_kinematics
+        options['kinematics_model'] = fixed_robot_kinematics(compiled.source,
+            robot=robot, task_body_names=task_body_names, task_site_transfers=task_site_transfers)
+    return options
+
+
 def build_panda_reference_stages(*, source_format, backend, controller_profile,
                                  prepare_source, source_context, compile_control,
                                  robot_uid, task_source_path, task_source_paths,
@@ -572,16 +589,11 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
             compile_control=finish_control)
     from ...controllers.canonical.execution import build_reference_position_controller
     def position_options(compiled, context, request):
-        options = dict(profile_id=controller_profile, dynamic_profile=context.dynamic_profile,
-            force_limit_N=force_limit_N, joint_velocity_limit_rad_s=velocity_limit)
-        if context.composition.intent.mode == 'replace' and controller_profile == 'r3_continuous_v1':
-            if (request.provider, request.backend) != ('mujoco', 'cpu'):
-                raise ValueError('fixed Robot R3 model requires MuJoCo CPU')
-            from .mujoco_composition import fixed_robot_kinematics
-            options['kinematics_model'] = fixed_robot_kinematics(compiled.source,
-                robot=context.robot, task_body_names=task_body_names,
-                task_site_transfers=task_site_transfers)
-        return options
+        return panda_position_controller_options(compiled, request=request, robot=context.robot,
+            intent=context.composition.intent, profile_id=controller_profile,
+            dynamic_profile=context.dynamic_profile, force_limit_N=force_limit_N,
+            joint_velocity_limit_rad_s=velocity_limit, task_body_names=task_body_names,
+            task_site_transfers=task_site_transfers)
     return SourceBoundTaskBuilder(
         compile_source, None, backend=backend, allow_sampled_reset=False,
         source_composer=compose, controller_factory=build_reference_position_controller,

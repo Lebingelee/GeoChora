@@ -6,10 +6,10 @@
 
 | Robot／Task | seed | 控制步／边界 | caller 完成与任务成功 | H5 SHA-256 |
 | --- | --- | --- | --- | --- |
-| 原 Panda／PickCube | 31 | 960／961 | done，成功，close | `4d90e80b503429ba510040c8870d9f54319bf858366f1396a275e6a30c41b682` |
-| 装配 Panda／PickCube | 31 | 946／947 | done，成功，close | `89adee65c416174a36c4f9d5382ccef04c8b1e2ec96d24f9c70ad6de0c620ee9` |
-| 原 Panda／Nut | 19 | 2377／2378 | done，strict／planned 完成，成功，close | `4a49bfa6937116991e38946fa7a58fbcc9caa7e5f28629ea3499722200eb681d` |
-| 装配 Panda／Nut | 19 | 2378／2379 | done，strict／planned 完成，成功，close | `ea9cab5c92a606d9b4cb47832059141ce304bbc5bf3e2ead7c8f8be6ce85bfba` |
+| 原 Panda／PickCube | 31 | 960／961 | done，成功，close | `69b446c4711e6af1697dbb69d9c2f945cfa4b24b9f2dc4603a0fbb6760d83bc4` |
+| 装配 Panda／PickCube | 31 | 946／947 | done，成功，close | `aae41cb7a36a598220b5adb1076b3a6e41fe778bdb4e81473e95ac2d8578de6f` |
+| 原 Panda／Nut | 19 | 2377／2378 | done，strict／planned 完成，成功，close | `d554e32c6eb0b485e65af889c100eac76f5c190494a5c465e75eb16305e61bfa` |
+| 装配 Panda／Nut | 19 | 2378／2379 | done，strict／planned 完成，成功，close | `f462664883fce1f33a4ed28141793209efbc7eb4d959a4ae543f4258438e5184` |
 
 装配 PickCube 原始失败保留：close 从 608 步持续到 1000 步上限，未进入 lift；修正 source 驱动参数后 close 为 84 步，最终 lift 105.3 mm。装配本体的冻结精度路径在 300 个 control interval、1500 个 native substep 下满足预定 2 mm／0.03 rad 容差；300 个提交 ACK，补偿样本无目标限幅或力限标记。最终 source 模型的独立 MuJoCo 运动学、Jacobian 和重力 oracle 通过。R1、R1-split 的进程内短运行通过；隔离 worker 的 R1 通过，R1-split 首次提交被现有 owner 校验拒绝，不能宣称该 worker 组合受支持。
 
@@ -18,3 +18,16 @@ SB3／RSL 对 coordinated device 提前拒绝，同时保留 host masked autores
 **未闭合：**当前 pin 的原 Panda GeoPhys Nut 运行在开爪释放时超时，独立 H5 读回确认任务失败且 close 返回；旧成功运行使用不同 Core／GeoPhys 身份，原因未确定。用户将该问题交由单独侧边 agent 排查；本包不修改 provider solver 或 Solution 策略，也不将该格计为通过。A2 因此未通过，整体 7a 不得宣称通过或接收；旧 device、LIBERO 和文档／锁／最终提交等逐门结论以本地报告的最新记录为准。7b 三 backend × 三 seed 仍为 NOT_RUN。
 
 `git diff --check` 在此前检查通过；current 文档校验仅报告已知的 `MUJOCO_LOG.TXT` 保护基准差异，实际保护文件 SHA 仍为 `3b08b858f62dcbaa6521802455c76126f9876a3d6727c7586db90c94296ed6a8`。最终交接前须重新校验状态、预算和关闭回执；不 push、merge、tag 或发布。
+
+## 共同构建与 reset 的补充复核
+
+维护者要求在原 G05 单元4／优化账本边界内核对真实构建、默认 Controller、显式选择及 reset。初版提交将 Nut 的装配模型选择重复放在 Task binding 中；续接已归回既有 source composition adapter，两任务均调用同一 Position Controller 选项 owner，再沿原共同 binding 进入 Runtime。上表是该补充调整后的四条完整运行；此前初版轨迹和失败记录仍保留在本地报告。
+
+| 规范条目 | 实际调用链与处理 | 当前验证／限制 |
+| --- | --- | --- |
+| 共同构建／source | `make_env → selected_binding → SourceBoundTaskBuilder → source composition adapter → Controller → 公共 binding`；Robot 保留 recipe、Frame、Joint、传动 | 原／装配及两任务的 7 个已准入配置，经真实动作和普通 reset 验证；不声明任意装配树或 provider |
+| 默认 Controller | 装配 Robot 提供稳定未绑定对象，既有 `bind_many` 绑定真实来源 arm／hand canonical writer | 两个实际 Task 的 native MuJoCo 模型核对关节、执行器、tendon、范围和 .5／.5 耦合；错误单位和外源拒绝。绑定后的 typed effort 计算使用明确标记的 synthetic physical boundary，**未在 Position Task 中提交 native 默认力控制** |
+| 显式 Controller 匹配 | R1、R1-split、R3 保留 Task 选择，复用既有 source／scene／writer 绑定与提交；不以默认对象替换 | 两任务各自受支持配置的绑定和真实 step／ACK 通过，错误装配拒绝；R1-split 隔离 worker 限制仍保留 |
+| 普通 reset | 既有 reset reconstruction 重建同一选择、参数、source binding 和 Controller 状态 | 7 个真实配置各作两次 reset 及动作，比较初态、profile、参数和绑定；不把普通 reset 当作任意 profile 切换证明 |
+
+补充代码下四个同运行完整轨迹均已独立 readback 并正常 close；记录的 61、65、66、66 个 source 文件哈希分别与实际代码一致。轨迹 revision 是未提交调整时的父提交 `cd8a6362`，逐文件哈希提供实际源码身份。共享 native 锁被其他工作持有时未并行启动。审查和各门最终状态以[同一续接报告](../../../../../workspace/maintenance/v211_g07a_attempt001/continuation001/report.md)及其原始回执为准。

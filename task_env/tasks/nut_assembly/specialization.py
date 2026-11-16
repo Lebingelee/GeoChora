@@ -395,20 +395,23 @@ def _reference_builder(*, include_solution, resolved_config=None, lift_height_m=
     dynamic = load_r3_dynamic_profile()
     profile = (resolved_config.control.profile_id if resolved_config is not None
                else NutAssemblyReferenceEnv.selected_default_controller_profile())
-    from ...runtime.sessions.source_composition_adapters import reference_task_source_robot
+    from ...runtime.sessions.source_composition_adapters import (
+        panda_position_controller_options, prepare_robot_source_intent, reference_task_source_robot,
+    )
     source_robot = None if robot is None else reference_task_source_robot(robot, profile)
 
     def controller_options(compiled, context, request):
-        options = dict(profile_id=profile, dynamic_profile=dynamic,
-            force_limit_N=context.task_config['recipe']['controller']['force_cap_N'])
-        if robot is not None and source_robot is None:
-            if (request.provider, request.backend) != ('mujoco', 'cpu'):
-                raise ValueError('fixed Robot R3 model requires MuJoCo CPU')
-            from ...runtime.sessions.mujoco_composition import fixed_robot_kinematics
-            options['kinematics_model'] = fixed_robot_kinematics(compiled.source,
-                robot=robot, task_body_names=NutAssemblyReferenceEnv.robot_source_roots,
+        intent = None
+        if robot is not None:
+            intent, _ = prepare_robot_source_intent(compiled.source, robot=robot,
+                controller_profile=profile, existing_robot_entity=NutAssemblyReferenceEnv.default_robot_source_uid,
+                task_body_names=NutAssemblyReferenceEnv.robot_source_roots,
                 task_site_transfers=NutAssemblyReferenceEnv.robot_source_site_transfers)
-        return options
+        return panda_position_controller_options(compiled, request=request, robot=robot,
+            intent=intent, profile_id=profile, dynamic_profile=dynamic,
+            force_limit_N=context.task_config['recipe']['controller']['force_cap_N'],
+            task_body_names=NutAssemblyReferenceEnv.robot_source_roots,
+            task_site_transfers=NutAssemblyReferenceEnv.robot_source_site_transfers)
     return SourceBoundTaskBuilder(
         lambda request: _compile_reference_source(request, resolved_config=resolved_config,
             lift_height_m=lift_height_m, task_config=task_config, robot=source_robot),

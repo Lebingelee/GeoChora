@@ -906,6 +906,68 @@ def test_assembled_composition_uses_the_robot_selected_by_the_common_entry(monke
         env.close()
 
 
+@pytest.mark.parametrize(('uid', 'profile'), [
+    ('pick-cube-p16-reference-v1', 'r1'),
+    ('pick-cube-p16-reference-v1', 'r1_split'),
+    ('pick-cube-p16-reference-v1', 'r3_continuous_v1'),
+    ('nut-assembly-outcome-reference-v1', 'r3_continuous_v1'),
+])
+def test_assembled_task_rebuilds_its_selected_controller_on_reset(uid, profile, monkeypatch):
+    """Exercise the formal caller, common source owner and ordinary reset twice."""
+    import numpy as np
+    from task_env import make_env
+    from task_env.runtime.sessions import source_composition_adapters as adapters
+
+    calls = []
+    original = adapters.panda_position_controller_options
+    def capture(compiled, **kwargs):
+        result = original(compiled, **kwargs)
+        calls.append((kwargs['robot'], kwargs['intent'].mode, kwargs['profile_id'], result))
+        return result
+    monkeypatch.setattr(adapters, 'panda_position_controller_options', capture)
+    env = make_env(uid, config={
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu', 'deployment': 'in_process'},
+        'episode': {'horizon': 100}, 'robot': {'uid': 'panda-arm-hand-v1'},
+        'controller': {'profile_id': profile},
+    })
+    try:
+        controllers, source_ids, joint_states, parameters, binding_ids = [], [], [], [], []
+        for _ in range(2):
+            obs, info = env.reset(seed=19 if uid.startswith('nut-') else 31)
+            robot, controller, state = env.binding.robot, env.controller, env.state
+            assert env.resolved_public_config.controller_profile == profile
+            assert controller is not robot.default_controller and not robot.default_controller.is_bound
+            assert state.control_step == 0 and state.simulation_time == pytest.approx(0.)
+            controllers.append(controller)
+            source_ids.append(env.value['source'].source_closure_digest)
+            parameters.append((controller.config, controller.gripper_config))
+            binding_ids.append(env.value['source'].position_subject_binding.plan.identity_hash)
+            joint_states.append(tuple(state.joint_position[f'panda-v1/joint{i}'] for i in range(1, 8)))
+            if uid.startswith('nut-'):
+                solution = env.value['solution_factory']()
+                solution.reset(obs, info, env.metadata)
+                action = solution.act(obs, info)
+                obs, reward, terminated, truncated, info = env.step(action)
+                solution.observe(obs, reward, terminated, truncated, info)
+            else:
+                pose = state.pose_world['panda-v1/ee']
+                action = np.asarray([*pose.position, *pose.quaternion_wxyz, -1.], dtype=np.float32)
+                _, _, terminated, truncated, _ = env.step(action)
+            assert not terminated and not truncated and env.state.control_step == 1
+            assert env.session._last_control_submission['status'] == 'acknowledged'
+        assert controllers[0] is not controllers[1]
+        assert controllers[0].identity == controllers[1].identity
+        assert source_ids[0] == source_ids[1] and joint_states[0] == pytest.approx(joint_states[1])
+        assert parameters[0] == parameters[1] and binding_ids[0] == binding_ids[1]
+        assert len(calls) >= 2
+        assert all(robot is env.binding.robot and intent == 'replace' and selected == profile
+                   for robot, intent, selected, _ in calls)
+        if profile == 'r3_continuous_v1':
+            assert all('kinematics_model' in options for _, _, _, options in calls)
+    finally:
+        env.close()
+
+
 def test_assembled_composition_rejects_robot_attachment_mismatch(monkeypatch):
     from dataclasses import replace
     from task_env import make_env
