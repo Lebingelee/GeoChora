@@ -74,6 +74,7 @@ def _terminate(proc: subprocess.Popen, grace: float) -> None:
 
 
 def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
+    raise RuntimeError('retired historical native supervisor; use the current canonical-lock Harness')
     plan_path = plan_path.resolve(strict=True)
     sidecar = sidecar.resolve(strict=True)
     plan_raw = plan_path.read_bytes()
@@ -137,7 +138,7 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
     lock_path = Path(limits["shared_native_lock_path"]).resolve()
     output_dir = Path(plan["output"]["run_dir"]).resolve()
     supervisor_receipt = Path(receipt_path).resolve()
-    lock = lock_path.open("a+")
+    lock = lock_path.open("r+")
     acquired, process = False, None
     start = time.monotonic()
     max_rss, peak_pids, reason = 0, [], None

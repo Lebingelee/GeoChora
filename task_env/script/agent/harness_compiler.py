@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import math
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 if __package__:
@@ -46,7 +47,7 @@ class CompiledTask:
     route: dict | None = None
 
     def env_class(self):
-        from task_env.tasks.reference_env import SelectedReferenceEnv
+        from task_env.environment.reference_env import SelectedReferenceEnv
         compiled_horizon=self.horizon
         declared=(self.provider,self.backend)
         binding=self.binding
@@ -168,10 +169,12 @@ def resolve_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
     selected_config = {
         'execution': {'physics_provider': spec.provider, 'physics_backend': spec.backend,
                       'physics_device': spec.device,
+                      **({'deployment': 'in_process', 'interpreter': sys.executable}
+                         if spec.provider == 'isaacsim' else {}),
                       **({'source_delivery_manifest': spec.source_delivery_manifest}
                          if spec.source_delivery_manifest is not None else {})},
         'episode': {'horizon': spec.horizon_control_ticks},
-        'task': {'controller_profile': spec.controller_profile},
+        'controller': {'profile_id': spec.controller_profile},
     }
     if spec.provider != 'isaacsim':
         provider_row = catalog.get('providers', {}).get(spec.provider)
@@ -298,7 +301,7 @@ def _compile_isaac_candidate(spec,catalog,route):
     envelope and success thresholds) may vary; scene geometry, external MJCF
     proxies, timebase and horizons above 1000 ticks are refused with
     provider-locality findings. Construction is delegated to the Core PickCube
-    owner (``make_reference_binding``/``build_isaac_reference``); the Harness
+    owner (``make_reference_binding(...).build_for_request``); the Harness
     adds no provider adapter or scene editor.
     """
     import copy
@@ -364,12 +367,12 @@ def _compile_isaac_candidate(spec,catalog,route):
         episode=replace(default_config.episode,horizon=spec.horizon))
     manifest_path=isaac_route['delivery_manifest']
     try:
-        from task_env.tasks.pick_cube.task import build_isaac_reference, make_reference_binding
+        from task_env.tasks.pick_cube.specialization import make_reference_binding
         binding=make_reference_binding(controller_profile=ISAAC_CONTROLLER_PROFILE,source_delivery_manifest=manifest_path,
-            resolved_config=resolved_config,task_config=task_config)
-        initial=build_isaac_reference(delivery_manifest=manifest_path,task_seed=ISAAC_CONSTRUCTION_SEED,horizon=spec.horizon,
-            include_solution=False,controller_profile=ISAAC_CONTROLLER_PROFILE,resolved_config=resolved_config,
-            task_config=task_config)
+            resolved_config=resolved_config,task_config=task_config,interval_provider='isaacsim')
+        # develop retired build_isaac_reference; the binding's own source builder
+        # is now the single Isaac construction owner.
+        initial=binding.build_for_request('isaacsim',route['backend'],ISAAC_CONSTRUCTION_SEED,spec.horizon)
     except ImportError as error:
         # OpenUSD (pxr) and the GeoPhys scene importer are interpreter facts, not spec defects.
         reject('isaac_construction_dependencies','',f'{type(error).__name__}: {error}',
@@ -416,7 +419,7 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         compile_panda_box_artifact, compile_panda_box_source)
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
     from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig,PickCubeReadinessSolution
-    from task_env.tasks.reference_env import ReferenceTaskBinding
+    from task_env.environment.reference_binding import ReferenceTaskBinding
     from task_env.objects.pick_cube import CUBE_HALF_SIZE,CUBE_CONTACT_MARGIN
     from task_env.controllers.canonical import ProductionCanonicalPandaController
     from task_env.planners.completion import ExpertExecutionInfo
@@ -500,7 +503,8 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
             for name in ('harness_compiler.py','harness_spec_schema.py')}
         for name in ('task_env/tasks/pick_cube/task.py','task_env/tasks/pick_cube/solution.py',
                      'task_env/assembly/panda_box.py','task_env/assembly/compiler.py',
-                     'task_env/environment/task_source.py','task_env/controllers/canonical/production.py'):
+                     'task_env/environment/task_source.py','task_env/controllers/canonical/production.py',
+                     'task_env/robots/panda.py','task_env/observations/selected_reference.py'):
             path=Path(catalog['core_repo'])/name
             if path.is_file():source_ids[name]=hashlib.sha256(path.read_bytes()).hexdigest()
         return dict(construction_id='harness-pick-lift-v0',artifact=artifact,source=source,
@@ -535,8 +539,18 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         return {'execution_info':ExpertExecutionInfo('expert-execution-info-v1',env.state.control_step,
             env.state.simulation_time,env.controller.readiness(env.state,env.feedback))}
 
-    binding=ReferenceTaskBinding(build=build,reset_sample=sample_reset,evaluate=evaluate_lift,
-        object_poses=(('cube-v1','cube_v1'),),external_actions=True,interval_mode='grouped',recorder_mode='canonical',
+    from task_env.robots.panda import PandaAgent, panda_reference_control_binding
+    from task_env.controllers.canonical.contracts import (
+        REFERENCE_POSE_ACTION_SCHEMA, reference_pose_action, reference_pose_action_space,
+    )
+    from task_env.observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
+    binding=ReferenceTaskBinding(build=lambda request: build(request.provider),reset_sample=sample_reset,evaluate=evaluate_lift,
+        action_schema=REFERENCE_POSE_ACTION_SCHEMA,action_space_factory=reference_pose_action_space,
+        prepare_action=reference_pose_action,
+        observation_space_factory=selected_reference_observation_spaces,observation_projection=build_selected_observation,
+        scalar_control_binding=panda_reference_control_binding(),
+        robot=PandaAgent(), object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
+        interval_mode='grouped',recorder_mode='canonical',
         reset_expert_kwargs=execution_info,observe_expert_kwargs=lambda env,guard:execution_info(env))
     return CompiledTask(artifact,binding,spec_hash,artifact.identity_hash,spec.horizon,
         hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),

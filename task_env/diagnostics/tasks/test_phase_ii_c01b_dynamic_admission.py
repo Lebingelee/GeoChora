@@ -67,7 +67,8 @@ def test_selected_artifact_requirements_admit_against_selected_build_manifest(
     materializations = []
     sentinel = object()
 
-    def materialize_admitted(actual_artifact, actual_execution, actual_source):
+    def materialize_admitted(actual_artifact, actual_execution, actual_source, *, mixed_actuator_plan):
+        assert mixed_actuator_plan is actual_source.mixed_actuator_plan
         materializations.append((actual_artifact, actual_execution, actual_source))
         return sentinel
 
@@ -128,7 +129,7 @@ def test_actual_manifest_rejects_task_requirement_even_if_caller_manifest_expand
     monkeypatch.setattr(
         runtime_api,
         "_materialize_admitted",
-        lambda *args: native_calls.append(args),
+        lambda *args, **kwargs: native_calls.append((args, kwargs)),
     )
 
     with pytest.raises(CapabilityAdmissionError, match="contact_detection"):
@@ -167,7 +168,7 @@ def test_restrictive_manifest_and_execution_mismatch_fail_before_native_creation
     monkeypatch.setattr(
         runtime_api,
         "_materialize_admitted",
-        lambda *args: native_calls.append(args),
+        lambda *args, **kwargs: native_calls.append((args, kwargs)),
     )
 
     with pytest.raises(CapabilityAdmissionError, match="frame_pose_query"):
@@ -191,7 +192,7 @@ def test_unsupported_render_selection_fails_before_native_creation(monkeypatch):
     monkeypatch.setattr(
         runtime_api,
         "_materialize_admitted",
-        lambda *args: native_calls.append(args),
+        lambda *args, **kwargs: native_calls.append((args, kwargs)),
     )
 
     with pytest.raises(ValueError, match="rendering is unsupported"):
@@ -201,3 +202,14 @@ def test_unsupported_render_selection_fails_before_native_creation(monkeypatch):
             source=source,
         )
     assert native_calls == []
+
+
+def test_f06_artifact_cannot_expand_its_own_provider_capabilities():
+    from types import SimpleNamespace
+    from task_env.artifacts import CapabilityAdmissionError, RequiredCapabilitySet, admit_capabilities
+    from task_env.runtime.sessions.api import _f06_pickcube_isaac_capability_manifest
+    artifact = SimpleNamespace(required_capabilities=RequiredCapabilitySet(('joint_torque_actuation',)))
+    manifest = _f06_pickcube_isaac_capability_manifest(artifact)
+    assert 'joint_torque_actuation' not in {claim.name for claim in manifest.capabilities}
+    with pytest.raises(CapabilityAdmissionError, match='joint_torque_actuation'):
+        admit_capabilities(artifact.required_capabilities, manifest)

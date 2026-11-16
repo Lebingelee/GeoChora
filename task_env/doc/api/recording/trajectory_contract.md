@@ -11,7 +11,7 @@
 
 **Kind**：frozen dataclass；**Defined in**：`trajectory.py`
 
-字段包括 `observations`、`actions`、`universal_actions`、`rewards`、`successes`、`terminated`、`truncated`、`infos`、`reset_info`、`record_metadata`、`stop_reason`。`transition_count` 是 `len(actions)`；`validate()` 要求 observations 为 **T+1**，其余 transition 字段为 **T**，否则抛 `ValueError`。`universal_actions` 始终表示经过 controller/native adapter 的 canonical runtime-facing action；其维度和组件由 `universal_action_schema` 声明，不把 non-arm 强行填充为 Panda 八维。
+字段包括 `observations`、`actions`、`universal_actions`、`rewards`、`successes`、`terminated`、`truncated`、`infos`、`reset_info`、`record_metadata`、`stop_reason`，以及可选的 `structured_controls`、`boundary_events`、`outcome`。`transition_count` 是 `len(actions)`；`validate()` 要求 observations 为 **T+1**，各 transition 字段为 **T**，存在的 structured control 数量也为 **T**，并校验 outcome 与 boundary events，否则抛 `ValueError`。`universal_actions` 表示经过 controller/native adapter 的 canonical runtime-facing action；其维度和组件由 `universal_action_schema` 声明，不把 non-arm 强行填充为 Panda 八维。
 
 ## `TransitionRecorder`
 

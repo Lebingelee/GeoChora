@@ -55,6 +55,52 @@ class CameraSensor:
             up=up,
         )
 
+    def resolve_device_pose(self, state, *, world_offsets=None):
+        """Resolve batched camera position/look-at/up from named device poses.
+
+        Positions are environment-local until optional renderer layout offsets
+        are applied here. Quaternions use WXYZ; local forward is +X and up +Z.
+        """
+        import torch
+
+        count, device = state.num_envs, state.device
+        if self.spec.frame == 'world':
+            parent_position = torch.zeros((count, 3), dtype=torch.float32, device=device)
+            parent_quaternion = torch.zeros((count, 4), dtype=torch.float32, device=device)
+            parent_quaternion[:, 0] = 1.
+        else:
+            prefix = 'body' if self.spec.frame == 'body' else 'frame'
+            parent_position = state.arrays[f'{prefix}_position'][:, self._parent_id]
+            parent_quaternion = state.arrays[f'{prefix}_orientation'][:, self._parent_id]
+        norms = torch.linalg.vector_norm(parent_quaternion, dim=-1, keepdim=True)
+        if (not bool(torch.isfinite(parent_position).all())
+                or not bool(torch.isfinite(parent_quaternion).all()) or bool((norms < 1e-12).any())):
+            raise ValueError('camera parent device pose must be finite with a nonzero quaternion')
+        parent_quaternion = parent_quaternion / norms
+        local_q = torch.as_tensor(normalize_quat_wxyz(self.spec.quaternion_wxyz),
+                                  dtype=torch.float32, device=device)
+        local_p = torch.as_tensor(self.spec.position, dtype=torch.float32, device=device).expand(count, -1)
+
+        def rotate(quaternion, vector):
+            xyz = quaternion[..., 1:]
+            return vector + 2. * torch.linalg.cross(xyz, torch.linalg.cross(xyz, vector, dim=-1)
+                                                   + quaternion[..., :1] * vector, dim=-1)
+
+        parent_xyz = parent_quaternion[:, 1:]
+        world_q = torch.cat((parent_quaternion[:, :1] * local_q[0]
+                             - (parent_xyz * local_q[1:]).sum(dim=1, keepdim=True),
+                             parent_quaternion[:, :1] * local_q[1:]
+                             + local_q[0] * parent_xyz
+                             + torch.linalg.cross(parent_xyz, local_q[1:].expand(count, -1), dim=-1)), dim=1)
+        position = parent_position + rotate(parent_quaternion, local_p)
+        if world_offsets is not None:
+            if tuple(world_offsets.shape) != (count, 3) or str(world_offsets.device) != device:
+                raise ValueError('camera world offsets must be device-resident (B, 3)')
+            position = position + world_offsets
+        forward = torch.tensor((1., 0., 0.), dtype=torch.float32, device=device).expand(count, -1)
+        up = torch.tensor((0., 0., 1.), dtype=torch.float32, device=device).expand(count, -1)
+        return torch.stack((position, position + rotate(world_q, forward), rotate(world_q, up)), dim=1)
+
     def metadata(self, snapshot: RuntimeSnapshot) -> CameraMetadata:
         pose = self.resolve_pose(snapshot)
         return CameraMetadata(

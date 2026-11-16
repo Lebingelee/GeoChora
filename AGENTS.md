@@ -21,7 +21,7 @@
 ## Canonical references
 
 - System and ownership: [architecture](docs/global/architecture.md), [ownership](docs/global/ownership.md).
-- Current TaskEnv: [version index](docs/module/task_env/README.md), [v2.1.0 candidate API](docs/module/task_env/v2.1.0/api/public-api.md), [Task Artifact](docs/module/task_env/v2.1.0/contracts/task-artifact.md), and [Qualification boundaries](docs/module/task_env/v2.1.0/contracts/qualification.md).
+- Current TaskEnv: [version index](docs/module/task_env/README.md), [v2.1.1 current state](docs/module/task_env/v2.1.1/maintenance/current-state.md), [v2.1.1 API](docs/module/task_env/v2.1.1/api/README.md), and [v2.1.1 capability matrix](docs/module/task_env/v2.1.1/capabilities/capability-matrix.json). The [v2.1.0 candidate API](docs/module/task_env/v2.1.0/api/public-api.md), [Task Artifact](docs/module/task_env/v2.1.0/contracts/task-artifact.md), and [Qualification boundaries](docs/module/task_env/v2.1.0/contracts/qualification.md) retain their versioned scope.
 - Version records: [v1.1.0 published baseline](docs/releases/v1.1/README.md), [v2.0.0 frozen source snapshot](docs/releases/v2.0.0/README.md), and [v2.1.0 local candidate](docs/releases/v2.1.0/README.md). The v2.1.0 matrix records bounded evidence; it is not a new Qualification.
 - Current direction: [v2.1.0 roadmap and follow-ups](docs/roadmap/README.md).
 - Repository governance: [.agents/skills/geochora/SKILL.md](.agents/skills/geochora/SKILL.md), [documentation](.agents/skills/geochora-doc-governance/SKILL.md), [architecture](.agents/skills/geochora-architecture-refactor/SKILL.md), [public API](.agents/skills/geochora-public-api-governance/SKILL.md), [tests](.agents/skills/geochora-test-governance/SKILL.md), and [TaskEnv](.agents/skills/geochora-task-env/SKILL.md).
@@ -68,6 +68,21 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   not prove an end-to-end task/provider capability.
 - Do not read provider-private solver or renderer state to compensate for a
   missing public capability.
+
+## Diagnostics and core code
+
+- Follow the [diagnostic and code-boundary standard](docs/global/diagnostics-and-code-boundaries.md)
+  for all core classes/functions, including Env, Controller, provider and renderer adapters.
+- Implement experiments outside Core using normal APIs, composition/wrappers,
+  diagnostic subclasses or scoped test injection. Do not add experiment/test-name
+  branches, probe switches or imports from diagnostics/tests to production paths.
+- Keep legitimate capability, validation, fault and lifecycle checks. Existing
+  diagnostic coupling in the maintainer-approved post-5c optimization ledger
+  must close before G06; use the [current state](docs/module/task_env/v2.1.1/maintenance/current-state.md)
+  and [execution plan](docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md).
+  G07 retains later integration work; do not extend old diagnostic branches by default.
+- Subsequent execution packages reference this standard and identify the home
+  of any new diagnostic code. Preserve one owner for state, stepping and teardown.
 
 ## Capability and evidence language
 

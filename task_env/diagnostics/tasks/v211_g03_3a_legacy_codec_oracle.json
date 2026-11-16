@@ -1,0 +1,313 @@
+{
+  "contracts_source_sha256": "93db8c569a457382c507ebe528efe85baee7977cf999d34612c66203334b5fb3",
+  "fixtures": {
+    "artifact_v0": {
+      "identity_hash": "9a3fca2d48b0abee7224b5eb96226cb579c13fb085220c412b86edf8e3f003b0",
+      "mapping": {
+        "artifact_id": "artifact",
+        "artifact_version": "v1",
+        "initialization": {
+          "inherited_state_policy": "clear",
+          "joint_position": {
+            "thing/joint": 0.0
+          },
+          "poses_world": {},
+          "randomization": [],
+          "reset_validity": "valid",
+          "schema_version": "initialization-v0",
+          "settle_steps": 0
+        },
+        "required_capabilities": {
+          "names": [
+            "rigid_body"
+          ]
+        },
+        "schema_version": "task-artifact-v0",
+        "semantics": {
+          "evaluator": "evaluate",
+          "parameters_si": {},
+          "required_joints": [
+            "thing/joint"
+          ],
+          "required_poses": [
+            "thing/frame"
+          ],
+          "schema_version": "semantics-v0",
+          "success_definition": "success"
+        },
+        "task_id": "task",
+        "timebase": {
+          "action_hold": "zero_order_hold",
+          "control_dt": 0.01,
+          "control_substeps": 5,
+          "observation_sampling": "post_control_step",
+          "physics_dt": 0.002,
+          "semantic_sampling": "post_control_step"
+        },
+        "world": {
+          "action": {
+            "controller_target": "arm_joint_position_and_gripper",
+            "mode": "absolute_joint",
+            "reference": null,
+            "rotation_representation": "none"
+          },
+          "convention": "SI_right_handed_z_up_wxyz",
+          "entities": [
+            {
+              "asset_reference": "asset:fixture",
+              "collision_intent": "solid",
+              "frames": [
+                "thing/frame"
+              ],
+              "geometry": "box",
+              "joints": [
+                "thing/joint"
+              ],
+              "kind": "static",
+              "parameters_si": {},
+              "semantic_id": "thing"
+            }
+          ],
+          "observation_requirements": [
+            "state"
+          ],
+          "randomization_dimensions": [],
+          "schema_version": "world-v0"
+        }
+      },
+      "sha256": "9a3fca2d48b0abee7224b5eb96226cb579c13fb085220c412b86edf8e3f003b0"
+    },
+    "artifact_v1": {
+      "identity_hash": "72cf7df2ed9c0c9d924a3f9d85d72f31d8c034820bbce39758de7e10cc4e5f2b",
+      "mapping": {
+        "action": {
+          "controller_target": "arm_joint_position_and_gripper",
+          "mode": "absolute_joint",
+          "reference": null,
+          "rotation_representation": "none"
+        },
+        "artifact_id": "artifact",
+        "artifact_version": "v1",
+        "initialization": {
+          "inherited_state_policy": "clear",
+          "joint_position": {
+            "thing/joint": 0.0
+          },
+          "poses_world": {},
+          "randomization": [],
+          "reset_validity": "valid",
+          "schema_version": "initialization-v0",
+          "settle_steps": 0
+        },
+        "legacy_frame_bindings": {},
+        "legacy_joint_bindings": {},
+        "observation_requirements": [
+          "state"
+        ],
+        "required_capabilities": {
+          "names": [
+            "rigid_body"
+          ]
+        },
+        "scene_id": "scene",
+        "scene_identity_hash": "76aa9548b5459fb4cb1d7f6a65b288c60fce0144c9a62290bec0fab1e0a26877",
+        "scene_schema_version": "scene-definition-v3",
+        "schema_version": "task-artifact-v1",
+        "semantics": {
+          "evaluator": "evaluate",
+          "parameters_si": {},
+          "required_joints": [
+            "thing/joint"
+          ],
+          "required_poses": [
+            "thing/frame"
+          ],
+          "schema_version": "semantics-v0",
+          "success_definition": "success"
+        },
+        "source_artifact_identity_hash": "9a3fca2d48b0abee7224b5eb96226cb579c13fb085220c412b86edf8e3f003b0",
+        "source_artifact_schema_version": "task-artifact-v0",
+        "source_retained_v0_fields": [
+          "/world/entities/0/kind",
+          "/world/entities/0/asset_reference",
+          "/world/entities/0/geometry",
+          "/world/entities/0/collision_intent",
+          "/world/entities/0/parameters_si"
+        ],
+        "task_id": "task",
+        "task_source": {
+          "identity": {
+            "task_id": "task",
+            "version": "v1"
+          },
+          "scene": {
+            "ref": "scene"
+          },
+          "schema_version": "task-source-v1"
+        },
+        "task_source_identity_hash": "114704bdb4136fb4df46af504717949dba17ac147f53b77dab2ac85f699d5c10",
+        "task_source_schema_version": "task-source-v1",
+        "timebase": {
+          "action_hold": "zero_order_hold",
+          "control_dt": 0.01,
+          "control_substeps": 5,
+          "observation_sampling": "post_control_step",
+          "physics_dt": 0.002,
+          "semantic_sampling": "post_control_step"
+        },
+        "world_convention": "SI_right_handed_z_up_wxyz"
+      },
+      "sha256": "72cf7df2ed9c0c9d924a3f9d85d72f31d8c034820bbce39758de7e10cc4e5f2b"
+    },
+    "execution_v0": {
+      "mapping": {
+        "backend": "cpu",
+        "determinism_mode": "strict",
+        "physics_profile": "cpu",
+        "physics_provider": "mujoco",
+        "provider_seed": 11,
+        "render_provider": "none"
+      },
+      "sha256": "8b72e7e1a86505d308608f90656f7a06c4b02cecb119f5dfdcf1c23bdd7f14b9"
+    },
+    "execution_v1": {
+      "identity_hash": "371b6d7c55d557b4843e2e55adbbbc75b55d1ae6b0baff6f19323ebbb336d887",
+      "mapping": {
+        "camera_overrides": [],
+        "determinism_mode": "strict",
+        "physics_backend": "cpu",
+        "physics_device": "cpu",
+        "physics_profile": "profile-v1",
+        "physics_provider": "mujoco",
+        "provider_seed": 11,
+        "render_default": {
+          "backend": "cpu",
+          "device": null,
+          "profile": "none",
+          "provider": "none",
+          "schema_version": "renderer-selection-v1"
+        },
+        "schema_version": "execution-spec-v1"
+      },
+      "sha256": "371b6d7c55d557b4843e2e55adbbbc75b55d1ae6b0baff6f19323ebbb336d887"
+    },
+    "scene_v1": {
+      "identity_hash": "492c8d5f0e5f71c8b0eb94c9ff1acbe6003bc408a445d45531529cd21d89f3a9",
+      "mapping": {
+        "assets": [
+          {
+            "asset_id": "asset",
+            "asset_version": "v1",
+            "license_id": null,
+            "schema_version": "asset-definition-v1",
+            "source_content_sha256": null,
+            "source_reference": "asset:fixture",
+            "source_revision": null
+          }
+        ],
+        "entities": [
+          {
+            "asset_id": "asset",
+            "asset_version": "v1",
+            "entity_id": "thing",
+            "schema_version": "entity-instance-v1"
+          }
+        ],
+        "scene_id": "scene",
+        "schema_version": "scene-definition-v1"
+      },
+      "sha256": "492c8d5f0e5f71c8b0eb94c9ff1acbe6003bc408a445d45531529cd21d89f3a9"
+    },
+    "scene_v2": {
+      "identity_hash": "9895694b7b2f7ff75277fe64fe68d1ca23ec6b3cf2582c99ca499661b108c64f",
+      "mapping": {
+        "articulations": [],
+        "assets": [
+          {
+            "asset_id": "asset",
+            "asset_version": "v1",
+            "license_id": null,
+            "schema_version": "asset-definition-v1",
+            "source_content_sha256": null,
+            "source_reference": "asset:fixture",
+            "source_revision": null
+          }
+        ],
+        "entities": [
+          {
+            "asset_id": "asset",
+            "asset_version": "v1",
+            "entity_id": "thing",
+            "schema_version": "entity-instance-v1"
+          }
+        ],
+        "frames": [
+          {
+            "entity_id": "thing",
+            "frame_id": "root",
+            "frame_kind": "runtime",
+            "parent": null,
+            "pose_parent": null,
+            "schema_version": "frame-definition-v1"
+          }
+        ],
+        "scene_id": "scene",
+        "schema_version": "scene-definition-v2"
+      },
+      "sha256": "9895694b7b2f7ff75277fe64fe68d1ca23ec6b3cf2582c99ca499661b108c64f"
+    },
+    "scene_v3": {
+      "identity_hash": "76aa9548b5459fb4cb1d7f6a65b288c60fce0144c9a62290bec0fab1e0a26877",
+      "mapping": {
+        "actuator_resources": [],
+        "articulations": [],
+        "assets": [
+          {
+            "asset_id": "asset",
+            "asset_version": "v1",
+            "license_id": null,
+            "schema_version": "asset-definition-v1",
+            "source_content_sha256": null,
+            "source_reference": "asset:fixture",
+            "source_revision": null
+          }
+        ],
+        "control_groups": [],
+        "entities": [
+          {
+            "asset_id": "asset",
+            "asset_version": "v1",
+            "entity_id": "thing",
+            "schema_version": "entity-instance-v1"
+          }
+        ],
+        "frames": [
+          {
+            "entity_id": "thing",
+            "frame_id": "root",
+            "frame_kind": "runtime",
+            "parent": null,
+            "pose_parent": null,
+            "schema_version": "frame-definition-v1"
+          }
+        ],
+        "robots": [],
+        "scene_id": "scene",
+        "schema_version": "scene-definition-v3"
+      },
+      "sha256": "76aa9548b5459fb4cb1d7f6a65b288c60fce0144c9a62290bec0fab1e0a26877"
+    },
+    "timebase": {
+      "mapping": {
+        "action_hold": "zero_order_hold",
+        "control_dt": 0.01,
+        "control_substeps": 5,
+        "observation_sampling": "post_control_step",
+        "physics_dt": 0.002,
+        "semantic_sampling": "post_control_step"
+      },
+      "sha256": "bc74e05e272087f885b5e02702f40dee45014ab5dc0cab7a9ac7c5483f12e7a4"
+    }
+  },
+  "input_head": "40ca5d56153b9e13848b20c2af550c1efe076b98"
+}

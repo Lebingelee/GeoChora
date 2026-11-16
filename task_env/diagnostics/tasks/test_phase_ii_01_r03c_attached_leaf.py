@@ -583,14 +583,25 @@ def _session_with_synthetic_native_io(candidate):
     session._leaf_fault=None; session._leaf_consumed_boundaries=set()
     session._leaf_interval_active=False; session._leaf_interval_writers=set()
     session._leaf_active_plan_identity=None
+    session._mixed_actuator_plan=None
     return session
 
 
 def test_public_env_reset_and_step_reach_real_attached_admission_and_publication(monkeypatch):
     from task_env.runtime.sessions import api
+    from task_env.environment.lifecycle import EpisodeExecutionState
+    intervals = []
+    execute_interval = EpisodeExecutionState.execute_interval
+    def track_interval(**kwargs):
+        intervals.append(1)
+        return execute_interval(**kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_interval', staticmethod(track_interval))
     candidate=_candidate(monkeypatch)
     session=_session_with_synthetic_native_io(candidate)
-    monkeypatch.setattr(api, '_materialize_admitted', lambda *_:session)
+    def synthetic_materialization(*_, mixed_actuator_plan):
+        assert mixed_actuator_plan is None
+        return session
+    monkeypatch.setattr(api, '_materialize_admitted', synthetic_materialization)
     try:
         obs, info=candidate.env.reset(seed=31)
         receipt=session.leaf_materialization_receipt
@@ -601,6 +612,7 @@ def test_public_env_reset_and_step_reach_real_attached_admission_and_publication
         assert obs['state']['entities']['panda-hand']['joint_position'].shape==(2,)
         assert session._data.ctrl[7] == 242.25
         candidate.env.step(action_for_interval(candidate,1,arm_active=True,hand_active=True))
+        assert len(intervals) == 1
         assert session._native_steps==5 and session._fixed_forward_calls==2
         assert candidate.env.typed_state.view.boundary.control_step==1
         assert len(session._leaf_consumed_boundaries)==1
@@ -608,6 +620,71 @@ def test_public_env_reset_and_step_reach_real_attached_admission_and_publication
     finally:
         candidate.env.close()
     assert session._closed and session._model is None and session._data is None
+
+
+def test_position_recording_retains_materialized_control_binding_source(monkeypatch, tmp_path):
+    from task_env.runtime.sessions import api
+    from task_env.recorders.reference_provenance import callable_source_snapshot
+
+    candidate = _candidate(monkeypatch)
+    session = _session_with_synthetic_native_io(candidate)
+    monkeypatch.setattr(api, '_materialize_admitted', lambda *a, **k: session)
+    env = candidate.env
+    try:
+        env.reset(seed=31)
+        actual_selector = env.binding.position_control_binding
+        env.binding = replace(env.binding, position_control_binding=lambda _: ControlBinding('other/gripper', 0.08))
+        from task_env.recorders import reference_provenance
+        with monkeypatch.context() as local:
+            def unavailable(_):
+                raise ValueError('source unavailable')
+            local.setattr(reference_provenance, 'callable_source_snapshot', unavailable)
+            with pytest.raises(ValueError, match='source unavailable'):
+                env.start_recording(tmp_path / 'position.h5')
+        assert env.recorder is None and not (tmp_path / 'position.h5').exists()
+        env.start_recording(tmp_path / 'position.h5')
+        provenance = env.recorder._record_metadata['resolved_config']['position_control_binding_provenance']
+        assert provenance == {
+            'binding': {'gripper_semantic_id': 'panda-hand/hand-position', 'opening_range_m': 0.08},
+            'selector_source_sha256': callable_source_snapshot(actual_selector),
+        }
+        for index in range(1, 65):
+            env.step(action_for_interval(candidate, index, arm_active=True, hand_active=True))
+        env.finish_recording('horizon')
+        from task_env.recorders.h5 import inspect_trajectory_h5
+        stored = inspect_trajectory_h5(tmp_path / 'position.h5')
+        assert stored['env_cfg']['position_control_binding_provenance'] == provenance
+    finally:
+        env.close()
+
+
+def test_leaf_observation_failure_keeps_last_published_boundary(monkeypatch):
+    from task_env.runtime.sessions import api
+    candidate = _candidate(monkeypatch)
+    session = _session_with_synthetic_native_io(candidate)
+
+    def synthetic_materialization(*_, mixed_actuator_plan):
+        assert mixed_actuator_plan is None
+        return session
+
+    monkeypatch.setattr(api, '_materialize_admitted', synthetic_materialization)
+    try:
+        candidate.env.reset(seed=31)
+        published = candidate.env._published_position_typed_state
+
+        def fail_observation(_state):
+            raise RuntimeError('injected leaf observation failure')
+
+        monkeypatch.setattr(candidate.env, 'observation', fail_observation)
+        with pytest.raises(RuntimeError, match='injected leaf observation failure'):
+            candidate.env.step(action_for_interval(candidate, 1, arm_active=True, hand_active=True))
+        assert candidate.env.execution_fault.phase == 'leaf_observation'
+        assert candidate.env._published_position_typed_state is published
+        assert session._native_steps == 5
+        with pytest.raises(RuntimeError, match='faulted'):
+            candidate.env.step(action_for_interval(candidate, 2, arm_active=True, hand_active=True))
+    finally:
+        candidate.env.close()
 
 
 def test_native_snapshot_bindings_use_scene_joint_definitions(monkeypatch):
@@ -652,7 +729,10 @@ def test_runner_mount_snapshot_reaches_real_core_after_reset_and_step(
     child = session._bodies['panda-hand/hand']
     session._data.xquat[child] = candidate.attachment_plan.parent_site_from_child_root.quaternion_wxyz
     session._data.warning = []
-    monkeypatch.setattr(api, '_materialize_admitted', lambda *_: session)
+    def synthetic_materialization(*_, mixed_actuator_plan):
+        assert mixed_actuator_plan is None
+        return session
+    monkeypatch.setattr(api, '_materialize_admitted', synthetic_materialization)
     try:
         candidate.env.reset(seed=31)
         joints, frames = _candidate_bindings(candidate)
@@ -669,7 +749,7 @@ def test_runner_mount_snapshot_reaches_real_core_after_reset_and_step(
         # Same path and API that failed in attempt002, not just a type assertion.
         wrong_joints = {f'{ref.entity_id}/{ref.joint_id}': ref
                         for entry in candidate.plan.leaves for ref in entry.binding.joint_order}
-        with pytest.raises(TypeError, match='must be a JointDefinition'):
+        with pytest.raises(TypeError, match='must map a string to JointDefinition'):
             session.snapshot_v1(scene=candidate.scene, joint_bindings=wrong_joints,
                                 frame_bindings=frames, requirements=requirements)
         candidate.env.step(action_for_interval(candidate, 1, arm_active=arm_active,

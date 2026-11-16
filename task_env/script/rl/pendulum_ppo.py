@@ -337,7 +337,8 @@ def _parse_batch_layout(value: str) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--num-env", dest="num_env", type=int, default=4)
-    parser.add_argument("--backend", choices=BACKEND_CHOICES, default="auto")
+    parser.add_argument("--backend", choices=BACKEND_CHOICES, default="auto",
+                        help="auto selects CUDA; use cpu explicitly when needed; failures are not retried")
     parser.add_argument(
         "--batch-physics-layout",
         type=_parse_batch_layout,

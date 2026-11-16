@@ -1,6 +1,23 @@
 # Configuration
 
-配置入口是 task_env.resolve_env_config 和各 task 的 default.yaml。配置对象在解析后冻结；未知字段、错误类型和不满足 capability 的组合会在构造阶段报错。
+用户通常将 mapping、YAML 路径或该路线接受的 resolved config 交给 `task_env.make_env(uid, *, config=None, render_mode=None, **kwargs)`。`task_env.resolve_env_config` 是关键字构造函数，必填 `task_uid`、`scene_uid`，并可传 `agent_uids`、`object_uids`、`success_definition` 及各 section；它不是接受任意字典的统一解析器。factory 内部 `resolve_task_env_config(environment_type, config)` 按实际 task 选择解析路径。未知字段、错误类型和不满足 capability 的组合会在相应构造／准入阶段报错。
+
+## Selected 配置
+
+PickCube 和 Nut 使用 `execution`、`episode`、`task`。例如：
+
+```python
+from task_env import make_env
+env = make_env("pick-cube-p16-reference-v1", config={
+    "execution": {"physics_provider": "mujoco", "physics_backend": "cpu"},
+    "episode": {"horizon": 1000},
+    "task": {"controller_profile": "r3_continuous_v1"},
+})
+print(env.resolved_public_config)
+env.close()
+```
+
+该片段本维护版本未运行。解析顺序是 Core → task class → task YAML → caller；允许的顶层兼容 alias 为 `provider`、`backend`、`horizon`、`controller_profile`、`source_delivery_manifest`，与其嵌套等价项同时指定会报冲突。`task` 可用字段由任务声明，不可任意叠加。当前 selected CPU 接受 GeoPhys 或 MuJoCo；Isaac 仅限明确的 PickCube/R3/CUDA 和 delivery manifest 准入。`execution.render_default` 当前只接受 none/cpu/none/null 的 state-only 组合，`render_mode` 非空也会被拒绝。精确类型、缺失值和错误以 [`configuration.py`](../../../environment/configuration.py) 为准。
 
 ## 配置层次
 
@@ -20,7 +37,7 @@ task
 episode
 ~~~
 
-任务 YAML 可以覆盖这些 section；用户覆盖值会经过同一套 dataclass/configuration 校验。单环境和并行环境共享任务、动作、观测和 episode 配置。
+对 legacy classic-control 路线，任务 YAML 可以覆盖这些 section，调用方叠加在其上并经过 dataclass/configuration 校验。此结构与上面的 selected 输入不同；统一 Env 并行尚未适配。
 
 ## RuntimeConfig
 

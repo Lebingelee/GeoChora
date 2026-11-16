@@ -133,6 +133,25 @@ def observation_schema_metadata(schema: ObservationSchema | None) -> dict[str, A
     }
 
 
+def task_info_for_solution(info: Mapping[str, Any]) -> dict[str, Any]:
+    """Expose public typed Gym info as a value payload for Solution callbacks.
+
+    Keep the Gym result's schema and immutable mappings intact. Numeric values
+    are passed through, including nonfinite values that a Solution must reject.
+    """
+    def value(item):
+        if isinstance(item, ObservationSchema):
+            return value(observation_schema_metadata(item))
+        if isinstance(item, Mapping):
+            return {key: value(child) for key, child in item.items()}
+        if isinstance(item, tuple):
+            return tuple(value(child) for child in item)
+        if isinstance(item, list):
+            return [value(child) for child in item]
+        return item
+    return value(info)
+
+
 def _observation_visibility(path: str) -> str:
     group = str(path).split(".", 1)[0]
     return {

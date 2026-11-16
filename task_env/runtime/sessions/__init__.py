@@ -13,11 +13,10 @@ __all__ = [
 _LEAF_CONTROL_EXPORTS = {
     'LeafActuatorPatchV1', 'LeafActuatorSlotValueV1', 'LeafApplyResultV1',
     'LeafControlIntervalRequestV1', 'LeafControlIntervalResultV1',
-    'LeafControlRuntime', 'LeafDispatchProgressV1', 'LeafMaterializationReceiptV1',
+    'LeafDispatchProgressV1', 'LeafMaterializationReceiptV1',
     'LeafNativeActuatorMappingV1', 'LeafNativeFrameMappingV1',
     'LeafNativeJointMappingV1', 'LeafNativeTendonMappingV1',
     'LeafPreparedCommandV1', 'LeafRuntimeClockV1',
-    'dispatch_leaf_control_interval', 'preflight_leaf_control_interval', 'prepare_leaf_command',
 }
 
 

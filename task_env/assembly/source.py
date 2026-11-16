@@ -121,6 +121,29 @@ class UsdTaskSceneSourceV1:
         self.validate()
         return hashlib.sha256(self.loaded_delivery.report_bytes).hexdigest()
 
+    @property
+    def xml(self) -> str:
+        """Expose the frozen original source text for legacy metadata consumers.
+
+        A USD delivery is the runtime representation, but the G05 local
+        delivery also binds the original MJCF entry bytes.  Returning those
+        bytes here keeps existing source-hash/recording code source-bound
+        without making it parse the derived USD as MJCF.
+        """
+        self.validate()
+        delivery = self.loaded_delivery.delivery
+        entry = getattr(delivery, 'source_entry_file', None)
+        raw = self.loaded_delivery.source_input_bytes.get(entry) if entry else None
+        if not isinstance(raw, bytes):
+            raise ValueError('USD TaskSceneSource has no frozen original source entry bytes')
+        return raw.decode('utf-8')
+
+    @property
+    def base_dir(self) -> Path:
+        """Return the immutable delivery root for compatibility-only callers."""
+        self.validate()
+        return self.loaded_delivery.manifest_path.parent
+
     def assert_fresh(self) -> None:
         self.validate()
         self.loaded_delivery.assert_fresh()

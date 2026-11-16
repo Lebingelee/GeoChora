@@ -74,6 +74,7 @@ def test_record_cli_exit_code_reflects_completion_and_finalizes(failed, success,
     calls = {}
     env = _env(done=False, failed=failed, task_success=success, reason='controller_failure' if failed else None)
     env.reset = lambda seed: (None, env.info)
+    env.prepare_expert = lambda: env.solution
     env.start_recording = lambda path: None
     def stop_with_flag():
         env.solution.done = True
@@ -100,7 +101,7 @@ def test_failed_cli_run_finalizes_readable_h5_before_nonzero_exit(monkeypatch, t
     """Exercise the CLI and real canonical recorder with one synthetic interval."""
     import task_env
     import task_env.runtime.sessions.provenance as provenance
-    import task_env.tasks.reference_env as reference_env
+    import task_env.environment.reference_env as reference_env
     from task_env.diagnostics.tasks.test_selected_consumers import FakeSession
     from task_env.trajectory.canonical.h5 import load
 

@@ -15,14 +15,27 @@ import traceback
 _CORE_ROOT = Path(__file__).resolve().parents[3]
 if str(_CORE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CORE_ROOT))
-_GEOPHYS_SOURCE = _CORE_ROOT / 'GeoPhys' / 'src'
-if _GEOPHYS_SOURCE.is_dir() and str(_GEOPHYS_SOURCE) not in sys.path:
-    sys.path.insert(1, str(_GEOPHYS_SOURCE))
-_CORE_SITE = os.environ.get('GEOCHORA_CORE_SITE')
-if _CORE_SITE and Path(_CORE_SITE).is_dir() and _CORE_SITE not in sys.path:
-    # Keep Isaac's native packages first; use the frozen Core environment only
-    # for Python dependencies that the Isaac distribution does not ship.
-    sys.path.append(_CORE_SITE)
+_GEOPHYS_SRC = os.environ.get('GEOCHORA_GEOPHYS_SRC')
+if _GEOPHYS_SRC:
+    _geophys_path = Path(_GEOPHYS_SRC).expanduser().resolve()
+    if not (_geophys_path / 'scene' / '__init__.py').is_file():
+        raise ValueError(f'GEOCHORA_GEOPHYS_SRC must point to a GeoPhys src directory: {_geophys_path}')
+    # Prefer the requested source over unrelated installed modules.
+    sys.path.insert(1, str(_geophys_path))
+
+# Append the supervisor's minimal Core dependency overlay after SDK paths.
+_ISAAC_SITE = os.environ.get('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY')
+if _ISAAC_SITE:
+    try:
+        _spec_arg = Path(sys.argv[sys.argv.index('--spec') + 1])
+        _output_arg = Path(sys.argv[sys.argv.index('--output') + 1]).resolve(strict=True)
+        _overlay = Path(_ISAAC_SITE).resolve(strict=True)
+        if (json.loads(_spec_arg.read_text())['provider'] != 'isaacsim'
+                or _overlay != _output_arg / 'isaac_dependency_overlay'):
+            raise ValueError('dependency overlay is not owned by this Isaac run')
+    except (ValueError, IndexError, KeyError, OSError) as error:
+        raise ValueError('invalid Isaac dependency overlay context') from error
+    sys.path.append(str(_overlay))
 
 if __package__:
     from .builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
@@ -208,9 +221,16 @@ def _read_f06_position_h5(path: Path, output: Path, row: dict) -> dict:
 def _prepare_output_directory(output: Path):
     output = output.resolve()
     if output.exists():
-        unexpected = {path.name for path in output.iterdir()} - {
+        allowed = {
             'worker.stdout.log', 'worker.stderr.log', 'run_plan.json', 'run_preflight.json',
         }
+        if _ISAAC_SITE:
+            overlay = output / 'isaac_dependency_overlay'
+            receipt = output / 'isaac_dependency_overlay.json'
+            if overlay.is_symlink() or not overlay.is_dir() or receipt.is_symlink() or not receipt.is_file():
+                raise ValueError('Isaac dependency overlay inputs are not regular run-owned entries')
+            allowed.update((overlay.name, receipt.name))
+        unexpected = {path.name for path in output.iterdir()} - allowed
         if unexpected:
             raise FileExistsError(f'worker output directory already contains data: {sorted(unexpected)}')
     else:
@@ -231,11 +251,7 @@ def _terminate_isaac_worker(exit_code: int) -> None:
 def _install_action_trace(env, path: Path):
     """Capture the public expert proposal and state around each step attempt."""
     capture = {'attempted': 0, 'completed': 0, 'rows': []}
-    position_route = (
-        bool(getattr(env, 'position_profile', False))
-        and getattr(env, 'value', {}).get('f06_pickcube_isaac_input') is not None
-    )
-    original_step = env._step_position_profile if position_route else env._step
+    original_step = env.step
 
     def pose(state, name):
         value = getattr(state, 'pose_world', {}).get(name)
@@ -261,18 +277,10 @@ def _install_action_trace(env, path: Path):
             'rows': capture['rows'],
         })
 
-    def observed_step(action, *, proposal=None, observer_solution=None):
+    def observed_step(proposal):
         capture['attempted'] += 1
         state = env.state
-        if position_route:
-            groups = {(group.entity_id, group.group_id): group for group in action.groups}
-            entity_id = env.position_profiles[0].entity_id
-            values = tuple(float(value) for value in (
-                *groups[(entity_id, 'arm')].values,
-                *groups[(entity_id, 'gripper')].values,
-            ))
-        else:
-            values = tuple(float(value) for value in action)
+        values = tuple(float(value) for value in proposal.action)
         proposal_diagnostics = dict(getattr(proposal, 'diagnostics', {}))
         row = {
             'attempt': capture['attempted'],
@@ -292,7 +300,7 @@ def _install_action_trace(env, path: Path):
             'task_metrics_before': dict(getattr(env, 'info', {}).get('task_metrics', {})),
         }
         try:
-            result = original_step(action, proposal=proposal, observer_solution=observer_solution)
+            result = original_step(proposal)
         except BaseException as error:
             row.update(error={'type': type(error).__name__, 'message': str(error)})
             fault = getattr(env, 'execution_fault', None)
@@ -321,15 +329,12 @@ def _install_action_trace(env, path: Path):
             write_trace()
         return result
 
-    if position_route:
-        env._step_position_profile = observed_step
-    else:
-        env._step = observed_step
+    env.step = observed_step
     return capture, write_trace
 
 
 def run_one(spec, catalog, scope, *, seed: int, output: Path):
-    from examples._common import run_expert
+    from examples._common import run_caller_solution
     from task_env.trajectory.canonical.h5 import load as load_canonical
 
     output = _prepare_output_directory(output)
@@ -375,10 +380,11 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                     or launch_profile_id != F06_ISAAC_APP_LAUNCH_PROFILE_V1):
                 raise ValueError('Isaac Harness run plan lacks an explicit App launch profile')
             app_owner = _process_app_owner(launch_profile_id=launch_profile_id)
-            # Source construction imports USD; initialize Kit's libraries first.
-            execution_phase = 'isaac_app_open'
+            if any(name == 'pxr' or name.startswith('pxr.') for name in sys.modules):
+                raise RuntimeError('OpenUSD was imported before Isaac App startup')
+            execution_phase = 'isaac_app_precompile_start'
             row['isaac_app_precompile_start_attempted'] = True
-            app_owner.open()
+            app_owner.open(f06_compatibility=True)
             row['isaac_app_precompile_start_completed'] = True
             row['isaac_app_launch_profile'] = app_owner.launch_profile_receipt()
         # The built-in profile has its own tracked-clean + exact untracked
@@ -409,7 +415,11 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                    repo_dirty=compiled.repo_dirty,
                    core_commit=context['core_commit'])
         execution_phase = 'reset'
-        _, reset_info = env.reset(seed=seed)
+        observation, reset_info = env.reset(seed=seed)
+        solution = env.value['solution_factory']()
+        if solution.identity != env.value['solution_identity']:
+            raise ValueError('constructed Solution identity differs from compiled task')
+        solution.reset(observation, reset_info, env.metadata)
         row['reset_succeeded'] = True
         row['reset_sample'] = {
             'task_seed': env.sample.task_seed,
@@ -427,9 +437,8 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         env.start_recording(h5)
         recording_started = True
         execution_phase = 'solution_execution'
-        episode = run_expert(
-            env, seed=seed, horizon=spec.horizon_control_ticks,
-            already_reset=True, initial_info=reset_info,
+        episode = run_caller_solution(
+            env, solution, observation, reset_info, horizon=spec.horizon_control_ticks,
         )
         row['episode'] = episode
         row.update(
@@ -484,6 +493,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
             # Env/session close normally closes this shared owner. Calling its
             # idempotent close here also covers compile failures before Env
             # construction and retains cleanup evidence in the worker receipt.
+            row['isaac_app_start_attempts'] = getattr(app_owner, 'start_attempts', None)
             try:
                 app_owner.close()
             except BaseException as error:

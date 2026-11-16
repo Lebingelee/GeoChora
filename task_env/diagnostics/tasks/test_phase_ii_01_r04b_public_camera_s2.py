@@ -422,7 +422,8 @@ def test_runner_rejects_nonfresh_output_without_touching_existing_bytes(tmp_path
 
 
 def test_supervisor_lock_timeout_launches_no_native_worker(tmp_path):
-    receipt = supervisor.supervise(
+    (tmp_path / 'shared.lock').touch()
+    receipt = supervisor._supervise_historical_test_logic(
         lock_path=tmp_path / "shared.lock",
         output=tmp_path / "supervisor",
         worker_output=tmp_path / "worker",
@@ -430,6 +431,7 @@ def test_supervisor_lock_timeout_launches_no_native_worker(tmp_path):
         python=Path("/bin/false"),
         worker_script=Path("/does/not/run.py"),
         wait_lock_s=0,
+        fake_popen=lambda *args, **kwargs: pytest.fail('must not launch'),
     )
     assert receipt["status"] == "NOT_RUN_RESOURCE_PENDING"
     assert receipt["lock_acquired"] is False
@@ -523,7 +525,7 @@ def test_provider_free_complete_worker_success_and_independent_reader_negative_m
     factory_calls = {"camera": 0, "fail_on_camera_call": None}
 
     from task_env import make_env as actual_make_env
-    reference_env_module = importlib.import_module("task_env.tasks.reference_env")
+    reference_env_module = importlib.import_module("task_env.environment.reference_env")
     camera_module = importlib.import_module("task_env.render.camera")
     from task_env.runtime.boundary import GeoPhysRuntimeBoundary
     from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1

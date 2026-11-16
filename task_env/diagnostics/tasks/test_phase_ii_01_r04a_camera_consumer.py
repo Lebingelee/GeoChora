@@ -69,6 +69,22 @@ def _config(*, width=2, height=3):
     )
 
 
+def test_position_camera_declaration_keeps_spaces_and_schema_in_agreement():
+    from types import SimpleNamespace
+    from task_env.observations.selected_reference import position_camera_observation_declaration
+
+    binding = SimpleNamespace(object_poses=(("object-v1", "object_v1"),))
+    spaces, schema = position_camera_observation_declaration(binding, _config(width=4, height=3))
+    by_name = {field.name: field for field in schema.fields}
+    assert schema.version == "position-camera-observation-v1"
+    assert by_name["privileged_state.object_v1_body_pose"].shape == (1, 7)
+    for group, cameras in spaces.items():
+        for camera_id, space in cameras.spaces.items():
+            field = by_name[f"{group}.{camera_id}"]
+            assert field.shape == space.shape
+            assert np.dtype(field.dtype) == space.dtype
+
+
 def _state(candidate, step=0, *, state_revision=None):
     revision = step if state_revision is None else state_revision
     boundary = StateBoundaryIdentity(
@@ -602,6 +618,12 @@ def test_post_step_camera_observation_failure_keeps_progress_fault_and_closes_on
         artifact=SimpleNamespace(timebase=SimpleNamespace(control_substeps=5, control_dt=0.01)),
         recorder=None, _camera_consumer=camera_consumer,
     )
+    # Exercise the actual Env state owner rather than a duck type with stale
+    # copies of the lifecycle fields.
+    fields = vars(selected)
+    selected = object.__new__(SelectedReferenceEnv)
+    for name, value in fields.items():
+        setattr(selected, name, value)
     selected._latch_fault = MethodType(SelectedReferenceEnv._latch_fault, selected)
     selected._position_requirements = MethodType(
         SelectedReferenceEnv._position_requirements, selected,
@@ -631,6 +653,70 @@ def test_post_step_camera_observation_failure_keeps_progress_fault_and_closes_on
     assert selected._stopped is True
     assert selected._camera_consumer is None
     assert camera_consumer.close_count == 1
+
+
+@pytest.mark.parametrize('recorder_fails', [False, True])
+@pytest.mark.parametrize('caller_driven', [False, True])
+def test_position_interval_publishes_only_after_recorder_succeeds(monkeypatch, recorder_fails, caller_driven):
+    from types import SimpleNamespace
+    from task_env.environment.lifecycle import EpisodeExecutionState
+    from task_env.runtime.sessions import control as control_sessions
+    from task_env.recorders import position_metadata
+    from task_env.tasks.reference_env import SelectedReferenceEnv
+
+    before = SimpleNamespace(control_step=0, simulation_time=0.0)
+    after = SimpleNamespace(control_step=1, simulation_time=0.01)
+    old_publication, new_publication = object(), object()
+    env = object.__new__(SelectedReferenceEnv)
+    values = dict(
+        _execution_fault=None, _stopped=False, _closed=False, horizon=4,
+        position_profile=True, dual_entity_position=False,
+        session=SimpleNamespace(snapshot=lambda: after), controller=object(),
+        position_profiles=(SimpleNamespace(requirements=object()),),
+        position_plan=object(), typed_state=old_publication, position_scene=object(),
+        position_joint_bindings={}, position_frame_bindings={}, state=before,
+        artifact=SimpleNamespace(timebase=SimpleNamespace(control_substeps=5, control_dt=0.01)),
+        recorder=SimpleNamespace(transition_count=0, observation_count=1),
+        _camera_consumer=None, _published_position_typed_state=old_publication,
+        value={},
+    )
+    for name, value in values.items():
+        setattr(env, name, value)
+    env.observation = lambda _state: ({'sample': 1}, {}, SimpleNamespace(failure=False, reward=1.0))
+    monkeypatch.setattr(control_sessions, 'execute_position_control_interval',
+                        lambda *_args, **_kwargs: (object(), object(), object(), after, new_publication))
+    calls = []
+    execute = EpisodeExecutionState.execute_interval
+    def track_interval(**kwargs):
+        calls.append(True)
+        return execute(**kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_interval', staticmethod(track_interval))
+
+    def record(*_args, **_kwargs):
+        if recorder_fails:
+            raise RuntimeError('injected recorder failure')
+
+    monkeypatch.setattr(position_metadata, 'record_position_transition', record)
+    if caller_driven:
+        from task_env.controllers.canonical.contracts import ControlGroupActionV1, StructuredActionRequestV1
+        monkeypatch.setattr(control_sessions, 'prepare_structured_action', lambda *_args: ())
+        group = ControlGroupActionV1('control-group-action-v1', 'robot', 'arm', 'pose-v1', (0.0,))
+        request = StructuredActionRequestV1('structured-action-request-v1', 'a' * 64, 'b' * 64, (group,))
+        def run_interval():
+            operations = env._prepare_position_profile(request, proposal=object(), caller_driven=True)
+            return env._episode_execution_state().execute_interval(**operations)
+    else:
+        def run_interval():
+            return env._step_position_profile(object())
+    if recorder_fails:
+        with pytest.raises(RuntimeError, match='injected recorder failure'):
+            run_interval()
+        assert env.execution_fault.phase == 'record_position_transition'
+        assert env._published_position_typed_state is old_publication
+    else:
+        assert run_interval()[1:4] == (1.0, False, False)
+        assert env._published_position_typed_state is new_publication
+    assert calls == [True]
 
 
 def test_v3_camera_metadata_extension_roundtrip_and_mask_guard(tmp_path):

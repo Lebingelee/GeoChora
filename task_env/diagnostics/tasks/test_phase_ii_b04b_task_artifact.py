@@ -240,3 +240,24 @@ def test_compiler_requires_explicit_binding_for_renamed_scene_frames():
     )
     assert compiled.legacy_frame_bindings["robot-a/base"] == FrameReference("robot-a", "root")
     assert TaskArtifactV1.from_mapping(compiled.to_mapping()).identity_hash == compiled.identity_hash
+
+
+def test_v1_identity_cache_reuses_only_immutable_payload_and_replace_invalidates(monkeypatch):
+    compiled = compile_task_artifact_v1(_source(), _scene(), _legacy_artifact())
+    compiled = replace(compiled)
+    canonical = json.dumps(compiled.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+    expected = hashlib.sha256(canonical.encode()).hexdigest()
+    original = TaskArtifactV1.to_mapping
+    calls = []
+    def counted(value):
+        calls.append(value)
+        return original(value)
+    monkeypatch.setattr(TaskArtifactV1, 'to_mapping', counted)
+    assert compiled.identity_hash == expected
+    assert compiled.identity_hash == expected
+    assert len(calls) == 1
+    with pytest.raises(TypeError):
+        compiled.task_source['identity']['version'] = 'changed'
+    changed = replace(compiled, artifact_id='new-b04b-artifact')
+    assert changed.identity_hash != expected
+    assert len(calls) == 2

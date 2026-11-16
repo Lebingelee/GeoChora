@@ -1,7 +1,7 @@
 """Render one current Pendulum frame through the scalar public TaskEnv API.
 
-This exercises Pendulum / GeoPhys CPU / scalar TaskEnv / GeoPhys rasterizer.
-It does not exercise Flora or Physics x Renderer interoperability.
+It declares the GeoPhys CPU observer through the formal scalar configuration.
+Running it requests a real frame; import and caller checks do not validate pixels.
 """
 
 from __future__ import annotations
@@ -50,17 +50,21 @@ def main(argv=None) -> int:
     try:
         with bounded_process(args.address_space_limit_mb, args.time_limit_s) as budget:
             from task_env import make_env
+            from task_env.environment.config import CameraSpec
 
             env = make_env(
                 "pendulum-v1",
                 config={
-                    "runtime": {"backend": "cpu", "broadphase": "n2", "prewarm": False},
-                    "render": {"backend": "rasterizer", "width": args.width, "height": args.height},
+                    "execution": {"physics_provider": "geophys", "physics_backend": "cpu",
+                                  "physics_device": "cpu"},
                     "episode": {"horizon": 2},
                 },
                 render_mode="rgb_array",
+                observer_camera=CameraSpec("observer", width=args.width, height=args.height,
+                                           position=(0.0, 0.0, 2.0)),
             )
             observation, info = env.reset(seed=args.seed)
+            reset_observation_valid = env.observation_space.contains(observation)
             frame = env.render()
             if (
                 not isinstance(frame, np.ndarray)
@@ -76,12 +80,13 @@ def main(argv=None) -> int:
                 status="PASS_BOUNDED_RENDER_SMOKE_NOT_QUALIFICATION",
                 frame_shape=list(frame.shape),
                 frame_dtype=str(frame.dtype),
-                task_success=bool(info.get("task_success", False)),
+                task_success=bool(info.get("is_success", False)),
                 expert_complete=None,
                 reward=float(reward),
                 terminated=bool(terminated),
                 truncated=bool(truncated),
-                reset_observation_valid=env.observation_space.contains(observation),
+                reset_observation_valid=reset_observation_valid,
+                step_observation_valid=env.observation_space.contains(observation),
                 resource_budget=budget,
             )
     except RunTimeout as exc:

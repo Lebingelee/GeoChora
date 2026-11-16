@@ -135,7 +135,7 @@ def _verify_native_inputs(*, output_root: Path, worker_path: Path, supervisor_pa
             or supervisor.get("resource_sample_count") != len(samples)):
         raise ValueError("native worker exceeded its wall budget or has a mismatched resource sample count")
 
-    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    fd = os.open(lock_path, os.O_RDWR | os.O_NOFOLLOW)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         lock_released = True

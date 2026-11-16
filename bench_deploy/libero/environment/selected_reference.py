@@ -34,8 +34,9 @@ from task_env.environment.task_source import TaskArtifactDeclarationV1
 from task_env.runtime.sessions.source import (
     ExecutionSourceReceiptV1, RuntimeSource, source_asset_bytes,
 )
-from task_env.environment.types import ReferenceSpec
-from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+from task_env.environment.types import ReferenceSpec, TaskCompositionSpec
+from task_env.environment.reference_binding import ReferenceTaskBinding
+from task_env.environment.reference_env import SelectedReferenceEnv
 
 from bench_deploy.libero.controllers.osc import LiberoMixedControllerV6, LiberoMixedControllerV7
 from bench_deploy.libero.tasks.predicates import (
@@ -746,7 +747,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         provider_objects = ()
     reference_declaration = ReferenceTaskDeclarationV1(
         artifact=artifact_declaration,
-        composition=plan['composition_receipt'],
+        composition=TaskCompositionSpec(
+            task_uid=task_uid, scene_uid=config.scene.scene_uid,
+            success_definition=config.task.success_definition,
+        ),
         bodies=bound_bodies,
         frames=frames,
         free_joints=free_joints,
@@ -1640,7 +1644,7 @@ def build_libero_selected_candidate(
             raise ValueError('external LIBERO Solution does not match the selected task/source/profile')
 
     binding = ReferenceTaskBinding(
-        build=lambda provider: build_value(provider, 'cpu'),
+        build=lambda provider, _backend, _seed, _horizon, _sampled: build_value(provider, 'cpu'),
         reset_sample=lambda artifact, seed: reset_with_options(
             artifact, seed, {'init_row_index': 0}, value_for_artifact(artifact)['source'],
         ),
@@ -1651,8 +1655,6 @@ def build_libero_selected_candidate(
         reset_seed=lambda seed: seed,
         runtime_episode_identity=True,
         build_mixed_control_profile=build_value,
-        build_external=(lambda provider: build_value(provider, 'cpu'))
-        if solution_profile and not panda_gripper_delta_replay else None,
         validate_external_solution=validate_external_solution
         if solution_profile and not panda_gripper_delta_replay else None,
         reset_sample_with_options=reset_with_options,

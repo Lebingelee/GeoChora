@@ -74,13 +74,208 @@ def _lower_receipt_mjcf_assets(receipt):
     return ET.tostring(root, encoding='unicode'), alias_payloads, rows
 
 
+def _mujoco_model_facts(model, mj):
+    """Read compiled public MjModel values, with inertia about COM in body axes."""
+    bodies = []
+    for i in range(model.nbody):
+        rotation = np.empty(9, dtype=np.float64)
+        mj.mju_quat2Mat(rotation, model.body_iquat[i])
+        rotation = rotation.reshape(3, 3)
+        tensor = rotation @ np.diag(model.body_inertia[i]) @ rotation.T
+        bodies.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_BODY, i),
+                       'mass_kg': float(model.body_mass[i]),
+                       'com_body_m': model.body_ipos[i].tolist(),
+                       'inertia_body_at_com_kg_m2': tensor.tolist(),
+                       'inertial_quaternion_body_wxyz': model.body_iquat[i].tolist()})
+    joints = []
+    for i in range(model.njnt):
+        joints.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, i), 'id': i,
+                       'type': int(model.jnt_type[i]), 'axis_body': model.jnt_axis[i].tolist(),
+                       'limited': bool(model.jnt_limited[i]), 'range': model.jnt_range[i].tolist(),
+                       'child_body_id': int(model.jnt_bodyid[i]),
+                       'qpos_address': int(model.jnt_qposadr[i]), 'dof_address': int(model.jnt_dofadr[i])})
+    actuators = []
+    for i in range(model.nu):
+        actuators.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_ACTUATOR, i), 'id': i,
+                          'transmission_type': int(model.actuator_trntype[i]),
+                          'transmission_ids': model.actuator_trnid[i].tolist(),
+                          'gear': model.actuator_gear[i].tolist(),
+                          'gain_type': int(model.actuator_gaintype[i]),
+                          'bias_type': int(model.actuator_biastype[i]),
+                          'dynamics_type': int(model.actuator_dyntype[i]),
+                          'gain_parameters': model.actuator_gainprm[i].tolist(),
+                          'bias_parameters': model.actuator_biasprm[i].tolist(),
+                          'control_limited': bool(model.actuator_ctrllimited[i]),
+                          'control_range': model.actuator_ctrlrange[i].tolist(),
+                          'force_limited': bool(model.actuator_forcelimited[i]),
+                          'force_range': model.actuator_forcerange[i].tolist()})
+    equality = [{'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_EQUALITY, i),
+                 'type': int(model.eq_type[i]), 'object1_id': int(model.eq_obj1id[i]),
+                 'object2_id': int(model.eq_obj2id[i]), 'active': bool(model.eq_active0[i]),
+                 'data': model.eq_data[i].tolist()} for i in range(model.neq)]
+    tendons = []
+    for i in range(model.ntendon):
+        start, count = int(model.tendon_adr[i]), int(model.tendon_num[i])
+        tendons.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_TENDON, i), 'id': i,
+                        'wraps': [{'type': int(model.wrap_type[j]), 'object_id': int(model.wrap_objid[j]),
+                                   'parameter': float(model.wrap_prm[j])}
+                                  for j in range(start, start + count)]})
+    return {'schema_version': 'mujoco-public-model-facts-v1', 'bodies': bodies,
+            'joints': joints, 'actuators': actuators, 'native_timestep_s': float(model.opt.timestep),
+            'inertia_reference': 'center_of_mass', 'inertia_frame': 'body',
+            'equalities': equality, 'tendons': tendons}
+
+
+def check_mujoco_named_layout(model, mj, source):
+    """Resolve this source's names and address shapes in a compiled model."""
+    result = {'joints': {}, 'free_joints': {}, 'bodies': {}, 'frames': {}, 'actuators': {}}
+    joint_ids = {}
+    for field, free in (('joints', False), ('free_joints', True)):
+        for semantic, native in getattr(source, field).items():
+            joint = int(model.joint(native).id)
+            if joint < 0 or joint >= min(len(model.jnt_type), len(model.jnt_qposadr), len(model.jnt_dofadr)):
+                raise ValueError(f'named joint is missing or has an invalid index: {semantic}')
+            kind = int(model.jnt_type[joint])
+            allowed = ((int(mj.mjtJoint.mjJNT_FREE),) if free else
+                       (int(mj.mjtJoint.mjJNT_HINGE), int(mj.mjtJoint.mjJNT_SLIDE)))
+            if kind not in allowed:
+                raise ValueError(f'unsupported named joint type for {semantic}: {kind}')
+            q, v = int(model.jnt_qposadr[joint]), int(model.jnt_dofadr[joint])
+            nq, nv = (7, 6) if free else (1, 1)
+            if q < 0 or v < 0 or q+nq > int(model.nq) or v+nv > int(model.nv):
+                raise ValueError(f'named joint addresses exceed compiled dimensions: {semantic}')
+            result[field][semantic] = {'native': native, 'id': joint, 'type': kind,
+                                       'qpos': q, 'dof': v, 'qpos_width': nq, 'dof_width': nv}
+            joint_ids[semantic] = joint
+    for field, accessor in (('bodies', model.body), ('frames', model.site)):
+        for semantic, native in getattr(source, field).items():
+            index = int(accessor(native).id)
+            if index < 0:
+                raise ValueError(f'named {field} object is missing: {semantic}')
+            result[field][semantic] = {'native': native, 'id': index}
+    for semantic, native in source.joint_targets.items():
+        actuator = int(model.actuator(native).id)
+        if actuator < 0 or actuator >= min(len(model.actuator_trntype), len(model.actuator_trnid)):
+            raise ValueError(f'named actuator is missing or has an invalid index: {semantic}')
+        if semantic not in joint_ids:
+            raise ValueError(f'actuator binding lacks its declared joint: {semantic}')
+        if (int(model.actuator_trntype[actuator]) != int(mj.mjtTrn.mjTRN_JOINT)
+                or int(model.actuator_trnid[actuator][0]) != joint_ids[semantic]):
+            raise ValueError(f'actuator transmission does not target the declared joint: {semantic}')
+        result['actuators'][semantic] = {'native': native, 'id': actuator,
+                                         'joint_id': joint_ids[semantic]}
+    for native in source.open_actuators:
+        actuator = int(model.actuator(native).id)
+        if actuator < 0 or actuator >= min(len(model.actuator_trntype), len(model.actuator_trnid)):
+            raise ValueError(f'named opening actuator is missing or invalid: {native}')
+        fact = {'native': native, 'id': actuator}
+        if source.scene_definition is None:
+            composition = getattr(source, 'composition_runtime_input', None)
+            prefix = ''
+            declaration_xml, declaration_name = source.scene_source.xml, native
+            if composition is not None:
+                fixed = composition.fixed_declaration.attachment_plan
+                names = fixed.native_actuator_names
+                owned = [key for key, value in names.items() if value == native]
+                if len(owned) != 1:
+                    raise ValueError(f'opening actuator has no unique composition owner: {native}')
+                entity, declaration_name = owned[0].split('/', 1)
+                declaration_xml = composition.fixed_declaration.source_by_entity[entity].xml
+                if entity == fixed.child_entity_id:
+                    prefix = fixed.namespace_prefix
+            actuator_section = ET.fromstring(declaration_xml).find('actuator')
+            candidates = [] if actuator_section is None else [
+                node for node in actuator_section if node.get('name') == declaration_name]
+            if len(candidates) != 1:
+                raise ValueError(f'opening actuator has no unique source declaration: {native}')
+            declaration = candidates[0]
+            tendon_name, joint_name = declaration.get('tendon'), declaration.get('joint')
+            tendon_name = prefix + tendon_name if tendon_name else None
+            joint_name = prefix + joint_name if joint_name else None
+            if tendon_name and not joint_name:
+                expected_type, target = int(mj.mjtTrn.mjTRN_TENDON), int(model.tendon(tendon_name).id)
+                fact.update(target_kind='tendon', target_native=tendon_name, target_id=target)
+            elif joint_name and not tendon_name:
+                expected_type, target = int(mj.mjtTrn.mjTRN_JOINT), int(model.joint(joint_name).id)
+                fact.update(target_kind='joint', target_native=joint_name, target_id=target)
+            else:
+                raise ValueError(f'opening actuator has an unsupported transmission declaration: {native}')
+            if (int(model.actuator_trntype[actuator]) != expected_type
+                    or int(model.actuator_trnid[actuator][0]) != target):
+                raise ValueError(f'opening actuator transmission differs from source: {native}')
+        result['actuators']['open:'+native] = fact
+    for field in ('torque_actuators', 'position_actuators'):
+        for semantic, native in getattr(source, field, {}).items():
+            actuator = int(model.actuator(native).id)
+            if actuator < 0 or actuator >= min(len(model.actuator_trntype), len(model.actuator_trnid)):
+                raise ValueError(f'named mixed actuator is missing or invalid: {semantic}')
+            if semantic not in joint_ids:
+                raise ValueError(f'mixed actuator lacks its declared joint: {semantic}')
+            if (int(model.actuator_trntype[actuator]) != int(mj.mjtTrn.mjTRN_JOINT)
+                    or int(model.actuator_trnid[actuator][0]) != joint_ids[semantic]):
+                raise ValueError(f'mixed actuator transmission mismatch: {semantic}')
+            result['actuators'][semantic] = {'native': native, 'id': actuator,
+                                             'joint_id': joint_ids[semantic]}
+    return result
+
+
 class _MuJoCoSession(_SessionValues):
+    def physical_source_dynamics_model(self):
+        """Create a source-bound, no-step model for the current physical episode."""
+        if getattr(self, '_physical_port', None) is None:
+            raise ValueError('source dynamics requires an admitted physical port')
+        from .mujoco_dynamics import MuJoCoSourceDynamicsV1
+        return MuJoCoSourceDynamicsV1(self)
+
+    def bind_physical_control(self, execution):
+        """Bind one verified physical profile to this materialized session."""
+        if getattr(self, '_physical_port', None) is not None or self._reset_done:
+            raise ValueError('physical port must be bound once before reset')
+        if getattr(self._source, 'position_subject_binding', None) is not None:
+            raise ValueError('physical effort port cannot share position-subject actuator ownership')
+        from .mujoco_physical import MuJoCoPhysicalPort
+        versions = execution.controller_versions()
+        self._physical_port = MuJoCoPhysicalPort(self, execution)
+        self._physical_controller_versions = versions
+        self.physical_control_generation = execution.generation
+
+    def assess_physical_control(self, binding):
+        return self._physical_port.assessment(binding)
+
+    def physical_joint_build_receipt(self, binding):
+        return self._physical_port.joints(binding)
+
+    def physical_body_build_receipt(self, binding):
+        return self._physical_port.body(binding)
+
+    def physical_buffer_policy(self, binding):
+        return self._physical_port.policy(binding)
+
+    def apply_physical_command_batch(self, resolved):
+        return self._physical_port.write(resolved)
+
+    def apply_physical_command_sequence(self, sequence):
+        return self._physical_port.write_sequence(sequence)
+
+    def abort_physical_control(self):
+        """Discard this session's pending physical batch after an interval fault."""
+        port = getattr(self, '_physical_port', None)
+        if port is not None and port.pending is not None:
+            port.finish_interval()
+
     def __init__(self, artifact, source, *, mixed_actuator_plan=None):
         self._initialize_values(artifact, source, 'mujoco')
         self._mixed_actuator_plan = mixed_actuator_plan
         if source.fixed_attachment_plan is not None:
             try:
                 self._initialize_fixed_attachment(artifact, source)
+                checked = check_mujoco_named_layout(self._model, self._mj, source)
+                self._build_layout_facts = {
+                    'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+                    'provider': 'mujoco', 'source_id': source.scene_source.source_id,
+                    'source_closure': source.source_closure_digest, 'objects': checked,
+                    'materialization_id': self.provider_materialization_id,
+                }
             except Exception:
                 # The existing adapter owns every partially-created native value.
                 self.close()
@@ -92,6 +287,13 @@ class _MuJoCoSession(_SessionValues):
                 raise TypeError('unsupported typed mixed actuator plan')
             try:
                 self._initialize_mixed_actuator(artifact, source)
+                checked = check_mujoco_named_layout(self._model, self._mj, source)
+                self._build_layout_facts = {
+                    'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+                    'provider': 'mujoco', 'source_id': source.scene_source.source_id,
+                    'source_closure': source.source_closure_digest, 'objects': checked,
+                    'materialization_id': self.provider_materialization_id,
+                }
             except BaseException as error:
                 try:
                     self.close()
@@ -104,26 +306,50 @@ class _MuJoCoSession(_SessionValues):
             return
         import mujoco
         self._mj = mujoco
-        assets = None
-        if source.scene_definition is not None:
-            source_xml, assets = lower_mujoco_scene_source(
-                source.scene_source,
-                source.scene_definition,
-                source.source_closure_digest,
+        composition = getattr(source, 'composition_runtime_input', None)
+        if composition is not None:
+            from .mujoco_composition import materialize_fixed_robot_task
+            self._model, self._composition_receipt, self._composition_details = materialize_fixed_robot_task(
+                composition=composition.plan, task_receipt=source.execution_source_receipt,
+                fixed_declaration=composition.fixed_declaration,
+                retained_roots=composition.retained_roots,
+                replaced_robot_roots=composition.replaced_robot_roots,
+                entity_body_names=composition.entity_body_names,
+                allowed_free_joints=composition.allowed_free_joints,
+                task_site_transfers=composition.plan.task_site_transfers,
             )
+            from dataclasses import replace
+            self._composition_receipt = replace(
+                self._composition_receipt, materialization_id=self.provider_materialization_id)
+            self._composition_receipt.validate_against(composition.plan)
         else:
-            source_xml = source.scene_source.xml
-            legacy_root = ET.fromstring(source_xml)
-            for element in legacy_root.iter('freejoint'):
-                element.tag = 'joint'
-                element.set('type', 'free')
-            for element in legacy_root.findall('keyframe'):
-                legacy_root.remove(element)
-            source_xml = ET.tostring(legacy_root, encoding='unicode')
-        root = ET.fromstring(source_xml)
-        self._model = mujoco.MjModel.from_xml_string(
-            ET.tostring(root, encoding='unicode'), assets=assets,
-        )
+            assets = None
+            if source.scene_definition is not None:
+                source_xml, assets = lower_mujoco_scene_source(
+                    source.scene_source,
+                    source.scene_definition,
+                    source.source_closure_digest,
+                )
+            else:
+                receipt = source.execution_source_receipt
+                if receipt is None:
+                    source_xml = source.scene_source.xml
+                else:
+                    receipt.validate_snapshot()
+                    source_xml = receipt.importer_xml.decode('utf-8')
+                    assets = {name: payload for name, payload in receipt.closure_files.items()
+                              if name not in {'scene.xml', 'canonical-source.xml'}}
+                legacy_root = ET.fromstring(source_xml)
+                for element in legacy_root.iter('freejoint'):
+                    element.tag = 'joint'
+                    element.set('type', 'free')
+                for element in legacy_root.findall('keyframe'):
+                    legacy_root.remove(element)
+                source_xml = ET.tostring(legacy_root, encoding='unicode')
+            root = ET.fromstring(source_xml)
+            self._model = mujoco.MjModel.from_xml_string(
+                ET.tostring(root, encoding='unicode'), assets=assets,
+            )
         self._data = mujoco.MjData(self._model)
         self._native_steps = 0
         self._fixed_forward_calls = 0
@@ -135,27 +361,54 @@ class _MuJoCoSession(_SessionValues):
         self._completed_force_measurement = None
         if self._model.opt.timestep != artifact.timebase.physics_dt:
             raise ValueError('MuJoCo native timestep mismatch')
-        self._joint_addresses = {
-            semantic: self._addresses(native, free=False) for semantic, native in source.joints.items()
-        }
-        self._free_addresses = {semantic: self._addresses(native, free=True)
-                                for semantic, native in source.free_joints.items()}
-        self._bodies = {semantic: self._model.body(native).id for semantic, native in source.bodies.items()}
-        self._frames = {semantic: self._model.site(native).id for semantic, native in source.frames.items()}
-        self._target_actuators = {semantic: self._model.actuator(native).id for semantic, native in source.joint_targets.items()}
-        self._open_actuators = tuple(self._model.actuator(native).id for native in source.open_actuators)
-        self._leaf_plan = None
-        self._leaf_materialization_receipt = None
-        self._leaf_configuration_revision = None
-        self._leaf_active_plan_identity = None
-        self._leaf_fault = None
-        self._leaf_interval_active = False
-        self._leaf_interval_boundary_id = None
-        self._leaf_interval_source_boundary = None
-        self._leaf_interval_source_sample_clock = None
-        self._leaf_interval_source_configuration_revision = None
-        self._leaf_interval_writers = set()
-        self._leaf_consumed_boundaries = set()
+        try:
+            checked = check_mujoco_named_layout(self._model, self._mj, source)
+            self._joint_addresses = {k: (v['qpos'], v['dof']) for k, v in checked['joints'].items()}
+            self._free_addresses = {k: (v['qpos'], v['dof']) for k, v in checked['free_joints'].items()}
+            self._bodies = {k: v['id'] for k, v in checked['bodies'].items()}
+            self._frames = {k: v['id'] for k, v in checked['frames'].items()}
+            self._target_actuators = {k: checked['actuators'][k]['id'] for k in source.joint_targets}
+            self._open_actuators = tuple(checked['actuators']['open:'+n]['id'] for n in source.open_actuators)
+            self._build_layout_facts = {'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+                'provider': 'mujoco', 'source_id': source.scene_source.source_id,
+                'source_closure': source.source_closure_digest, 'objects': checked,
+                'materialization_id': self.provider_materialization_id,
+                'composition_intent_sha256': getattr(source.source_composition_intent, 'identity_hash', None),
+                'composition_request_v2_sha256': getattr(source.source_composition_request, 'identity_hash', None),
+                'physical_model': _mujoco_model_facts(self._model, self._mj)}
+            if source.source_reference_plan is not None:
+                self._build_layout_facts['source_reference'] = {
+                    'schema_version': 'source-composition-materialization-receipt-v1',
+                    'plan_sha256': source.source_reference_plan.identity_hash,
+                    'composition_intent_sha256': getattr(source.source_composition_intent, 'identity_hash', None),
+                    'composition_request_v2_sha256': getattr(source.source_composition_request, 'identity_hash', None),
+                    'materialization_id': self.provider_materialization_id,
+                    'task_source_id': source.source_reference_plan.task_source.source_id,
+                    'task_closure_sha256': source.source_reference_plan.task_source.closure_sha256,
+                    'robot_entities': list(source.source_reference_plan.existing_robot_entity_ids),
+                    'objects': checked, 'physical_model': self._build_layout_facts['physical_model'],
+                    'controller_binding_sha256': source.position_subject_binding.plan.identity_hash,
+                    'subject_binding_sha256': source.position_subject_binding.subject_identity_sha256,
+                    'resource_writers': list(source.position_subject_binding.plan.resource_writers),
+                }
+            if composition is not None:
+                self._build_layout_facts['source_composition'] = {
+                    'schema_version': 'source-composition-materialization-receipt-v1',
+                    'plan_sha256': self._composition_receipt.plan_sha256,
+                    'composition_intent_sha256': getattr(source.source_composition_intent, 'identity_hash', None),
+                    'composition_request_v2_sha256': getattr(source.source_composition_request, 'identity_hash', None),
+                    'source_closures': list(self._composition_receipt.source_closures),
+                    'entity_native_names': list(self._composition_receipt.entity_native_names),
+                    'materialization_id': self._composition_receipt.materialization_id,
+                    'details': self._composition_details,
+                    'objects': checked, 'physical_model': self._build_layout_facts['physical_model'],
+                    'controller_binding_sha256': source.position_subject_binding.plan.identity_hash,
+                    'subject_binding_sha256': source.position_subject_binding.subject_identity_sha256,
+                    'resource_writers': list(source.position_subject_binding.plan.resource_writers),
+                }
+        except BaseException:
+            self.close()
+            raise
         self._validate_canonical_scene_model()
 
     def _initialize_mixed_actuator(self, artifact, source):
@@ -530,24 +783,15 @@ class _MuJoCoSession(_SessionValues):
     def runtime_progress_receipt(self):
         if self._mixed_actuator_plan is None:
             raise RuntimeError('mixed runtime progress is unavailable for this session profile')
-        return {
-            'schema_version': 'runtime-progress-v1',
-            'provider_materialization_id': self._provider_materialization_id,
-            'episode_id': self._episode_id,
-            'reset_sample_id': self._reset_sample_id,
-            'reset_count': int(self._reset_count),
-            'control_step': int(self._control_step),
-            'state_revision': int(self._state_revision),
-            'native_step_count': int(self._native_steps),
+        result = self._mixed_runtime_progress_values()
+        result.update({
             'preprocess_call_count': int(self._preprocess_calls),
             'forward_call_count': int(self._forward_calls),
             'simulation_time_native_s': float(self._data.time),
             'simulation_time_episode_s': float(self._data.time - self._reset_time_origin),
-            'source_id': self._source.scene_source.source_id,
-            'source_closure_digest': self._source.source_closure_digest,
-            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
             'physical_state_monitor': self.physical_state_monitor_receipt,
-        }
+        })
+        return result
 
     @property
     def close_receipt(self):
@@ -630,6 +874,7 @@ class _MuJoCoSession(_SessionValues):
         import mujoco
         from .provenance import provider_build_identity
         from ...assembly.fixed_attachment import lower_fixed_attachment_sources
+        from ...assembly import panda_source_profiles
 
         self._mj = mujoco
         runtime_identity = self._fixed_runtime_identity(mujoco)
@@ -639,6 +884,7 @@ class _MuJoCoSession(_SessionValues):
             scene=source.scene_definition,
             plan=source.fixed_attachment_plan,
             assembly=source.fixed_attachment_assembly,
+            source_profile=panda_source_profiles,
         )
         parent_root = ET.fromstring(lowered.parent_xml)
         for keyframe in tuple(parent_root.findall("keyframe")):
@@ -692,18 +938,6 @@ class _MuJoCoSession(_SessionValues):
             semantic: model.actuator(native).id for semantic, native in source.joint_targets.items()
         }
         self._open_actuators = tuple(model.actuator(native).id for native in source.open_actuators)
-        self._leaf_plan = None
-        self._leaf_materialization_receipt = None
-        self._leaf_configuration_revision = None
-        self._leaf_active_plan_identity = None
-        self._leaf_fault = None
-        self._leaf_interval_active = False
-        self._leaf_interval_boundary_id = None
-        self._leaf_interval_source_boundary = None
-        self._leaf_interval_source_sample_clock = None
-        self._leaf_interval_source_configuration_revision = None
-        self._leaf_interval_writers = set()
-        self._leaf_consumed_boundaries = set()
         self._validate_canonical_scene_model()
         self._fixed_attachment_runtime_identity = runtime_identity
         self._fixed_attachment_provider_build = provider_build_identity("mujoco")
@@ -742,43 +976,6 @@ class _MuJoCoSession(_SessionValues):
     def fixed_attachment_close_evidence(self):
         value = self._fixed_attachment_close_receipt
         return None if value is None else json.loads(json.dumps(value, sort_keys=True))
-
-    def apply_fixed_attachment_diagnostic_control(
-        self, receipt_identity_sha256: str, *, arm_joint1_target_rad: float,
-        hand_opening_m: float,
-    ):
-        """Write the one receipt-owned Arm slot and Hand actuator at a Core boundary."""
-        self._require_reset()
-        receipt = self.fixed_attachment_receipt
-        if receipt_identity_sha256 != receipt["receipt_identity_sha256"]:
-            raise ValueError("fixed Attachment diagnostic command is not bound to this model receipt")
-        if not math.isfinite(arm_joint1_target_rad) or not math.isfinite(hand_opening_m):
-            raise ValueError("fixed Attachment diagnostic commands must be finite")
-        if not -2.8973 <= arm_joint1_target_rad <= 2.8973 or not 0.0 <= hand_opening_m <= 0.08:
-            raise ValueError("fixed Attachment diagnostic command exceeds its source joint/opening range")
-        plan = self._source.fixed_attachment_plan
-        arm_slot = receipt["native_actuator_mappings"][f"{plan.parent_entity_id}/actuator1"]["ctrl_slot"]
-        hand_slot = receipt["native_actuator_mappings"][f"{plan.child_entity_id}/actuator8"]["ctrl_slot"]
-        arm_low, arm_high = self._model.actuator_ctrlrange[arm_slot]
-        hand_low, hand_high = self._model.actuator_ctrlrange[hand_slot]
-        if (not bool(self._model.actuator_ctrllimited[arm_slot])
-                or not bool(self._model.actuator_ctrllimited[hand_slot])
-                or (float(arm_low), float(arm_high)) != (-2.8973, 2.8973)
-                or (float(hand_low), float(hand_high)) != (0.0, 255.0)):
-            raise ValueError("fixed Attachment source actuator ranges differ from the admitted model receipt")
-        self._data.ctrl[arm_slot] = arm_joint1_target_rad
-        self._data.ctrl[hand_slot] = 255.0 * hand_opening_m / 0.08
-        self._current_ctrl = self._data.ctrl.copy()
-        return {
-            "provider_materialization_id": self._provider_materialization_id,
-            "episode_id": self._episode_id,
-            "reset_sample_id": self._reset_sample_id,
-            "control_step": self._control_step,
-            "arm_joint1_target_rad": float(arm_joint1_target_rad),
-            "hand_opening_command_m": float(hand_opening_m),
-            "arm_ctrl": float(self._data.ctrl[arm_slot]),
-            "hand_ctrl": float(self._data.ctrl[hand_slot]),
-        }
 
     def _make_fixed_attachment_receipt(self):
         plan = self._source.fixed_attachment_plan
@@ -911,502 +1108,6 @@ class _MuJoCoSession(_SessionValues):
         ).hexdigest()
         return payload
 
-    @property
-    def leaf_materialization_receipt(self):
-        if self._leaf_materialization_receipt is None:
-            raise RuntimeError('MuJoCo RuntimeSession has no admitted leaf materialization')
-        return self._leaf_materialization_receipt
-
-    @property
-    def leaf_configuration_revision(self):
-        if self._leaf_configuration_revision is None:
-            raise RuntimeError('MuJoCo RuntimeSession has no admitted leaf configuration')
-        return self._leaf_configuration_revision
-
-    @property
-    def leaf_control_fault(self):
-        return self._leaf_fault
-
-    @property
-    def active_leaf_plan_identity(self):
-        return self._leaf_active_plan_identity
-
-    def admit_leaf_control_plan(self, plan):
-        """Bind the public R02b receipt to this compiled MuJoCo model."""
-        from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
-        from ...runtime.sessions.leaf_control import (
-            LeafMaterializationReceiptV1, LeafNativeActuatorMappingV1,
-            LeafNativeFrameMappingV1, LeafNativeJointMappingV1,
-            LeafNativeTendonMappingV1,
-        )
-        if type(plan) is not EffectiveLeafPlanV1 or not plan._compiled:
-            raise TypeError('MuJoCo leaf admission requires a compiled EffectiveLeafPlanV1')
-        if (plan.scene_identity_sha256 != self._source.scene_definition.identity_hash
-                or plan.source_closure_sha256 != self._source.source_closure_digest
-                or plan.provider_name != 'mujoco' or plan.backend != 'cpu'
-                or plan.physics_dt_s != self._artifact.timebase.physics_dt
-                or plan.control_substeps != self._artifact.timebase.control_substeps):
-            raise ValueError('MuJoCo model/source differs from the exact leaf plan')
-        if plan.fixed_attachment_plan_identity_sha256 is not None:
-            return self._admit_attached_leaf_control_plan(plan)
-        model, mj = self._model, self._mj
-        dimensions = (int(model.nq), int(model.nv), int(model.nu), int(model.njnt),
-                      int(model.nbody), int(model.neq), int(model.ntendon))
-        if dimensions != (9, 9, 8, 9, dimensions[4], 1, 1):
-            raise ValueError(f'R02c full-Panda native dimensions are not the fixed 9/9/8/9/1/1 route: {dimensions}')
-        if any(int(value) == int(mj.mjtJoint.mjJNT_FREE) for value in model.jnt_type):
-            raise ValueError('R02c source unexpectedly contains an additional free root')
-        joint_maps = []
-        native_joint_id_by_name = {}
-        for entry in plan.leaves:
-            binding = entry.binding
-            for ref, limits in zip(binding.joint_order, binding.joint_position_limits, strict=True):
-                native_name = ref.joint_id
-                joint_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_JOINT, native_name))
-                if joint_id < 0:
-                    raise ValueError(f'planned native Joint {native_name!r} is absent')
-                unit = binding.joint_position_unit
-                expected_type = mj.mjtJoint.mjJNT_HINGE if unit == 'radian' else mj.mjtJoint.mjJNT_SLIDE
-                if int(model.jnt_type[joint_id]) != int(expected_type):
-                    raise ValueError(f'native Joint {native_name!r} has the wrong MuJoCo type')
-                if not bool(model.jnt_limited[joint_id]) or not np.allclose(
-                    model.jnt_range[joint_id], limits, rtol=0.0, atol=1.0e-12,
-                ):
-                    raise ValueError(f'native Joint {native_name!r} limits differ from the leaf contract')
-                qadr, dadr = int(model.jnt_qposadr[joint_id]), int(model.jnt_dofadr[joint_id])
-                native_joint_id_by_name[native_name] = joint_id
-                joint_maps.append(LeafNativeJointMappingV1(
-                    'leaf-native-joint-mapping-v1', ref, native_name, joint_id,
-                    qadr, dadr, unit,
-                ))
-        actuator_maps = []
-        native_actuator_ids = set()
-        for entry in plan.leaves:
-            binding = entry.binding
-            if binding.profile_kind == 'arm_position':
-                pairs = binding.joint_actuator_bindings
-            else:
-                pairs = ()
-            if pairs:
-                for pair in pairs:
-                    actuator_ref = pair.actuator
-                    native_name = actuator_ref.actuator_id
-                    actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native_name))
-                    if actuator_id < 0:
-                        raise ValueError(f'planned native Actuator {native_name!r} is absent')
-                    trn_type = int(model.actuator_trntype[actuator_id])
-                    trn_id = int(model.actuator_trnid[actuator_id, 0])
-                    target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, trn_id)
-                    if (trn_type != int(mj.mjtTrn.mjTRN_JOINT)
-                            or target_name != pair.joint.joint_id):
-                        raise ValueError(f'Arm actuator {native_name!r} transmission differs from its Joint binding')
-                    limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id])
-                    if not bool(model.actuator_ctrllimited[actuator_id]):
-                        raise ValueError(f'Arm actuator {native_name!r} must preserve its source ctrlrange')
-                    actuator_maps.append(LeafNativeActuatorMappingV1(
-                        'leaf-native-actuator-mapping-v1', actuator_ref, native_name,
-                        actuator_id, actuator_id, limits,
-                        'radian', 'joint', str(target_name),
-                    ))
-                    native_actuator_ids.add(actuator_id)
-            else:
-                actuator_ref = binding.actuator_order[0]
-                native_name = actuator_ref.actuator_id
-                actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native_name))
-                if actuator_id < 0:
-                    raise ValueError(f'planned native Hand actuator {native_name!r} is absent')
-                trn_type = int(model.actuator_trntype[actuator_id])
-                trn_id = int(model.actuator_trnid[actuator_id, 0])
-                target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_TENDON, trn_id)
-                if trn_type != int(mj.mjtTrn.mjTRN_TENDON) or target_name != 'split':
-                    raise ValueError('Hand actuator8 is not connected to the exact split tendon')
-                limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id])
-                if (not bool(model.actuator_ctrllimited[actuator_id])
-                        or limits != tuple(binding.native_ctrlrange)):
-                    raise ValueError('Hand actuator ctrlrange differs from the bound 0..255 range')
-                actuator_maps.append(LeafNativeActuatorMappingV1(
-                    'leaf-native-actuator-mapping-v1', actuator_ref, native_name,
-                    actuator_id, actuator_id, limits,
-                    'native_ctrl', 'tendon', str(target_name),
-                ))
-                native_actuator_ids.add(actuator_id)
-        if native_actuator_ids != set(range(int(model.nu))):
-            raise ValueError('R02c leaf writers do not own every native MuJoCo ctrl slot exactly once')
-        frame_maps = []
-        for entry in plan.leaves:
-            ref = entry.binding.tcp_frame
-            body_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_BODY, ref.frame_id))
-            if body_id <= 0:
-                raise ValueError(f'leaf TCP Body {ref.frame_id!r} is missing or is world')
-            frame_maps.append(LeafNativeFrameMappingV1(
-                'leaf-native-frame-mapping-v1', ref, ref.frame_id, body_id,
-            ))
-        tendon_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_TENDON, 'split'))
-        if tendon_id < 0 or int(model.tendon_num[tendon_id]) != 2:
-            raise ValueError('R02c native Hand split tendon must contain exactly two wraps')
-        tendon_adr = int(model.tendon_adr[tendon_id])
-        wrap_joint_ids = tuple(int(value) for value in model.wrap_objid[tendon_adr:tendon_adr + 2])
-        wrap_types = tuple(int(value) for value in model.wrap_type[tendon_adr:tendon_adr + 2])
-        wrap_coefficients = tuple(float(value) for value in model.wrap_prm[tendon_adr:tendon_adr + 2])
-        expected_fingers = tuple(native_joint_id_by_name[name] for name in ('finger_joint1', 'finger_joint2'))
-        if (wrap_joint_ids != expected_fingers
-                or any(value != int(mj.mjtWrap.mjWRAP_JOINT) for value in wrap_types)
-                or wrap_coefficients != (0.5, 0.5)):
-            raise ValueError('R02c native split tendon finger order/coefficients differ from source')
-        equality_matches = []
-        for eq_id in range(int(model.neq)):
-            if (int(model.eq_type[eq_id]) == int(mj.mjtEq.mjEQ_JOINT)
-                    and {int(model.eq_obj1id[eq_id]), int(model.eq_obj2id[eq_id])} == set(expected_fingers)):
-                equality_matches.append(eq_id)
-        if len(equality_matches) != 1:
-            raise ValueError('R02c requires the exact one native finger-joint equality')
-        receipt = LeafMaterializationReceiptV1(
-            'leaf-materialization-receipt-v1', 'provider_materialization',
-            plan.scene_identity_sha256, plan.source_closure_sha256, plan.identity_sha256,
-            'mujoco', plan.provider_version, plan.provider_build_sha256, 'cpu',
-            self._provider_materialization_id, 'leaf-' + plan.identity_sha256[:20],
-            int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.nbody),
-            int(model.neq), int(model.ntendon), tuple(joint_maps), tuple(actuator_maps),
-            tuple(frame_maps), (LeafNativeTendonMappingV1(
-                'leaf-native-tendon-mapping-v1', 'hand.xml/tendon/split', 'split',
-            ),), ('hand.xml/equality/finger_joint1=finger_joint2',),
-        )
-        receipt.validate_against_plan(plan)
-        self._leaf_plan = plan
-        self._leaf_materialization_receipt = receipt
-        self._leaf_configuration_revision = receipt.configuration_revision
-        self._leaf_fault = None
-        self._leaf_consumed_boundaries.clear()
-
-    def _admit_attached_leaf_control_plan(self, plan):
-        """Resolve canonical leaf resources only through the compiled Attachment receipt."""
-        from ...controllers.canonical.leaf_profiles import (
-            PANDA_HAND_EQUALITY_IDENTITY, PANDA_HAND_TENDON_IDENTITY,
-        )
-        from ...runtime.sessions.leaf_control import (
-            LeafMaterializationReceiptV1, LeafNativeActuatorMappingV1,
-            LeafNativeFrameMappingV1, LeafNativeJointMappingV1,
-            LeafNativeTendonMappingV1,
-        )
-        source_plan = self._source.fixed_attachment_plan
-        attached = self.fixed_attachment_receipt
-        if (source_plan is None
-                or source_plan.identity_hash != plan.fixed_attachment_plan_identity_sha256
-                or attached.get('attachment_plan_sha256') != source_plan.identity_hash
-                or attached.get('scene_identity_sha256') != plan.scene_identity_sha256
-                or attached.get('source_closure_sha256') != plan.source_closure_sha256
-                or attached.get('assembly_identity_sha256') != plan.root_logical_content_sha256
-                or attached.get('provider_materialization_id') != self._provider_materialization_id):
-            raise ValueError('fixed Attachment model receipt does not attest the selected leaf plan/source/runtime')
-        if attached.get('provider') != 'mujoco' or attached.get('backend') != 'cpu':
-            raise ValueError('attached leaf plan requires the same MuJoCo CPU Attachment model receipt')
-        model, mj = self._model, self._mj
-        dimensions = attached.get('dimensions', {})
-        if ((int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.neq), int(model.ntendon))
-                != tuple(dimensions.get(key) for key in ('nq', 'nv', 'nu', 'njnt', 'neq', 'ntendon'))
-                or (int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.neq), int(model.ntendon))
-                != (9, 9, 8, 9, 1, 1)):
-            raise ValueError('attached leaf native dimensions differ from the fixed model receipt')
-        if any(int(value) == int(mj.mjtJoint.mjJNT_FREE) for value in model.jnt_type):
-            raise ValueError('fixed Attachment model unexpectedly contains a free root joint')
-
-        receipt_joint_maps = attached.get('native_joint_mappings', {})
-        receipt_actuator_maps = attached.get('native_actuator_mappings', {})
-        receipt_body_maps = attached.get('native_body_mappings', {})
-        receipt_tendon_maps = attached.get('native_tendon_mappings', {})
-        # The fixed Attachment receipt is keyed by its Entity-scoped source
-        # plan (panda-hand/split); the leaf profile has its own logical
-        # identity (hand.xml/tendon/split). Resolve through the former and
-        # publish the latter only after the native mapping is verified.
-        hand_tendon_source_key = f'{source_plan.child_entity_id}/split'
-        joint_maps, actuator_maps, frame_maps = [], [], []
-        native_joint_ids = {}
-        native_actuator_ids = set()
-        for entry in plan.leaves:
-            binding = entry.binding
-            for ref, limits in zip(binding.joint_order, binding.joint_position_limits, strict=True):
-                canonical = f'{ref.entity_id}/{ref.joint_id}'
-                native = receipt_joint_maps.get(canonical)
-                if native is None or source_plan.native_joint_names.get(canonical) != native.get('native_name'):
-                    raise ValueError(f'Attachment receipt omits the exact canonical Joint mapping {canonical}')
-                name = native['native_name']
-                joint_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_JOINT, name))
-                expected_type = mj.mjtJoint.mjJNT_HINGE if binding.joint_position_unit == 'radian' else mj.mjtJoint.mjJNT_SLIDE
-                if (joint_id < 0 or joint_id != native['joint_id']
-                        or int(model.jnt_type[joint_id]) != int(expected_type)
-                        or not bool(model.jnt_limited[joint_id])
-                        or not np.allclose(model.jnt_range[joint_id], limits, rtol=0.0, atol=1e-12)
-                        or int(model.jnt_qposadr[joint_id]) != native['qpos_address']
-                        or int(model.jnt_dofadr[joint_id]) != native['dof_address']):
-                    raise ValueError(f'Attachment native Joint mapping differs from the leaf contract: {canonical}')
-                native_joint_ids[name] = joint_id
-                joint_maps.append(LeafNativeJointMappingV1(
-                    'leaf-native-joint-mapping-v1', ref, name, joint_id,
-                    int(model.jnt_qposadr[joint_id]), int(model.jnt_dofadr[joint_id]),
-                    binding.joint_position_unit,
-                ))
-            if binding.profile_kind == 'arm_position':
-                pairs = binding.joint_actuator_bindings
-            else:
-                pairs = ()
-            if pairs:
-                for pair in pairs:
-                    actuator_ref = pair.actuator
-                    canonical = f'{actuator_ref.entity_id}/{actuator_ref.actuator_id}'
-                    native = receipt_actuator_maps.get(canonical)
-                    if native is None or source_plan.native_actuator_names.get(canonical) != native.get('native_name'):
-                        raise ValueError(f'Attachment receipt omits the exact canonical Actuator mapping {canonical}')
-                    actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native['native_name']))
-                    target_id = int(model.actuator_trnid[actuator_id, 0]) if actuator_id >= 0 else -1
-                    target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, target_id) if target_id >= 0 else None
-                    if (actuator_id != native['actuator_id'] or actuator_id != native['ctrl_slot']
-                            or int(model.actuator_trntype[actuator_id]) != int(mj.mjtTrn.mjTRN_JOINT)
-                            or target_name != source_plan.native_joint_names[f'{pair.joint.entity_id}/{pair.joint.joint_id}']):
-                        raise ValueError(f'Attachment native Arm transmission differs from its leaf mapping: {canonical}')
-                    limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id])
-                    actuator_maps.append(LeafNativeActuatorMappingV1(
-                        'leaf-native-actuator-mapping-v1', actuator_ref, native['native_name'],
-                        actuator_id, int(native['ctrl_slot']), limits, 'radian', 'joint', str(target_name),
-                    ))
-                    native_actuator_ids.add(actuator_id)
-            else:
-                actuator_ref = binding.actuator_order[0]
-                canonical = f'{actuator_ref.entity_id}/{actuator_ref.actuator_id}'
-                native = receipt_actuator_maps.get(canonical)
-                tendon = receipt_tendon_maps.get(hand_tendon_source_key)
-                if (native is None or tendon is None
-                        or source_plan.native_actuator_names.get(canonical) != native.get('native_name')
-                        or source_plan.native_tendon_names.get(hand_tendon_source_key) != tendon.get('native_name')):
-                    raise ValueError('Attachment receipt omits the canonical Hand actuator/tendon mapping')
-                actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native['native_name']))
-                target_id = int(model.actuator_trnid[actuator_id, 0]) if actuator_id >= 0 else -1
-                target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_TENDON, target_id) if target_id >= 0 else None
-                limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id]) if actuator_id >= 0 else ()
-                if (actuator_id != native['actuator_id'] or actuator_id != native['ctrl_slot']
-                        or int(model.actuator_trntype[actuator_id]) != int(mj.mjtTrn.mjTRN_TENDON)
-                        or target_name != tendon['native_name'] or limits != tuple(binding.native_ctrlrange)
-                        or not bool(model.actuator_ctrllimited[actuator_id])):
-                    raise ValueError('Attachment Hand actuator differs from its receipt tendon/ctrl contract')
-                actuator_maps.append(LeafNativeActuatorMappingV1(
-                    'leaf-native-actuator-mapping-v1', actuator_ref, native['native_name'],
-                    actuator_id, int(native['ctrl_slot']), limits, 'native_ctrl', 'tendon', str(target_name),
-                ))
-                native_actuator_ids.add(actuator_id)
-                tendon_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_TENDON, tendon['native_name']))
-                if tendon_id < 0 or int(model.tendon_num[tendon_id]) != 2:
-                    raise ValueError('Attachment Hand tendon must contain exactly two source finger wraps')
-                adr = int(model.tendon_adr[tendon_id])
-                wraps = tuple({
-                    'wrap_type': int(model.wrap_type[index]),
-                    'joint_native_name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT,
-                                                       int(model.wrap_objid[index])),
-                    'coefficient': float(model.wrap_prm[index]),
-                } for index in range(adr, adr + 2))
-                expected_names = tuple(source_plan.native_joint_names[f'panda-hand/{name}']
-                                       for name in ('finger_joint1', 'finger_joint2'))
-                if tuple(item['joint_native_name'] for item in wraps) != expected_names or tuple(
-                        item['coefficient'] for item in wraps) != (0.5, 0.5):
-                    raise ValueError('Attachment Hand tendon wraps differ from receipt child-prefix mappings')
-                matching = [eq for eq in range(int(model.neq)) if
-                            int(model.eq_type[eq]) == int(mj.mjtEq.mjEQ_JOINT)
-                            and {int(model.eq_obj1id[eq]), int(model.eq_obj2id[eq])}
-                            == {native_joint_ids[name] for name in expected_names}]
-                if len(matching) != 1:
-                    raise ValueError('Attachment Hand requires exactly the receipt-bound finger equality')
-            ref = binding.tcp_frame
-            canonical = f'{ref.entity_id}/{ref.frame_id}'
-            native = receipt_body_maps.get(canonical)
-            if native is None or source_plan.native_body_names.get(canonical) != native.get('native_name'):
-                raise ValueError(f'Attachment receipt omits the canonical leaf TCP Body mapping {canonical}')
-            body_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_BODY, native['native_name']))
-            if body_id <= 0 or body_id != native['body_id']:
-                raise ValueError(f'Attachment native TCP Body differs from its receipt: {canonical}')
-            frame_maps.append(LeafNativeFrameMappingV1(
-                'leaf-native-frame-mapping-v1', ref, native['native_name'], body_id,
-            ))
-        if native_actuator_ids != set(range(int(model.nu))):
-            raise ValueError('attached leaf writers must own every native ctrl slot exactly once')
-        fixed_receipt_hash = attached.get('receipt_identity_sha256')
-        receipt = LeafMaterializationReceiptV1(
-            'leaf-materialization-receipt-v1', 'provider_materialization',
-            plan.scene_identity_sha256, plan.source_closure_sha256, plan.identity_sha256,
-            'mujoco', plan.provider_version, plan.provider_build_sha256, 'cpu',
-            self._provider_materialization_id, 'leaf-' + plan.identity_sha256[:20],
-            int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.nbody),
-            int(model.neq), int(model.ntendon), tuple(joint_maps), tuple(actuator_maps),
-            tuple(frame_maps), (LeafNativeTendonMappingV1(
-                'leaf-native-tendon-mapping-v1', PANDA_HAND_TENDON_IDENTITY,
-                receipt_tendon_maps[hand_tendon_source_key]['native_name'],
-            ),), (PANDA_HAND_EQUALITY_IDENTITY,), fixed_receipt_hash,
-        )
-        receipt.validate_against_plan(plan)
-        self._leaf_plan = plan
-        self._leaf_materialization_receipt = receipt
-        self._leaf_configuration_revision = receipt.configuration_revision
-        self._leaf_fault = None
-        self._leaf_consumed_boundaries.clear()
-
-    def read_leaf_runtime_clock(self):
-        from ...artifacts.state import StateBoundaryIdentity, StateSampleClock
-        from ...runtime.sessions.leaf_control import LeafRuntimeClockV1
-        self._require_reset()
-        if self._leaf_plan is None:
-            raise RuntimeError('MuJoCo session has no admitted leaf plan')
-        state = self.snapshot()
-        boundary = StateBoundaryIdentity(
-            'state-boundary-identity-v1', self._episode_id, self._reset_sample_id,
-            self._leaf_plan.scene_identity_sha256, self._scene_instance_id,
-            self._provider_materialization_id, self._control_step, self._state_revision,
-        )
-        clock = StateSampleClock(
-            'state-sample-clock-v1', 'evaluation_boundary', self._control_step,
-            float(state.simulation_time),
-        )
-        return LeafRuntimeClockV1(
-            'leaf-runtime-clock-v1', boundary, clock, self.leaf_configuration_revision,
-        )
-
-    def validate_leaf_materialization(self, receipt, plan):
-        if (receipt != self.leaf_materialization_receipt or plan is not self._leaf_plan
-                or receipt.provenance_kind != 'provider_materialization'):
-            raise ValueError('leaf materialization receipt is not owned by this MuJoCo model')
-        receipt.validate_against_plan(plan)
-
-    def validate_leaf_writer_available(self, writer_id, actuator_refs, receipt):
-        self.validate_leaf_materialization(receipt, self._leaf_plan)
-        if self._leaf_fault is not None:
-            raise RuntimeError('MuJoCo leaf RuntimeSession is fault-latched')
-        entry = next((item for item in self._leaf_plan.leaves if item.binding.writer_id == writer_id), None)
-        if entry is None or tuple(entry.binding.actuator_order) != tuple(actuator_refs):
-            raise ValueError('requested leaf writer does not own the exact planned Actuator order')
-        if self._leaf_interval_active:
-            raise RuntimeError('MuJoCo leaf interval is already active')
-
-    def begin_leaf_control_interval(self, plan_identity, boundary_id):
-        clock = self.read_leaf_runtime_clock()
-        if (self._leaf_fault is not None or plan_identity != self._leaf_plan.identity_sha256
-                or boundary_id != clock.boundary.boundary_id
-                or boundary_id in self._leaf_consumed_boundaries):
-            raise ValueError('MuJoCo leaf interval is stale, replayed or fault-latched')
-        self._leaf_consumed_boundaries.add(boundary_id)
-        self._leaf_active_plan_identity = plan_identity
-        self._leaf_interval_active = True
-        self._leaf_interval_boundary_id = boundary_id
-        self._leaf_interval_source_boundary = clock.boundary
-        self._leaf_interval_source_sample_clock = clock.sample_clock
-        self._leaf_interval_source_configuration_revision = clock.configuration_revision
-        self._leaf_interval_writers.clear()
-
-    def apply_leaf_actuator_patch(self, patch):
-        from ...runtime.sessions.leaf_control import LeafApplyResultV1
-        from ...controllers.canonical.leaf_profiles import LeafApplicationAckV1
-        if not self._leaf_interval_active or self._leaf_fault is not None:
-            raise RuntimeError('MuJoCo leaf actuator patch requires an active, healthy interval')
-        if patch.writer_id in self._leaf_interval_writers:
-            raise ValueError('MuJoCo leaf writer attempted a duplicate actuator patch')
-        entry = next((item for item in self._leaf_plan.leaves
-                      if item.binding.writer_id == patch.writer_id), None)
-        if entry is None or (patch.effective_plan_identity_sha256, patch.materialization_identity_sha256) != (
-            self._leaf_plan.identity_sha256, self.leaf_materialization_receipt.identity_sha256,
-        ):
-            raise ValueError('MuJoCo patch is bound to another writer/plan/materialization')
-        target = patch.target
-        binding = entry.binding
-        source_boundary = self._leaf_interval_source_boundary
-        source_sample_clock = self._leaf_interval_source_sample_clock
-        source_configuration_revision = self._leaf_interval_source_configuration_revision
-        if (target.writer_id != binding.writer_id
-                or target.binding_identity_hash != binding.identity_hash
-                or target.source_closure_sha256 != self._source.source_closure_digest
-                or target.scene_identity_hash != self._leaf_plan.scene_identity_sha256
-                or target.source_boundary != source_boundary
-                or target.sample_clock != source_sample_clock
-                or patch.state_configuration_revision != source_configuration_revision
-                or tuple(target.joint_order) != tuple(binding.joint_order)
-                or tuple(target.actuator_order) != tuple(binding.actuator_order)
-                or tuple(item.actuator for item in patch.slot_values) != tuple(binding.actuator_order)):
-            raise ValueError('MuJoCo patch Target/slot/source clock differs from the consumed leaf evaluation')
-        mapping = {item.canonical_actuator: item for item in self.leaf_materialization_receipt.actuators}
-        for item in patch.slot_values:
-            native = mapping.get(item.actuator)
-            if (native is None or native.ctrl_slot != item.ctrl_slot
-                    or not native.ctrlrange[0] <= item.value <= native.ctrlrange[1]):
-                raise ValueError('MuJoCo leaf patch exceeds its exact native ctrl slot/range')
-        current_clock = self.read_leaf_runtime_clock()
-        current_boundary = current_clock.boundary
-        same_evaluation = (
-            source_boundary is not None
-            and source_sample_clock is not None
-            and source_configuration_revision is not None
-            and current_clock.sample_clock == source_sample_clock
-            and current_clock.configuration_revision == source_configuration_revision
-            and (current_boundary.episode_id, current_boundary.reset_sample_id,
-                 current_boundary.scene_identity_hash, current_boundary.scene_instance_id,
-                 current_boundary.provider_materialization_id, current_boundary.control_step)
-            == (source_boundary.episode_id, source_boundary.reset_sample_id,
-                source_boundary.scene_identity_hash, source_boundary.scene_instance_id,
-                source_boundary.provider_materialization_id, source_boundary.control_step)
-            and current_boundary.state_revision
-            == source_boundary.state_revision + len(self._leaf_interval_writers)
-        )
-        if not same_evaluation:
-            raise ValueError('MuJoCo leaf patch crossed its consumed evaluation boundary')
-        for item in patch.slot_values:
-            self._data.ctrl[item.ctrl_slot] = item.value
-        self._state_revision += 1
-        self._current_ctrl = self._data.ctrl.copy()
-        self._leaf_interval_writers.add(patch.writer_id)
-        application_clock = self.read_leaf_runtime_clock()
-        ack = LeafApplicationAckV1(
-            'leaf-application-ack-v1', binding.profile_kind, binding.profile_id,
-            binding.action_schema_id, target.identity_hash, binding.writer_id,
-            binding.identity_hash, binding.source_closure_sha256, binding.scene_identity_hash,
-            binding.joint_order, binding.actuator_order, target.source_boundary,
-            target.sample_clock, application_clock.boundary, application_clock.sample_clock,
-        )
-        return LeafApplyResultV1(
-            'leaf-apply-result-v1', binding.writer_id, patch.command_identity_sha256,
-            patch.materialization_identity_sha256,
-            tuple(item.ctrl_slot for item in patch.slot_values), ack,
-        )
-
-    def step_leaf_control_interval(self, *, substeps):
-        if (not self._leaf_interval_active or self._leaf_fault is not None
-                or substeps != self._leaf_plan.control_substeps
-                or set(self._leaf_interval_writers) != {entry.binding.writer_id for entry in self._leaf_plan.leaves}):
-            raise RuntimeError('MuJoCo leaf outer step requires all planned writer patches exactly once')
-        self.step()
-        self._leaf_interval_active = False
-        self._leaf_interval_boundary_id = None
-        self._leaf_interval_source_boundary = None
-        self._leaf_interval_source_sample_clock = None
-        self._leaf_interval_source_configuration_revision = None
-        self._leaf_interval_writers.clear()
-
-    def publish_leaf_state(self, scene, requirements):
-        if self._leaf_plan is None or scene.identity_hash != self._leaf_plan.scene_identity_sha256:
-            raise ValueError('MuJoCo leaf state publication Scene mismatch')
-        return self.snapshot_v1(
-            scene=scene,
-            joint_bindings={
-                f'{art.entity_id}/{joint.joint_id}': joint
-                for art in scene.articulations or () for joint in art.joints if joint.kind != 'fixed'
-            },
-            frame_bindings={
-                key: __import__('task_env.artifacts', fromlist=['FrameReference']).FrameReference(*key.split('/', 1))
-                for key in (*self._source.bodies, *self._source.frames)
-            }, requirements=requirements,
-        )
-
-    def latch_leaf_control_fault(self, progress, error):
-        if self._leaf_fault is not None:
-            raise RuntimeError('MuJoCo leaf fault is already latched')
-        self._leaf_fault = progress
-        self._leaf_interval_active = False
-        self._leaf_interval_source_boundary = None
-        self._leaf_interval_source_sample_clock = None
-        self._leaf_interval_source_configuration_revision = None
-
     def _cache_completed_actuator_force(self):
         """Read force only when the admitted Controller state contract requires it."""
         if getattr(self, '_force_feedback_required', False):
@@ -1467,6 +1168,7 @@ class _MuJoCoSession(_SessionValues):
             'revolute': self._mj.mjtJoint.mjJNT_HINGE,
             'continuous': self._mj.mjtJoint.mjJNT_HINGE,
             'prismatic': self._mj.mjtJoint.mjJNT_SLIDE,
+            'floating': self._mj.mjtJoint.mjJNT_FREE,
         }
         for articulation in scene.articulations or ():
             for joint in articulation.joints:
@@ -1503,6 +1205,13 @@ class _MuJoCoSession(_SessionValues):
                     raise ValueError(
                         f'canonical Joint {joint.joint_id!r} type/child binding differs in MuJoCo'
                     )
+                if joint.kind == 'floating':
+                    matches = [semantic for semantic, native in self._source.free_joints.items()
+                               if native == joint.joint_id
+                               and self._artifact.legacy_frame_bindings.get(semantic) == joint.child_frame]
+                    if len(matches) != 1:
+                        raise ValueError('canonical floating Joint differs from its source binding')
+                    continue
                 if not np.allclose(
                     self._model.jnt_axis[joint_id], joint.axis, rtol=0.0, atol=1.0e-9,
                 ):
@@ -1674,11 +1383,31 @@ class _MuJoCoSession(_SessionValues):
             if type(sample) is not ResetSampleV1:
                 raise TypeError('source-bound mixed actuator session requires ResetSampleV1 before native reset')
             return self._reset_mixed_actuator(sample)
-        from ...artifacts.execution import ResetSample
-        if type(sample) is not ResetSample:
-            raise TypeError('legacy MuJoCo RuntimeSession requires ResetSample v0 before reset')
+        from ...artifacts.execution import ResetSample, ResetSampleV1
+        physical_sample = (type(sample) is ResetSampleV1 and
+            sample.control_policy == 'named_physical_effort_by_source_v1')
+        if type(sample) is not ResetSample and not physical_sample:
+            raise TypeError('MuJoCo RuntimeSession requires an admitted reset sample')
         self._validate_sample(sample)
+        if physical_sample:
+            self._preflight_physical_reset(sample)
+        external = getattr(self, '_external_com_port', None)
+        if external is not None:
+            external.preflight_reset()
+            external.finish()
+        physical_port = getattr(self, '_physical_port', None)
+        if physical_port is not None:
+            if (np.any(self._data.xfrc_applied)
+                    or (physical_port.pending is None and np.any(self._data.qfrc_applied))
+                    or (physical_port.pending is not None
+                        and not np.array_equal(self._data.qfrc_applied, physical_port.pending_values))):
+                raise RuntimeError('physical reset cannot clear a foreign force buffer')
+            if physical_port.pending is not None:
+                physical_port.finish_interval()
         self._begin_reset()
+        self._pending_position_sequence = None
+        self._last_position_sequence_applied = None
+        self._last_position_sequence_progress = None
         self._last_typed_force_publication = None
         self._mj.mj_resetData(self._model, self._data)
         self._native_steps = 0
@@ -1694,6 +1423,9 @@ class _MuJoCoSession(_SessionValues):
             address = self._free_addresses[name][0]
             self._data.qpos[address:address+7] = (*requested.position, *requested.quaternion_wxyz)
         self._data.qvel[:] = 0
+        if physical_sample:
+            for name, value in sample.joint_velocity.items():
+                self._data.qvel[self._joint_addresses[name][1]] = value
         self._data.act[:] = 0
         for name, actuator in self._target_actuators.items():
             self._data.ctrl[actuator] = sample.joint_position[name]
@@ -1703,27 +1435,6 @@ class _MuJoCoSession(_SessionValues):
             self._data.ctrl[self._open_actuators[0]] = (
                 255.0 * self._source.fixed_attachment_plan.reset_hand_opening_m / 0.08
             )
-        if getattr(self, '_leaf_plan', None) is not None:
-            from ...robots.gripper import position_gripper_ctrl_for_opening
-            hand = next(entry for entry in self._leaf_plan.leaves
-                        if entry.binding.profile_kind == 'hand_position')
-            config = hand.section.values()
-            actuator_ref = hand.binding.actuator_order[0]
-            native = next(item for item in self._leaf_materialization_receipt.actuators
-                          if item.canonical_actuator == actuator_ref)
-            self._data.ctrl[native.ctrl_slot] = position_gripper_ctrl_for_opening(
-                0.076, config['gripper_opening_range_m'],
-                config['gripper_close_ctrl'], config['gripper_open_ctrl'],
-            )
-            self._leaf_fault = None
-            self._leaf_active_plan_identity = None
-            self._leaf_interval_active = False
-            self._leaf_interval_boundary_id = None
-            self._leaf_interval_source_boundary = None
-            self._leaf_interval_source_sample_clock = None
-            self._leaf_interval_source_configuration_revision = None
-            self._leaf_interval_writers.clear()
-            self._leaf_consumed_boundaries.clear()
         self._current_ctrl = self._data.ctrl.copy()
         self._mj.mj_forward(self._model, self._data)
         if self._source.fixed_attachment_plan is not None:
@@ -1731,6 +1442,17 @@ class _MuJoCoSession(_SessionValues):
         realized = self._realized(sample)
         self._cache_completed_actuator_force()
         return realized
+
+    def _preflight_physical_reset(self, sample):
+        self._validate_sample(sample)
+        if sample.control_policy != 'named_physical_effort_by_source_v1':
+            raise ValueError('physical reset requires the named effort policy')
+        for name, value in sample.joint_position.items():
+            joint = int(self._model.joint(self._source.joints[name]).id)
+            if bool(self._model.jnt_limited[joint]):
+                low, high = self._model.jnt_range[joint]
+                if not float(low) <= float(value) <= float(high):
+                    raise ValueError(f'physical reset joint position exceeds source limits: {name}')
 
     def _preflight_mixed_actuator_reset(self, sample):
         """Validate a source-bound reset completely before changing session state."""
@@ -1984,136 +1706,18 @@ class _MuJoCoSession(_SessionValues):
                 'MuJoCo required actuator-force cache is invalid: '
                 f'{measurement.invalid_reason or "unknown reason"}'
             )
-        if getattr(self, '_r1_force_admitted', False):
-            from ...artifacts import TypedActuatorForceStateValue
-
-            if not isinstance(actuator_force, TypedActuatorForceStateValue):
-                raise ValueError('plan-bound R1 feedback requires its current typed force publication')
-            if actuator_force != getattr(self, '_last_typed_force_publication', None):
-                raise ValueError('typed actuator-force value is not the current RuntimeSession publication')
-            actuator_index = self._open_actuators[0]
-            if (
-                not actuator_force.valid
-                or actuator_force.entity_id != 'panda-main'
-                or actuator_force.actuator_id != self._source.open_actuators[0]
-                or actuator_force.unit != measurement.force_unit
-                or actuator_force.signed_value != measurement.signed_force_N
-                or actuator_force.actuator_control_value != measurement.actuator_ctrl
-                or actuator_force.source_generation != measurement.source_generation
-                or actuator_force.sample_sequence != measurement.sample_sequence
-                or actuator_force.source_state_revision != measurement.state_revision
-                or actuator_force.configuration_revision != measurement.configuration_revision
-                or actuator_force.source_closure_digest != self._source.source_closure_digest
-                or actuator_force.provider_materialization_id != self._provider_materialization_id
-                or actuator_force.native_step_index != measurement.native_step_index
-                or actuator_force.sample_phase != measurement.phase
-                or actuator_force.episode_id != self._episode_id
-                or actuator_force.reset_sample_id != self._reset_sample_id
-                or actuator_force.evaluation_control_step != state.control_step
-                or actuator_force.evaluation_simulation_time_s != state.simulation_time
-                or actuator_force.actuator_control_value != float(self._data.ctrl[actuator_index])
-            ):
-                raise ValueError('typed actuator-force publication differs from the current MuJoCo cache')
-            signed_force = float(actuator_force.signed_value)
-        else:
-            if actuator_force is not None:
-                raise ValueError('typed actuator-force injection is reserved for exact plan-bound R1 admission')
-            signed_force = float(measurement.signed_force_N)
+        if actuator_force is not None:
+            raise ValueError('external typed actuator-force injection is not admitted')
+        signed_force = float(measurement.signed_force_N)
         return feedback_value(self, state, signed_force)
 
     def _snapshot_typed_actuator_force_values(self, boundary, sample_clock, requirements):
-        """Project the existing reset/step force cache without running another forward pass."""
-        from ...artifacts import TypedActuatorForceStateValue, UnavailableStateValue
-
-        if not getattr(self, '_r1_force_admitted', False):
-            return (), tuple(UnavailableStateValue(
-                'unavailable-state-value-v1', item.field_name, item.subject_kind,
-                item.entity_id, item.subject_id, item.sample_domain,
-                'MuJoCo typed actuator force is limited to the exact admitted Panda R1 candidate',
-            ) for item in requirements)
-        if self._inner_interval_active:
-            raise ValueError('MuJoCo typed actuator-force publication requires an evaluation boundary')
-        state = self.snapshot()
-        if (state.control_step != boundary.control_step
-                or float(state.simulation_time) != sample_clock.simulation_time_s
-                or sample_clock.clock_domain != 'evaluation_boundary'):
-            raise ValueError('MuJoCo typed force readback boundary changed during state publication')
-
-        values = []
-        unavailable = []
-        for item in requirements:
-            if (item.entity_id, item.subject_id, item.unit) != (
-                'panda-main', self._source.open_actuators[0], 'N',
-            ):
-                unavailable.append(UnavailableStateValue(
-                    'unavailable-state-value-v1', item.field_name, item.subject_kind,
-                    item.entity_id, item.subject_id, item.sample_domain,
-                    'MuJoCo bounded R1 force route only maps panda-main/actuator8 in N',
-                ))
-                continue
-            measurement = self._completed_force_measurement
-            if (measurement is None or self._completed_actuator_force is None
-                    or self._completed_actuator_ctrl is None):
-                unavailable.append(UnavailableStateValue(
-                    'unavailable-state-value-v1', item.field_name, item.subject_kind,
-                    item.entity_id, item.subject_id, item.sample_domain,
-                    'MuJoCo completed actuator-force cache is unavailable',
-                ))
-                continue
-
-            physics_dt = float(self._artifact.timebase.physics_dt)
-            native_ratio = float(state.simulation_time) / physics_dt
-            expected_native_step = int(round(native_ratio))
-            if (not math.isfinite(native_ratio)
-                    or abs(native_ratio - expected_native_step) > 1.0e-7):
-                raise ValueError('MuJoCo force evaluation boundary is not on the native-step clock')
-            expected_control_native = int(state.control_step) * self._artifact.timebase.control_substeps
-            if expected_native_step != expected_control_native:
-                raise ValueError('MuJoCo force native index differs from the evaluation boundary')
-            expected_phase = 'reset_forward' if expected_native_step == 0 else 'native_step_pre_integration'
-            expected_sample_time = (
-                0.0 if expected_native_step == 0
-                else float(expected_native_step - 1) * physics_dt
-            )
-            if (
-                measurement.episode_id != self._episode_id
-                or measurement.reset_sample_id != self._reset_sample_id
-                or measurement.actuator_id != item.subject_id
-                or measurement.sample_sequence != expected_native_step + 1
-                or measurement.native_step_index != expected_native_step
-                or measurement.state_revision != expected_native_step
-                or measurement.configuration_revision != self._force_configuration_revision
-                or measurement.phase != expected_phase
-                or measurement.native_sample_time_s != expected_sample_time
-            ):
-                raise ValueError('MuJoCo completed force cache is stale or belongs to another reset/boundary')
-
-            actuator_index = self._open_actuators[0]
-            cached_control = float(self._completed_actuator_ctrl[actuator_index])
-            current_control = float(self._data.ctrl[actuator_index])
-            if not math.isfinite(current_control) or cached_control != current_control:
-                raise ValueError('MuJoCo completed force cache does not match the current actuator input')
-            force = measurement.signed_force_N
-            valid = measurement.valid and force is not None and math.isfinite(float(force))
-            if valid and (not math.isfinite(cached_control) or measurement.force_unit != 'N'):
-                valid = False
-            invalid_reason = measurement.invalid_reason
-            if not valid and not invalid_reason:
-                invalid_reason = 'MuJoCo required actuator-force cache is non-finite or has an unsupported unit'
-            value = TypedActuatorForceStateValue(
-                'typed-actuator-force-state-v1', item.entity_id, item.subject_id,
-                measurement.force_unit, float(force) if valid else None,
-                cached_control if valid else None, valid, invalid_reason,
-                measurement.source_generation, measurement.sample_sequence,
-                measurement.state_revision, measurement.configuration_revision,
-                self._source.source_closure_digest, self._provider_materialization_id,
-                measurement.phase, measurement.native_step_index, physics_dt,
-                expected_sample_time, str(self._episode_id), str(self._reset_sample_id),
-                boundary.boundary_id, int(state.control_step), float(state.simulation_time),
-            )
-            values.append(value)
-            self._last_typed_force_publication = value
-        return tuple(values), tuple(unavailable)
+        from ...artifacts import UnavailableStateValue
+        return (), tuple(UnavailableStateValue(
+            'unavailable-state-value-v1', item.field_name, item.subject_kind,
+            item.entity_id, item.subject_id, item.sample_domain,
+            'MuJoCo typed actuator-force publication is not admitted for this source',
+        ) for item in requirements)
 
     def native_control_feedback_sample(self, state, feedback):
         """Publish provenance for the exact cached force used by control_feedback()."""
@@ -2145,21 +1749,195 @@ class _MuJoCoSession(_SessionValues):
         sample.validate()
         return sample
 
+    def configure_gravity_compensation(self):
+        """Admit source-bound arm gravity on the exact affine MuJoCo drive.
+
+        This profile composes the torque through a position-reference offset;
+        it is not a general effort interface. The existing actuator's native
+        force limit remains in effect and the actual adjusted target is acked.
+        """
+        if self._mixed_actuator_plan is not None or self._source.fixed_attachment_plan is not None:
+            raise ValueError('gravity compensation does not admit mixed or attached sources')
+        if self._reset_done or hasattr(self, '_gravity_model'):
+            raise ValueError('gravity compensation must be configured once before reset')
+        if int(self._model.opt.disableflags) & int(self._mj.mjtDisableBit.mjDSBL_GRAVITY):
+            raise ValueError('gravity compensation requires native gravity to be enabled')
+        from ...controllers.canonical.kinematics import PandaKinematics, PANDA_HAND_ORIGIN_TCP_V1
+        source_xml = self._source.scene_source.xml
+        model = PandaKinematics(source_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
+        bodies = model._compile_gravity_bodies()
+        model._gravity_bodies = bodies
+        base = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, model._gravity_root_body_id))
+        if base <= 0:
+            raise ValueError('gravity compensation requires the exact named fixed Panda base')
+        ancestor = base
+        while ancestor:
+            if int(self._model.body_jntnum[ancestor]) != 0:
+                raise ValueError('gravity compensation requires a fixed base and fixed ancestors')
+            ancestor = int(self._model.body_parentid[ancestor])
+        indices = []
+        for name, parent, fixed, joint, kind, axis, pivot, mass, com in bodies:
+            body = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, name))
+            parent_id = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, parent))
+            native_rotation = np.empty(9, dtype=np.float64)
+            if body >= 0:
+                self._mj.mju_quat2Mat(native_rotation, self._model.body_quat[body])
+            if (body < 0 or int(self._model.body_parentid[body]) != parent_id
+                    or abs(float(self._model.body_mass[body]) - mass) > 1e-10
+                    or not np.allclose(self._model.body_ipos[body], com, rtol=0, atol=1e-10)
+                    or not np.allclose(self._model.body_pos[body], fixed[:3, 3], rtol=0, atol=1e-10)
+                    or not np.allclose(native_rotation.reshape(3, 3), fixed[:3, :3], rtol=0, atol=1e-10)
+                    or abs(float(self._model.body_gravcomp[body])) > 0):
+                raise ValueError(f'gravity source/compiled mass, COM, parent or compensation differs: {name}')
+            if joint:
+                jid = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, joint))
+                expected_type = self._mj.mjtJoint.mjJNT_HINGE if kind == 'hinge' else self._mj.mjtJoint.mjJNT_SLIDE
+                if (jid < 0 or int(self._model.jnt_bodyid[jid]) != body
+                        or int(self._model.jnt_type[jid]) != int(expected_type)
+                        or not np.allclose(self._model.jnt_axis[jid], axis, rtol=0, atol=1e-10)
+                        or not np.allclose(self._model.jnt_pos[jid], pivot, rtol=0, atol=1e-10)):
+                    raise ValueError(f'gravity source/compiled joint differs: {joint}')
+        for i in range(1, 8):
+            semantic = f'panda-v1/joint{i}'
+            if semantic not in self._target_actuators or semantic not in self._joint_addresses:
+                raise ValueError('gravity compensation requires seven exact panda-v1 arm joints')
+            actuator = self._target_actuators[semantic]
+            gain = float(self._model.actuator_gainprm[actuator, 0])
+            bias = self._model.actuator_biasprm[actuator]
+            gear = self._model.actuator_gear[actuator]
+            jid = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, self._source.joints[semantic]))
+            if (int(self._model.actuator_trntype[actuator]) != int(self._mj.mjtTrn.mjTRN_JOINT)
+                    or int(self._model.actuator_trnid[actuator, 0]) != jid
+                    or int(self._model.actuator_dyntype[actuator]) != int(self._mj.mjtDyn.mjDYN_NONE)
+                    or int(self._model.actuator_gaintype[actuator]) != int(self._mj.mjtGain.mjGAIN_FIXED)
+                    or int(self._model.actuator_biastype[actuator]) != int(self._mj.mjtBias.mjBIAS_AFFINE)
+                    or not np.isfinite(gain) or gain <= 0 or not np.isfinite(gear).all()
+                    or abs(float(gear[0])) < 1e-12 or not np.allclose(gear[1:], 0, rtol=0, atol=0)
+                    or abs(float(bias[0])) > 1e-12 or abs(float(bias[1]) + gain) > 1e-9
+                    or not bool(self._model.actuator_ctrllimited[actuator])
+                    or not bool(self._model.actuator_forcelimited[actuator])):
+                raise ValueError(f'gravity compensation cannot represent this position actuator: {semantic}')
+            indices.append((semantic, actuator, gain, float(gear[0])))
+        for name in ('panda-v1/finger_joint1', 'panda-v1/finger_joint2'):
+            if name not in self._joint_addresses:
+                raise ValueError('gravity compensation requires both named finger positions')
+        finger_ids = [int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT,
+                      self._source.joints[f'panda-v1/finger_joint{i}'])) for i in (1, 2)]
+        equalities = [i for i in range(self._model.neq)
+                      if int(self._model.eq_type[i]) == int(self._mj.mjtEq.mjEQ_JOINT)
+                      and bool(self._model.eq_active0[i])
+                      and [int(self._model.eq_obj1id[i]), int(self._model.eq_obj2id[i])] == finger_ids
+                      and np.allclose(self._model.eq_data[i, :5], [0, 1, 0, 0, 0], rtol=0, atol=1e-12)]
+        if len(equalities) != 1 or len(self._open_actuators) != 1:
+            raise ValueError('gravity compensation requires the exact coupled Panda finger equality and one tendon')
+        opening = self._open_actuators[0]
+        if {item[1] for item in indices} | {opening} != set(range(self._model.nu)):
+            raise ValueError('gravity compensation refuses additional or shared source actuators')
+        if int(self._model.actuator_trntype[opening]) != int(self._mj.mjtTrn.mjTRN_TENDON):
+            raise ValueError('gravity compensation requires the Panda opening tendon')
+        tendon = int(self._model.actuator_trnid[opening, 0])
+        if not 0 <= tendon < self._model.ntendon:
+            raise ValueError('gravity compensation opening tendon is unavailable')
+        start, count = int(self._model.tendon_adr[tendon]), int(self._model.tendon_num[tendon])
+        wraps = [(int(self._model.wrap_type[i]), int(self._model.wrap_objid[i]), float(self._model.wrap_prm[i]))
+                 for i in range(start, start + count)]
+        if wraps != [(int(self._mj.mjtWrap.mjWRAP_JOINT), finger_ids[0], 0.5),
+                     (int(self._mj.mjtWrap.mjWRAP_JOINT), finger_ids[1], 0.5)]:
+            raise ValueError('gravity compensation requires the exact symmetric opening tendon')
+        if not np.isfinite(self._model.opt.gravity).all():
+            raise ValueError('gravity compensation requires finite scene gravity')
+        self._gravity_model = model
+        self._gravity_base_body = base
+        self._gravity_actuators = tuple(indices)
+        self._gravity_interval_receipts = []
+
+    @property
+    def gravity_compensation_receipt(self):
+        import copy
+        if not hasattr(self, '_gravity_model'):
+            return None
+        return copy.deepcopy(self._gravity_interval_receipts)
+
+    def _gravity_adjusted_targets(self, target):
+        if np.any(self._data.qfrc_applied) or np.any(self._data.xfrc_applied):
+            raise ValueError('gravity contribution refuses unaccounted applied force contributions')
+        model = self._gravity_model
+        q = [float(self._data.qpos[self._joint_addresses[f'panda-v1/joint{i}'][0]]) for i in range(1, 8)]
+        fingers = [float(self._data.qpos[self._joint_addresses[f'panda-v1/finger_joint{i}'][0]]) for i in (1, 2)]
+        rotation = np.asarray(self._data.xmat[self._gravity_base_body]).reshape(3, 3).copy()
+        gravity = np.asarray(self._model.opt.gravity).copy()
+        torque, finger_force = model.gravity_support(q, fingers, gravity, rotation, include_fingers=True)
+        # The current Panda hand has one equality-coupled tendon, not two
+        # independent effort actuators. Equal travel is gravity-neutral only
+        # when the sum of the two finger loads vanishes. Fail closed rather
+        # than silently pretending to compensate an unrepresentable load.
+        if abs(float(np.sum(finger_force))) > 1e-9:
+            raise ValueError('gravity compensation cannot represent net coupled finger gravity')
+        rows, adjusted = [], {}
+        for (semantic, actuator, gain, gear), support in zip(self._gravity_actuators, torque, strict=True):
+            original = float(target.arm_servo_position[semantic])
+            requested = original + float(support) / (gain * gear)
+            low, high = self._model.actuator_ctrlrange[actuator]
+            actual = float(np.clip(requested, low, high))
+            adjusted[semantic] = actual
+            rows.append({'joint': semantic, 'unit': 'N*m', 'computed_support_torque': float(support),
+                         'original_position_target_rad': original, 'requested_position_target_rad': requested,
+                         'applied_position_target_rad': actual, 'gain': gain, 'gear': gear,
+                         'position_target_clamped': actual != requested})
+        if not self._gravity_interval_receipts or self._gravity_interval_receipts[-1]['control_step'] != self._control_step:
+            self._gravity_interval_receipts = []
+        self._gravity_interval_receipts.append({
+            'schema_version': 'panda-gravity-position-contribution-v1',
+            'calculation_kind': 'source_body_mass_com_gravity_only',
+            'source_closure_digest': self._source.source_closure_digest,
+            'kinematics_source_sha256': model.source_sha256,
+            'body_names': [item[0] for item in model._gravity_bodies],
+            'provider_materialization_id': self.provider_materialization_id,
+            'episode_id': self._episode_id, 'reset_sample_id': self._reset_sample_id,
+            'control_step': self._control_step, 'native_step_before': self._native_steps,
+            'target_identity_sha256': target.identity_hash,
+            'joint_position_rad': q, 'finger_position_m': fingers,
+            'finger_gravity_support_force_N': finger_force.tolist(),
+            'coupled_finger_gravity_support_force_N': float(np.sum(finger_force)),
+            'gravity_world_m_s2': gravity.tolist(), 'world_from_base_rotation': rotation.tolist(),
+            'mapping': 'affine_position_target_offset_with_native_force_limits', 'joints': rows,
+            'actual_actuator_force_samples': [],
+        })
+        return adjusted
+
+    def _record_gravity_force_sample(self):
+        if not getattr(self, '_gravity_interval_receipts', None):
+            return
+        values = []
+        for semantic, actuator, _gain, gear in self._gravity_actuators:
+            force = float(self._data.actuator_force[actuator])
+            low, high = self._model.actuator_forcerange[actuator]
+            values.append({'joint': semantic, 'native_actuator_force': force,
+                           'generalized_actuator_torque_Nm': gear * force,
+                           'force_limit_reached': bool(force <= low + 1e-9 or force >= high - 1e-9)})
+        self._gravity_interval_receipts[-1]['actual_actuator_force_samples'].append({
+            'native_step': self._native_steps, 'values': values,
+            'provenance': 'provider_actuator_force_not_external_sensor',
+        })
+
     def apply_control(self, target):
         if self._mixed_actuator_plan is not None:
             return self.apply_mixed_actuator_command(target)
         from .control import validate_target
         from ...controllers.canonical.contracts import AppliedCanonicalControl
         validate_target(self, target)
+        gravity_targets = self._gravity_adjusted_targets(target) if hasattr(self, '_gravity_model') else None
         clipped = False
         realized = {}
         for name, requested in target.arm_servo_position.items():
             index = self._target_actuators[name]
             low, high = self._model.actuator_ctrlrange[index]
-            value = float(np.clip(requested, low, high)) if self._model.actuator_ctrllimited[index] else requested
+            candidate = requested if gravity_targets is None else gravity_targets[name]
+            value = float(np.clip(candidate, low, high)) if self._model.actuator_ctrllimited[index] else candidate
             self._data.ctrl[index] = value
             realized[name] = value
-            clipped = clipped or value != requested
+            clipped = clipped or value != candidate or (gravity_targets is not None and any(
+                row['position_target_clamped'] for row in self._gravity_interval_receipts[-1]['joints']))
         index = getattr(self, '_open_actuators_by_semantic', {}).get(
             target.gripper.semantic_id, self._open_actuators[0],
         )
@@ -2177,7 +1955,9 @@ class _MuJoCoSession(_SessionValues):
         self._current_ctrl = self._data.ctrl.copy()
         return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, 'mujoco',
             realized, opening, target.gripper.force_limit_N, clipped,
-            'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
+            ('named_position_servo_plus_source_gravity_offset_and_affine_tendon_force_limit_ZOH'
+             if gravity_targets is not None else
+             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH'))
 
     def bind_mixed_controller(self, controller_identity):
         if self._mixed_actuator_plan is None:
@@ -2390,8 +2170,86 @@ class _MuJoCoSession(_SessionValues):
             }
             raise
 
+    def stage_position_sequence(self, sequence, lowers):
+        """Stage one preflighted Position schedule without touching native controls."""
+        from .control_submission import PositionControlSequenceV1, PositionSequenceStagedV1
+        receipt = getattr(self, '_last_scene_control_submission', None)
+        if (type(sequence) is not PositionControlSequenceV1
+                or getattr(self, '_prepared_position_sequence', None) is not sequence
+                or type(receipt) is not dict or receipt.get('status') != 'pending'
+                or receipt.get('inner_position_command_sha256',
+                               receipt.get('inner_command_sha256')) != sequence.identity_hash
+                or type(lowers) is not tuple or len(lowers) != len(sequence.slices)
+                or any(not callable(lower) for lower in lowers)
+                or getattr(self, '_pending_position_sequence', None) is not None):
+            raise ValueError('Position schedule requires the pending common submission')
+        sequence.validate()
+        self._pending_position_sequence = (sequence, lowers, sequence.identity_hash)
+        self._last_position_sequence_applied = None
+        self._last_position_sequence_progress = {
+            'schema_version': 'position-sequence-native-progress-v1',
+            'sequence_sha256': sequence.identity_hash, 'status': 'staged',
+            'attempted_target_sha256': [], 'acknowledged_target_sha256': [],
+            'native_steps_attempted': 0, 'native_steps_completed': 0,
+            'native_step_result_unknown': False,
+        }
+        return PositionSequenceStagedV1(sequence.identity_hash)
+
+    def _apply_position_sequence_substep(self, pending, index, applied_results):
+        sequence, lowers, admitted_hash = pending
+        if sequence.identity_hash != admitted_hash:
+            raise RuntimeError('Position sequence changed after submission')
+        if not np.array_equal(self._data.ctrl, self._current_ctrl):
+            raise RuntimeError('Position native control changed during sequence')
+        for (start, _end, target), lower in zip(sequence.slices, lowers, strict=True):
+            if index == start:
+                progress = self._last_position_sequence_progress
+                progress['attempted_target_sha256'].append(target.identity_hash)
+                applied = lower()
+                if applied.target_hash != target.target.identity_hash:
+                    raise ValueError('Position sequence native acknowledgement differs')
+                applied_results.append(applied)
+                progress['acknowledged_target_sha256'].append(target.identity_hash)
+
     def step(self):
         self._require_reset()
+        external = getattr(self, '_external_com_port', None)
+        if external is not None and not external.authorized:
+            raise RuntimeError('caller wrench requires an acknowledged interval submission')
+        physical_port = getattr(self, '_physical_port', None)
+        if physical_port is not None:
+            if physical_port.pending is None:
+                raise RuntimeError('physical interval requires exactly one fresh batch')
+            pending_position = getattr(self, '_pending_position_sequence', None)
+            position_applied = []
+            try:
+                for index in range(self._artifact.timebase.control_substeps):
+                    if pending_position is not None:
+                        self._apply_position_sequence_substep(pending_position, index, position_applied)
+                    physical_port.refresh_substep()
+                    if pending_position is not None:
+                        self._last_position_sequence_progress['native_steps_attempted'] += 1
+                    self._mj.mj_step(self._model, self._data)
+                    if pending_position is not None:
+                        self._last_position_sequence_progress['native_steps_completed'] += 1
+                    self._native_steps += 1
+                self._mj.mj_forward(self._model, self._data)
+                self._control_step += 1
+                self._state_revision += 1
+                if pending_position is not None:
+                    self._last_position_sequence_applied = tuple(position_applied)
+                    self._last_position_sequence_progress['status'] = 'completed'
+                return self.snapshot()
+            except BaseException:
+                if pending_position is not None:
+                    progress = self._last_position_sequence_progress
+                    progress['status'] = 'failed_partial'
+                    progress['native_step_result_unknown'] = (
+                        progress['native_steps_attempted'] > progress['native_steps_completed'])
+                raise
+            finally:
+                self._pending_position_sequence = None
+                physical_port.finish_interval()
         if self._mixed_actuator_plan is not None:
             if self._mixed_fault is not None:
                 raise RuntimeError('mixed actuator MuJoCo session is fault-latched')
@@ -2418,21 +2276,48 @@ class _MuJoCoSession(_SessionValues):
                     'control_boundary': int(self._control_step),
                 }
                 raise
-        for _ in range(self._artifact.timebase.control_substeps):
-            self._mj.mj_step(self._model, self._data)
-            self._native_steps += 1
-            self._cache_completed_actuator_force()
-        self._mj.mj_forward(self._model, self._data)
-        if self._source.fixed_attachment_plan is not None:
-            self._fixed_forward_calls += 1
-        self._control_step += 1
-        self._state_revision += 1
-        return self.snapshot()
+        pending_position = getattr(self, '_pending_position_sequence', None)
+        position_applied = []
+        try:
+            for index in range(self._artifact.timebase.control_substeps):
+                if pending_position is not None:
+                    self._apply_position_sequence_substep(pending_position, index, position_applied)
+                if external is not None:
+                    external.refresh_substep()
+                if pending_position is not None:
+                    self._last_position_sequence_progress['native_steps_attempted'] += 1
+                self._mj.mj_step(self._model, self._data)
+                if pending_position is not None:
+                    self._last_position_sequence_progress['native_steps_completed'] += 1
+                self._native_steps += 1
+                self._record_gravity_force_sample()
+                self._cache_completed_actuator_force()
+            self._mj.mj_forward(self._model, self._data)
+            if self._source.fixed_attachment_plan is not None:
+                self._fixed_forward_calls += 1
+            self._control_step += 1
+            self._state_revision += 1
+            if pending_position is not None:
+                self._last_position_sequence_applied = tuple(position_applied)
+                self._last_position_sequence_progress['status'] = 'completed'
+            return self.snapshot()
+        except BaseException:
+            if pending_position is not None:
+                progress = self._last_position_sequence_progress
+                progress['status'] = 'failed_partial'
+                progress['native_step_result_unknown'] = (
+                    progress['native_steps_attempted'] > progress['native_steps_completed'])
+            raise
+        finally:
+            self._pending_position_sequence = None
+            if external is not None:
+                external.finish()
 
     def _step_physics_once(self):
         self._require_reset()
         self._mj.mj_step(self._model, self._data)
         self._native_steps += 1
+        self._record_gravity_force_sample()
         self._cache_completed_actuator_force()
         self._mj.mj_forward(self._model, self._data)
 
@@ -2562,6 +2447,12 @@ class _MuJoCoSession(_SessionValues):
 
     def close(self):
         if not self._closed:
+            external = getattr(self, '_external_com_port', None)
+            if external is not None:
+                external.finish()
+            physical_port = getattr(self, '_physical_port', None)
+            if physical_port is not None and physical_port.pending is not None:
+                physical_port.finish_interval()
             if self._mixed_actuator_plan is not None:
                 self._last_close_receipt = {
                     'schema_version': 'runtime-close-v1',

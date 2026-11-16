@@ -141,8 +141,11 @@ def backend_candidates(requested: str) -> tuple[str, ...]:
     normalized = str(requested).strip().lower()
     if normalized not in BACKEND_CHOICES:
         raise ValueError(f"backend must be one of {BACKEND_CHOICES}, got {requested!r}")
-    if normalized in {"auto", "cuda"}:
-        return ("cuda", "cpu")
+    if normalized == "auto":
+        # The example scripts prefer CUDA.  Construction and even training can
+        # happen inside the factory, so an exception does not establish that
+        # CUDA is unavailable or that it is safe to repeat the operation.
+        return ("cuda",)
     return (normalized,)
 
 
@@ -153,38 +156,29 @@ def with_backend_fallback(
     logger: Any,
     operation: str,
 ) -> tuple[str, T]:
-    """Run an environment factory CUDA-first and log an explicit CPU fallback."""
+    """Run the selected backend once; report failure without replaying work.
 
-    candidates = backend_candidates(requested)
-    last_error: Exception | None = None
-    for index, backend in enumerate(candidates):
-        try:
-            result = factory(backend)
-            logger.info(
-                "TaskEnv script backend selected",
-                event="runtime.backend_selected",
-                operation=operation,
-                requested_backend=requested,
-                backend=backend,
-            )
-            return backend, result
-        except Exception as exc:
-            last_error = exc
-            if index + 1 >= len(candidates):
-                raise
-            logger.warning(
-                "TaskEnv script backend failed; switching to CPU",
-                event="runtime.backend_fallback",
-                operation=operation,
-                requested_backend=requested,
-                failed_backend=backend,
-                fallback_backend=candidates[index + 1],
-                error_type=type(exc).__name__,
-                error=str(exc),
-            )
-    if last_error is None:
-        raise RuntimeError("backend factory did not produce a result")
-    raise last_error
+    ``auto`` currently selects CUDA.  Select CPU explicitly on hosts where it
+    is required: arbitrary factory failures cannot establish CUDA availability.
+    """
+
+    (backend,) = backend_candidates(requested)
+    logger.info(
+        "TaskEnv script backend attempt",
+        event="runtime.backend_attempt",
+        operation=operation,
+        requested_backend=requested,
+        backend=backend,
+    )
+    result = factory(backend)
+    logger.info(
+        "TaskEnv script backend selected",
+        event="runtime.backend_selected",
+        operation=operation,
+        requested_backend=requested,
+        backend=backend,
+    )
+    return backend, result
 
 
 def _walk_arrays(value: Any, path: str = ""):
@@ -219,17 +213,3 @@ def check_observation(observation: Any, observation_space: Any, *, batch: int | 
             raise ValueError(f"observation leaf {path!r} contains non-finite values")
         if batch is not None and (value.ndim < 1 or value.shape[0] != batch):
             raise ValueError(f"observation leaf {path!r} must have leading batch {batch}")
-
-
-def pick_cube_config(*, backend: str, horizon: int):
-    """Return the documented public configuration used by all examples."""
-    return {
-        "runtime": {
-            "backend": backend,
-            "broadphase": "n2",
-            "prewarm": False,
-            "control_substeps": 25,
-        },
-        "robot": {"controller": {"kind": "absolute_pose", "reference": "world"}},
-        "episode": {"horizon": horizon},
-    }

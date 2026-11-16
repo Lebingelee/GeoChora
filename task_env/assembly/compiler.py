@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 import hashlib
 import json
+from pathlib import Path
 from types import MappingProxyType
 import xml.etree.ElementTree as ET
 
@@ -13,23 +14,9 @@ import numpy as np
 
 from ..environment import EpisodePhysicsState, TaskCompositionSpec
 from ..environment.task_source import TaskArtifactDeclarationV1
+from ..utils._paths import callable_source_path
 from .references import TaskReferences, resolve_task_references
 from .logical_source import LogicalAssemblySourceProjectionV1, project_logical_assembly_source
-
-
-_EMPTY_TABLETOP_XML = """
-<mujoco model="task_env_empty_tabletop">
-  <option timestep="0.002" gravity="0 0 -9.81"/>
-  <worldbody>
-    <body name="grasp_table" pos="0 0 0.45">
-      <geom name="grasp_table_geom" type="box" size="0.28 0.20 0.01"
-            rgba="0.34 0.39 0.42 1"/>
-      <geom name="grasp_table_visual" type="box" size="0.28 0.20 0.0101"
-            contype="0" conaffinity="0" rgba="0.34 0.39 0.42 1"/>
-    </body>
-  </worldbody>
-</mujoco>
-"""
 
 
 @dataclass(frozen=True)
@@ -49,6 +36,7 @@ class CompiledReferenceTaskV1:
     artifact: object
     source: object
     controller: object | None = None
+    source_owners: tuple = ()
 
     def identity_fields(self, *, include_runtime_config_sha256: bool = True) -> dict[str, object]:
         return reference_task_identity_fields(
@@ -81,6 +69,68 @@ def reference_task_identity_fields(artifact, source, controller, *,
             runtime_config, sort_keys=True, separators=(",", ":"),
         ).encode()).hexdigest()
     return result
+
+
+def reference_construction_value(compiled, *, task_id, construction_schema, owners=(), binding=None, metadata=None):
+    """Prepare a selected construction receipt from a compiled task and its owners.
+
+    Source bytes are sampled for this construction, rather than cached by path.
+    The caller may supply additional task-specific owners. When a selected
+    binding is supplied, collect its declared callable owners as well; shared
+    construction and lifecycle owners remain visible in provenance.
+    """
+    from ..controllers.canonical.contracts import digest
+    from ..environment.lifecycle import EpisodeExecutionState
+    from ..environment.reference_binding import ReferenceTaskBinding
+
+    if compiled.controller is None:
+        raise ValueError("selected reference construction requires a controller")
+    root = Path(__file__).resolve().parents[2]
+    binding_owners = ()
+    if binding is not None:
+        if type(binding) is not ReferenceTaskBinding:
+            raise TypeError('construction binding must be an exact ReferenceTaskBinding')
+        binding_owners = (type(binding), *(
+            value for descriptor in fields(binding)
+            if callable(value := getattr(binding, descriptor.name))
+        ))
+        if binding.scalar_control_binding is not None:
+            binding_owners += (type(binding.scalar_control_binding),)
+    all_owners = (*owners, *binding_owners, *compiled.source_owners, type(compiled), ReferenceTaskDeclarationV1,
+                  TaskArtifactDeclarationV1, compile_reference_source,
+                  reference_task_identity_fields, reference_construction_value,
+                  callable_source_path, type(compiled.controller), EpisodeExecutionState)
+    paths = set()
+    for owner in all_owners:
+        try:
+            paths.add(callable_source_path(owner))
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"construction owner has no source file: {owner!r}") from error
+    source_hashes = {
+        (path.relative_to(root).as_posix() if path.is_relative_to(root)
+         else f'external:{path.name}'): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(paths)
+    }
+    if len(source_hashes) != len(paths):
+        raise ValueError("construction owner source paths have ambiguous provenance names")
+    metadata = {} if metadata is None else dict(metadata)
+    identities = reference_task_identity_fields(compiled.artifact, compiled.source, compiled.controller)
+    reserved = {'schema_version', 'task_id', 'source_sha256', 'solution', 'qualification'} | identities.keys()
+    if metadata.keys() & reserved:
+        raise ValueError('construction metadata conflicts with reserved fields')
+    resolved = {
+        **metadata, 'schema_version': construction_schema, 'task_id': task_id,
+        **identities,
+        'source_sha256': source_hashes,
+        'solution': 'not_declared', 'qualification': 'NOT_REQUALIFIED',
+    }
+    return {
+        'construction_id': construction_schema, 'artifact': compiled.artifact,
+        'source': compiled.source, 'controller': compiled.controller, 'solution': None,
+        'solution_identity': digest({'schema': 'no-task-solution-v1', 'task_id': task_id}),
+        'recipe_identity': digest(resolved), 'resolved_configuration': resolved,
+        'source_sha256': source_hashes,
+    }
 
 
 @dataclass(frozen=True)
@@ -124,12 +174,12 @@ class ReferenceTaskDeclarationV1:
             raise ValueError("open_actuators must contain nonempty names")
         object.__setattr__(self, "open_actuators", actuators)
 
-    def compile_source(self, artifact, *, scene_source, config, **source_options):
+    def compile_source(self, artifact, *, scene_source, config, own_snapshot=False, **source_options):
         """Bind one declared Artifact to its source without native materialization."""
         expected = self.artifact.compile()
         if type(artifact) is not type(expected) or artifact.identity_hash != expected.identity_hash:
             raise ValueError("source Artifact does not match the task declaration")
-        return compile_reference_source(
+        source = compile_reference_source(
             artifact=artifact,
             scene_source=scene_source,
             composition=self.composition,
@@ -142,133 +192,38 @@ class ReferenceTaskDeclarationV1:
             **({"joints": self.joints} if self.joints is not None else {}),
             **source_options,
         )
+        if own_snapshot:
+            from ..runtime.sessions.source import snapshot_legacy_mjcf_source
+            source = snapshot_legacy_mjcf_source(source)
+        return source
 
-    def compile(self, *, scene_source, config, controller_factory: Callable | None = None,
-                **source_options) -> CompiledReferenceTaskV1:
+    def compile(self, *, scene_source, config, artifact=None, controller_factory: Callable | None = None,
+                own_snapshot=False, **source_options) -> CompiledReferenceTaskV1:
         """Compile Artifact, source bindings and an optional pure controller."""
-        artifact = self.artifact.compile()
+        artifact = self.artifact.compile() if artifact is None else artifact
         source = self.compile_source(
-            artifact, scene_source=scene_source, config=config, **source_options,
+            artifact, scene_source=scene_source, config=config, own_snapshot=own_snapshot, **source_options,
         )
-        controller = None
-        if controller_factory is not None:
-            if not callable(controller_factory):
-                raise TypeError("controller_factory must be callable")
-            controller = controller_factory(artifact, source)
+        from contextlib import nullcontext
+        from ..runtime.sessions.source import close_execution_source_on_failure
+        cleanup = close_execution_source_on_failure(source) if own_snapshot else nullcontext()
+        with cleanup:
+            controller = None
+            if controller_factory is not None:
+                if not callable(controller_factory):
+                    raise TypeError("controller_factory must be callable")
+                controller = controller_factory(artifact, source)
         return CompiledReferenceTaskV1(artifact, source, controller)
 
 
-def _find_body(root: ET.Element, name: str) -> ET.Element:
-    for body in root.iter("body"):
-        if body.get("name") == name:
-            return body
-    raise KeyError(f"body {name!r} is required by the task scene builder")
-
-
-def _ensure_panda_ee_site(root: ET.Element) -> None:
-    hand = _find_body(root, "hand")
-    if hand.find("site[@name='nutassembly_ee_site']") is not None:
-        return
-    ET.SubElement(
-        hand,
-        "site",
-        {
-            "name": "nutassembly_ee_site",
-            "pos": "0 0 0.0584",
-            "size": "0.000001",
-            "group": "6",
-            "rgba": "0 0 0 0",
-        },
-    )
-
-
-def _add_tabletop_if_missing(root: ET.Element) -> None:
-    worldbody = root.find("worldbody")
-    if worldbody is None:
-        raise KeyError("Panda MJCF does not contain worldbody")
-    if worldbody.find("body[@name='grasp_table']") is not None:
-        return
-    table = ET.SubElement(
-        worldbody,
-        "body",
-        {
-            "name": "grasp_table",
-            "pos": "0.5545 0 0.452",
-        },
-    )
-    ET.SubElement(
-        table,
-        "geom",
-        {
-            "name": "grasp_table_geom",
-            "type": "box",
-            "size": "0.28 0.20 0.01",
-            "condim": "4",
-            "friction": "1.2 0.25 0.02",
-            "rgba": "0.34 0.39 0.42 1",
-        },
-    )
-    ET.SubElement(
-        table,
-        "geom",
-        {
-            "name": "grasp_table_visual",
-            "type": "box",
-            "size": "0.28 0.20 0.0101",
-            "contype": "0",
-            "conaffinity": "0",
-            "group": "2",
-            "mass": "0",
-            "rgba": "0.34 0.39 0.42 1",
-        },
-    )
-
-
-def _empty_tabletop_with_panda_xml(agents) -> tuple[str, object]:
-    panda_agents = [agent for agent in agents if agent.uid == "panda-v1"]
-    if len(panda_agents) != 1 or len(tuple(agents)) != 1:
-        raise NotImplementedError("empty-v1 currently supports at most one panda-v1 agent")
-    manifest = panda_agents[0].asset_manifest()
-    if not manifest.mjcf_sources:
-        raise ValueError("panda-v1 asset manifest must provide an MJCF source")
-    panda_xml = manifest.mjcf_sources[0]
-    root = ET.parse(panda_xml).getroot()
-    compiler = root.find("compiler")
-    if compiler is None:
-        compiler = ET.SubElement(root, "compiler")
-    compiler.set("meshdir", str((panda_xml.parent / "assets").resolve()).replace("\\", "/"))
-
-    option = root.find("option")
-    if option is None:
-        option = ET.SubElement(root, "option")
-    option.set("timestep", "0.002")
-    option.set("gravity", "0 0 -9.81")
-
-    _add_tabletop_if_missing(root)
-    _ensure_panda_ee_site(root)
-    return ET.tostring(root, encoding="unicode"), panda_xml.parent
-
-
-def _source_for_task(composition: TaskCompositionSpec, agents, scene_composer=None):
-    from scene import SceneSource
-
-    build_scene_source = getattr(scene_composer, "build_scene_source", None)
-    if build_scene_source is not None:
-        return build_scene_source(composition, agents)
-    if composition.task_uid == "empty-v1":
-        if composition.agent_uids:
-            xml, base_dir = _empty_tabletop_with_panda_xml(agents)
-            return SceneSource.mjcf_string(
-                xml,
-                base_dir=base_dir,
-                label="task-env-empty-tabletop-panda",
-            ), "task_env_empty_tabletop_panda_v1"
-        return SceneSource.mjcf_string(
-            _EMPTY_TABLETOP_XML,
-            label="task-env-empty-tabletop",
-        ), "inline_empty_tabletop_v1"
+def _source_for_task(composition: TaskCompositionSpec, agents, scene, scene_composer=None):
+    """Resolve source through the explicitly supplied composer or Scene owner."""
+    for owner in (scene_composer, scene):
+        build = getattr(owner, "build_scene_source", None)
+        if callable(build):
+            return build(composition, agents)
     raise NotImplementedError(
-        f"no Stage 1 scene composition adapter for {composition.task_uid}"
+        f"no scene source composer for {composition.task_uid} / {composition.scene_uid}"
     )
 
 
@@ -334,17 +289,29 @@ def _initial_state(scene_model, agents, references: TaskReferences) -> EpisodePh
     )[:n_act].copy()
 
     for agent in agents:
-        agent_ref = references.agents[agent.uid]
         named_positions = dict(agent.initial_state_spec().joint_positions)
         for joint_name, value in named_positions.items():
             joint_id = references.names.joints[joint_name]
             qpos_adr = int(scene_model.joint_data["jnt_qposadr"][joint_id])
             qpos[qpos_adr] = np.float32(value)
-        if agent.uid == "panda-v1":
-            ctrl[agent_ref.arm_actuator_ids] = qpos[agent_ref.arm_qpos_ids]
-            gripper_ids = agent_ref.gripper_actuator_ids
-            if gripper_ids.size:
-                ctrl[gripper_ids] = agent_ref.ctrl_range[gripper_ids, 1]
+        initial_control = getattr(agent, "component_initial_control", None)
+        if initial_control is not None:
+            targets, upper_limits = initial_control()
+            agent_ref = references.agents[agent.uid]
+            declaration = agent.reference_spec()
+            target_actuators = tuple(name for name, _ in targets)
+            if (len(set((*target_actuators, *upper_limits))) != len(target_actuators) + len(upper_limits)
+                    or not set((*target_actuators, *upper_limits)) <= set(declaration.actuator_names)
+                    or not {name for _, name in targets} <= set(declaration.joint_names)):
+                raise ValueError("initial control must use distinct actuators and joints owned by the Robot")
+            for actuator_name, joint_name in targets:
+                actuator_id = references.names.actuators[actuator_name]
+                joint_id = references.names.joints[joint_name]
+                qpos_adr = int(joint_data["jnt_qposadr"][joint_id])
+                ctrl[actuator_id] = qpos[qpos_adr]
+            for actuator_name in upper_limits:
+                actuator_id = references.names.actuators[actuator_name]
+                ctrl[actuator_id] = agent_ref.ctrl_range[actuator_id, 1]
 
     return EpisodePhysicsState(
         qpos=qpos,
@@ -352,19 +319,6 @@ def _initial_state(scene_model, agents, references: TaskReferences) -> EpisodePh
         qacc=np.zeros(n_dof, dtype=np.float32),
         ctrl=ctrl,
         act=act,
-    )
-
-
-def panda_entity_declaration():
-    """Return the shared pinned Panda embodiment declaration."""
-    from ..artifacts import EntityDefinition
-    return EntityDefinition(
-        'panda-v1', 'embodiment',
-        'mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml',
-        ('panda-v1/base', 'panda-v1/ee'),
-        (*tuple(f'panda-v1/joint{i}' for i in range(1, 8)),
-         'panda-v1/finger_joint1', 'panda-v1/finger_joint2'),
-        'referenced_articulation', 'arm_hand_finger_collision', {},
     )
 
 
@@ -387,12 +341,23 @@ def compile_reference_source(*, artifact, scene_source, composition, config,
     if joints is None:
         joints = {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position}
     supplied = tuple(value is not _UNSET_COMPONENT for value in (scene, agents, objects))
-    if any(supplied) and not all(supplied):
-        raise ValueError("explicit source components must be supplied together")
-    if not any(supplied):
-        scene = make_scene(composition.scene_uid)
-        agents = tuple(make_agent(uid) for uid in composition.agent_uids)
-        objects = tuple(make_object(uid) for uid in composition.object_uids)
+    if not all(supplied):
+        if scene is _UNSET_COMPONENT:
+            scene = make_scene(composition.scene_uid)
+        elif getattr(scene, 'uid', None) != composition.scene_uid:
+            raise ValueError('supplied Scene differs from the task composition')
+        if agents is _UNSET_COMPONENT:
+            agents = tuple(make_agent(uid) for uid in composition.agent_uids)
+        else:
+            agents = tuple(agents)
+            if tuple(getattr(agent, 'uid', None) for agent in agents) != composition.agent_uids:
+                raise ValueError('supplied Robots differ from the task composition')
+        if objects is _UNSET_COMPONENT:
+            objects = tuple(make_object(uid) for uid in composition.object_uids)
+        else:
+            objects = tuple(objects)
+            if tuple(getattr(item, 'uid', None) for item in objects) != composition.object_uids:
+                raise ValueError('supplied objects differ from the task composition')
     return RuntimeSource(
         task_artifact_hash=artifact.identity_hash, scene_source=scene_source,
         joints=joints, bodies=bodies, frames=frames, free_joints=free_joints,
@@ -411,9 +376,16 @@ def compile_task_scene(
     scene_composer=None,
 ) -> CompiledTaskScene:
     from scene import import_scene_source
+    from ..environment.protocols import AgentComponent, RobotComponent
 
-    _validate_external_assets((*agents, *objects))
-    source, adapter_name = _source_for_task(composition, agents, scene_composer)
+    # Robots represented by the source already own their scene identities.
+    # Only components declaring the legacy asset/reference contract need the
+    # corresponding import-time name and initial-state resolution.
+    if any(not isinstance(agent, RobotComponent) for agent in agents):
+        raise TypeError('scene agents must be Robot components')
+    reference_agents = tuple(agent for agent in agents if isinstance(agent, AgentComponent))
+    _validate_external_assets((*reference_agents, *objects))
+    source, adapter_name = _source_for_task(composition, agents, scene, scene_composer)
     imported_scene = import_scene_source(source)
     scene_model = _build_scene_model(imported_scene, composition, scene_composer)
     # G4 场景导入不再暴露旧 loader_result；其 articulation 视图保留了
@@ -424,10 +396,10 @@ def compile_task_scene(
         scene_model=scene_model,
         semantic_geom_names=_semantic_geom_names(source),
         scene=scene,
-        agents=agents,
+        agents=reference_agents,
         objects=objects,
     )
-    initial_state = _initial_state(scene_model, agents, references)
+    initial_state = _initial_state(scene_model, reference_agents, references)
     return CompiledTaskScene(
         imported_scene=imported_scene,
         loader_result=loader_result,
@@ -444,4 +416,5 @@ __all__ = [
     "ReferenceTaskDeclarationV1",
     "compile_task_scene",
     "reference_task_identity_fields",
+    "reference_construction_value",
 ]

@@ -3,6 +3,17 @@
 from __future__ import annotations
 
 
+def test_f05_r3_tracking_uses_current_shared_controller_profile():
+    import hashlib
+    from task_env.controllers.canonical.production_r3 import R3_PROFILE_PATH, load_r3_dynamic_profile
+    from task_env.tasks.position_candidate.builder import _dg02_r3_arm_profile
+
+    resolved = _dg02_r3_arm_profile()
+    digest = resolved.pop('profile_source_sha256')
+    assert resolved == load_r3_dynamic_profile()
+    assert digest == hashlib.sha256(R3_PROFILE_PATH.read_bytes()).hexdigest()
+
+
 def test_dg02_usd_bindings_cover_the_dg01_runtime_frames_and_keep_free_cube_semantics():
     from task_env.tasks.position_candidate.builder import (
         F05_DG02_GEOPHYS_PROFILE,

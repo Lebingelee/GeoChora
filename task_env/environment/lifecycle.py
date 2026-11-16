@@ -29,6 +29,7 @@ from .task_definition import (
     TaskPredicateEvaluationV1,
     TaskPredicateResultV1,
     TaskStateView,
+    TaskStateInput,
     TemporalPredicateRuleV1,
     as_task_state_view,
 )
@@ -45,6 +46,180 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..trajectory.canonical.episode import EpisodeEndV1
+
+
+@dataclass
+class EpisodeExecutionState:
+    """Scalar episode's shared admission state, independent of runtime type.
+
+    Publication and provider-specific cleanup remain with their existing
+    owners; no physical operation is performed here.
+    """
+
+    closed: bool = False
+    stopped: bool = False
+    fault: ExecutionFaultV1 | None = None
+    episode_id: str | None = None
+    episode_end: EpisodeEndV1 | None = None
+    closing: bool = False
+
+    def require_open(self, message: str) -> None:
+        if self.closed:
+            raise RuntimeError(message)
+
+    @staticmethod
+    def validate_stop_reason(reason: str) -> None:
+        if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
+            raise ValueError("Stop reason must be a trimmed non-empty string")
+
+    def begin_reset(self) -> None:
+        """Prevent new steps while a replacement episode is being built."""
+        self.stopped = True
+
+    def finish_reset(self) -> None:
+        """Publish an active episode only after reset has succeeded."""
+        self.stopped = False
+        self.fault = None
+
+    def execute_reset(self, *, prepare, materialize, reset_runtime, read_state,
+                      observe, publish, on_failure):
+        """Run reset stages in order and publish only a fully built boundary."""
+        self.begin_reset()
+        phase = 'reset_prepare'
+        try:
+            prepare()
+            phase = 'reset_materialization'
+            materialize()
+            phase = 'reset_runtime'
+            reset_runtime()
+            phase = 'reset_readback'
+            state = read_state()
+            phase = 'reset_observation'
+            observation = observe(state)
+            phase = 'reset_publication'
+            result = publish(state, observation)
+            self.finish_reset()
+            return result
+        except BaseException as error:
+            on_failure(phase, error)
+            raise
+
+    def latch_fault(self, fault: ExecutionFaultV1, *, stop: bool) -> None:
+        self.fault = fault
+        if stop:
+            self.stopped = True
+
+    def finish_step(self, *, terminated: bool, truncated: bool,
+                    preserve_stop: bool = False) -> None:
+        self.stopped = bool((preserve_stop and self.stopped) or terminated or truncated)
+
+    @staticmethod
+    def step_outcome(*, task_terminated: bool, task_truncated: bool,
+                     control_step: int, horizon: int, ignore_done: bool = False):
+        """Resolve a scalar task result and its horizon at the same boundary."""
+        if ignore_done:
+            return False, False
+        return bool(task_terminated), bool(task_truncated or control_step >= horizon)
+
+    @staticmethod
+    def execute_interval(*, apply_control, advance, read_state, evaluate,
+                         observe, publish, on_failure, phases=None):
+        """Run the ordered scalar interval; only a complete publication returns.
+
+        The hooks bind existing task and runtime operations. The coordinator
+        owns their ordering and reports the last attempted phase on failure.
+        Action validation remains before this method, so invalid requests do
+        not latch a physical-execution fault.
+        """
+        if phases is None:
+            phases = ("control_application", "physics_step", "snapshot_readback",
+                      "task_evaluation", "observation", "observation")
+        if len(phases) != 6:
+            raise ValueError("scalar interval requires six execution phases")
+        phase = phases[0]
+        try:
+            control = apply_control()
+            phase = phases[1]
+            advance(control)
+            phase = phases[2]
+            state = read_state()
+            phase = phases[3]
+            evaluation = evaluate(state)
+            phase = phases[4]
+            observation = observe(state)
+            phase = phases[5]
+            return publish(control, state, evaluation, observation)
+        except BaseException as error:
+            on_failure(phase, error)
+            raise
+
+    def execute_selected_interval(self, env, **operations):
+        """Run selected hooks against the Env's single state and observation owner."""
+        return self.execute_interval(
+            read_state=lambda: env.state, observe=lambda _state: env.obs, **operations)
+
+    def finish_episode(self) -> None:
+        self.stopped = True
+
+    def stop_outcome(self, reason: str, *, selected_reasons: bool = False,
+                     external_stop_terminated: bool = False,
+                     bootstrap_on_external_stop: bool = True):
+        """Choose Stop flags independently of the runtime and receipt format.
+
+        The caller validates whether a requested Solution reason is admissible
+        before invoking this decision. A latched execution fault always wins.
+        """
+        if self.fault is not None:
+            return "execution_fault", False, True, False
+        if selected_reasons:
+            if reason == "solution_completed":
+                return reason, False, False, True
+            if reason == "solution_failed":
+                return reason, True, False, False
+            if reason == "horizon_reached":
+                return reason, False, True, True
+        terminated = bool(external_stop_terminated)
+        return ("external_stop", terminated, not terminated,
+                bool(bootstrap_on_external_stop and not terminated))
+
+    def execute_stop(self, reason, *, closed_message, ensure_boundary, create_end):
+        """Finalize once at an admitted published boundary without stepping."""
+        self.require_open(closed_message)
+        self.validate_stop_reason(reason)
+        if self.episode_end is not None:
+            return self.episode_end
+        ensure_boundary()
+        result = create_end()
+        self.episode_end = result
+        self.finish_episode()
+        return result
+
+    def finish_close(self, *, stop: bool) -> None:
+        self.closed = True
+        if stop:
+            self.stopped = True
+
+    def execute_close(self, cleanup, *, stop: bool, allow_closed: bool = False):
+        """Attempt one resource teardown, including auxiliary owners on a closed runtime."""
+        if self.closing or (self.closed and not allow_closed):
+            return
+        self.closing = True
+        try:
+            return cleanup()
+        finally:
+            self.finish_close(stop=stop)
+            self.closing = False
+
+    def require_step(self, *, closed_message: str, fault_prefix: str,
+                     stopped_message: str | None = None) -> None:
+        self.require_open(closed_message)
+        if self.fault is not None:
+            raise RuntimeError(
+                f"{fault_prefix} (phase={self.fault.phase}, "
+                f"physical_progress={self.fault.physical_progress})"
+            )
+        if stopped_message is not None and self.stopped:
+            raise RuntimeError(stopped_message)
 
 
 @dataclass
@@ -361,12 +536,16 @@ class TaskLifecycleAdapter:
         task_definition: TaskDefinitionBase | None,
         horizon: int,
         ignore_done: bool,
+        observation_transform: Callable[[RuntimeSnapshot | TaskStateView, Any], Any] | None = None,
     ) -> None:
         if int(horizon) < 1:
             raise ValueError("task lifecycle horizon must be positive")
         self.task_definition = task_definition
         self.horizon = int(horizon)
         self.ignore_done = bool(ignore_done)
+        if observation_transform is not None and not callable(observation_transform):
+            raise TypeError("observation_transform must be callable")
+        self._observation_transform = observation_transform
         rules_method = getattr(task_definition, "temporal_predicate_rules", None)
         rules = tuple(rules_method()) if callable(rules_method) else ()
         self._temporal_predicate_state = _TemporalPredicateCommitState(rules)
@@ -374,7 +553,7 @@ class TaskLifecycleAdapter:
     def reset_task(
         self,
         *,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
         reset_mask: np.ndarray | None = None,
         legacy_snapshot: RuntimeSnapshot | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation:
@@ -412,10 +591,10 @@ class TaskLifecycleAdapter:
     def evaluate_task(
         self,
         *,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
         action: Any,
         elapsed_steps: int | np.ndarray,
-        previous_state: RuntimeSnapshot | TaskStateView | None = None,
+        previous_state: TaskStateInput | None = None,
         legacy_previous_snapshot: RuntimeSnapshot | None = None,
         legacy_current_snapshot: RuntimeSnapshot | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation:
@@ -528,7 +707,7 @@ class TaskLifecycleAdapter:
 
     def build_observation(
         self,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
         *,
         fallback: Callable[[], Any] | None = None,
     ) -> Any:
@@ -541,18 +720,22 @@ class TaskLifecycleAdapter:
             callable(builder)
             and type(definition).build_observation is not TaskDefinitionBase.build_observation
         ):
-            return builder(view)
-        if fallback is None:
-            raise StageUnavailableError(
-                f"task definition {type(definition).__name__ if definition is not None else 'None'} "
-                "has no observation builder"
-            )
-        return fallback()
+            observation = builder(view)
+        else:
+            if fallback is None:
+                raise StageUnavailableError(
+                    f"task definition {type(definition).__name__ if definition is not None else 'None'} "
+                    "has no observation builder"
+                )
+            observation = fallback()
+        if self._observation_transform is not None:
+            observation = self._observation_transform(state, observation)
+        return observation
 
     def normalize_evaluation(
         self,
         evaluation: Any,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
     ) -> TaskEvaluation | TaskBatchEvaluation:
         """Validate and normalize a task result against the state cardinality."""
 
@@ -670,19 +853,23 @@ class TaskLifecycleAdapter:
             self.ignore_done if ignore_done is None else bool(ignore_done)
         )
         if effective_ignore_done:
-            return False, False
+            return EpisodeExecutionState.step_outcome(
+                task_terminated=False, task_truncated=False,
+                control_step=0, horizon=effective_horizon, ignore_done=True,
+            )
         effective_policy = policy or EpisodeTerminationPolicyV1()
         if not isinstance(effective_policy, EpisodeTerminationPolicyV1):
             raise TypeError("scalar termination policy must be EpisodeTerminationPolicyV1")
-        terminated = bool(
-            (evaluation.success and effective_policy.terminate_on_success)
-            or (evaluation.failure and effective_policy.terminate_on_failure)
+        return EpisodeExecutionState.step_outcome(
+            task_terminated=(
+                (evaluation.success and effective_policy.terminate_on_success)
+                or (evaluation.failure and effective_policy.terminate_on_failure)
+            ),
+            task_truncated=getattr(evaluation, "truncated", False),
+            control_step=int(elapsed_steps),
+            horizon=effective_horizon,
+            ignore_done=effective_ignore_done,
         )
-        truncated = bool(
-            getattr(evaluation, "truncated", False)
-            or int(elapsed_steps) >= effective_horizon
-        )
-        return terminated, truncated
 
     def resolve_batch_done(
         self,
@@ -747,6 +934,52 @@ class SingleTaskStepResult:
 class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
     """Own scalar runtime reset/step around the shared task semantic adapter."""
 
+    def _episode_execution_state(self):
+        state = self.__dict__.get("_episode_state")
+        if state is None:
+            state = self.__dict__["_episode_state"] = EpisodeExecutionState()
+        return state
+
+    @property
+    def _closed(self):
+        return self._episode_execution_state().closed
+
+    @_closed.setter
+    def _closed(self, value):
+        self._episode_execution_state().closed = value
+
+    @property
+    def _episode_finished(self):
+        return self._episode_execution_state().stopped
+
+    @_episode_finished.setter
+    def _episode_finished(self, value):
+        self._episode_execution_state().stopped = value
+
+    @property
+    def _episode_end(self):
+        return self._episode_execution_state().episode_end
+
+    @_episode_end.setter
+    def _episode_end(self, value):
+        self._episode_execution_state().episode_end = value
+
+    @property
+    def _episode_id(self):
+        return self._episode_execution_state().episode_id
+
+    @_episode_id.setter
+    def _episode_id(self, value):
+        self._episode_execution_state().episode_id = value
+
+    @property
+    def _execution_fault(self):
+        return self._episode_execution_state().fault
+
+    @_execution_fault.setter
+    def _execution_fault(self, value):
+        self._episode_execution_state().fault = value
+
     def __init__(
         self,
         *,
@@ -765,11 +998,17 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         episode_limits: Callable[[], tuple[int, bool]] | None = None,
         expected_control_dt_s: float | None = None,
         termination_policy: EpisodeTerminationPolicyV1 | None = None,
+        episode_state: EpisodeExecutionState | None = None,
+        observation_transform: Callable[[RuntimeSnapshot | TaskStateView, Any], Any] | None = None,
     ) -> None:
+        if episode_state is not None and not isinstance(episode_state, EpisodeExecutionState):
+            raise TypeError("episode_state must be EpisodeExecutionState")
+        self._episode_state = episode_state if episode_state is not None else EpisodeExecutionState()
         super().__init__(
             task_definition=task_definition,
             horizon=horizon,
             ignore_done=ignore_done,
+            observation_transform=observation_transform,
         )
         if int(control_substeps) < 1:
             raise ValueError("scalar task lifecycle control_substeps must be positive")
@@ -861,7 +1100,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
             transition_status=transition_status,
             readback_error=readback_error,
         )
-        self._execution_fault = fault
+        self._episode_execution_state().latch_fault(fault, stop=False)
         attach_execution_fault(error, fault)
         return fault
 
@@ -871,15 +1110,14 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         except BaseException as error:
             return None, f"{type(error).__name__}: {error}"
 
-    def reset(
+    def prepare_reset(
         self,
         *,
         seed: int | None,
         options: Mapping[str, Any] | None,
         rng: np.random.Generator,
-    ) -> SingleTaskResetResult:
-        if self._closed:
-            raise RuntimeError("scalar task lifecycle is closed")
+    ) -> dict[str, Callable]:
+        self._episode_execution_state().require_open("scalar task lifecycle is closed")
         del options
         previous_episode_end = self._episode_end
         if self._episode_id is not None and self._boundary_snapshot is not None and previous_episode_end is None:
@@ -892,27 +1130,28 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         self._episode_boundary = 0
         before_snapshot = self._last_snapshot
         before_elapsed_steps = self._elapsed_steps
-        phase = "reset_sampling"
+        failure_phase = "reset_sampling"
         reset_state_applied = False
         snapshot: RuntimeSnapshot | None = None
-        try:
+        reset_state = reset_parameters = evaluation = None
+
+        def prepare():
+            nonlocal failure_phase, reset_state, reset_parameters
             reset_state, reset_parameters = self._sample_reset_state(seed, rng)
             if not isinstance(reset_parameters, Mapping):
                 raise TypeError("episode reset sampler must return a mapping of parameters")
             on_reset_sample = getattr(self.task_definition, "on_reset_sample", None)
             if callable(on_reset_sample):
-                phase = "reset_task_sample"
+                failure_phase = "reset_task_sample"
                 on_reset_sample(
                     parameters=reset_parameters,
                     seeds=(None if seed is None else (int(seed),)),
                     reset_mask=np.ones(1, dtype=np.bool_),
                 )
             from ..runtime.contracts import build_world_randomization_batch
-
-            phase = "reset_randomization_prepare"
+            failure_phase = "reset_randomization_prepare"
             world_randomization = build_world_randomization_batch(
-                (reset_parameters,),
-                reset_mask=np.ones(1, dtype=np.bool_),
+                (reset_parameters,), reset_mask=np.ones(1, dtype=np.bool_),
             )
             if world_randomization is not None:
                 apply_randomization = getattr(self.runtime, "apply_world_randomization", None)
@@ -921,107 +1160,115 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                         "reset sampler requested world randomization but scalar runtime "
                         "does not expose apply_world_randomization()"
                     )
-                phase = "reset_randomization_apply"
-                apply_randomization(
-                    payload=world_randomization,
-                    mask=np.ones(1, dtype=np.bool_),
-                )
-            phase = "reset_state_apply"
+                failure_phase = "reset_randomization_apply"
+                apply_randomization(payload=world_randomization, mask=np.ones(1, dtype=np.bool_))
+
+        def reset_runtime():
+            nonlocal failure_phase, reset_state_applied
+            failure_phase = "reset_state_apply"
             self.runtime.apply_reset_state(reset_state)
             reset_state_applied = True
-            phase = "reset_readback"
+
+        def read_state():
+            nonlocal failure_phase, snapshot, evaluation
+            failure_phase = "reset_readback"
             snapshot = self.runtime.read_snapshot(self._snapshot_request())
-            phase = "reset_components"
+            failure_phase = "reset_components"
             self._reset_components(snapshot)
-            phase = "reset_task_evaluation"
+            failure_phase = "reset_task_evaluation"
             evaluation = self.reset_task(
-                state=snapshot,
-                reset_mask=np.ones(1, dtype=np.bool_),
-                legacy_snapshot=snapshot,
+                state=snapshot, reset_mask=np.ones(1, dtype=np.bool_), legacy_snapshot=snapshot,
             )
             evaluation = self.coerce_scalar_evaluation(evaluation)
-            phase = "reset_observation"
-            observation = self.build_observation(
-                snapshot,
-                fallback=lambda: self._observation_fallback(snapshot),
-            )
-            self._last_snapshot = snapshot
-            self._boundary_snapshot = snapshot
+            return snapshot
+
+        def observe(state):
+            nonlocal failure_phase
+            failure_phase = "reset_observation"
+            return self.build_observation(state, fallback=lambda: self._observation_fallback(state))
+
+        def publish(state, observation):
+            self._last_snapshot = state
+            self._boundary_snapshot = state
             self._last_evaluation = evaluation
             self._elapsed_steps = 0
             self._episode_boundary = 0
             self._episode_id = uuid4().hex
             self._episode_end = None
-            self._episode_finished = False
-            self._execution_fault = None
             return SingleTaskResetResult(
-                snapshot=snapshot,
-                evaluation=evaluation,
-                observation=observation,
-                reset_parameters=dict(reset_parameters),
-                previous_episode_end=previous_episode_end,
+                snapshot=state, evaluation=evaluation, observation=observation,
+                reset_parameters=dict(reset_parameters), previous_episode_end=previous_episode_end,
             )
-        except BaseException as error:
+
+        def on_failure(_phase, error):
+            nonlocal snapshot
             readback_error = None
             if reset_state_applied and snapshot is None:
                 snapshot, readback_error = self._read_fault_snapshot()
             self._last_snapshot = snapshot
             self._last_evaluation = None
             self._latch_fault(
-                phase,
-                error,
-                before_snapshot=before_snapshot,
-                after_snapshot=snapshot,
-                control_step_before=before_elapsed_steps,
-                control_step_after=None,
+                failure_phase, error, before_snapshot=before_snapshot, after_snapshot=snapshot,
+                control_step_before=before_elapsed_steps, control_step_after=None,
                 readback_error=readback_error,
             )
-            raise
 
-    def step(self, action: Any) -> SingleTaskStepResult:
-        if self._closed:
-            raise RuntimeError("scalar task lifecycle is closed")
-        if self._execution_fault is not None:
-            fault = self._execution_fault
-            raise RuntimeError(
-                "scalar task lifecycle is faulted; reset() is required "
-                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
-            )
-        if self._episode_finished:
-            raise RuntimeError("reset() must be called before stepping after episode end")
+        return dict(
+            prepare=prepare, materialize=lambda: None, reset_runtime=reset_runtime,
+            read_state=read_state, observe=observe, publish=publish, on_failure=on_failure,
+        )
+
+    def reset(self, *, seed, options, rng) -> SingleTaskResetResult:
+        operations = self.prepare_reset(seed=seed, options=options, rng=rng)
+        return self._episode_execution_state().execute_reset(**operations)
+
+    def prepare_step(self, action: Any):
+        self._episode_execution_state().require_step(
+            closed_message="scalar task lifecycle is closed",
+            fault_prefix="scalar task lifecycle is faulted; reset() is required",
+            stopped_message="reset() must be called before stepping after episode end",
+        )
         if self._last_snapshot is None:
             raise RuntimeError("reset() must be called before step()")
         previous_snapshot = self._last_snapshot
         command = self._convert_action(action, previous_snapshot)
-        phase = "control_application"
         interval_attempted = False
         interval_completed = False
         snapshot: RuntimeSnapshot | None = None
         before_elapsed_steps = self._elapsed_steps
-        try:
-            applied = self.runtime.apply_control(command)
-            phase = "physics_step"
+
+        def apply_control():
+            return self.runtime.apply_control(command)
+
+        def advance(_applied):
+            nonlocal interval_attempted, interval_completed
             interval_attempted = True
             self.runtime.step(substeps=self.control_substeps)
             interval_completed = True
             self._elapsed_steps += 1
-            phase = "snapshot_readback"
+
+        def read_state():
+            nonlocal snapshot
             snapshot = self.runtime.read_snapshot(self._snapshot_request())
-            phase = "task_evaluation"
+            return snapshot
+
+        def evaluate(state):
             evaluation = self.evaluate_task(
-                state=snapshot,
+                state=state,
                 action=command.external_action,
                 elapsed_steps=self._elapsed_steps,
                 previous_state=previous_snapshot,
                 legacy_previous_snapshot=previous_snapshot,
-                legacy_current_snapshot=snapshot,
+                legacy_current_snapshot=state,
             )
-            evaluation = self.coerce_scalar_evaluation(evaluation)
-            phase = "observation"
-            observation = self.build_observation(
-                snapshot,
-                fallback=lambda: self._observation_fallback(snapshot),
+            return self.coerce_scalar_evaluation(evaluation)
+
+        def observe(state):
+            return self.build_observation(
+                state, fallback=lambda: self._observation_fallback(state),
             )
+
+        def publish(applied, state, evaluation, observation):
             horizon, ignore_done = self._get_episode_limits()
             terminated, truncated = self.resolve_scalar_done(
                 evaluation,
@@ -1030,11 +1277,13 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 ignore_done=ignore_done,
                 policy=self.termination_policy,
             )
-            self._last_snapshot = snapshot
+            self._last_snapshot = state
             self._last_evaluation = evaluation
-            self._boundary_snapshot = snapshot
+            self._boundary_snapshot = state
             self._episode_boundary = self._elapsed_steps
-            self._episode_finished = bool(terminated or truncated)
+            self._episode_execution_state().finish_step(
+                terminated=terminated, truncated=truncated,
+            )
             episode_end = None
             if self._episode_finished:
                 if terminated:
@@ -1058,7 +1307,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 )
             return SingleTaskStepResult(
                 previous_snapshot=previous_snapshot,
-                snapshot=snapshot,
+                snapshot=state,
                 evaluation=evaluation,
                 observation=observation,
                 command=command,
@@ -1068,7 +1317,9 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 elapsed_steps=self._elapsed_steps,
                 episode_end=episode_end,
             )
-        except BaseException as error:
+
+        def on_failure(phase, error):
+            nonlocal snapshot
             readback_error = None
             if interval_attempted and snapshot is None:
                 snapshot, readback_error = self._read_fault_snapshot()
@@ -1085,7 +1336,15 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 interval_completed=interval_completed,
                 readback_error=readback_error,
             )
-            raise
+
+        return dict(
+            apply_control=apply_control, advance=advance, read_state=read_state,
+            evaluate=evaluate, observe=observe, publish=publish, on_failure=on_failure,
+        )
+
+    def step(self, action: Any) -> SingleTaskStepResult:
+        operations = self.prepare_step(action)
+        return self._episode_execution_state().execute_interval(**operations)
 
     def revoke_unpublished_step(self, result: SingleTaskStepResult) -> None:
         """Restore the public finalizer boundary when an outer Env facade fails.
@@ -1139,42 +1398,50 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
             task_success=task_success,
         )
         self._episode_end = result
-        self._episode_finished = True
+        self._episode_execution_state().finish_episode()
         return result
+
+    def prepare_stop(self, reason: str):
+        state = self._episode_execution_state()
+
+        def ensure_boundary():
+            if self._last_snapshot is None or self._episode_id is None:
+                raise RuntimeError("reset() must complete before Stop")
+
+        def create_end():
+            end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(
+                reason,
+                external_stop_terminated=self.termination_policy.external_stop_terminated,
+                bootstrap_on_external_stop=self.termination_policy.bootstrap_on_external_stop,
+            )
+            if self._execution_fault is not None:
+                return self._finish_episode(
+                    end_reason,
+                    terminated=terminated,
+                    truncated=truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    task_success=None,
+                    payload={"fault": self._execution_fault.to_mapping()},
+                )
+            return self._finish_episode(
+                end_reason,
+                terminated=terminated,
+                truncated=truncated,
+                bootstrap_allowed=bootstrap_allowed,
+                task_success=(
+                    None if self._last_evaluation is None else bool(self._last_evaluation.success)
+                ),
+                payload={"requested_reason": reason},
+            )
+
+
+        return dict(closed_message="cannot stop a closed scalar task lifecycle",
+                    ensure_boundary=ensure_boundary, create_end=create_end)
 
     def stop(self, reason: str = "external_stop") -> EpisodeEndV1:
         """End at the last published boundary without a Controller or Runtime step."""
-
-        if self._closed:
-            raise RuntimeError("cannot stop a closed scalar task lifecycle")
-        if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
-            raise ValueError("Stop reason must be a trimmed non-empty string")
-        if self._episode_end is not None:
-            return self._episode_end
-        if self._last_snapshot is None or self._episode_id is None:
-            raise RuntimeError("reset() must complete before Stop")
-        if self._execution_fault is not None:
-            return self._finish_episode(
-                "execution_fault",
-                terminated=False,
-                truncated=True,
-                bootstrap_allowed=False,
-                task_success=None,
-                payload={"fault": self._execution_fault.to_mapping()},
-            )
-        is_terminated = self.termination_policy.external_stop_terminated
-        return self._finish_episode(
-            "external_stop",
-            terminated=is_terminated,
-            truncated=not is_terminated,
-            bootstrap_allowed=(
-                self.termination_policy.bootstrap_on_external_stop and not is_terminated
-            ),
-            task_success=(
-                None if self._last_evaluation is None else bool(self._last_evaluation.success)
-            ),
-            payload={"requested_reason": reason},
-        )
+        operations = self.prepare_stop(reason)
+        return self._episode_execution_state().execute_stop(reason, **operations)
 
     def close(self) -> None:
         if self._closed:
@@ -1186,7 +1453,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 # event construction or a task policy rejects the Stop.
                 self.stop("environment_close")
         finally:
-            self._closed = True
+            self._episode_execution_state().finish_close(stop=False)
             self._temporal_predicate_state.reset()
             self.runtime.close()
 

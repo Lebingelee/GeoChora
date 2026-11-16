@@ -8,7 +8,6 @@ from copy import deepcopy
 from math import isfinite
 from pathlib import Path
 import xml.etree.ElementTree as ET
-from ..robots.panda import PANDA_ASSET_ROOT
 from ..objects.nut_assembly import NUT_ASSET_ROOT
 ARM_DOF = 7
 ARM_FORCE_RANGE = 250.0
@@ -16,6 +15,47 @@ GRIPPER_FORCE_RANGE = 400.0
 GRIPPER_OPEN_TENDON_LENGTH = 0.04
 GRIPPER_SERVO_STIFFNESS = 5000.0
 GRIPPER_CLOSE_DAMPING = 120.0
+
+def build_nut_assembly_declared_model(*, scene, asset, physics_dt, robot_source):
+    """Materialize the Task's scene and object declarations with its selected Robot."""
+    parameters = {**scene, 'physics_dt': physics_dt,
+        'nut_contact_margin_m': asset['nut_contact_margin_m'],
+        'freejoint_damping': asset['freejoint_damping'],
+        'freejoint_armature': asset['freejoint_armature']}
+    return build_nut_assembly_model_xml(parameters,
+        nut_mass_kg=float(asset['nut_mass_kg']),
+        nut_diagonal_inertia_kg_m2=tuple(asset['nut_diagonal_inertia_kg_m2']),
+        robot_source=robot_source)
+
+
+def compile_nut_assembly_source(*, artifact, artifact_declaration, composition, scene, asset,
+                                physics_dt, robot, config, provider, provider_options, eef_semantic):
+    """Lower the declared Nut scene and Robot to a source with an owned snapshot."""
+    from .compiler import ReferenceTaskDeclarationV1
+    from .source import TaskSceneSource
+    from ..runtime.sessions.source_composition_adapters import apply_declared_provider_source_options
+
+    expected = artifact_declaration.compile()
+    if type(artifact) is not type(expected) or artifact.identity_hash != expected.identity_hash:
+        raise ValueError('selected nominal NutAssembly Artifact required')
+    xml, base = build_nut_assembly_declared_model(
+        scene=scene, asset=asset, physics_dt=physics_dt, robot_source=robot.single_mjcf_source())
+    xml, contact_profile = apply_declared_provider_source_options(
+        xml, provider=provider, declarations=provider_options)
+    joint_targets, open_actuators = robot.reference_source_actuation()
+    source = ReferenceTaskDeclarationV1(
+        artifact=artifact_declaration, composition=composition,
+        bodies={'square-nut-v1': 'SquareNut', 'square-peg-v1': 'peg1',
+                'round-peg-v1': 'peg2', f'{robot.uid}/base': 'link0'},
+        frames={eef_semantic: scene['ee_site_name']},
+        free_joints={'square-nut-v1': 'SquareNut_joint'},
+        joint_targets=joint_targets, open_actuators=open_actuators,
+    ).compile_source(
+        artifact, scene_source=TaskSceneSource(
+            xml, base, 'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'),
+        config=config, agents=(robot,), own_snapshot=True)
+    return source, contact_profile
+
 
 def _find_body(root: ET.Element, name: str) -> ET.Element:
     for body in root.iter("body"):
@@ -397,6 +437,7 @@ def build_nut_assembly_model_xml(
     *,
     nut_mass_kg: float,
     nut_diagonal_inertia_kg_m2: tuple[float, float, float],
+    robot_source,
 ) -> tuple[str, Path]:
     """Build task-owned NutAssemblySquare MJCF for a declared asset profile."""
 
@@ -404,7 +445,7 @@ def build_nut_assembly_model_xml(
     if len(values) != 4 or not all(isfinite(value) and value > 0.0 for value in values):
         raise ValueError("nut mass and diagonal inertia must be positive")
 
-    panda_xml = PANDA_ASSET_ROOT / "panda.xml"
+    panda_xml = Path(robot_source)
     root = _load_xml(panda_xml)
     _ensure_panda_compiler(root, panda_xml)
     _ensure_option(root, scene["physics_dt"])

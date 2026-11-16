@@ -1,14 +1,18 @@
-"""Native torque adapter for the Stage 12b two-wheel balance task."""
+"""Two-wheel Robot subject and source declarations."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
+import hashlib
+from pathlib import Path
 
-import numpy as np
-from gymnasium.spaces import Box, Dict
+from ..artifacts import (ActuatorReference, ActuatorResourceDefinition, ArticulationDefinition,
+    AssetDefinition, ControlGroup, EntityInstance, FrameDefinition, FrameReference,
+    JointDefinition, PoseWorld, RobotInstance, SceneDefinition)
 
-from ..environment import ControlCommand, ExternalActionContract, RuntimeSnapshot
+from ..environment import ExternalActionContract
+from ..environment.protocols import RobotComponent
+from ..registry import register_agent
 
 
 TWO_WHEEL_ACTION_SCHEMA_ID = "task-env.two-wheel-balance.wheel-torque.v1"
@@ -32,98 +36,135 @@ TWO_WHEEL_ACTION_CONTRACT = ExternalActionContract(
 )
 
 
+TWO_WHEEL_BALANCE_MJCF_XML = """
+<mujoco model="task_env_two_wheel_balance">
+  <compiler angle="radian"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+  <worldbody>
+    <body name="balance_anchor" pos="0 0 0">
+      <geom name="balance_anchor_geom" type="cylinder" size="0.06 0.02"
+            mass="0" rgba="0.28 0.28 0.32 1"/>
+      <body name="balance_chassis" pos="0 0 0">
+        <joint name="chassis_pitch" type="hinge" axis="0 1 0"
+               damping="0.04"/>
+        <inertial pos="0 0 0.45" mass="2.0"
+                  diaginertia="0.20 0.20 0.20"/>
+        <geom name="balance_chassis_geom" type="box" pos="0 0 0.45"
+              size="0.18 0.10 0.45" mass="0"
+              rgba="0.20 0.48 0.78 1"/>
+        <body name="left_wheel" pos="-0.22 0 0">
+          <joint name="left_wheel_hinge" type="hinge" axis="0 1 0"
+                 damping="0.01"/>
+          <inertial pos="0 0 0" mass="0.25"
+                    diaginertia="0.01 0.01 0.01"/>
+          <geom name="left_wheel_geom" type="cylinder" size="0.12 0.045"
+                mass="0" rgba="0.08 0.08 0.10 1"/>
+        </body>
+        <body name="right_wheel" pos="0.22 0 0">
+          <joint name="right_wheel_hinge" type="hinge" axis="0 1 0"
+                 damping="0.01"/>
+          <inertial pos="0 0 0" mass="0.25"
+                    diaginertia="0.01 0.01 0.01"/>
+          <geom name="right_wheel_geom" type="cylinder" size="0.12 0.045"
+                mass="0" rgba="0.08 0.08 0.10 1"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="balance_anchor" body2="balance_chassis"/>
+    <exclude body1="balance_chassis" body2="left_wheel"/>
+    <exclude body1="balance_chassis" body2="right_wheel"/>
+    <exclude body1="left_wheel" body2="right_wheel"/>
+  </contact>
+  <actuator>
+    <motor name="left_wheel_torque" joint="left_wheel_hinge"
+           gear="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+    <motor name="right_wheel_torque" joint="right_wheel_hinge"
+           gear="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+  </actuator>
+</mujoco>
+""".strip()
+
+@register_agent("two-wheel-balance-v1")
 @dataclass(frozen=True)
-class TwoWheelBalanceEntity:
+class TwoWheelBalanceEntity(RobotComponent):
     """Stable body/joint/actuator names for the two-wheel topology."""
 
+    observer_source_family = 'inline-articulation-v1'
     uid: str = "two-wheel-balance-v1"
     chassis_joint_name: str = "chassis_pitch"
     left_wheel_joint_name: str = "left_wheel_hinge"
     right_wheel_joint_name: str = "right_wheel_hinge"
     left_actuator_name: str = "left_wheel_torque"
     right_actuator_name: str = "right_wheel_torque"
-
-
-class TwoWheelTorqueActionAdapter:
-    """Resolve left/right native torques into their matching actuators."""
-
+    assembly_id = 'two-wheel-source-assembly'
+    source_xml = TWO_WHEEL_BALANCE_MJCF_XML
+    source_base_dir = Path(__file__).resolve().parent
+    controller_profiles = ('direct_joint_effort_v1', 'velocity_damped_joint_effort_v1')
     action_contract = TWO_WHEEL_ACTION_CONTRACT
 
-    def __init__(self, *, actuator_ids: tuple[int, int], actuator_count: int) -> None:
-        if len(actuator_ids) != 2:
-            raise ValueError("Two-wheel action adapter requires two actuator ids")
-        if any(index < 0 or index >= actuator_count for index in actuator_ids):
-            raise ValueError("Two-wheel actuator id is outside the compiled actuator range")
-        if actuator_ids[0] == actuator_ids[1]:
-            raise ValueError("Two-wheel left/right actuators must be distinct")
-        self._actuator_ids = tuple(int(index) for index in actuator_ids)
-        self._actuator_count = int(actuator_count)
-        self._torque_space = Box(
-            low=np.full(2, -TWO_WHEEL_TORQUE_LIMIT_NM, dtype=np.float32),
-            high=np.full(2, TWO_WHEEL_TORQUE_LIMIT_NM, dtype=np.float32),
-            dtype=np.float32,
-        )
-        # Public action tree; H5 writes this leaf as ``action/torque``.
-        self.action_space = Dict({"torque": self._torque_space})
+    @classmethod
+    def physical_controller_kinds(cls):
+        return {profile: 'joint-effort' for profile in cls.controller_profiles}
 
-    def reset(self, snapshot: RuntimeSnapshot) -> None:
-        del snapshot
+    frame_names = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
 
-    def convert(
-        self,
-        action: np.ndarray,
-        snapshot: RuntimeSnapshot,
-    ) -> ControlCommand:
-        if isinstance(action, Mapping):
-            if tuple(action.keys()) != ("torque",):
-                raise ValueError("Two-wheel action tree must contain only torque")
-            action = action["torque"]
-        value = np.asarray(action, dtype=np.float32)
-        if value.shape != (2,):
-            raise ValueError(f"Two-wheel action shape must be (2,), got {value.shape}")
-        if not np.isfinite(value).all():
-            raise ValueError("Two-wheel action must contain only finite values")
-        if not self._torque_space.contains(value):
-            raise ValueError("Two-wheel torque action is outside the declared native bounds")
+    @property
+    def actuator_names(self):
+        return (self.left_actuator_name, self.right_actuator_name)
 
-        del snapshot
-        ctrl = np.zeros(self._actuator_count, dtype=np.float32)
-        if ctrl.shape != (self._actuator_count,):
-            raise ValueError("Two-wheel snapshot ctrl shape does not match compiled actuators")
-        universal = value.copy()
-        ctrl[self._actuator_ids[0]] = universal[0]
-        ctrl[self._actuator_ids[1]] = universal[1]
-        return ControlCommand(
-            actuator_ctrl=ctrl,
-            external_action=universal,
-            requested_action=universal,
-            controller_target=universal,
-            # No controller is present: the native action is already the
-            # runtime-facing canonical universal action.
-            universal_action=universal,
-            mode="direct_wheel_torque",
-        )
+    def source_recipe(self):
+        """Declare the inline source and its paired wheel writers."""
+        from .source_recipe import RobotSourceRecipeV1, RobotSourceReferenceV1
+        revision = hashlib.sha256(self.source_xml.encode()).hexdigest()
+        return RobotSourceRecipeV1(self.uid, 'reference-task-source', (
+            RobotSourceReferenceV1(f'{self.uid}/inline', 'inline://task-env/two-wheel-balance',
+                                   revision, (self.uid,)),), (),
+            (self.left_wheel_joint_name, self.right_wheel_joint_name), self.controller_profiles,
+            tuple((self.uid, actuator, 'two-wheel-direct-effort') for actuator in self.actuator_names))
 
-    def convert_batch(self, action, state) -> np.ndarray:
-        """Convert the public torque tree for all slots in one host pass."""
+    def scene_definition(self, *, source_revision=None):
+        identity = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
+        asset = AssetDefinition('asset-definition-v1', 'two-wheel-inline', 'v1',
+            'inline://task-env/two-wheel-balance', source_revision=source_revision,
+            source_content_sha256=hashlib.sha256(self.source_xml.encode()).hexdigest())
+        entity = EntityInstance('entity-instance-v1', self.uid, asset.asset_id, asset.asset_version)
+        frames = tuple(FrameDefinition('frame-definition-v1', self.uid, name, 'runtime', None, None)
+                       for name in self.frame_names)
+        refs = tuple(FrameReference(self.uid, name) for name in self.frame_names)
+        offsets = (identity, PoseWorld((-.22, 0., 0.), (1., 0., 0., 0.)),
+                   PoseWorld((.22, 0., 0.), (1., 0., 0., 0.)))
+        joints = tuple(JointDefinition('joint-definition-v1', name, refs[parent], refs[child],
+            offset, identity, 'revolute', (0., 1., 0.), 'radian', 'radian_per_second', 1, 1)
+            for name, parent, child, offset in zip(self.state_joint_names, (0, 1, 1), (1, 2, 3), offsets, strict=True))
+        articulation = ArticulationDefinition('articulation-definition-v1', self.uid, self.frame_names[0], self.frame_names, joints)
+        actuators = tuple(ActuatorResourceDefinition('actuator-resource-v1', self.uid, a) for a in self.actuator_names)
+        group = ControlGroup('control-group-v1', self.uid, 'wheel-drive',
+            tuple(ActuatorReference(self.uid, a) for a in self.actuator_names))
+        return SceneDefinition('scene-definition-v3', 'two-wheel-inline-scene-v1', (asset,),
+            (entity,), frames, (articulation,), (RobotInstance('robot-instance-v1', self.uid, (refs[0],)),), actuators, (group,))
 
-        del state
-        if isinstance(action, Mapping):
-            if tuple(action.keys()) != ("torque",):
-                raise ValueError("Two-wheel batch action tree must contain only torque")
-            action = action["torque"]
-        value = np.asarray(action, dtype=np.float32)
-        expected = (value.shape[0], 2) if value.ndim == 2 else None
-        if expected is None or value.shape != expected:
-            raise ValueError("Two-wheel batch action must have shape (B, 2)")
-        if not np.isfinite(value).all() or np.any(
-            value < -TWO_WHEEL_TORQUE_LIMIT_NM
-        ) or np.any(value > TWO_WHEEL_TORQUE_LIMIT_NM):
-            raise ValueError("Two-wheel batch torque is outside the declared bounds")
-        control = np.zeros((value.shape[0], self._actuator_count), dtype=np.float32)
-        control[:, self._actuator_ids[0]] = value[:, 0]
-        control[:, self._actuator_ids[1]] = value[:, 1]
-        return control
+    @property
+    def state_joint_names(self):
+        return (self.chassis_joint_name, self.left_wheel_joint_name, self.right_wheel_joint_name)
+
+    def physical_subject_declaration(self, *, source_id, source_closure_sha256):
+        """Describe ordered wheel joints before constructing a control binding."""
+        from ..artifacts import FrameReference
+        from ..runtime.sessions.physical_control import ControlledSubjectV1, SubjectJointDeclarationV1
+        writer, component_paths = 'two-wheel-direct-effort', (('left',), ('right',))
+        subject = ControlledSubjectV1(self.uid, self.uid, source_id, source_closure_sha256,
+            'references_existing', 'fixed', FrameReference(self.uid, 'balance_anchor'), None,
+            component_paths, (writer,),
+            supported_controller_profiles=self.controller_profiles)
+        joints = tuple(SubjectJointDeclarationV1(path, name, (writer,), actuator,
+            actuator, 1., (-TWO_WHEEL_TORQUE_LIMIT_NM, TWO_WHEEL_TORQUE_LIMIT_NM), 'disabled')
+            for path, name, actuator in zip(
+                component_paths, (self.left_wheel_joint_name, self.right_wheel_joint_name),
+                (self.left_actuator_name, self.right_actuator_name), strict=True))
+        return subject, joints
+
 
 
 __all__ = [
@@ -132,5 +173,4 @@ __all__ = [
     "TWO_WHEEL_ACTION_SCHEMA_VERSION",
     "TWO_WHEEL_TORQUE_LIMIT_NM",
     "TwoWheelBalanceEntity",
-    "TwoWheelTorqueActionAdapter",
 ]

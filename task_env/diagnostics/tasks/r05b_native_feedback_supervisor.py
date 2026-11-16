@@ -245,6 +245,7 @@ def check(backend: str, cell: str, python: Path, output_path: Path):
 
 def run(backend: str, run_root: Path, python: Path, *, gripper_hz: int = 500,
         full_episode: bool = False):
+    raise RuntimeError('retired historical native supervisor; use the current canonical-lock Harness')
     run_root.mkdir(parents=True, exist_ok=False)
     worker_dir = run_root / 'worker'
     worker_log = run_root / 'native_worker.log'

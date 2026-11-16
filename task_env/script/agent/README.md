@@ -115,6 +115,12 @@ Without overrides, Core Python is the calling interpreter and Isaac Python uses
 `workspace/environments/isaacsim-6.2.0/bin/python`. All simultaneous checkouts
 using the same GPU must use the same `GEOCHORA_NATIVE_LOCK` path.
 
+The candidate feasibility and oracle workflows drive a caller-owned Solution
+through `act → env.step(action) → observe`. Legacy `--env` inputs must expose
+the caller-driven action route and a matching Solution factory; unsupported
+routes fail explicitly rather than falling back to `step_expert()`. Catalog
+provenance still requires a clean checkout, including untracked files.
+
 ## Built-in PickCube runtime example
 
 `--execution harness --provider {mujoco,geophys,isaacsim,genesis,sapien}` selects
@@ -242,7 +248,7 @@ Isaac's `pxr` package first:
 
 ```sh
 CORE=/absolute/path/to/GeoChora
-ISAAC_PY="$CORE/workspace/environments/isaacsim-6.2.0/bin/python"
+ISAAC_PY=/absolute/path/to/isaacsim-6.2.0/bin/python
 CORE_PY=/absolute/path/to/geochora-py312/bin/python
 "$ISAAC_PY" "$CORE/task_env/diagnostics/tasks/pickcube_isaac_usd_delivery.py" \
   --help
@@ -256,6 +262,14 @@ The Core and Isaac interpreters must use the same Python major/minor ABI. An
 existing filtered `GEOCHORA_CORE_SITE` overlay may be used instead of
 `--core-python`. This operation validates and writes USD evidence only; it
 does not launch `SimulationApp` or advance physics.
+
+For the supervised PickCube example, select the Isaac worker interpreter with
+`--isaac-python /absolute/path/to/python`, or set `ISAAC_SIM_PYTHON`. The
+command-line option takes precedence; if neither is supplied, the existing
+`workspace/environments/isaacsim-6.2.0/bin/python` under Core is used. A
+missing interpreter produces a `NOT_RUN_DEPENDENCY` preflight result. This
+selection does not establish that an Isaac installation is compatible or that
+the route has run successfully.
 
 Generate a fresh catalog after each Core commit, then run the three fixed seeds
 for one provider:
@@ -279,9 +293,16 @@ Use `--provider geophys` for the other CPU route. A clean checkout can use the
 checked-in empty working-tree scope. A Goal run with one unrelated untracked
 file must supply a separate versioned scope pinning its exact path and SHA-256;
 tracked changes remain rejected. The legacy strict catalog validator still
-requires a fully clean checkout. Each example episode holds the shared native
-lock through worker process-group exit and writes a separate run receipt and
-canonical H5.
+requires a fully clean checkout. The example uses
+`workspace/locks/shared_native_execution.lock` as a hard link to this
+checkout's existing historical lock and rejects a missing or different lock
+identity. Keep both paths intact while old callers exist. On a monitored error
+or a single SIGINT, SIGTERM or SIGHUP, the supervisor retains its lock while
+retiring the worker process group; an unretired group keeps the lock held. This
+does not cover repeated-signal races, SIGKILL, host failure, unhandled signals,
+escaped process groups, or an independently created lock in another checkout.
+The example acquires this checkout's lock; coordination requires every caller
+to use the same inode. Each run writes a separate receipt and canonical H5.
 
 A passing probe covers its declared seeds only. Preserve execution faults and
 sampling-distribution revisions for Human review. Recording/storage validity is

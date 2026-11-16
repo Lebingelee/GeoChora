@@ -4,44 +4,13 @@ import argparse
 import json
 
 
-def _completion_result(env, info, *, terminated=False, truncated=False):
+def _completion_result(env, info, *, solution=None, terminated=False, truncated=False):
     """Report success only after the selected task policy and outcome complete."""
-    solution = env.solution
-    result = {
-        'solution_done': bool(solution.done),
-        'solution_failed': bool(solution.failed),
-        'task_success': bool(info.get('task_metrics', {}).get('task_success', info.get('is_success', False))),
-        'planned_trajectory_completed': None,
-        'outcome_complete': None,
-        'unapproved_override_used': None,
-        'terminated': bool(terminated),
-        'truncated': bool(truncated),
-    }
-    reason = None
-    if terminated:
-        reason = 'environment_terminated'
-    elif truncated:
-        reason = 'environment_truncated_or_horizon_reached'
-    elif solution.failed:
-        reason = solution.failure_reason or 'selected_policy_failed'
-    elif not solution.done:
-        reason = 'selected_policy_incomplete'
-    elif not result['task_success']:
-        reason = 'task_success_false'
-    elif callable(getattr(solution, 'outcome_report', None)):
-        outcome = solution.outcome_report()
-        result['planned_trajectory_completed'] = bool(outcome.get('planned_trajectory_completed'))
-        result['outcome_complete'] = bool(outcome.get('outcome_complete'))
-        result['unapproved_override_used'] = outcome.get('unapproved_override_used')
-        if not result['planned_trajectory_completed']:
-            reason = 'planned_trajectory_incomplete'
-        elif not result['outcome_complete']:
-            reason = 'outcome_incomplete'
-        elif result['unapproved_override_used'] is not False:
-            reason = 'unapproved_override_used_or_unreported'
-    result['status'] = 'PASS' if reason is None else 'FAIL'
-    result['failure_reason'] = reason
-    return result
+    from task_env.script.trajectory.completion import completion_facts
+
+    solution = env.solution if solution is None else solution
+    facts = completion_facts(solution, info, terminated=terminated, truncated=truncated)
+    return {**facts, 'status': 'PASS' if facts['policy_complete'] else 'FAIL'}
 
 
 def main(argv=None):
@@ -54,24 +23,50 @@ def main(argv=None):
     parser.add_argument('--seed', type=int, default=19)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(argv)
-    env = make_env(args.env_id, config={'provider': args.provider, 'backend': 'cpu', 'horizon': args.horizon})
+    env = None
+    info = {}
+    completion = verification = error = close_error = None
+    close_attempted = close_succeeded = False
     try:
-        _, info = env.reset(seed=args.seed)
+        env = make_env(args.env_id, config={'execution': {'physics_provider': args.provider, 'physics_backend': 'cpu'}, 'episode': {'horizon': args.horizon}})
+        observation, info = env.reset(seed=args.seed)
+        solution = None
+        if args.env_id == selected_env_ids[1]:
+            from task_env.tasks.nut_assembly.task import build_outcome_solution
+            solution = build_outcome_solution(provider=args.provider)
+            solution.reset(observation, info, env.metadata)
+        else:
+            from task_env.tasks.pick_cube import build_readiness_solution
+            solution = build_readiness_solution(backend='cpu', controller_profile='r3_continuous_v1')
+            solution.reset(observation, info, env.metadata)
         env.start_recording(args.output)
         terminated = truncated = False
-        env.prepare_expert()
-        while not env.solution.done and not env.solution.failed:
-            _, _, terminated, truncated, info = env.step_expert()
+        while not solution.done and not solution.failed:
+            action = solution.act(observation, info)
+            observation, reward, terminated, truncated, info = env.step(action)
+            solution.observe(observation, reward, terminated, truncated, info)
             if terminated or truncated:
                 break
-        completion = _completion_result(env, info, terminated=terminated, truncated=truncated)
+        completion = _completion_result(env, info, solution=solution, terminated=terminated, truncated=truncated)
         stop_reason = completion['failure_reason'] or 'selected_policy_completed'
         verification = env.finish_recording(stop_reason)
-        print(json.dumps({'status': completion['status'], 'completion': completion,
-                          'verification': verification, 'info': info}, default=str))
-        return 0 if completion['status'] == 'PASS' else 1
+    except Exception as exc:
+        error = {'type': type(exc).__name__, 'message': str(exc)}
     finally:
-        env.close()
+        if env is not None:
+            close_attempted = True
+            try:
+                env.close()
+                close_succeeded = True
+            except Exception as exc:
+                close_error = {'type': type(exc).__name__, 'message': str(exc)}
+    status = ('INVALID' if error is not None or close_error is not None or completion is None
+              else completion['status'])
+    print(json.dumps({'status': status, 'completion': completion,
+                      'verification': verification, 'info': info, 'error': error,
+                      'close_attempted': close_attempted, 'close_succeeded': close_succeeded,
+                      'close_error': close_error}, default=str))
+    return 0 if status == 'PASS' else 1
 
 
 if __name__ == '__main__':

@@ -1,16 +1,15 @@
 """NutAssembly reset, feedback observations, and task evaluation semantics."""
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 import math
 import numpy as np
 
 from ...artifacts import CanonicalStateView, SemanticDefinition, TaskArtifact
 from ...artifacts.execution import ResetSample
+from ...environment.task_definition import CanonicalTaskStateView, TaskDefinitionBase, as_task_state_view
 from ...objects.nut_assembly import NUT_HALF_HEIGHT, NUT_HANDLE_LOCAL_X
 from ...utils.rotation import quat_wxyz_to_matrix
-from .solution import NutAssemblyNativeFeedbackSampleV1, NutAssemblyNativeIntervalReceiptV1
 
 EEF = "panda-v1/ee"
 NUT = "square-nut-v1"
@@ -109,7 +108,7 @@ def sample_reset(artifact: TaskArtifact, task_seed: int = 19, *, lift_height_m=N
 
 
 @dataclass(frozen=True)
-class NutAssemblyTaskDefinition:
+class NutAssemblyTaskDefinition(TaskDefinitionBase):
     """Immutable selected reset and evaluation contract bound to an Artifact."""
 
     artifact_hash: str
@@ -119,6 +118,7 @@ class NutAssemblyTaskDefinition:
     velocity_policy: str
     control_policy: str
     settle_steps: int
+    uses_unified_state_view = True
 
     @classmethod
     def from_artifact(cls, artifact: TaskArtifact, reset: dict):
@@ -128,10 +128,17 @@ class NutAssemblyTaskDefinition:
                    reset['sampler_version'], reset['inherited_state_policy'],
                    reset['control_policy'], int(reset['settle_steps']))
 
-    def evaluate(self, state, semantics):
-        if not isinstance(state, CanonicalStateView) or semantics != self.semantics:
+    def reset(self, state, reset_mask=None):
+        return self.evaluate(state)
+
+    def evaluate(self, state, semantics=None, *, action=None, elapsed_steps=None, previous_state=None):
+        view = as_task_state_view(state)
+        if not isinstance(view, CanonicalTaskStateView):
+            raise ValueError('NutAssembly semantics require named canonical state')
+        semantics = self.semantics if semantics is None else semantics
+        if semantics != self.semantics:
             raise ValueError('unsupported canonical NutAssembly state/semantics')
-        return _evaluate_bound(state, semantics)
+        return _evaluate_bound(view.canonical_state, semantics)
 
     def sample_reset(self, artifact, task_seed):
         if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != self.artifact_hash:
@@ -154,89 +161,11 @@ def _reset_seed(seed):
     return 19 if seed is None else seed
 
 
-def _native_feedback_sample(env, stage, index, state, feedback, target, applied, diagnostics,
-                            provider_feedback_sample, request_boundary):
-    metrics = None
-    if stage == "close_gripper":
-        _, observation_info, _ = env.observation(state)
-        metrics = observation_info["task_metrics"]
-    ee = state.pose_world["panda-v1/ee"]
-    sample = NutAssemblyNativeFeedbackSampleV1(
-        "nutassembly-native-feedback-sample-v1",
-        env.provider,
-        provider_feedback_sample.provider_materialization_id,
-        env.artifact.identity_hash,
-        env.value["source"].scene_source.source_id,
-        hashlib.sha256(env.value["source"].scene_source.xml.encode()).hexdigest(),
-        request_boundary["controller_identity"],
-        request_boundary["solution_identity"],
-        request_boundary["episode_id"],
-        request_boundary["reset_sample_id"],
-        request_boundary["identity_hash"],
-        float(state.simulation_time),
-        int(state.control_step),
-        int(index),
-        int(provider_feedback_sample.actuator_force_measurement.sample_sequence),
-        float(provider_feedback_sample.actuator_force_measurement.native_sample_time_s),
-        float(env.artifact.timebase.physics_dt),
-        str(provider_feedback_sample.actuator_force_measurement.phase),
-        "valid" if provider_feedback_sample.actuator_force_measurement.valid else "invalid",
-        tuple((*ee.position, *ee.quaternion_wxyz)),
-        feedback,
-        dict(diagnostics),
-        provider_feedback_sample,
-        target.identity_hash,
-        applied.to_mapping(),
-        None if metrics is None else bool(metrics.get("grasped_nut", False)),
-    )
-    return sample
-
-
-def _native_interval_receipt(env, request_boundary, evaluation_boundary, native_samples, substeps):
-    expected = env.artifact.timebase.control_substeps
-    if expected != 5 or len(native_samples) != expected or len(substeps) != expected:
-        raise ValueError("NutAssembly native interval requires five completed 2 ms applications")
-    if tuple(index for index, _, _ in substeps) != tuple(range(expected)):
-        raise ValueError("NutAssembly native interval substeps are missing or out of order")
-    return NutAssemblyNativeIntervalReceiptV1(
-        "nutassembly-native-interval-receipt-v1",
-        env.provider,
-        request_boundary["provider_materialization_id"],
-        env.artifact.identity_hash,
-        env.value["source"].scene_source.source_id,
-        hashlib.sha256(env.value["source"].scene_source.xml.encode()).hexdigest(),
-        request_boundary["controller_identity"],
-        request_boundary["solution_identity"],
-        request_boundary["episode_id"],
-        request_boundary["reset_sample_id"],
-        request_boundary,
-        evaluation_boundary,
-        float(env.artifact.timebase.physics_dt),
-        expected,
-        len(native_samples),
-        tuple(native_samples),
-    )
-
-
-def _observe_kwargs(env, native_samples, receipt):
-    if not isinstance(receipt, NutAssemblyNativeIntervalReceiptV1):
-        raise ValueError("NutAssembly Solution observation requires a completed native interval receipt")
-    return {"readiness": env.controller.readiness(env.state, env.feedback),
-        "native_samples": tuple(native_samples),
-        "native_interval_receipt": receipt}
-
-
-# Existing imports remain a thin bridge while repository callers migrate.
 from .specialization import (
-    NutAssemblyReferenceEnv, REFERENCE_ENV_ID, R05B_NATIVE_FEEDBACK_PROFILE,
-    _configuration, _recipe, build_artifact, build_reference, build_runtime_source,
-    build_outcome_solution, build_gripper_cadence_diagnostic_reference,
-    build_gripper_cadence_diagnostic_solution, build_native_feedback_reference,
-    build_native_feedback_solution,
+    NutAssemblyReferenceEnv, REFERENCE_ENV_ID, _configuration, _recipe,
+    build_artifact, build_reference, build_outcome_solution,
 )
 
 __all__ = ["NutAssemblyTaskDefinition", "NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
-           "build_reference", "build_outcome_solution", "build_runtime_source", "evaluate",
-           "sample_reset", "semantic_definition", "build_gripper_cadence_diagnostic_reference",
-           "build_gripper_cadence_diagnostic_solution", "build_native_feedback_reference",
-           "build_native_feedback_solution", "R05B_NATIVE_FEEDBACK_PROFILE"]
+           "build_reference", "build_outcome_solution", "evaluate",
+           "sample_reset", "semantic_definition"]

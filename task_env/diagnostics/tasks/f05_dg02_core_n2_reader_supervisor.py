@@ -76,7 +76,7 @@ def _process_group_sample(pgid: int) -> tuple[int, list[int], float]:
 
 
 def _lock_available(path: Path = LOCK) -> bool:
-    with path.open("a+") as stream:
+    with path.open("r+") as stream:
         try:
             fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:

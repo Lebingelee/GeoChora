@@ -71,12 +71,12 @@ class SceneBatchRuntime:
         if size < 1:
             raise ValueError("num_envs must be positive")
 
-        from geophys.demo_runtime import assemble_mjcf_articulated_runtime
-        from geophys.test_runtime import init_test_backend
+        from simulation import assemble_mjcf_articulated_runtime
+        from ..provider_bootstrap import init_task_env_backend
         from solvers.rigid import RigidGroundConfig
         from solvers.rigid.model import merge_rigid_scene_models
 
-        init_test_backend(str(backend))
+        init_task_env_backend(str(backend))
         base_model = compiled_scene.scene_model
         scene_models = [copy.deepcopy(base_model) for _ in range(size)]
         merged_model = merge_rigid_scene_models(scene_models)

@@ -39,6 +39,7 @@ def _row(path: Path) -> dict[str, str]:
 
 
 def build(suffix: str) -> tuple[dict, Path]:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     if not suffix.isdigit() or len(suffix) != 3:
         raise ValueError("S1 refresh suffix must contain three digits")
     previous_plan_path = PREVIOUS_PLAN.resolve(strict=True)
@@ -69,7 +70,7 @@ def build(suffix: str) -> tuple[dict, Path]:
     ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
     base_progress = json.loads(BASE_PROGRESS.read_text(encoding="utf-8"))
     lock_path = LOCK.resolve(strict=True)
-    with lock_path.open("a+") as lock:
+    with lock_path.open("r+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:

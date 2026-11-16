@@ -17,7 +17,7 @@ from examples._common import (
     bootstrap_imports,
     identity_summary,
     load_recording_summary,
-    run_expert,
+    run_caller_solution,
 )
 
 
@@ -57,18 +57,32 @@ def main(argv=None) -> int:
     verification = None
     recording = None
     error = None
+    finalization_error = None
+    close_error = None
+    readback_error = None
+    close_attempted = close_succeeded = False
     status = "ERROR"
     try:
         with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
             from task_env import make_env
 
-            env = make_env(args.env_id, config={"provider": args.provider, "backend": "cpu", "horizon": args.horizon})
-            _, reset_info = env.reset(seed=seed)
+            env = make_env(args.env_id, config={"execution": {"physics_provider": args.provider, "physics_backend": "cpu"}, "episode": {"horizon": args.horizon}})
+            obs, reset_info = env.reset(seed=seed)
+            if args.env_id == ENV_IDS[1]:
+                from task_env.tasks.nut_assembly.task import build_outcome_solution
+                solution = build_outcome_solution(provider=args.provider)
+                solution.reset(obs, reset_info, env.metadata)
+            else:
+                from task_env.tasks.pick_cube import build_readiness_solution
+                solution = build_readiness_solution(backend='cpu', controller_profile='r3_continuous_v1')
+                solution.reset(obs, reset_info, env.metadata)
             # Recording begins with the measured reset boundary, before the first expert action.
             env.start_recording(output)
             recording_started = True
-            episode = run_expert(env, seed=seed, horizon=args.horizon, already_reset=True,
-                                 initial_info=reset_info)
+            if args.env_id == ENV_IDS[1]:
+                episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
+            else:
+                episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
             identity = identity_summary(env, provider=args.provider)
             status = episode["status"]
     except RunTimeout as exc:
@@ -89,15 +103,21 @@ def main(argv=None) -> int:
                         (episode or {}).get("failure_reason") or status.lower()
                     )
                 except Exception as exc:
-                    error = {"type": type(exc).__name__, "message": f"recording finalization failed: {exc}"}
+                    finalization_error = {"type": type(exc).__name__, "message": str(exc)}
                     status = "ERROR"
-            env.close()
+            close_attempted = True
+            try:
+                env.close()
+                close_succeeded = True
+            except Exception as exc:
+                close_error = {"type": type(exc).__name__, "message": str(exc)}
+                status = "ERROR"
 
     if output.exists():
         try:
             recording = load_recording_summary(output)
         except Exception as exc:
-            error = {"type": type(exc).__name__, "message": f"recording validation failed: {exc}"}
+            readback_error = {"type": type(exc).__name__, "message": str(exc)}
             status = "ERROR"
     else:
         recording = {"status": "NOT_WRITTEN", "path": str(output)}
@@ -113,7 +133,8 @@ def main(argv=None) -> int:
         "provider": args.provider,
         "backend": "cpu",
         "seed": seed,
-        "capability_intersection": "selected task-owned expert, scalar CPU; H5 storage check is not D0 replay",
+        "capability_intersection": ("selected scalar CPU; NutAssembly uses a caller-owned Solution; "
+                                    "H5 storage check is not D0 replay"),
         "episode": episode,
         "identity": identity,
         "recording": recording,
@@ -122,6 +143,11 @@ def main(argv=None) -> int:
         "resource_budget": budget,
         "output": str(output),
         "error": error,
+        "finalization_error": finalization_error,
+        "close_attempted": close_attempted,
+        "close_succeeded": close_succeeded,
+        "close_error": close_error,
+        "readback_error": readback_error,
     }
     print(json.dumps(report, sort_keys=True, default=str))
     return 0 if status == "PASS" else 1

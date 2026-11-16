@@ -126,6 +126,7 @@ def make_variant(source_path: Path, destination: Path, *, label: str, relation_a
 
 
 def build(*, suffix: str, expected_starts: int, expected_steps: int) -> Path:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     if not suffix.isdigit() or len(suffix) != 3:
         raise ValueError("N1 run suffix must be exactly three digits")
     run_name = f"n1_public_consumer_{suffix}"
@@ -151,7 +152,7 @@ def build(*, suffix: str, expected_starts: int, expected_steps: int) -> Path:
     native = progress["native"]
     if native["geophys_starts"] != expected_starts or native["geophys_steps"] != expected_steps or native["probe_steps"] != expected_steps:
         raise RuntimeError(f"cumulative N1 counters changed since the planned freeze: {native}")
-    lock_stream = LOCK.open("a+")
+    lock_stream = LOCK.open("r+")
     try:
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

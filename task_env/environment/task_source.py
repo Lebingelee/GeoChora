@@ -686,6 +686,41 @@ class TaskArtifactDeclarationV1:
         )
 
 
+def compile_named_effort_joint_reset_plan(*, artifact, source, task_seed, sampler_id,
+                                   sampled_values, joint_position, joint_velocity):
+    """Bind one Task's sampled joint state to the common episode reset contract."""
+    from ..artifacts.execution import ResetPlanV1, ResetSampleV1
+
+    row = json.dumps([float(value) for value in sampled_values], separators=(',', ':')).encode()
+    sample = ResetSampleV1.create(schema_version='reset-sample-v1',
+        task_artifact_hash=artifact.identity_hash, source_id=source.source_id,
+        source_closure_digest=source.source_closure_digest, sampler_id=sampler_id,
+        sampler_version='v1', task_seed=task_seed, init_row_index=0,
+        init_row_sha256=hashlib.sha256(row).hexdigest(), joint_position=joint_position,
+        joint_velocity=joint_velocity, sampled_poses_world={}, poses_world={}, free_joint_velocity={},
+        free_joint_velocity_frame='mujoco_world_linear_local_angular_v1', fixture_pose_world={},
+        simulation_time_s=0., velocity_policy='named_qvel_and_free_joint_qvel_v1',
+        control_policy='named_physical_effort_by_source_v1', initialization_order=(
+            'sample_source_properties', 'native_preprocess', 'sample_task_placements',
+            'restore_source_bound_state', 'forward_derived_state'), settle_steps=0)
+    return ResetPlanV1('reset-plan-v1', sample, 'task_episode')
+
+
+def compile_existing_subject_effort_task(*, scene, robot, task_id, artifact_id,
+                                         semantic_id, success_definition, timebase):
+    """Compile a joint-effort Task from an existing Robot and its Scene topology."""
+    subject = robot.artifact_entity(scene)
+    joints = subject.joints
+    initialization = InitializationContract('initialization-v0', {}, {name: 0. for name in joints},
+                                             (), 'clear', 'source', 0)
+    semantics = SemanticDefinition('semantics-v0', semantic_id, (), joints, {}, success_definition)
+    declaration = TaskArtifactDeclarationV1(artifact_id, task_id, 'v1', (subject,),
+        ActionIntent('direct_joint_effort', None, 'none', 'joint_effort'), ('joint_state',),
+        initialization, semantics, timebase, ('articulated_robot', 'joint_state_query'))
+    source = TaskSourceV1(task_id, 'v1', scene.scene_id, (), None)
+    return source, declaration.compile_v1(source, scene)
+
+
 def compile_declared_artifact(*, artifact_id: str, task_id: str, version: str,
                               entities: tuple, action: ActionIntent,
                               observations: tuple[str, ...],

@@ -196,6 +196,18 @@ def _validate_leaf(member, scene, entities, assets, frames, joints):
         raise ValueError(f"unsupported typed target kind: {member.target_kind!r}")
 
 
+def existing_entity_joint_members(scene, entity_id, joint_paths):
+    """Declare one existing Scene entity and its named joint references."""
+    entities = tuple(entity for entity in scene.entities if entity.entity_id == entity_id)
+    if len(entities) != 1:
+        raise ValueError('Assembly subject must refer to exactly one Scene entity')
+    entity = entities[0]
+    return (LogicalAssemblyEntityMemberV1('entity_member', ('owner',), entity_id,
+                                           entity.asset_id, entity.asset_version),
+            *(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
+                path, 'joint', JointReference(entity_id, name)) for path, name in joint_paths))
+
+
 def resolve_logical_assembly(
     root: LogicalAssemblyV1,
     scene: SceneDefinition,

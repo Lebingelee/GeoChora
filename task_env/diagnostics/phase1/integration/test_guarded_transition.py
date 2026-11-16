@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from task_env.tasks.guarded_transition import (
+from task_env.tasks.nut_assembly.solution import (
     GuardedTransitionEvaluator,
     TransitionGuardSpec,
 )

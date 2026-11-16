@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +22,7 @@ from ..artifacts import (
     RobotInstance,
     SceneDefinition,
 )
-from ..assembly.assets import _asset_definition_from_manifest, _source_closure_digest
+from ..assembly.assets import _asset_definition_from_manifest
 from ..registry import register_agent
 from .base import BaseAgent
 from .gripper import ExperimentalPandaGripperController, PandaGripperController
@@ -32,9 +32,180 @@ from ..utils.rotation import matrix_to_quat_wxyz
 PANDA_ASSET_ROOT = MUJOCO_MENAGERIE_ROOT / "franka_emika_panda"
 
 
+def panda_reference_control_binding():
+    """Return the legacy scalar Panda gripper binding owned by this robot."""
+    from ..runtime.sessions.control import ControlBinding
+
+    return ControlBinding('panda-v1/gripper', 0.08)
+
+
+@dataclass(frozen=True)
+class PandaEffortSourceLayout:
+    """Source-admitted transmission names and identity for one Panda layout."""
+    native_actuators: tuple[str, ...]
+    transmission_ids: tuple[str, ...]
+    assembly_id: str
+    nested_component_id: str
+    model_id: str
+    finger_action_id: str
+
+
 @register_agent("panda-v1")
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
+    observer_source_family = 'panda-articulation-v1'
+    component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
+    control_capabilities = frozenset(('position_drive_gravity_compensation',))
+
+    @staticmethod
+    def construction_source_paths():
+        """Declare the shared Panda implementation files used in construction identity."""
+        directory = Path(__file__).resolve().parent
+        return tuple(directory / name for name in (
+            'panda.py', 'assembled_panda.py', 'source_recipe.py', 'panda_observation.py'))
+
+    def effort_source_layout(self):
+        """Declare the Panda's default MJCF transmission and assembly names."""
+        return PandaEffortSourceLayout(
+            tuple(f'actuator{i+1}' if i < 7 else 'actuator8' for i in range(9)),
+            tuple(f'arm-transmission-{i+1}' if i < 7 else 'split-transmission' for i in range(9)),
+            'panda-direct-effort-assembly', 'panda-direct-effort-components',
+            'direct-effort-zero-bias-v1', 'finger-tendon-effort')
+
+    @staticmethod
+    def device_effort_action_components(controller):
+        """Name the shared action inputs independently of native transmission."""
+        profile = controller.profile
+        names = tuple(profile.action_names)
+        if ((profile.action_key or 'effort') != 'effort' or len(names) < 2
+                or len(set(names)) != len(names)
+                or names[-1] not in {'finger-tendon-effort', 'finger-pair-effort'}):
+            raise ValueError('Panda device effort requires its declared effort inputs')
+        return (*names[:-1], 'finger-pair-effort')
+
+    def reference_source_actuation(self):
+        """Declare the arm targets and coupled opening actuator of this source."""
+        names = self.physical_joint_names()
+        actuators = self.effort_source_layout().native_actuators
+        if len(names) != 9 or len(actuators) != len(names) or actuators[-2] != actuators[-1]:
+            raise ValueError('Panda reference source requires seven arm and coupled finger channels')
+        return ({f'{self.uid}/{name}': actuator
+                 for name, actuator in zip(names[:7], actuators[:7], strict=True)},
+                (actuators[-1],))
+
+    def artifact_entity(self, scene=None):
+        """Declare the canonical Panda identity consumed by Task Artifacts."""
+        from ..artifacts import EntityDefinition
+        manifest = self.asset_manifest()
+        return EntityDefinition(
+            self.uid, 'embodiment',
+            f'mujoco_menagerie/{manifest.source_revision}/franka_emika_panda/panda.xml',
+            (f'{self.uid}/base', f'{self.uid}/ee'),
+            tuple(f'{self.uid}/{name}' for name in self.physical_joint_names()),
+            'referenced_articulation', 'arm_hand_finger_collision', {},
+        )
+
+    @staticmethod
+    def reference_observation_spaces(env, *, include_robot_state=False):
+        from .panda_observation import reference_observation_spaces
+        return reference_observation_spaces(env, include_robot_state=include_robot_state)
+
+    @staticmethod
+    def reference_observation_field_metadata(env):
+        from .panda_observation import reference_observation_field_metadata
+        return reference_observation_field_metadata(env)
+
+    @staticmethod
+    def reference_observation_state(env, adapted):
+        from .panda_observation import reference_observation_state
+        return reference_observation_state(env, adapted)
+
+    def physical_reference_observation(self, env, state):
+        from .panda_observation import physical_reference_observation
+        return physical_reference_observation(self, env, state)
+
+    def device_reference_observation_space(self):
+        """Declare the Robot state used by the canonical device observation."""
+        from .panda_observation import device_reference_observation_space
+        return device_reference_observation_space(self)
+
+    def device_reference_observation(self, view, state):
+        """Project the live source-bound Robot view without boundary digests."""
+        from .panda_observation import device_reference_observation
+        return device_reference_observation(self, view, state)
+
+    def position_subject_layout(self, *, entity_id, end_frame_id):
+        """Declare the existing Panda subject and its position control groups."""
+        from .source_recipe import PositionSubjectLayoutV1
+        return PositionSubjectLayoutV1(
+            ((entity_id, 'link0', self.physical_joint_names(), None),),
+            entity_id, end_frame_id, ((entity_id, 'arm'), (entity_id, 'gripper')))
+
+    @staticmethod
+    def reference_frame_parents():
+        """Declare the link and local name of the Panda reference frame."""
+        return {'ee': ('hand', 'ee')}
+
+    @staticmethod
+    def physical_joint_names():
+        return tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+
+    @staticmethod
+    def effort_controller_profiles():
+        """Expose Controller kinds; source and provider still admit actual combinations."""
+        from ..controllers.canonical.r3_effort import PANDA_EFFORT_PROFILE_KINDS
+        return PANDA_EFFORT_PROFILE_KINDS
+
+    @classmethod
+    def physical_controller_kinds(cls):
+        """Describe declared physical Controller kinds without selecting a provider."""
+        return cls.effort_controller_profiles()
+
+    @staticmethod
+    def physical_subject_declaration(*, entity_id, source_id, source_closure_sha256,
+                                     native_ranges, native_drive, split=False,
+                                     native_actuators=None, transmission_ids=None):
+        """Describe Panda channels before any physical binding is constructed."""
+        from ..runtime.sessions.physical_control import ControlledSubjectV1, SubjectJointDeclarationV1
+        names = PandaAgent.physical_joint_names()
+        if len(native_ranges) != 8:
+            raise ValueError('Panda source requires eight checked actuator ranges')
+        if native_actuators is None:
+            native_actuators = tuple(f'actuator{i+1}' if i < 7 else 'actuator8' for i in range(9))
+        if transmission_ids is None:
+            transmission_ids = tuple(f'arm-transmission-{i+1}' if i < 7 else 'split-transmission' for i in range(9))
+        if len(native_actuators) != 9 or len(transmission_ids) != 9:
+            raise ValueError('Panda source requires nine named transmission channels')
+        writers = ('panda-arm-effort', 'panda-hand-effort') if split else ('panda-direct-effort',)
+        paths = tuple(('robot', name) for name in names)
+        subject = ControlledSubjectV1(entity_id, entity_id, source_id, source_closure_sha256,
+            'references_existing', 'fixed', FrameReference(entity_id, 'link0'), None, paths, writers,
+            supported_controller_profiles=tuple(PandaAgent.effort_controller_profiles()))
+        declarations = tuple(SubjectJointDeclarationV1(
+            path, name, ((writers[0] if i < 7 else writers[-1]),),
+            native_actuators[i], transmission_ids[i],
+            1.0 if i < 7 else 0.5, native_ranges[i if i < 7 else 7], native_drive)
+            for i, (name, path) in enumerate(zip(names, paths, strict=True)))
+        return subject, declarations
+
+    def project_references(self, *, names, spec, qpos_adr, dof_adr, ctrl_range):
+        """Project the established Panda layout without making the resolver identify robots."""
+        from ..assembly.references import AgentReferences
+        arm_names = tuple(f'joint{i}' for i in range(1, 8))
+        fingers = ('finger_joint1', 'finger_joint2')
+        arm_ids = [names.joints[name] for name in arm_names]
+        finger_ids = [names.joints[name] for name in fingers]
+        return AgentReferences(uid=self.uid, arm_joint_ids=arm_ids,
+            arm_qpos_ids=qpos_adr[arm_ids], arm_dof_ids=dof_adr[arm_ids],
+            arm_actuator_ids=[names.actuators[f'actuator{i}'] for i in range(1, 8)],
+            gripper_joint_ids=finger_ids, gripper_qpos_ids=qpos_adr[finger_ids],
+            gripper_actuator_ids=[names.actuators['actuator8']],
+            eef_site_id=names.sites['nutassembly_ee_site'], hand_body_id=names.bodies['hand'],
+            ctrl_range=ctrl_range, arm_joint_names=arm_names, base_body_id=names.bodies['link0'],
+            base_body_name='link0', eef_site_name='nutassembly_ee_site',
+            joint_names=tuple(spec.joint_names), actuator_names=tuple(spec.actuator_names),
+            body_ids=[names.bodies[name] for name in spec.body_names],
+            site_ids=[names.sites[name] for name in spec.site_names])
 
     def asset_manifest(self) -> AssetManifest:
         return AssetManifest(
@@ -47,43 +218,29 @@ class PandaAgent(BaseAgent):
             source_revision="b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
         )
 
-    def _scene_definition(
-        self, *, entity_id: str | None = None, scene_id: str | None = None,
-    ) -> SceneDefinition:
-        """Build the Panda Scene from its declared MJCF through GeoPhys' importer."""
-
+    def source_recipe(self):
+        """Declare this Panda's pinned asset and canonical controlled joints."""
+        from .source_recipe import RobotSourceRecipeV1, RobotSourceReferenceV1
         manifest = self.asset_manifest()
-        if len(manifest.mjcf_sources) != 1 or len(manifest.asset_roots) != 1:
-            raise ValueError("Panda Scene construction requires one declared MJCF root")
-        from scene import SceneSource, import_scene_source
+        targets, opening = self.reference_source_actuation()
+        return RobotSourceRecipeV1(self.uid, 'reference-task-source', (
+            RobotSourceReferenceV1('panda-menagerie-source', manifest.source_reference,
+                                   manifest.source_revision, (self.uid,)),), (),
+            self.physical_joint_names(), self.selected_controller_profiles(),
+            tuple((self.uid, name, 'panda-position-controller')
+                  for name in (*targets.values(), *opening)))
 
-        imported = import_scene_source(
-            SceneSource.mjcf_path(
-                manifest.mjcf_sources[0],
-                label=f"{self.uid}:{manifest.source_revision}",
-            ),
-            cache=False,
-        )
-        root = manifest.asset_roots[0].resolve(strict=True)
-        files = {}
-        for raw_path in imported.dependency_paths:
-            path = Path(raw_path).resolve(strict=True)
-            try:
-                logical_path = path.relative_to(root).as_posix()
-            except ValueError as exc:
-                raise ValueError(
-                    f"Panda importer dependency escaped its declared asset root: {path}"
-                ) from exc
-            files[logical_path] = path.read_bytes()
-        if not files:
-            raise ValueError("Panda importer returned an empty source closure")
-        return _panda_scene_from_import(
-            imported,
-            manifest,
-            entity_id=self.uid if entity_id is None else entity_id,
-            scene_id=self.uid if scene_id is None else scene_id,
-            source_content_sha256=_source_closure_digest(files),
-        )
+    def source_recipe_for_profile(self, profile):
+        """Declare the writer ownership of the selected Controller profile."""
+        recipe = self.source_recipe()
+        if profile in self.selected_controller_profiles():
+            return recipe
+        if profile not in self.effort_controller_profiles():
+            raise ValueError('Panda does not declare this Controller profile')
+        from dataclasses import replace
+        return replace(recipe, control_profiles=tuple(self.effort_controller_profiles()),
+            resource_writers=tuple((entity, actuator, 'panda-direct-effort')
+                                   for entity, actuator, _writer in recipe.resource_writers))
 
     def reference_spec(self) -> ReferenceSpec:
         return ReferenceSpec(
@@ -128,12 +285,86 @@ class PandaAgent(BaseAgent):
             notes=("Stage 1 must resolve these names to qpos addresses.",),
         )
 
-    def supported_controller_kinds(self) -> tuple[str, ...]:
+    def component_mjcf_frames(self):
+        """Declare the legacy component reference frame without parsing MJCF."""
+        return (("hand", {"name": "nutassembly_ee_site", "pos": "0 0 0.0584",
+                           "size": "0.000001", "group": "6", "rgba": "0 0 0 0"}),)
+
+    def component_scene_identity(self):
+        """Preserve the historical component source identity for this Robot."""
+        return "task-env-empty-tabletop-panda", "task_env_empty_tabletop_panda_v1"
+
+    def component_initial_control(self):
+        """Declare position-drive targets and the open gripper actuator."""
         return (
-            "absolute_joint",
-            "absolute_pose",
-            "delta_pose",
+            tuple((f"actuator{i}", f"joint{i}") for i in range(1, 8)),
+            ("actuator8",),
         )
+
+    @classmethod
+    def selected_controller_profiles(cls):
+        return ('r1', 'r3_continuous_v1')
+
+    @classmethod
+    def declared_controller_profiles(cls):
+        return (*cls.selected_controller_profiles(), *cls.effort_controller_profiles())
+
+    def supported_controller_kinds(self) -> tuple[str, ...]:
+        return self.component_controller_kinds
+
+    def bind_runtime(self, *, references, config, boundary):
+        """Bind this robot's controller and named frames to a compiled runtime."""
+        from ..controllers import (
+            AbsoluteJointPositionActionAdapter, AbsolutePoseActionAdapter,
+            DeltaPoseActionController,
+        )
+        from ..environment.types import ActionModeSpec, StageUnavailableError
+        from .runtime import RobotControllerHandle, RobotFrameReference, RobotRuntime
+
+        controller_config = config.robot.controller
+        if controller_config is None:
+            raise StageUnavailableError('robot TaskEnv requires an explicit robot.controller config')
+        adapters = {
+            'absolute_joint': AbsoluteJointPositionActionAdapter,
+            'absolute_pose': AbsolutePoseActionAdapter,
+            'delta_pose': DeltaPoseActionController,
+        }
+        adapter_type = adapters.get(controller_config.kind)
+        if adapter_type is None:
+            raise StageUnavailableError(f'unsupported robot controller kind {controller_config.kind!r}')
+        reference_identity = {
+            None: None, 'world': 'world',
+            'base': f'body:{references.base_body_name}',
+            'ee': f'site:{references.eef_site_name}',
+        }[controller_config.reference]
+        action_spec = replace(
+            ActionModeSpec.from_controller_config(controller_config),
+            reference_identity=reference_identity,
+        )
+        gripper = self.create_gripper_controller(
+            references=references, config=config.action, kind=config.robot.gripper.kind,
+            force_limit_N=config.robot.gripper.force_limit_N,
+            opening_step_m=config.robot.gripper.opening_step_m,
+            force_deadband_N=config.robot.gripper.force_deadband_N,
+            force_adjust_step_m=config.robot.gripper.force_adjust_step_m,
+        )
+        bind_force_limit = getattr(gripper, 'bind_force_limit', None)
+        if callable(bind_force_limit):
+            bind_force_limit(boundary)
+        adapter_kwargs = {'references': references, 'config': config.action, 'gripper': gripper}
+        if controller_config.kind in {'absolute_pose', 'delta_pose'}:
+            adapter_kwargs.update(controller_config=controller_config, action_spec=action_spec)
+        controller = RobotControllerHandle(
+            adapter=adapter_type(**adapter_kwargs), kind=controller_config.kind,
+            reference=controller_config.reference, action_spec=action_spec,
+        )
+        runtime = RobotRuntime(
+            uid=self.uid, references=references, controller=controller, gripper=gripper,
+            world=RobotFrameReference('world', 'world', None, 'world'),
+            base=RobotFrameReference('base', 'body', references.base_body_id, references.base_body_name),
+            ee=RobotFrameReference('ee', 'site', references.eef_site_id, references.eef_site_name),
+        )
+        return runtime, action_spec
 
     def create_gripper_controller(
         self,
@@ -166,7 +397,7 @@ class PandaAgent(BaseAgent):
         )
 
 
-__all__ = ["PANDA_ASSET_ROOT", "PandaAgent"]
+__all__ = ["PANDA_ASSET_ROOT", "PandaAgent", "panda_reference_control_binding"]
 
 
 def _panda_scene_from_import(

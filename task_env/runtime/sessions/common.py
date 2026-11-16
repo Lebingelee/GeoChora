@@ -1,5 +1,6 @@
 """Shared value checks/projection only; no solver abstraction."""
 from collections.abc import Mapping
+from dataclasses import dataclass, asdict
 import math
 import xml.etree.ElementTree as ET
 from uuid import uuid4
@@ -29,6 +30,32 @@ from ...artifacts.execution import (
     EpisodeResetPlanV1, RealizedInitialState, ResetPlanV1, ResetSampleV1,
 )
 from ...controllers.canonical.contracts import digest
+
+
+@dataclass(frozen=True)
+class LegacyStateBoundaryIdentity:
+    """Identity for legacy source publications, which have no canonical Scene."""
+    schema_version: str
+    episode_id: str
+    reset_sample_id: str
+    artifact_identity_hash: str
+    source_id: str
+    source_closure_digest: str
+    scene_instance_id: str
+    provider_materialization_id: str
+    control_step: int
+    state_revision: int
+
+    def to_mapping(self):
+        return asdict(self)
+
+    @classmethod
+    def from_mapping(cls, value):
+        return cls(**value)
+
+    @property
+    def boundary_id(self):
+        return 'state-boundary-' + digest(self.to_mapping())
 
 
 def pose(position, quaternion):
@@ -187,6 +214,31 @@ class _SessionValues:
         elif option is None or explicit_timestep is None or float(explicit_timestep) != artifact.timebase.physics_dt:
             raise ValueError('source/native physics timestep mismatch')
 
+    def _mixed_runtime_progress_values(self):
+        """Project the shared identity and counters of an admitted mixed session."""
+        return {
+            'schema_version': 'runtime-progress-v1',
+            'provider_materialization_id': self._provider_materialization_id,
+            'episode_id': self._episode_id,
+            'reset_sample_id': self._reset_sample_id,
+            'reset_count': int(self._reset_count),
+            'control_step': int(self._control_step),
+            'state_revision': int(self._state_revision),
+            'native_step_count': int(self._native_steps),
+            'source_id': self._source.scene_source.source_id,
+            'source_closure_digest': self._source.source_closure_digest,
+            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
+        }
+
+    @property
+    def build_layout_facts(self):
+        """Owned values from the adapter's completed request-specific mapping check."""
+        import copy
+        facts = getattr(self, '_build_layout_facts', None)
+        if facts is None:
+            raise RuntimeError('request-specific build layout was not checked')
+        return copy.deepcopy(facts)
+
     @property
     def provider_materialization_id(self):
         """Public identity of this concrete RuntimeSession materialization."""
@@ -205,6 +257,28 @@ class _SessionValues:
         if self._episode_id is None:
             raise RuntimeError('RuntimeSession has no active episode identity')
         return self._episode_id
+
+    def state_boundary_identity(self):
+        """Return the current owned evaluation-boundary identity without advancing."""
+        self._require_reset()
+        if isinstance(self._artifact, TaskArtifactV1):
+            boundary = StateBoundaryIdentity(
+                'state-boundary-identity-v1', self._episode_id, self._reset_sample_id,
+                self._artifact.scene_identity_hash, self._scene_instance_id,
+                self._provider_materialization_id, self._control_step, self._state_revision,
+            )
+            boundary.validate()
+        else:
+            closure = self._source.source_closure_digest
+            if not isinstance(closure, str) or len(closure) != 64:
+                raise ValueError('legacy state boundary requires source closure identity')
+            boundary = LegacyStateBoundaryIdentity(
+                'legacy-state-boundary-identity-v1', self._episode_id, self._reset_sample_id,
+                self._artifact.identity_hash, self._source.scene_source.source_id, closure,
+                self._scene_instance_id, self._provider_materialization_id,
+                self._control_step, self._state_revision,
+            )
+        return boundary
 
     def _require_open(self):
         if self._closed:
@@ -225,11 +299,56 @@ class _SessionValues:
         self._reset_plan_evidence = None
         if hasattr(self, '_position_applied_boundary_ids'):
             self._position_applied_boundary_ids.clear()
+        if hasattr(self, '_control_submission_consumed'):
+            self._control_submission_consumed.clear()
+        if hasattr(self, '_control_lifecycle_dispatch'):
+            self._control_lifecycle_dispatch = None
+        if hasattr(self, '_subject_position_consumed'):
+            self._subject_position_consumed.clear()
+        self._subject_position_inflight = None
 
     def reset_plan(self, plan: EpisodeResetPlanV1 | ResetPlanV1) -> RealizedInitialState:
         """Reset from a public Core plan and open rollout after its readback gate."""
         self._require_open()
         if isinstance(plan, ResetPlanV1):
+            if (getattr(self, '_physical_port', None) is not None
+                    and plan.reset_sample.control_policy == 'named_physical_effort_by_source_v1'):
+                plan.validate()
+                sample = plan.reset_sample
+                self._validate_sample(sample)
+                preflight = getattr(self, '_preflight_physical_reset', None)
+                if not callable(preflight):
+                    raise RuntimeError('physical RuntimeSession lacks reset preflight')
+                preflight(sample)
+                self._reset_plan_gate_required = False
+                self._reset_plan_gate_open = False
+                self._reset_plan_evidence = None
+                realized = self.reset(sample)
+                self._reset_plan_gate_required = True
+                try:
+                    plan.validate_realization_identity(realized)
+                    state = realized.measured_state
+                    for name, value in sample.joint_position.items():
+                        actual = float(state.joint_position[name])
+                        if not math.isfinite(actual) or abs(actual - value) > 1e-6:
+                            raise ValueError('physical reset position readback differs')
+                    for name, value in sample.joint_velocity.items():
+                        actual = float(state.joint_velocity[name])
+                        if not math.isfinite(actual) or abs(actual - value) > 1e-6:
+                            raise ValueError('physical reset velocity readback differs')
+                    if state.control_step != 0 or float(state.simulation_time) != 0.0:
+                        raise ValueError('physical reset readback clock is not zero')
+                    self._reset_plan_evidence = {'schema_version': 'physical-reset-evidence-v1',
+                        'reset_plan_identity_sha256': plan.identity_hash,
+                        'reset_sample_id': sample.sample_id, 'source_id': sample.source_id,
+                        'source_closure_digest': sample.source_closure_digest,
+                        'joint_position': dict(state.joint_position),
+                        'joint_velocity': dict(state.joint_velocity), 'simulation_time_s': 0.0}
+                    self._reset_plan_gate_open = True
+                except BaseException:
+                    self._reset_plan_gate_open = False
+                    raise
+                return realized
             if self._provider != 'mujoco':
                 raise ValueError('source-bound ResetPlanV1 is currently admitted for MuJoCo mixed sessions only')
             plan.validate()
@@ -325,9 +444,13 @@ class _SessionValues:
     def _validate_sample(self, sample):
         self._require_open()
         if isinstance(sample, ResetSampleV1) and (
-                self._provider not in {'mujoco', 'geophys'}
-                or getattr(self._source, 'mixed_actuator_plan', None) is None):
-            raise TypeError('ResetSampleV1 requires an admitted mixed actuator session before reset')
+                self._provider not in {'mujoco', 'geophys', 'isaacsim'}
+                or (getattr(self._source, 'mixed_actuator_plan', None) is None
+                    and not (getattr(self, '_physical_port', None) is not None
+                             and sample.control_policy == 'named_physical_effort_by_source_v1'))):
+            raise TypeError(
+                'ResetSampleV1 requires an admitted mixed actuator or physical-effort session before reset'
+            )
         if getattr(sample, 'schema_version', None) not in {'reset-sample-v0', 'reset-sample-v1'}:
             raise TypeError('RuntimeSession reset requires an admitted reset sample schema')
         if sample.task_artifact_hash != self._artifact.identity_hash:
@@ -339,7 +462,7 @@ class _SessionValues:
             if (sample.source_id != self._source.scene_source.source_id
                     or sample.source_closure_digest != self._source.source_closure_digest):
                 raise ValueError('ResetSampleV1 source/closure identity mismatch')
-            if set(sample.fixture_pose_world) != set(self._source.fixture_bodies):
+            if set(sample.fixture_pose_world) != set(getattr(self._source, 'fixture_bodies', ())):
                 raise ValueError('ResetSampleV1 fixture-root bindings mismatch')
             if set(sample.free_joint_velocity) != set(self._source.free_joints):
                 raise ValueError('ResetSampleV1 free-joint velocity bindings mismatch')
@@ -366,6 +489,35 @@ class _SessionValues:
         raise ValueError(
             f'{self._provider} does not expose a typed free-joint readback through this RuntimeSession'
         )
+
+    def snapshot_free_joint_native_v1(self):
+        """Publish owned free-joint values from the current legacy CPU boundary.
+
+        The velocity convention matches the existing MuJoCo-compatible free
+        joint projection: world linear velocity and body-local angular velocity.
+        This does not advance simulation and is not an actuator-force sensor.
+        Native-I/O providers with body COM readbacks use ``snapshot_v1`` instead.
+        """
+        self._require_reset()
+        state, free = self._snapshot_with_native_free_joints()
+        rows = {}
+        for name, value in free.items():
+            if not isinstance(value, tuple) or len(value) != 2:
+                raise ValueError('provider requires the typed body-COM free-joint projection')
+            position, velocity = value
+            if (len(position) != 7 or len(velocity) != 6
+                    or any(not math.isfinite(float(v)) for v in (*position, *velocity))):
+                raise ValueError(f'free-joint native readback is invalid: {name}')
+            rows[name] = {'position_xyz_quaternion_wxyz': [float(v) for v in position],
+                          'velocity': [float(v) for v in velocity]}
+        return {'schema_version': 'free-joint-native-readback-v1',
+                'provider': self._provider, 'materialization_id': self._provider_materialization_id,
+                'source_closure_digest': self._source.source_closure_digest,
+                'episode_id': self._episode_id, 'reset_sample_id': self._reset_sample_id,
+                'control_step': state.control_step, 'simulation_time_s': state.simulation_time,
+                'position_units': 'm and quaternion_wxyz',
+                'velocity_units': 'm/s and rad/s',
+                'velocity_frame': 'world_linear_body_local_angular', 'joints': rows}
 
     def snapshot_v1(
         self,

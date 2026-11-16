@@ -2,9 +2,15 @@
 
 ## Current state
 
-v1.1.0 is the published release. v2.0.0 is preserved as a frozen source tag, with no publication or acceptance date added here. The v2.1.0 F/R integration and selected TaskEnv API closeout are recorded as a **local draft candidate**, not a published release or a general capability expansion. Follow the [v2.1.0 scope](../module/task_env/v2.1.0/planning/current-scope.md) and [capability matrix](../module/task_env/v2.1.0/capabilities/capability-matrix.json) for exact evidence.
+v1.1.0 is the published consolidation baseline. v2.0.0 is preserved as a frozen source tag. The v2.1.0 F/R integration and selected API closeout form the source baseline for v2.1.1; the locally verified v2.1.0 tag resolves to `fd03817c9f6ef8ce9fd68c1db30125efda68e1c8`. Its [scope](../module/task_env/v2.1.0/planning/current-scope.md) and [capability matrix](../module/task_env/v2.1.0/capabilities/capability-matrix.json) retain the original candidate context and exact bounded evidence. Remote refs and GitHub Release publication were not rechecked during this planning work.
 
-## Next API work
+## v2.1.1 agreed route
+
+The maintainer confirmed [seven stages / twenty-two substages](../module/task_env/v2.1.1/planning/roadmap.md): Core/physics/render protocols first, a PickCube success reference, backend translation and reset rebuilding, common effort and Controller switching, native rendering with synchronized RGB, multiple parallel backends, then task reuse and final acceptance. The [execution table](../module/task_env/v2.1.1/planning/execution-and-acceptance.md) owns dependencies and gates.
+
+The [v2.1.1 contracts](../module/task_env/v2.1.1/README.md) are discussion drafts. Creating these documents starts no implementation Goal or native execution. Selected rendering remains state-only in the source baseline until its real implementation and evidence exist.
+
+## API migration within the agreed route
 
 The approved follow-on API scope is:
 
@@ -16,6 +22,6 @@ The current owners and boundaries are recorded in the [API handoff](../module/ta
 
 ## Deferred v2.1.x work
 
-R07/F06 solution behavior review and optimization, F07, and unresolved strict DG03/source-actuation work remain separate follow-ups. A runtime-valid episode is not task success. The F06 final shared R3 identity had 9/9 runtime-valid runs but 0/9 task successes; preserve that result and its source identity.
+F06 PickCube Solution is now part of the agreed v2.1.1 route. R07 autonomous Solution expansion, Flora, full F07, asset-harness automation, non-rigid examples, RL/IL demos, agent_factory improvements and complete new-backend integrations remain later v2.1.x work. Strict DG03/source-equivalence research stays separately scoped. A runtime-valid episode is not task success. The F06 final shared R3 identity had 9/9 runtime-valid runs but 0/9 task successes; preserve that result and its source identity.
 
 Longer-term benchmark, asset, policy, and learning harnesses must build on current Core owners. Documentation pages for these harnesses describe scope and status, not implemented products. New provider/backend combinations, renderers, simulator equivalence, and formal Qualification each need their own bounded evidence and maintainer decision.

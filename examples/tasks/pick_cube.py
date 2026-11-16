@@ -15,7 +15,7 @@ if str(_REPOSITORY_ROOT) not in sys.path:
 
 from examples._common import (
     RunTimeout, bounded_process, bootstrap_imports, identity_summary,
-    load_recording_summary, run_expert,
+    load_recording_summary, run_caller_solution,
 )
 
 
@@ -116,7 +116,7 @@ def _run_harness(args):
     scope_path = _REPOSITORY_ROOT / "examples/tasks/pick_cube_harness_working_tree_scope.json"
     result = validate_provider(
         spec_path, catalog_path, scope_path, run_root / "result",
-        only_seed=args.seed,
+        only_seed=args.seed, isaac_python=args.isaac_python,
     )
     print(json.dumps({"provider": result["provider"], "seed": args.seed,
                       "disposition": result["disposition"],
@@ -138,59 +138,74 @@ def main(argv=None) -> int:
     parser.add_argument("--recording", type=Path,
                         help="canonical H5 output; default workspace/examples/pick_cube/<provider>-<seed>.h5")
     parser.add_argument("--source-delivery-manifest", type=Path,
-                        help="exact versioned F06 PickCube USD manifest for Isaac Sim")
+                        help="optional Isaac USD manifest; required by the versioned F06 Harness")
+    parser.add_argument("--isaac-python", type=Path,
+                        help="Isaac interpreter; overrides ISAAC_SIM_PYTHON and checkout default")
     parser.add_argument("--harness-output-dir", type=Path,
-                        help="fresh supervised Harness output directory for Isaac Sim")
-    parser.add_argument("--diagnostic-seed", action="store_true",
-                        help="allow the Harness route to run a seed outside the fixed F06 set "
-                             "31/32/33; the run is recorded as an extra diagnostic seed")
+                        help="fresh supervised Harness output directory")
     parser.add_argument("--time-limit-s", type=int, default=420)
     parser.add_argument(
         "--address-space-limit-mb", "--memory-limit-mb", dest="memory_limit_mb",
-        type=int, default=8192,
-        help="Linux per-process RLIMIT_AS virtual address-space cap; not RSS or process-tree memory",
+        type=int, default=None,
+        help="CPU route RLIMIT_AS virtual address-space cap (default 8192 MiB); not supported on direct Isaac",
     )
     args = parser.parse_args(argv)
     if not 1 <= args.horizon <= 6000:
         parser.error("--horizon must be in [1, 6000]")
     if args.provider in ("genesis", "sapien") and args.execution != "harness":
         parser.error("Genesis/SAPIEN are optional and may only be selected through --execution harness")
-    if args.provider == "isaacsim" or args.execution == "harness":
+    if args.execution == "harness":
         try:
             return _run_harness(args)
         except (ValueError, FileExistsError) as error:
             parser.error(str(error))
 
+    if args.provider != "isaacsim" and (args.isaac_python is not None or args.source_delivery_manifest is not None):
+        parser.error("--isaac-python and --source-delivery-manifest require --provider isaacsim")
+    if args.harness_output_dir is not None:
+        parser.error("--harness-output-dir requires --execution harness")
+    if args.provider == "isaacsim" and args.memory_limit_mb is not None:
+        parser.error("--memory-limit-mb is not supported on the direct Isaac route")
     bootstrap_imports()
+    backend, device = ("cuda", "cuda:0") if args.provider == "isaacsim" else ("cpu", "cpu")
+    execution = {"physics_provider": args.provider, "physics_backend": backend, "physics_device": device}
+    if args.isaac_python is not None:
+        execution["interpreter"] = str(args.isaac_python.expanduser().absolute())
+    if args.source_delivery_manifest is not None:
+        execution["source_delivery_manifest"] = str(args.source_delivery_manifest.expanduser().absolute())
     env = None
     recording = (args.recording.expanduser().resolve() if args.recording else
                  (_REPOSITORY_ROOT / "workspace/examples/pick_cube" / f"{args.provider}-{args.seed}.h5").resolve())
     report = {"status": "ERROR", "runtime_valid": False, "task_outcome": "UNRESOLVED",
-              "env_id": ENV_ID, "provider": args.provider, "backend": "cpu", "device": "cpu",
+              "env_id": ENV_ID, "provider": args.provider, "backend": backend, "device": device,
               "controller_profile": args.controller_profile, "seed": args.seed,
               "horizon": args.horizon, "recording_path": str(recording),
               "capability_intersection": (
-                  f"selected PickCube P1.6, scalar CPU, existing task-owned "
+                  f"selected PickCube P1.6, scalar {args.provider}/{backend}/{device}, existing task-owned "
                   f"{args.controller_profile}/ReadinessSolution"
               )}
     construction_succeeded = reset_succeeded = finalize_succeeded = close_succeeded = False
     episode = None
     try:
-        with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
+        with bounded_process(args.memory_limit_mb if args.memory_limit_mb is not None else 8192, args.time_limit_s,
+                             limit_address_space=args.provider != "isaacsim",
+                             limit_cpu_time=args.provider != "isaacsim") as budget:
             from task_env import make_env
 
             env = make_env(ENV_ID, config={
-                "execution": {"physics_provider": args.provider, "physics_backend": "cpu"},
+                "execution": execution,
                 "episode": {"horizon": args.horizon},
-                "task": {"controller_profile": args.controller_profile},
+                "controller": {"profile_id": args.controller_profile},
             })
             construction_succeeded = True
-            _, reset_info = env.reset(seed=args.seed)
+            from task_env.tasks.pick_cube import build_readiness_solution
+            solution = build_readiness_solution(backend=backend, controller_profile=args.controller_profile)
+            obs, reset_info = env.reset(seed=args.seed)
+            solution.reset(obs, reset_info, env.metadata)
             reset_succeeded = True
             recording.parent.mkdir(parents=True, exist_ok=True)
             env.start_recording(recording)
-            episode = run_expert(env, seed=args.seed, horizon=args.horizon,
-                                 already_reset=True, initial_info=reset_info)
+            episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
             reason = episode.get("failure_reason") or (
                 "task_success" if episode.get("task_success") else "task_or_expert_incomplete"
             )
@@ -200,7 +215,7 @@ def main(argv=None) -> int:
             finalize_succeeded = True
             report.update(episode=episode, identity=identity_summary(env, provider=args.provider),
                           controller_identity=env.controller.identity,
-                          solution_identity=env.solution.identity,
+                          solution_identity=solution.identity,
                           provider_materialization_id=env.session.provider_materialization_id,
                           resource_budget=budget)
     except RunTimeout as exc:
@@ -222,9 +237,14 @@ def main(argv=None) -> int:
     if recording.is_file():
         try:
             recording_summary = load_recording_summary(recording)
-            from task_env.trajectory.canonical.h5 import load
-            trajectory = load(recording)
-            report["planned_action_count"] = sum(item.planned_action for item in trajectory.transitions)
+            if recording_summary.get("schema") == "task-env-h5/v3":
+                # The generic recorder stores structured controls but no canonical
+                # planned_action flag; the caller's transition count is separate.
+                report["planned_action_count"] = None
+            else:
+                from task_env.trajectory.canonical.h5 import load
+                trajectory = load(recording)
+                report["planned_action_count"] = sum(item.planned_action for item in trajectory.transitions)
             report["recording"] = {
                 "path": str(recording),
                 "sha256": __import__("hashlib").sha256(recording.read_bytes()).hexdigest(),
@@ -236,12 +256,18 @@ def main(argv=None) -> int:
     runtime_valid = bool(
         construction_succeeded and reset_succeeded and finalize_succeeded and close_succeeded
         and recording_summary and recording_summary.get("t_plus_one_valid")
-        and report.get("planned_action_count", 0) > 0
+        and episode and episode.get("transitions", 0) > 0
+        and recording_summary.get("transitions") == episode["transitions"]
+        and (recording_summary.get("schema") == "task-env-h5/v3"
+             or report.get("planned_action_count", 0) > 0)
         and not report.get("error") and not report.get("close_error")
+        and not report.get("readback_error")
     )
     report["runtime_valid"] = runtime_valid
+    report["close_attempted"] = env is not None
+    report["close_succeeded"] = close_succeeded
     report["task_outcome"] = (
-        "SOLVED" if episode and episode.get("task_success") and episode.get("expert_complete")
+        "SOLVED" if runtime_valid and episode and episode.get("completion_eligible")
         else "TASK_OR_EXPERT_FAILURE_REPORTED" if runtime_valid
         else "UNRESOLVED_RUNTIME_FAILURE"
     )

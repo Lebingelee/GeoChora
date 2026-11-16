@@ -1,7 +1,7 @@
 """Provider-free declarations for a Panda and one free box on a table."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 
 import numpy as np
@@ -13,12 +13,20 @@ from ..environment.types import TaskCompositionSpec
 from ..objects.pick_cube import (CUBE_CONTACT_MARGIN, CUBE_DIAG_INERTIA, CUBE_HALF_SIZE,
                                  CUBE_MASS, EE_SITE_NAME, PickCubeSceneComposer)
 from ..robots.panda import PandaAgent
-from .compiler import ReferenceTaskDeclarationV1, panda_entity_declaration
+from .compiler import ReferenceTaskDeclarationV1
 
 
 PANDA_BOX_CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot',
                           'joint_position_actuation', 'joint_state_query',
                           'body_pose_query', 'frame_pose_query')
+
+
+def panda_box_construction_source_paths():
+    """Identify the asset and assembly owners used by this source recipe."""
+    from pathlib import Path
+    from ..objects import pick_cube
+
+    return (Path(__file__).resolve(), Path(pick_cube.__file__).resolve())
 
 
 @dataclass(frozen=True)
@@ -56,7 +64,7 @@ class PandaBoxDeclaration:
             raise ValueError('task semantics must reference the declared box Entity')
 
 
-def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
+def _panda_box_reference_declaration(declaration: PandaBoxDeclaration, *, robot=None):
     """Project the Panda box task data onto the shared Core construction API."""
     d = declaration
     center = (tuple(float(value) for value in np.asarray(d.reset_center_xy, dtype=np.float32))
@@ -68,7 +76,10 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
                          (value - extent, value + extent), (value - extent, value + extent))
         for axis, value in zip(('x', 'y'), center, strict=True)
     ) if extent else ()
-    joints = {f'panda-v1/{name}': value for name, value in PandaAgent().initial_state_spec().joint_positions}
+    from ..registry import make_agent
+    robot = make_agent('panda-v1') if robot is None else robot
+    joint_targets, open_actuators = robot.reference_source_actuation()
+    joints = {f'{robot.uid}/{name}': value for name, value in robot.initial_state_spec().joint_positions}
     entities = (
         EntityDefinition('tabletop-v1', 'static', 'tabletop-v1/task-local',
                          ('tabletop-v1/top',), (), 'box', 'support_contact',
@@ -77,7 +88,7 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
                              for axis, value in zip('xyz', d.table_half_size, strict=True)},
                           **({'center_x': d.table_center_xy[0], 'center_y': d.table_center_xy[1]}
                              if d.include_table_center else {})}),
-        panda_entity_declaration(),
+        robot.artifact_entity(),
         EntityDefinition(d.object_id, 'movable', d.object_asset_reference, (), (),
                          'free_box', 'table_hand_contact',
                          {'half_size': CUBE_HALF_SIZE, 'mass': CUBE_MASS, **{
@@ -103,36 +114,70 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
         composition=TaskCompositionSpec(d.task_id, 'tabletop-v1', ('panda-v1',), ('cube-v1',),
                                         success_definition=d.success_definition),
         bodies={d.object_id: 'PickCube'},
-        frames={'panda-v1/ee': EE_SITE_NAME},
+        frames={f'{robot.uid}/ee': EE_SITE_NAME},
         free_joints={d.object_id: 'PickCube_joint'},
-        joint_targets={f'panda-v1/joint{i}': f'actuator{i}' for i in range(1, 8)},
-        open_actuators=('actuator8',),
+        joint_targets=joint_targets,
+        open_actuators=open_actuators,
     )
 
 
-def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
+def compile_panda_box_artifact(declaration: PandaBoxDeclaration, *, robot=None):
     """Compile declarations into the current Artifact with no native runtime."""
-    return _panda_box_reference_declaration(declaration).artifact.compile()
+    return _panda_box_reference_declaration(declaration, robot=robot).artifact.compile()
 
 
-def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config):
+def compile_panda_box_mjcf_task(task_config, robot, legacy_artifact, *, build_task_scene,
+                               compile_task_artifact):
+    """Bind Task declarations to this MJCF asset's canonical native names."""
+    from ..artifacts import FrameReference
+    from ..runtime.sessions.source_scene_import import declare_panda_scene
+
+    panda = declare_panda_scene(robot, entity_id=robot.uid,
+        scene_id=str(task_config['recipe']['scene_uid']))
+    scene = build_task_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
+        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
+        cube_joint='PickCube_joint', table_frame='grasp_table')
+    frames = {'panda-v1/base': FrameReference('panda-v1', 'link0'),
+              'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
+              'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')}
+    additional = {f'panda-v1/{item.frame_id}': FrameReference('panda-v1', item.frame_id)
+                  for item in scene.frames or ()
+                  if item.entity_id == 'panda-v1' and item.frame_id != 'nutassembly_ee_site'}
+    task_source, artifact = compile_task_artifact(task_config, scene, legacy_artifact,
+        frame_bindings=frames, cube_frame='PickCube', additional_frames=additional)
+    bodies = {name: reference.frame_id for name, reference in additional.items()}
+    bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
+    return task_source, scene, artifact, bodies, {'panda-v1/ee': 'nutassembly_ee_site'}
+
+
+def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config, *, own_snapshot=False,
+                             backend=None):
     """Resolve the same box asset into source names and registered components."""
-    return compile_panda_box_task(declaration, config=config, artifact=artifact).source
+    return compile_panda_box_task(declaration, config=config, artifact=artifact, backend=backend,
+                                  own_snapshot=own_snapshot).source
 
 
-def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact=None):
+def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact=None,
+                           controller_factory=None, robot=None, own_snapshot=False, backend=None):
     """Compile the declared Artifact and RuntimeSource through the shared owner."""
     d = declaration
+    if backend is not None:
+        if backend not in {'cpu', 'cuda'}:
+            raise ValueError('PickCube reference backend must be cpu or cuda')
+        config = replace(config, runtime=replace(config.runtime, backend=backend))
+    from ..registry import make_agent
+    robot = make_agent('panda-v1') if robot is None else robot
     composer = PickCubeSceneComposer(
         table_half_size=d.table_half_size, table_top_z=d.table_top_z,
         table_center_xy=d.table_center_xy, cube_world_pos=d.source_box_position,
-        cube_world_quat=d.source_box_quaternion_wxyz,
+        cube_world_quat=d.source_box_quaternion_wxyz, robot_source=robot.single_mjcf_source(),
     )
-    reference = _panda_box_reference_declaration(d)
-    if artifact is not None:
-        expected = reference.artifact.compile()
-        if artifact.identity_hash != expected.identity_hash:
-            raise ValueError("selected Artifact does not match the Panda box declaration")
-    return reference.compile(
-        scene_source=composer.build_source_description(), config=config,
+    reference = _panda_box_reference_declaration(d, robot=robot)
+    compiled = reference.compile(
+        scene_source=composer.build_source_description(), config=config, artifact=artifact,
+        controller_factory=controller_factory, agents=(robot,), own_snapshot=own_snapshot,
     )
+    return replace(compiled, source_owners=(
+        PickCubeSceneComposer, PandaAgent, PandaBoxDeclaration,
+        compile_panda_box_task, compile_panda_box_artifact,
+    ))

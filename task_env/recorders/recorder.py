@@ -98,28 +98,25 @@ class TransitionRecorder:
     def begin_episode(self, initial_obs: Any, reset_info: dict[str, Any], record_metadata: dict[str, Any]) -> None:
         if self._active:
             raise RuntimeError("recording is already active")
+        # Prepare the entire first boundary before replacing a frozen episode.
+        # A copy or capacity failure must leave the recorder retryable.
+        reset_copy = copy_tree(reset_info)
+        metadata_copy = copy_tree(record_metadata)
+        observation_copy = _recording_copy(initial_obs)
+        observation_bytes = tree_nbytes(observation_copy)
+        if observation_bytes > self.config.max_buffer_bytes:
+            raise MemoryError("recording buffer exceeds max_buffer_bytes")
         self._active = True
         self._frozen = None
-        self._bytes = 0
-        self._observations = []
+        self._bytes = observation_bytes
+        self._observations = [observation_copy]
         self._actions = []
         self._universal_actions = []
         self._rewards, self._successes, self._terminated, self._truncated, self._infos = [], [], [], [], []
-        self._reset_info, self._record_metadata = copy_tree(reset_info), copy_tree(record_metadata)
+        self._reset_info, self._record_metadata = reset_copy, metadata_copy
         self._structured_controls = []
         self._boundary_events = []
         self._outcome = None
-        self._append_observation(initial_obs)
-
-    def _append_observation(self, observation: Any) -> None:
-        copied = _recording_copy(observation)
-        self._reserve(tree_nbytes(copied))
-        self._observations.append(copied)
-
-    def _reserve(self, count: int) -> None:
-        if self._bytes + count > self.config.max_buffer_bytes:
-            raise MemoryError("recording buffer exceeds max_buffer_bytes")
-        self._bytes += count
 
     def append_transition(
         self,
@@ -275,6 +272,149 @@ class TransitionRecorder:
         output = save_trajectory_h5(self._frozen, self.config, path=path, name=name, index=self._save_index)
         self._save_index += 1
         return output
+
+
+def mixed_control_transition(request, writer_control, target, applied_payload, stepwise_receipt):
+    """Build and validate the structured recording projection for one interval."""
+    writer_row = {
+        **dict(writer_control),
+        'controller_target': {
+            'schema_version': target.schema_version,
+            'payload': target.to_mapping(),
+            'identity_hash': target.identity_hash,
+        },
+        'applied_control': {
+            'schema_version': applied_payload['schema_version'],
+            'payload': dict(applied_payload),
+            'target_hash': applied_payload['target_hash'],
+        },
+    }
+    if stepwise_receipt is not None:
+        canonical_action = dict(writer_row['canonical_action'])
+        canonical_action['physics_rate_control_v1'] = stepwise_receipt
+        writer_row['canonical_action'] = canonical_action
+    transition = StructuredControlTransitionV1(
+        'structured-control-transition-v1', request, (writer_row,),
+    )
+    transition.validate()
+    return transition
+
+
+def begin_structured_recording(path, *, horizon, observation, reset_info, metadata_factory,
+                               max_buffer_bytes=None):
+    """Create a v3 recording and publish it only after begin_episode succeeds."""
+    path = Path(path)
+    if path.suffix != '.h5':
+        path = path.with_name(path.name + '.h5')
+    if path.exists():
+        raise FileExistsError(path)
+    # Fail before arming the episode if this interpreter cannot write H5.  A
+    # missing dependency discovered after end_episode would leave a frozen
+    # recording that cannot be finalized through the public Env again.
+    import h5py  # noqa: F401
+    config = {'schema_version': 'v3', 'max_transitions': max(horizon, 1)}
+    if max_buffer_bytes is not None:
+        config['max_buffer_bytes'] = max_buffer_bytes
+    recorder = TransitionRecorder(RecorderConfig(**config))
+    recorder.begin_episode(observation, dict(reset_info), metadata_factory())
+    return path, recorder
+
+
+def begin_selected_recording(env, path, *, adapter_path):
+    """Choose the existing writer and prepare its metadata for one reset boundary."""
+    if env.value.get('physical_execution') is not None or getattr(env, '_physical_reset_selection', None) is not None:
+        from .physical_metadata import physical_boundary_info, physical_record_metadata
+        execution = env._physical_execution()
+        if getattr(env, '_physical_reset_selection', None) is None:
+            groups = execution.scene.control_groups or ()
+            if (len(execution.controllers) != 1 or len(groups) != 1
+                    or env.binding.external_action_contract is None):
+                raise ValueError('physical recording requires one declared controller and action group')
+        return begin_structured_recording(
+            path, horizon=env.horizon, observation=env.obs,
+            reset_info=physical_boundary_info(env, env.info),
+            metadata_factory=lambda: physical_record_metadata(env))
+    if getattr(env, 'position_profile', False):
+        from .position_metadata import position_record_metadata
+        return begin_structured_recording(
+            path, horizon=env.horizon, observation=env.obs, reset_info=env._position_reset_info,
+            metadata_factory=lambda: position_record_metadata(env, include_binding_provenance=True))
+
+    path = Path(path)
+    if path.exists():
+        raise FileExistsError(path)
+    from .reference_provenance import selected_recording_metadata, selected_source_provenance
+    execution_configuration = env._recorded_execution_configuration()
+    solution_identity = env._active_solution_identity()
+    env._recording_adapter_source_sha256, provenance = selected_source_provenance(
+        adapter_path=adapter_path, binding=env.binding, value=env.value, artifact=env.artifact,
+        controller_identity=env._selected_controller.identity, solution_identity=solution_identity,
+        execution_configuration=execution_configuration,
+        execution_receipt=(env.get_execution_receipt()
+                           if getattr(env, 'resolved_public_config', None) is not None else None))
+    owners = env._owners()
+    metadata, recipe = selected_recording_metadata(
+        artifact=env.artifact, sample=env.sample, realized=env.realized,
+        execution=env.execution, provider=env.provider, source_provenance=provenance,
+        controller_identity=env._selected_controller.identity, solution_identity=solution_identity,
+        action_schema=env.metadata['action_schema'],
+        factory=type(env).__module__ + '.' + type(env).__name__,
+        configuration=env.value['resolved_configuration'],
+        execution_configuration=execution_configuration, owners=owners)
+    if env.binding.recorder_mode == 'canonical':
+        from ..trajectory.canonical.contracts import CanonicalRecorder
+        return path, CanonicalRecorder(metadata, env._boundary())
+    from ..trajectory.canonical.execution import ExecutionRecorder
+    recorder = ExecutionRecorder(metadata, recipe, content_fields=('task_outcome',))
+    recorder.boundary(env._boundary(), owners, 'reference', env.info['task_metrics'])
+    return path, recorder
+
+
+def finalize_structured_recording(recorder, path, episode_end, reason, *, position, camera=False):
+    """Finalize and verify the existing v3 stream against its episode boundary."""
+    from .h5 import load_camera_observations_h5, load_structured_control_records_h5
+
+    outcome = episode_end.outcome
+    allowed_reasons = {
+        outcome.end_reason,
+        str(episode_end.boundary_event.payload.get('requested_reason', '')),
+    }
+    if position and outcome.end_reason == 'horizon_reached':
+        allowed_reasons.add('horizon')
+    if str(reason) not in allowed_reasons:
+        raise ValueError(
+            'recording finalization reason disagrees with EpisodeOutcome' if position else
+            'mixed-control recording finalization reason disagrees with EpisodeOutcome'
+        )
+    if recorder.transition_count != outcome.final_boundary:
+        raise RuntimeError(
+            'recording T does not match the last complete Position boundary; '
+            'an incomplete interval cannot be finalized' if position else
+            'mixed-control H5 T does not match the final complete control boundary'
+        )
+    trajectory = recorder.end_episode(
+        outcome.end_reason, outcome=outcome, end_event=episode_end.boundary_event,
+    )
+    output = recorder.save_h5(path.parent, path.name)
+    loaded = load_structured_control_records_h5(output)
+    if (loaded['transition_count'] != trajectory.transition_count
+            or loaded['observation_count'] != len(trajectory.observations)
+            or loaded['outcome'] != outcome):
+        raise ValueError('PositionServoV1 Generic H5 v3 readback mismatch' if position else
+                         'mixed-control Generic H5 v3 structured-control readback mismatch')
+    camera_result = None
+    if camera:
+        camera_result = load_camera_observations_h5(output)
+        if camera_result['observation_count'] != len(trajectory.observations):
+            raise ValueError('Position camera metadata reader T/T+1 count mismatch')
+    return {
+        'schema_id': 'task-env-h5', 'schema_version': 'v3',
+        'transition_count': loaded['transition_count'],
+        'observation_count': loaded['observation_count'],
+        **({'camera_observation_schema': camera_result['schema_version']}
+           if camera_result is not None else {}),
+        'outcome': outcome.to_mapping(), 'path': str(output),
+    }
 
 
 __all__ = ["TransitionRecorder"]

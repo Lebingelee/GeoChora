@@ -52,12 +52,17 @@ def record_episode(compiled, spec, *, provider, seed, h5, deadline):
     """Construct, reset, record and drive the expert once; storage inspection stays with the caller."""
     facts = {'episode': None, 'identity': None, 'controller_identity': None, 'expert_identity': None,
              'verification': None, 'execution_fault': None, 'errors': [], 'recording_started': False,
-             'close_attempted': False, 'close_succeeded': False, 'backend': compiled.backend,
-             'device': compiled.device}
+             'close_attempted': False, 'close_succeeded': False,
+             'backend': getattr(compiled, 'backend', None), 'device': getattr(compiled, 'device', None)}
     env = None
     try:
-        env = compiled.env_class()(provider=provider, backend=compiled.backend)
-        _, reset_info = env.reset(seed=seed)
+        env = compiled.env_class()(provider=provider, backend=facts['backend'])
+        observation, reset_info = env.reset(seed=seed)
+        # Core owns the Solution factory; the caller constructs and drives it.
+        solution = env.value['solution_factory']()
+        if solution.identity != env.value['solution_identity']:
+            raise ValueError('constructed Solution identity differs from compiled task')
+        solution.reset(observation, reset_info, env.metadata)
         if requires_native_worker(provider):
             # Bind expected H5 identities to the reset Core value; the public
             # get_record_metadata hook only serves mixed-control environments.
@@ -83,12 +88,15 @@ def record_episode(compiled, spec, *, provider, seed, h5, deadline):
             }
         env.start_recording(h5)
         facts['recording_started'] = True
-        from examples._common import run_expert, identity_summary
-        facts['episode'] = run_expert(env, seed=seed, horizon=spec.horizon,
-                                      already_reset=True, initial_info=reset_info)
-        facts['identity'] = identity_summary(env, provider=provider, backend=compiled.backend)
+        from examples._common import run_caller_solution, identity_summary
+        facts['episode'] = run_caller_solution(env, solution, observation, reset_info,
+                                               horizon=spec.horizon)
+        identity = identity_summary(env, provider=provider)
+        if identity.get('backend') is None:
+            identity['backend'] = facts['backend']
+        facts['identity'] = identity
         facts['controller_identity'] = env.controller.identity
-        facts['expert_identity'] = env.solution.identity
+        facts['expert_identity'] = solution.identity
         fault = getattr(env, 'execution_fault', None)
         facts['execution_fault'] = fault.to_mapping() if hasattr(fault, 'to_mapping') else (str(fault) if fault else None)
         if fault:

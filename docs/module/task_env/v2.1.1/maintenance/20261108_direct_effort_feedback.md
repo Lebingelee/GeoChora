@@ -1,0 +1,5 @@
+# Direct-effort compatibility feedback
+
+The selected physical path can opt into legacy step action feedback for an isolated, unit-transmission direct torque Controller. The shared Controller verifies the admitted named efforts and matching native write acknowledgement after submission; the Env publishes the compatibility fields only after the interval advances. Arrays follow the Controller-declared channel order and float32 action shape. Clipping flags are emitted only when diagnostics are enabled.
+
+The legacy `requested_ctrl` and `applied_ctrl` names are compatibility projections of the admitted generalized-effort command in N·m. The source motors are isolated: these fields are not native motor ctrl readback or measured physical force. The same distinction is included in `control_application`. This bounded behavior applies to the opted-in Pendulum and two-wheel direct-effort routes; it does not generalize to arbitrary transmissions, controllers, or providers. Visible human presentation remains unavailable on the tested two-wheel selected route.

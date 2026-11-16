@@ -154,6 +154,7 @@ class ParallelRenderProvider:
         self.layout = layout or ParallelRenderLayout()
         self._render_source = render_source
         self._parallel_render_num = 1
+        self._camera_worlds_required = False
         self._closed = False
 
     @property
@@ -189,11 +190,27 @@ class ParallelRenderProvider:
             raise ValueError(
                 "parallel_render_num must satisfy 1 <= parallel_render_num <= num_envs"
             )
+        if self._camera_worlds_required and value != self.num_envs:
+            raise ValueError('device camera observations require every batch world in the render layout')
         self._parallel_render_num = value
         source = self._render_source
         set_count = getattr(source, "set_parallel_render_num", None)
         if callable(set_count):
             set_count(value)
+
+    def enable_device_cameras(self) -> None:
+        """Keep all batch rows in the scene used by device camera capture."""
+        self.set_parallel_render_num(self.num_envs)
+        self._camera_worlds_required = True
+
+    def capture_cameras(self, *, state):
+        """Capture configured device cameras at the supplied physics boundary."""
+        source = self._require_source()
+        capture = getattr(source, 'capture_cameras', None)
+        if not callable(capture):
+            raise RenderUnavailableError('parallel render source has no device camera capture')
+        return capture(state=state, world_ids=self.world_ids, world_transforms=self.world_transforms,
+                       width=self.width, height=self.height)
 
     def set_parallel_render_hard(self, enabled: bool) -> None:
         source = self._render_source
@@ -290,6 +307,17 @@ class ParallelRenderProvider:
             width=self.width,
             height=self.height,
         )
+        if getattr(source, 'frame_transport', None) == 'device_rgb8':
+            import torch
+
+            if (not isinstance(frame, torch.Tensor) or frame.device.type != 'cuda'
+                    or frame.dtype != torch.uint8 or tuple(frame.shape) != (self.height, self.width, 3)):
+                raise RuntimeError('parallel device renderer must return CUDA uint8 HWC RGB')
+            if normalized is RenderMode.RGB_ARRAY:
+                return frame
+            source.present_parallel(frame=frame, world_ids=world_ids,
+                                    world_transforms=world_transforms)
+            return None
         frame = np.asarray(frame, dtype=np.float32)
         expected = (self.height, self.width, 3)
         if frame.shape != expected:
@@ -331,15 +359,18 @@ class ParallelRenderProvider:
     def close(self) -> None:
         if self._closed:
             return
-        self._closed = True
         close = getattr(self._render_source, "close", None)
         if callable(close):
             close()
+        self._closed = True
 
     def close_render(self) -> None:
         """Close only renderer-owned resources; keep the physics runtime alive."""
-
-        self.close()
+        if self._camera_worlds_required:
+            self._require_open()
+            self._render_source.close_window()
+        else:
+            self.close()
 
 
 __all__ = [

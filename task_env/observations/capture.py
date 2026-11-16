@@ -3,219 +3,114 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import replace
+from uuid import uuid4
 
 import numpy as np
 
 from ..environment import RenderConfig, RuntimeSnapshot, SensorObservation
 from .camera import CameraSensor
 from .canonical_camera.images import normalize_rgb
-from .canonical_camera.consumer import (
-    CAMERA_IDS,
-    CameraObservationConfigV1,
-    camera_observation_boundary_from_captures,
-)
-from .canonical_camera.geometry import resolve_camera
 from .canonical_camera.images import CanonicalCameraObservation
 
 
-class DynamicCameraObservationConsumerV1:
-    """Own two D04 camera sessions and publish one cached boundary bundle.
+class BorrowedTaskCameraSessionV1:
+    """Use a task camera leased from a RuntimeSession without closing its owner."""
 
-    The consumer only reads the already-published CanonicalStateViewV1.  Its
-    default factory is imported lazily, so importing TaskEnv or constructing a
-    state-only candidate never imports MuJoCo or initializes a renderer.
-    """
-
-    def __init__(
-        self,
-        *,
-        config: CameraObservationConfigV1,
-        task_artifact_hash: str,
-        runtime_source,
-        horizon: int,
-        session_factory=None,
-    ) -> None:
-        if not isinstance(config, CameraObservationConfigV1):
-            raise TypeError("dynamic camera consumer requires CameraObservationConfigV1")
-        self.config = config
-        self.config.validate()
-        self.capacity = config.capacity(horizon)
-        self._task_artifact_hash = task_artifact_hash
-        self._runtime_source = runtime_source
-        self._horizon = horizon
-        self._session_factory = session_factory
-        self._sessions = []
-        self._closed = False
-        self._last_key = None
-        self._last_control_step = None
-        self._last_boundary = None
-        self._last_leaves = None
-        self._last_capture_values = None
-        self._request_context = None
-
-    def _ensure_sessions(self, state):
-        if self._sessions:
-            return
-        from ..artifacts import ExecutionSpecV1, RendererSelectionV1
-        from ..render.camera import (
-            D03_PHYSICS_PROFILE,
-            D04_ENTITY_SEGMENTATION_PROFILE,
-            DynamicCameraRenderSourceV1,
-            create_dynamic_camera_session,
-            dynamic_entity_instance_segmentation_manifest,
-        )
-
-        render_source = DynamicCameraRenderSourceV1.from_runtime_source(self._runtime_source)
-        renderer = RendererSelectionV1(
-            "renderer-selection-v1", "mujoco", "native-opengl",
-            D04_ENTITY_SEGMENTATION_PROFILE, None,
-        )
-        execution = ExecutionSpecV1(
-            "execution-spec-v1", "geophys", "cpu", D03_PHYSICS_PROFILE,
-            31, "best_effort", renderer, physics_device="cpu:0",
-        )
-        manifest = dynamic_entity_instance_segmentation_manifest()
-        geometries = self.config.geometries(self._task_artifact_hash)
-        factory = self._session_factory or create_dynamic_camera_session
-        # Freeze the independent request inputs before calling a factory. A
-        # returned capture must satisfy this request, not only be self-consistent.
-        self._request_context = (render_source, execution, manifest, geometries)
-        try:
-            for camera in geometries:
-                session = factory(
-                    camera,
-                    execution,
-                    source=render_source,
-                    initial_state=state,
-                    manifest=manifest,
-                )
-                self._sessions.append(session)
-        except BaseException as error:
-            try:
-                self.close()
-            except BaseException as cleanup_error:
-                add_note = getattr(error, "add_note", None)
-                if callable(add_note):
-                    add_note(f"camera session cleanup after construction failure also failed: {cleanup_error!r}")
-            raise
-
-    @staticmethod
-    def _state_key(state):
-        boundary = state.boundary
-        clock = state.sample_clock
-        return (
-            boundary.scene_identity_hash,
-            boundary.scene_instance_id,
-            boundary.provider_materialization_id,
-            boundary.episode_id,
-            boundary.reset_sample_id,
-            boundary.boundary_id,
-            boundary.state_revision,
-            boundary.control_step,
-            float(clock.simulation_time_s),
-        )
+    def __init__(self, owner, camera, state):
+        self._owner, self._camera = owner, camera
+        owner.bind_task_camera(camera, state)
 
     def capture(self, state):
-        """Capture all modalities for the exact current typed boundary."""
+        if self._owner is None:
+            raise RuntimeError('task camera lease is closed')
+        result = self._owner.capture_task_camera(self._camera, state)
+        completion = getattr(self._owner, 'task_camera_completion', None)
+        self.completion_evidence = completion(state) if callable(completion) else None
+        return result
 
-        if self._closed:
-            raise RuntimeError("camera observation consumer is closed")
+    def close(self):
+        self._owner = None
+
+
+class TaskRgbObservationConsumerV1:
+    """One owned RGB consumer of successive typed boundaries in one episode."""
+
+    def __init__(self, camera, renderer, session_factory, *, color_space):
+        from .canonical_camera import CameraGeometry
+        if type(camera) is not CameraGeometry:
+            raise TypeError('task RGB requires CameraGeometry')
+        camera.validate()
+        if not camera.rgb or camera.depth or camera.rgb_layout != 'HWC' or camera.rgb_dtype != 'float32':
+            raise ValueError('task RGB requires HWC float32 RGB without depth')
+        self.camera, self.renderer = camera, renderer
+        self._factory, self._session = session_factory, None
+        self._closed, self._last_boundary = False, None
+        self.generation = uuid4().hex
+        self.color_space = color_space
+
+    def capture(self, state):
         from ..artifacts.state import CanonicalStateViewV1
-
+        if self._closed:
+            raise RuntimeError('task RGB consumer is closed')
         if not isinstance(state, CanonicalStateViewV1):
-            raise TypeError("camera observation requires CanonicalStateViewV1")
+            raise TypeError('task RGB requires a canonical state')
         state.validate()
-        key = self._state_key(state)
-        if self._last_key == key:
-            return self._result()
         boundary = state.boundary
-        if self._last_key is not None:
+        if self._last_boundary is None:
+            if boundary.control_step != 0:
+                raise ValueError('task RGB must start at the reset boundary')
+            phase = 'reset_initial'
+        else:
             previous = self._last_boundary
             if (boundary.episode_id != previous.episode_id
                     or boundary.reset_sample_id != previous.reset_sample_id
                     or boundary.scene_instance_id != previous.scene_instance_id
                     or boundary.provider_materialization_id != previous.provider_materialization_id
-                    or boundary.control_step != self._last_control_step + 1):
-                raise ValueError("camera consumer requires one contiguous episode boundary; reset the consumer first")
-        self._ensure_sessions(state)
-        captures = tuple(session.capture(state) for session in self._sessions)
-        if len(captures) != 2 or any(not isinstance(item, CanonicalCameraObservation) for item in captures):
-            raise ValueError("camera consumer requires two CanonicalCameraObservation values")
-        render_source, execution, manifest, geometries = self._request_context
-        for camera_id, camera, capture in zip(CAMERA_IDS, geometries, captures):
-            if capture.capture_identity is None or capture.segmentation is None:
-                raise ValueError(f"camera {camera_id} did not publish its required capture identity and Entity mask")
-            if capture.capture_identity.camera_id != camera_id:
-                raise ValueError("camera capture order or identity changed")
-            if (capture.capture_identity.state_boundary != state.boundary
-                    or capture.capture_identity.sample_clock != state.sample_clock):
-                raise ValueError("camera capture identity does not bind the supplied typed publication")
-            expected_identity = render_source.capture_identity(
-                camera, execution, manifest, state,
-                additional_modalities=("entity_instance_segmentation",),
-            )
-            if capture.capture_identity != expected_identity:
-                raise ValueError(
-                    f"camera {camera_id} capture identity does not match the consumer's authored request"
-                )
-            expected_calibration = resolve_camera(camera, state)
-            if capture.metadata != expected_calibration:
-                raise ValueError(
-                    f"camera {camera_id} calibration does not match its requested geometry and typed parent Frame"
-                )
-            if capture.rgb is None or capture.rgb.dtype != np.float32 or capture.rgb.shape != (
-                self.config.height, self.config.width, 3,
-            ) or not np.isfinite(capture.rgb).all() or np.any(capture.rgb < 0) or np.any(capture.rgb > 1):
-                raise ValueError(f"camera {camera_id} RGB must be HWC float32 in [0,1]")
-            if capture.depth is None or capture.depth.dtype != np.float32 or capture.depth.shape != (
-                self.config.height, self.config.width,
-            ) or not np.isfinite(capture.depth).all() or np.any(capture.depth < 0):
-                raise ValueError(f"camera {camera_id} depth must be finite H×W optical-Z metres")
-            mask = capture.segmentation.mask
-            if mask.dtype != np.uint32 or mask.shape != (self.config.height, self.config.width):
-                raise ValueError(f"camera {camera_id} Entity mask must be H×W uint32")
-        metadata = camera_observation_boundary_from_captures(captures)
-        if metadata.state_boundary_id != boundary.boundary_id:
-            raise ValueError("camera capture belongs to another typed state publication")
-        self._last_key = key
-        self._last_control_step = boundary.control_step
+                    or boundary.control_step != previous.control_step + 1):
+                raise ValueError('task RGB requires the next boundary of the same episode')
+            phase = 'post_control_step'
+        if self._session is None:
+            self._session = self._factory(state)
+        result = self._session.capture(state)
+        if not isinstance(result, CanonicalCameraObservation) or result.capture_identity is None:
+            raise ValueError('task RGB requires an actual completed camera capture')
+        identity = result.capture_identity
+        identity.validate()
+        if (result.metadata.camera != self.camera or identity.camera_id != self.camera.camera_id
+                or identity.camera_geometry_identity_hash != self.camera.identity_hash
+                or identity.task_artifact_hash != self.camera.task_artifact_hash
+                or identity.state_boundary != boundary or identity.sample_clock != state.sample_clock
+                or identity.renderer_selection != self.renderer or identity.modalities != ('rgb',)
+                or identity.capture_phase != 'post_control_step'):
+            raise ValueError('task RGB capture does not match its requested camera, renderer, or boundary')
+        # The underlying renderer has completed at this boundary.  The phase
+        # is derived from the consumer lifecycle, not from the camera geometry.
+        identity = replace(identity, capture_phase=phase)
+        identity.validate()
         self._last_boundary = boundary
-        self._last_capture_values = captures
-        self._last_boundary_value = metadata
-        self._last_leaves = {
-            "rgb": OrderedDict((camera_id, capture.rgb) for camera_id, capture in zip(CAMERA_IDS, captures)),
-            "depth": OrderedDict((camera_id, capture.depth) for camera_id, capture in zip(CAMERA_IDS, captures)),
-            "entity_mask": OrderedDict((camera_id, capture.segmentation.mask) for camera_id, capture in zip(CAMERA_IDS, captures)),
+        return np.array(result.rgb, copy=True), {
+            'schema_version': 'task-rgb-observation-v1',
+            'capture_identity': identity.to_mapping(),
+            'capture_identity_sha256': identity.identity_hash,
+            'camera': self.camera.to_mapping(),
+            'resolved_camera': result.metadata.to_mapping(),
+            'renderer_generation': self.generation,
+            'completion': 'synchronous capture completed before observation publication',
+            'completion_evidence': getattr(self._session, 'completion_evidence', None),
+            'ownership': 'owned host copy',
+            'color_space': self.color_space,
         }
-        return self._result()
-
-    def _result(self):
-        if self._last_leaves is None or self._last_boundary_value is None:
-            raise RuntimeError("camera consumer has no captured boundary")
-        return (
-            OrderedDict((group, OrderedDict(values.items())) for group, values in self._last_leaves.items()),
-            self._last_boundary_value,
-        )
 
     def close(self):
-        """Close each renderer once, attempting every close even after an error."""
-
-        if self._closed:
-            return
-        self._closed = True
-        sessions, self._sessions = tuple(self._sessions), []
-        first_error = None
-        for session in sessions:
-            try:
+        if not self._closed:
+            self._closed = True
+            session, self._session = self._session, None
+            if session is not None:
                 session.close()
-            except BaseException as error:
-                if first_error is None:
-                    first_error = error
-        if first_error is not None:
-            raise first_error
 
 
-__all__ = ["CameraObservationProvider", "DynamicCameraObservationConsumerV1"]
+__all__ = ["CameraObservationProvider"]
 
 
 class CameraObservationProvider:
@@ -227,6 +122,7 @@ class CameraObservationProvider:
         render_source,
         config: RenderConfig,
         camera_sensors: tuple[CameraSensor, ...],
+        task_rgb_camera_name: str | None = None,
     ) -> None:
         if render_source is None:
             raise ValueError("CameraObservationProvider requires a render_source")
@@ -234,6 +130,20 @@ class CameraObservationProvider:
             raise ValueError("CameraObservationProvider requires at least one camera")
         self.config = config
         self.camera_sensors = tuple(camera_sensors)
+        self.task_rgb_camera_name = task_rgb_camera_name
+        self._task_camera_bound = False
+        if task_rgb_camera_name is not None:
+            if len(self.camera_sensors) != 1 or self.camera_sensors[0].name != task_rgb_camera_name:
+                raise ValueError("component task RGB requires its sole configured camera sensor")
+            spec = self.camera_sensors[0].spec
+            if not spec.rgb or spec.depth or spec.rgb_layout != "HWC" or spec.rgb_dtype != "float32":
+                raise ValueError("component task RGB requires HWC float32 RGB without depth")
+            if (
+                not all(np.isfinite(float(value)) for value in (spec.fov_y, spec.near, spec.far))
+                or not 0.0 < float(spec.fov_y) < np.pi
+                or not 0.0 < float(spec.near) < float(spec.far)
+            ):
+                raise ValueError("component task RGB requires finite 0 < fov_y < pi and 0 < near < far")
         first_camera = self.camera_sensors[0].spec
         self._visualizer = render_source.build_visualizer(
             backend=config.backend,
@@ -250,19 +160,26 @@ class CameraObservationProvider:
         metadata = OrderedDict()
         for sensor in self.camera_sensors:
             camera_metadata = sensor.metadata(snapshot)
+            if sensor.name == self.task_rgb_camera_name:
+                camera_metadata = replace(
+                    camera_metadata,
+                    renderer_readback=self._bind_and_read_task_camera(sensor, camera_metadata),
+                )
+                frame = self._visualizer.read_task_camera_frame(synchronized=True)
+            else:
+                self._visualizer.write_camera_pose(
+                    {
+                        "pos": camera_metadata.pose.position,
+                        "look_at": camera_metadata.pose.look_at,
+                        "up": camera_metadata.pose.up,
+                    }
+                )
+                frame = self._visualizer.read_frame(
+                    width=sensor.spec.width,
+                    height=sensor.spec.height,
+                    synchronized=True,
+                )
             metadata[sensor.name] = camera_metadata
-            self._visualizer.write_camera_pose(
-                {
-                    "pos": camera_metadata.pose.position,
-                    "look_at": camera_metadata.pose.look_at,
-                    "up": camera_metadata.pose.up,
-                }
-            )
-            frame = self._visualizer.read_frame(
-                width=sensor.spec.width,
-                height=sensor.spec.height,
-                synchronized=True,
-            )
             if sensor.spec.rgb:
                 array = np.asarray(frame, dtype=np.float32)
                 expected_shape = (sensor.spec.height, sensor.spec.width, 3)
@@ -282,6 +199,81 @@ class CameraObservationProvider:
                     )
                 depth[sensor.name] = np.ascontiguousarray(depth_array)
         return SensorObservation(rgb=rgb, depth=depth, camera_metadata=metadata)
+
+    def _bind_and_read_task_camera(self, sensor, requested):
+        """Bind requested component optics, then verify the renderer's own readback."""
+        from math import degrees
+        from ..environment import CameraRendererReadbackV1
+
+        visualizer = self._visualizer
+        bind = getattr(visualizer, "bind_task_camera", None)
+        update = getattr(visualizer, "update_task_camera", None)
+        read = getattr(visualizer, "read_task_camera", None)
+        if not callable(bind) or not callable(update) or not callable(read):
+            raise RuntimeError("component task RGB renderer lacks bind/update/read camera capability")
+        spec = sensor.spec
+        pose = requested.pose
+        request = {
+            "camera_id": sensor.name,
+            "position": np.asarray(pose.position, dtype=np.float64),
+            "look_at": np.asarray(pose.look_at, dtype=np.float64),
+            "up": np.asarray(pose.up, dtype=np.float64),
+            "fov_degrees": degrees(float(spec.fov_y)),
+            "near": float(spec.near),
+            "far": float(spec.far),
+            "width": int(spec.width),
+            "height": int(spec.height),
+        }
+        bind_result = (update if self._task_camera_bound else bind)(**request)
+        self._task_camera_bound = True
+        actual = read()
+        if not isinstance(actual, dict):
+            raise TypeError("renderer task camera readback must be a mapping")
+        required = {
+            "camera_id", "binding_id", "position", "forward", "up", "fov_degrees",
+            "near", "far", "width", "height",
+        }
+        if not required <= set(actual):
+            raise ValueError("renderer task camera readback is missing optical fields")
+        if not isinstance(bind_result, dict) or bind_result.get("binding_id") != actual["binding_id"]:
+            raise ValueError("renderer camera bind result differs from its independent readback")
+        expected_forward = request["look_at"] - request["position"]
+        expected_forward /= np.linalg.norm(expected_forward)
+        expected_up = request["up"] / np.linalg.norm(request["up"])
+        position = np.asarray(actual["position"], dtype=np.float64)
+        forward = np.asarray(actual["forward"], dtype=np.float64)
+        up = np.asarray(actual["up"], dtype=np.float64)
+        same = (
+            actual["camera_id"] == request["camera_id"]
+            and type(actual["binding_id"]) is str and bool(actual["binding_id"])
+            and actual["width"] == request["width"]
+            and actual["height"] == request["height"]
+            and np.isfinite(position).all() and np.isfinite(forward).all() and np.isfinite(up).all()
+            and np.linalg.norm(position - request["position"]) <= 3.0e-5
+            and np.linalg.norm(forward - expected_forward) <= 2.0e-4
+            and np.linalg.norm(up - expected_up) <= 2.0e-4
+            and abs(float(actual["fov_degrees"]) - request["fov_degrees"]) <= 2.0e-4
+            and abs(float(actual["near"]) - request["near"]) <= max(2.0e-7, abs(request["near"]) * 2.0e-6)
+            and abs(float(actual["far"]) - request["far"]) <= max(2.0e-6, abs(request["far"]) * 2.0e-6)
+        )
+        if not same:
+            raise ValueError("renderer task camera readback differs from requested identity, pose, optics, or extent")
+        return CameraRendererReadbackV1(
+            camera_id=actual["camera_id"], binding_id=actual["binding_id"],
+            position=tuple(actual["position"]), forward=tuple(actual["forward"]),
+            up=tuple(actual["up"]), fov_degrees=actual["fov_degrees"],
+            near=actual["near"], far=actual["far"], width=actual["width"],
+            height=actual["height"],
+        )
+
+    def project_task_camera(self, point):
+        """Expose the renderer's public task-camera geometry projection for audits."""
+        if self.task_rgb_camera_name is None or not self._task_camera_bound:
+            raise RuntimeError("component task camera has no completed native binding")
+        project = getattr(self._visualizer, "project_task_camera", None)
+        if not callable(project):
+            raise RuntimeError("component task RGB renderer lacks camera projection readback")
+        return project(point)
 
     def close(self) -> None:
         close = getattr(self._visualizer, "close", None)

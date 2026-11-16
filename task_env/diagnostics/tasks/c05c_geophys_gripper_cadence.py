@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, defaultdict
+from dataclasses import replace
 import hashlib
 import json
 import math
@@ -22,6 +23,30 @@ from task_env.tasks.nut_assembly.task import (
     build_native_feedback_solution,
 )
 from task_env.trajectory.canonical.execution import expand_snapshot, load
+
+
+def cadence_diagnostic_binding(*, backend, gripper_control_hz):
+    """Opt in to the isolated Nut cadence experiment using the normal Env."""
+    from task_env.tasks.nut_assembly.specialization import (
+        _binding, build_gripper_cadence_diagnostic_reference,
+    )
+    if (backend not in {'cpu', 'cuda'} or type(gripper_control_hz) is not int
+            or gripper_control_hz not in {100, 500}):
+        raise ValueError('gripper cadence diagnostic requires CPU/CUDA and 100/500 Hz')
+
+    def build(provider, *, include_solution):
+        if provider != 'geophys':
+            raise ValueError('gripper cadence diagnostic requires GeoPhys')
+        return build_gripper_cadence_diagnostic_reference(
+            backend=backend, gripper_control_hz=gripper_control_hz,
+            include_solution=include_solution,
+        )
+
+    return replace(
+        _binding(), build=lambda provider: build(provider, include_solution=True),
+        build_external=lambda provider: build(provider, include_solution=False),
+        diagnostic_profile='nutassembly-gripper-cadence-v1',
+    )
 
 
 def _sha(data: bytes) -> str:
@@ -377,8 +402,9 @@ def run_group(backend, gripper_hz, output_dir, *, profile='diagnostic'):
                 backend=backend, gripper_control_hz=gripper_hz,
             )
         else:
-            env = NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(
-                backend=backend, gripper_control_hz=gripper_hz, horizon=6000,
+            env = NutAssemblyReferenceEnv(
+                provider='geophys', backend=backend, horizon=6000,
+                _binding=cadence_diagnostic_binding(backend=backend, gripper_control_hz=gripper_hz),
             )
             solution = build_gripper_cadence_diagnostic_solution(
                 backend=backend, gripper_control_hz=gripper_hz,

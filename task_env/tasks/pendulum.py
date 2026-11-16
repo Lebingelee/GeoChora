@@ -8,10 +8,9 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
-from gymnasium.spaces import Box, Dict
+from ..environment.gym_compat import Box, Dict
 
 from ..environment import (
-    EpisodePhysicsState,
     ObservationFieldSpec,
     ObservationSchema,
     RuntimeSnapshot,
@@ -28,10 +27,10 @@ from ..environment import (
 from ..environment.configuration import resolve_env_config
 from ..environment.task_definition import TaskDefinitionBase
 from ..registry import register_env
-from ..vectorization.registry import register_parallel_env
 from ..robots.pendulum import (
     PENDULUM_ACTION_CONTRACT,
-    PendulumTorqueActionAdapter,
+    PENDULUM_MJCF_XML,
+    PendulumEntity,
 )
 from .base import BaseTaskEnv
 
@@ -51,37 +50,7 @@ PENDULUM_SUCCESS_WINDOW_STEPS = 5
 PENDULUM_REFERENCE_PROFILE_ID = "task-env-pendulum-reference-v1"
 
 
-# The asset is intentionally inline for the first non-arm TaskEnv.  It keeps
-# the exact reference scene local to the versioned task while still going
-# through GeoPhys's normal MJCF import and rigid runtime boundary.
-PENDULUM_MJCF_XML = """
-<mujoco model="task_env_pendulum">
-  <compiler angle="radian"/>
-  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
-  <worldbody>
-    <body name="pendulum_anchor" pos="0 0 0">
-      <geom name="pendulum_anchor_geom" type="cylinder" size="0.08 0.03"
-            mass="0" rgba="0.30 0.30 0.34 1"/>
-      <body name="pendulum_link" pos="0 0 0">
-        <joint name="pendulum_hinge" type="hinge" axis="0 1 0"
-               damping="0.05"/>
-        <inertial pos="0 0 0.25" mass="1.0"
-                  diaginertia="0.05 0.05 0.05"/>
-        <geom name="pendulum_link_geom" type="capsule"
-              fromto="0 0 0 0 0 0.50" size="0.04"
-              density="1000" rgba="0.16 0.46 0.82 1"/>
-      </body>
-    </body>
-  </worldbody>
-  <contact>
-    <exclude body1="pendulum_anchor" body2="pendulum_link"/>
-  </contact>
-  <actuator>
-    <motor name="pendulum_torque" joint="pendulum_hinge"
-           gear="1" ctrllimited="true" ctrlrange="-2 2"/>
-  </actuator>
-</mujoco>
-""".strip()
+
 
 
 def _wrap_angle(angle: float) -> float:
@@ -103,6 +72,10 @@ class PendulumTaskSemantics:
     success_window_steps: int = PENDULUM_SUCCESS_WINDOW_STEPS
     horizon: int = PENDULUM_HORIZON
     torque_limit: float = float(PENDULUM_ACTION_CONTRACT.high)
+    reset_angle_range: tuple[float, float] = (-math.pi, math.pi)
+    reset_velocity_range: tuple[float, float] = (-1.0, 1.0)
+    angular_velocity_cost_weight: float = 0.10
+    torque_cost_weight: float = 0.001
 
     def __post_init__(self) -> None:
         if self.upright_angle_rad <= 0.0 or self.upright_angular_velocity <= 0.0:
@@ -139,12 +112,12 @@ class PendulumTaskSemantics:
     ) -> tuple[np.ndarray | np.float32, np.ndarray | np.float32]:
         if size is None:
             return (
-                np.float32(rng.uniform(-math.pi, math.pi)),
-                np.float32(rng.uniform(-1.0, 1.0)),
+                np.float32(rng.uniform(*self.reset_angle_range)),
+                np.float32(rng.uniform(*self.reset_velocity_range)),
             )
         return (
-            rng.uniform(-math.pi, math.pi, size=int(size)).astype(np.float32),
-            rng.uniform(-1.0, 1.0, size=int(size)).astype(np.float32),
+            rng.uniform(*self.reset_angle_range, size=int(size)).astype(np.float32),
+            rng.uniform(*self.reset_velocity_range, size=int(size)).astype(np.float32),
         )
 
     def validate_torque(self, torque: np.ndarray) -> None:
@@ -178,8 +151,8 @@ class PendulumTaskSemantics:
         success = next_upright_steps >= self.success_window_steps
         reward_terms = {
             "upright": math.cos(float(theta)),
-            "angular_velocity_cost": -0.10 * float(theta_dot) ** 2,
-            "torque_cost": -0.001 * float(torque) ** 2,
+            "angular_velocity_cost": -self.angular_velocity_cost_weight * float(theta_dot) ** 2,
+            "torque_cost": -self.torque_cost_weight * float(torque) ** 2,
             "success": 1.0 if success else 0.0,
         }
         metrics = {
@@ -240,8 +213,8 @@ class PendulumTaskSemantics:
         truncated = elapsed >= self.horizon
         reward_terms = {
             "upright": np.cos(theta_value).astype(np.float32),
-            "angular_velocity_cost": (-0.10 * theta_dot_value * theta_dot_value).astype(np.float32),
-            "torque_cost": (-0.001 * torque_value * torque_value).astype(np.float32),
+            "angular_velocity_cost": (-self.angular_velocity_cost_weight * theta_dot_value * theta_dot_value).astype(np.float32),
+            "torque_cost": (-self.torque_cost_weight * torque_value * torque_value).astype(np.float32),
             "success": success.astype(np.float32),
         }
         reward = np.sum(np.stack(tuple(reward_terms.values()), axis=0), axis=0).astype(np.float32)
@@ -325,6 +298,7 @@ class PendulumObservationBuilder:
 @dataclass
 class PendulumTaskDefinition(TaskDefinitionBase):
     uses_unified_state_view = True
+    device_state_required_fields = ('qpos', 'qvel')
 
     qpos_id: int
     qvel_id: int
@@ -340,22 +314,68 @@ class PendulumTaskDefinition(TaskDefinitionBase):
             horizon=PENDULUM_HORIZON,
         )
         self._upright_steps = 0
+        self._device_upright_steps = None
 
-    def create_action_adapter(self, compiled_scene):
-        names = compiled_scene.references.names
-        actuator_id = names.actuators["pendulum_torque"]
-        actuator_count = int(compiled_scene.scene_model.joint_data["n_actuators"])
-        return PendulumTorqueActionAdapter(
-            actuator_id=actuator_id,
-            actuator_count=actuator_count,
-        )
+    def device_reset_spec(self):
+        """Declare per-row random domains and source state fields."""
+        return {'random': {'angle': (), 'angular_velocity': ()},
+                'state_fields': ('qpos', 'qvel')}
 
-    def create_observation_builder(self, compiled_scene, **_kwargs):
-        del compiled_scene
-        return PendulumObservationBuilder(
-            qpos_id=self.qpos_id,
-            qvel_id=self.qvel_id,
-        )
+    def sample_device_reset(self, uniforms, template):
+        """Apply the same angle/velocity reset distributions to device uniforms."""
+        import torch
+
+        qpos, qvel = torch.zeros_like(template['qpos']), torch.zeros_like(template['qvel'])
+        angle_low, angle_high = self._semantics.reset_angle_range
+        velocity_low, velocity_high = self._semantics.reset_velocity_range
+        qpos[:, self.qpos_id] = angle_low + uniforms['angle'] * (angle_high - angle_low)
+        qvel[:, self.qvel_id] = velocity_low + uniforms['angular_velocity'] * (velocity_high - velocity_low)
+        return {'qpos': qpos, 'qvel': qvel}
+
+    def device_observation_space(self):
+        """Use the same declared observation schema as the scalar task."""
+        return PendulumObservationBuilder(qpos_id=self.qpos_id, qvel_id=self.qvel_id).observation_space
+
+    def reset_device(self, *, state, reset_mask, selection=None):
+        """Reset only the selected rows of the task's device success window."""
+        import torch
+
+        del selection
+        if self._device_upright_steps is None:
+            self._device_upright_steps = torch.zeros(state.num_envs, dtype=torch.int32, device=state.device)
+        self._device_upright_steps.masked_fill_(reset_mask, 0)
+
+    def close_device(self):
+        self._device_upright_steps = None
+
+    def build_device_observation(self, state):
+        import torch
+
+        q = state.arrays['qpos'][:, self.qpos_id]
+        qd = state.arrays['qvel'][:, self.qvel_id]
+        theta = torch.remainder(q + math.pi, 2.0 * math.pi) - math.pi
+        return {'state': {'proprioception': torch.stack((torch.cos(theta), torch.sin(theta), qd), dim=1)}}
+
+    def evaluate_device(self, *, state, action, elapsed_steps, previous_state=None):
+        """Evaluate the existing Pendulum reward and dwell semantics on device."""
+        import torch
+
+        del previous_state
+        if self._device_upright_steps is None:
+            raise RuntimeError('Pendulum device task must be reset before evaluation')
+        q = state.arrays['qpos'][:, self.qpos_id]
+        qd = state.arrays['qvel'][:, self.qvel_id]
+        theta = torch.remainder(q + math.pi, 2.0 * math.pi) - math.pi
+        effort = action['torque'][:, 0]
+        upright = (theta.abs() <= self._semantics.upright_angle_rad) & (
+            qd.abs() <= self._semantics.upright_angular_velocity)
+        self._device_upright_steps = torch.where(upright, self._device_upright_steps + 1,
+                                                 torch.zeros_like(self._device_upright_steps))
+        success = self._device_upright_steps >= self._semantics.success_window_steps
+        reward = (torch.cos(theta) - self._semantics.angular_velocity_cost_weight * qd.square()
+                  - self._semantics.torque_cost_weight * effort.square() + success.float())
+        return {'reward': reward, 'terminated': success,
+                'truncated': elapsed_steps >= self._semantics.horizon}
 
     def _coerce_action(
         self,
@@ -612,70 +632,27 @@ class PendulumTaskDefinition(TaskDefinitionBase):
         )
 
 
-class PendulumResetSampler:
-    """Replayable random initial state for the fixed Pendulum profile."""
-
-    def sample_episode_state(
-        self,
-        *,
-        compiled_scene: object,
-        initial_state: EpisodePhysicsState,
-        rng: np.random.Generator,
-        seed: int | None,
-    ) -> tuple[EpisodePhysicsState, dict[str, Any]]:
-        del seed
-        joint_id = compiled_scene.references.names.joints["pendulum_hinge"]
-        qpos_id = int(compiled_scene.scene_model.joint_data["jnt_qposadr"][joint_id])
-        dof_id = int(compiled_scene.scene_model.joint_data["jnt_dofadr"][joint_id])
-        qpos = np.asarray(initial_state.qpos, dtype=np.float32).copy()
-        qvel = np.asarray(initial_state.qvel, dtype=np.float32).copy()
-        ctrl = np.asarray(initial_state.ctrl, dtype=np.float32).copy()
-        act = np.asarray(initial_state.act, dtype=np.float32).copy()
-        theta_value, theta_dot_value = PENDULUM_TASK_SEMANTICS.sample_reset(rng)
-        theta = float(theta_value)
-        theta_dot = float(theta_dot_value)
-        qpos[qpos_id] = np.float32(theta)
-        qvel[dof_id] = np.float32(theta_dot)
-        ctrl.fill(0.0)
-        act.fill(0.0)
-        return (
-            EpisodePhysicsState(
-                qpos=qpos,
-                qvel=qvel,
-                qacc=np.zeros_like(qvel),
-                ctrl=ctrl,
-                act=act,
-            ),
-            {
-                "profile": "pendulum_uniform_angle_velocity_v1",
-                "angle_range_rad": [-math.pi, math.pi],
-                "angular_velocity_range_rad_s": [-1.0, 1.0],
-                "theta_rad": theta,
-                "theta_dot_rad_s": theta_dot,
-            },
-        )
-
-
-class _PendulumSceneComposer:
-    def build_scene_source(self, composition, agents):
-        del composition
-        if tuple(agents):
-            raise ValueError("Pendulum scene must not receive robot agents")
-        from scene import SceneSource
-
-        return (
-            SceneSource.mjcf_string(
-                PENDULUM_MJCF_XML,
-                label="task-env-pendulum-inline-v1",
-            ),
-            "pendulum_inline_v1",
-        )
-
-
-@register_parallel_env()
 @register_env()
 class PendulumEnv(BaseTaskEnv):
-    """GeoPhys-native single Pendulum environment."""
+    """Single Pendulum with a shared source-bound physical runtime."""
+
+    uses_selected_public_config = True
+    selected_controller_profiles = frozenset(PendulumEntity.controller_profiles)
+    selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
+    selected_parameter_limits = {}
+    selected_supports_isaac = True
+    selected_robot_uids = frozenset(('pendulum-v1',))
+    controller_profile_routes = {'velocity_damped_joint_effort_v1': frozenset((('mujoco', 'cpu'),))}
+
+    @staticmethod
+    def selected_default_controller_profile(task_config=None):
+        return 'direct_joint_effort_v1'
+
+    @classmethod
+    def selected_binding(cls, config, *, robot=None):
+        from .pendulum_physical import task_binding
+        return task_binding(config.environment, robot=robot,
+                            source_delivery_manifest=config.source_delivery_manifest)
 
     uid = PENDULUM_ENV_ID
     task_uid = PENDULUM_TASK_UID
@@ -704,7 +681,7 @@ class PendulumEnv(BaseTaskEnv):
     def placement_notes(self) -> tuple[str, ...]:
         return (
             "Pendulum is an inline single-hinge MJCF topology with theta=0 upright.",
-            "Native action is direct hinge torque; no robot controller is bound.",
+            "The scalar selected route binds direct hinge torque through a physical Controller.",
         )
 
     def reference_profile(self) -> dict[str, Any]:
@@ -760,18 +737,6 @@ class PendulumEnv(BaseTaskEnv):
             },
         }
 
-    def create_scene_composer(self):
-        return _PendulumSceneComposer()
-
-    def create_reset_sampler(self):
-        return PendulumResetSampler()
-
-    def create_task_definition(self, compiled_scene):
-        joint_id = compiled_scene.references.names.joints["pendulum_hinge"]
-        return PendulumTaskDefinition(
-            qpos_id=int(compiled_scene.scene_model.joint_data["jnt_qposadr"][joint_id]),
-            qvel_id=int(compiled_scene.scene_model.joint_data["jnt_dofadr"][joint_id]),
-        )
 
 
 __all__ = [
@@ -789,6 +754,5 @@ __all__ = [
     "PendulumEnv",
     "PendulumObservationBuilder",
     "PendulumTaskSemantics",
-    "PendulumResetSampler",
     "PendulumTaskDefinition",
 ]

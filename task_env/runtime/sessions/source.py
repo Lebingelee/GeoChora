@@ -1,5 +1,6 @@
 """Advanced Phase-I source bridge. Semantic names map to source names, never IDs."""
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from collections.abc import Mapping
 from types import MappingProxyType
 from pathlib import Path
@@ -11,9 +12,89 @@ import re
 import tempfile
 import xml.etree.ElementTree as ET
 
-from ...artifacts import SceneDefinition, TaskArtifactV1
+from ...artifacts import FrameReference, SceneDefinition, TaskArtifactV1
 from ...assembly.source import TaskSceneSource, UsdTaskSceneSourceV1
 from ...assembly.assets import _source_closure_digest
+
+
+def source_resource_receipt(source):
+    """Return the snapshot owned by a RuntimeSource, independent of projection."""
+    return (getattr(source, 'source_snapshot_receipt', None)
+            or getattr(source, 'execution_source_receipt', None))
+
+
+def close_source_and_task_resources(source, binding, *, error=None):
+    """Release owned source and Task resources, preserving the first failure."""
+    receipt = source_resource_receipt(source)
+    for label, operation in (('source receipt cleanup', getattr(receipt, 'close', None)),
+                             ('task resource cleanup', getattr(binding, 'close_task_resources', None))):
+        if not callable(operation):
+            continue
+        try:
+            operation()
+        except BaseException as cleanup_error:
+            if error is None:
+                error = cleanup_error
+            else:
+                error.add_note(f'{label} also failed: {cleanup_error!r}')
+    return error
+
+
+@contextmanager
+def close_execution_source_on_failure(source):
+    """Keep a source lease on success; release it if its owner cannot be built."""
+    try:
+        yield source
+    except BaseException as error:
+        receipt = source_resource_receipt(source)
+        if receipt is not None:
+            try:
+                receipt.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'execution source cleanup also failed: {cleanup_error!r}')
+        raise
+
+
+def position_frame_bindings_from_artifact(artifact, source):
+    """Resolve runtime body/Frame names through their exact Artifact references."""
+    semantics = (*source.bodies, *source.frames)
+    if len(semantics) != len(set(semantics)):
+        raise ValueError('Position RuntimeSource body/Frame semantics must be unique')
+    bindings = {}
+    for semantic in semantics:
+        reference = artifact.legacy_frame_bindings.get(semantic)
+        if type(reference) is not FrameReference:
+            raise ValueError('Position RuntimeSource semantic lacks an exact Artifact FrameReference')
+        bindings[semantic] = reference
+    return bindings
+
+
+def position_joint_bindings_from_artifact(scene, artifact, source):
+    """Bind scalar joints and resolve each reset Frame to its unique floating Joint."""
+    bindings = {
+        f'{articulation.entity_id}/{joint.joint_id}': joint
+        for articulation in scene.articulations or ()
+        for joint in articulation.joints
+        if joint.kind in {'revolute', 'continuous', 'prismatic'}
+    }
+    for reset_frame_name in source.free_joints:
+        frame_reference = artifact.legacy_frame_bindings.get(reset_frame_name)
+        if frame_reference is None:
+            raise ValueError('free-body reset key lacks an Artifact Frame binding')
+        candidates = tuple(
+            joint
+            for articulation in scene.articulations or ()
+            if articulation.entity_id == frame_reference.entity_id
+            for joint in articulation.joints
+            if joint.kind == 'floating' and joint.child_frame == frame_reference
+        )
+        if len(candidates) != 1:
+            raise ValueError('reset Frame must resolve to exactly one Scene floating Joint')
+        if reset_frame_name in bindings:
+            raise ValueError('free-body reset Joint binding overlaps a scalar binding')
+        bindings[reset_frame_name] = candidates[0]
+    return bindings
+
 
 @dataclass(frozen=True)
 class ExecutionSourceReceiptV1:
@@ -136,6 +217,71 @@ class ExecutionSourceReceiptV1:
             owner.cleanup()
 
 
+def snapshot_legacy_mjcf_source(source):
+    """Capture the files actually referenced by an existing Panda MJCF source.
+
+    Canonical XML remains unchanged. The importer XML points at the existing
+    receipt snapshot and its bytes are consumed directly by the adapter.
+    """
+    from dataclasses import replace
+    if source.scene_definition is not None or source.execution_source_receipt is not None:
+        return source
+    xml = source.scene_source.xml
+    root = ET.fromstring(xml)
+    compiler = root.find('compiler')
+    if compiler is None:
+        raise ValueError('selected MJCF source has no compiler')
+    allowed = []
+    for component in (*source.agents, *source.objects):
+        manifest = component.asset_manifest()
+        if manifest.owner_uid != component.uid:
+            raise ValueError('MJCF component asset manifest has a foreign owner')
+        allowed.extend(path.resolve() for path in manifest.asset_roots)
+    files = {'canonical-source.xml': xml.encode('utf-8')}
+    total = 0
+    for node in root.iter():
+        raw = node.get('file')
+        if raw is None:
+            continue
+        if node.tag not in {'mesh', 'skin', 'texture'}:
+            raise ValueError(f'unsupported MJCF external reference: {node.tag}')
+        rel = Path(raw)
+        if rel.is_absolute() or '\\' in raw or any(part in {'', '.', '..'} for part in rel.parts):
+            raise ValueError(f'unsafe MJCF asset reference: {raw!r}')
+        attr = 'texturedir' if node.tag == 'texture' else 'meshdir'
+        directory = Path(compiler.get(attr, compiler.get('meshdir', '')))
+        if not directory.is_absolute():
+            directory = source.scene_source.base_dir / directory
+        directory = directory.resolve()
+        if not any(directory.is_relative_to(root) for root in allowed):
+            raise ValueError(f'MJCF {attr} is outside declared component asset roots')
+        path = (directory / rel).resolve()
+        if not path.is_relative_to(directory):
+            raise ValueError('MJCF asset escaped its declared directory')
+        if not path.is_file():
+            raise ValueError(f'MJCF asset is missing: {raw!r}')
+        data = path.read_bytes()
+        total += len(data)
+        if total > 128 * 1024 * 1024:
+            raise ValueError('selected MJCF referenced assets exceed 128 MiB')
+        key = 'assets/' + rel.as_posix()
+        if key in files and files[key] != data:
+            raise ValueError(f'MJCF asset alias differs: {key}')
+        files[key] = data
+    compiler.set('meshdir', 'assets')
+    if compiler.get('texturedir') is not None:
+        compiler.set('texturedir', 'assets')
+    importer = ET.tostring(root, encoding='utf-8')
+    receipt = ExecutionSourceReceiptV1.create(source_id=source.scene_source.source_id,
+        canonical_xml=xml.encode('utf-8'), importer_xml=importer, closure_files=files)
+    try:
+        return replace(source, execution_source_receipt=receipt,
+                       source_closure_digest=receipt.source_closure_digest)
+    except BaseException:
+        receipt.close()
+        raise
+
+
 def project_scene_definition_v3_to_mjcf(source_xml: str, scene_definition: SceneDefinition) -> str:
     """Apply the bounded v3 scalar-joint projection to an MJCF source.
 
@@ -230,29 +376,47 @@ def source_asset_bytes(base_dir, source_xml: str) -> dict[str, bytes]:
     return assets
 
 
-def lower_mujoco_scene_source(scene_source, scene_definition, expected_closure_digest: str):
-    """Apply the shared Scene-v3 MJCF lowering and verify its source closure.
-
-    Runtime physics materialization and the D03 visual consumer use this same
-    source path. Returned XML contains the current MuJoCo compatibility lowering;
-    a renderer may append its camera/light settings after this boundary.
-    """
-
+def project_mjcf_scene_source(scene_source, scene_definition):
+    """Project one MJCF Scene and calculate its bounded source closure."""
     if not isinstance(scene_source, TaskSceneSource):
-        raise TypeError('MuJoCo Scene lowering requires the public TaskSceneSource value')
+        raise TypeError('MJCF Scene lowering requires the public TaskSceneSource value')
     if not isinstance(scene_definition, SceneDefinition):
-        raise TypeError('MuJoCo Scene lowering requires the canonical SceneDefinition')
+        raise TypeError('MJCF Scene lowering requires the canonical SceneDefinition')
+    projected = project_scene_definition_v3_to_mjcf(scene_source.xml, scene_definition)
+    assets = source_asset_bytes(scene_source.base_dir, projected)
+    closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'), **assets})
+    return projected, assets, closure
+
+
+def verify_projected_scene_source(scene_source, scene_definition, expected_closure_digest: str):
+    """Project a canonical Scene and verify its XML and asset closure."""
     if not re.fullmatch(r'[0-9a-f]{64}', str(expected_closure_digest)):
-        raise ValueError('MuJoCo Scene lowering requires a source closure SHA-256')
-    source_xml = project_scene_definition_v3_to_mjcf(scene_source.xml, scene_definition)
-    assets = source_asset_bytes(scene_source.base_dir, source_xml)
-    from ...assembly.assets import _source_closure_digest
-    measured_closure = _source_closure_digest({
-        'scene.xml': source_xml.encode('utf-8'),
-        **assets,
-    })
-    if measured_closure != expected_closure_digest:
+        raise ValueError('MJCF Scene lowering requires a source closure SHA-256')
+    projected, assets, closure = project_mjcf_scene_source(scene_source, scene_definition)
+    if closure != expected_closure_digest:
         raise ValueError('MuJoCo canonical source closure digest mismatch')
+    return projected, assets
+
+
+def bind_reference_scene_source(source, *, artifact, scene, bodies, frames):
+    """Bind a declared Scene to its owned MJCF snapshot without native I/O."""
+    from dataclasses import replace
+    receipt = source.execution_source_receipt
+    receipt.validate_snapshot()
+    scene_source = TaskSceneSource(receipt.importer_xml.decode('utf-8'), receipt.snapshot_root,
+                                   f'scene-definition-v3:{scene.identity_hash}')
+    projected, _, closure = project_mjcf_scene_source(scene_source, scene)
+    bound = replace(source, task_artifact_hash=artifact.identity_hash,
+        scene_source=scene_source, scene_definition=scene, source_closure_digest=closure,
+        execution_source_receipt=None, source_snapshot_receipt=receipt,
+        bodies=bodies, frames=frames)
+    return bound, projected, closure
+
+
+def lower_mujoco_scene_source(scene_source, scene_definition, expected_closure_digest: str):
+    """Verify the common Scene source and lower it for the MuJoCo importer."""
+    source_xml, assets = verify_projected_scene_source(
+        scene_source, scene_definition, expected_closure_digest)
     root = ET.fromstring(source_xml)
     # GeoPhys accepts extended freejoint attributes; MuJoCo expects type=free.
     for element in root.iter('freejoint'):
@@ -292,13 +456,114 @@ class RuntimeSource:
     contact_geom_groups: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     mixed_actuator_plan: object | None = None
     task_local_joint_limit_tolerance_overrides: Mapping[str, float] = field(default_factory=dict)
+    composition_runtime_input: object | None = None
+    position_subject_binding: object | None = None
+    source_reference_plan: object | None = None
+    source_composition_request: object | None = None
+    source_composition_intent: object | None = None
+    source_snapshot_receipt: ExecutionSourceReceiptV1 | None = None
 
     @property
     def source_id(self) -> str:
         """Expose the canonical TaskSceneSource identity used by Core receipts."""
         return self.scene_source.source_id
 
+    @property
+    def position_subject_plan(self):
+        """Expose the source-owned Position plan independently of native mapping."""
+        return self.position_subject_binding
+
     def __post_init__(self):
+        snapshot = self.source_snapshot_receipt
+        if snapshot is not None:
+            if (type(snapshot) is not ExecutionSourceReceiptV1 or self.scene_definition is None
+                    or self.execution_source_receipt is not None
+                    or Path(self.scene_source.base_dir).resolve() != snapshot.snapshot_root
+                    or self.scene_source.xml.encode('utf-8') != snapshot.importer_xml):
+                raise ValueError('canonical source snapshot differs from its owned input')
+            snapshot.validate_snapshot()
+        if self.source_composition_request is not None:
+            from ...assembly.source_composition import (
+                SourceCompositionIntentV1, SourceCompositionRequestV2,
+            )
+            request = self.source_composition_request
+            if (type(request) is not SourceCompositionRequestV2
+                    or request.task_source.source_id != self.scene_source.source_id
+                    or request.task_source.closure_sha256 != self.source_closure_digest):
+                raise ValueError('V2 composition request differs from RuntimeSource provenance')
+            intent = self.source_composition_intent
+            if (type(intent) is not SourceCompositionIntentV1
+                    or intent.identity_hash != request.intent_identity_sha256
+                    or intent.task_source_id != request.task_source.source_id
+                    or intent.task_source_closure_sha256 != request.task_source.closure_sha256
+                    or intent.task_entity_ids != request.task_entity_ids
+                    or intent.existing_robot_entity_ids != request.existing_robot_entity_ids
+                    or intent.robot_uid != request.robot_uid or intent.mode != request.mode):
+                raise ValueError('V2 composition request lacks its matching pre-parse intent')
+            intent_entities = {entity for item in intent.robot_sources for entity in item.entity_ids}
+            request_entities = {entity for item in request.robot_sources for entity in item.entity_ids}
+            if intent_entities != request_entities:
+                raise ValueError('resolved Robot source ownership differs from composition intent')
+            intent_edges = set(intent.component_edges)
+            request_edges = {(item.parent_entity_id, item.parent_frame_id,
+                              item.child_entity_id, item.child_frame_id, item.rule_id)
+                             for item in request.attachments}
+            if intent_edges != request_edges:
+                raise ValueError('resolved attachment edges differ from composition intent')
+            if set(intent.resource_writers) != set(request.resource_writers):
+                raise ValueError('resolved resource writers differ from composition intent')
+            if request.mode == 'reference':
+                if self.source_reference_plan is None or self.source_reference_plan.robot_uid != request.robot_uid:
+                    raise ValueError('V2 reference request lacks its compatible V1 reference projection')
+            elif self.composition_runtime_input is None or self.composition_runtime_input.plan.robot_uid != request.robot_uid:
+                raise ValueError('V2 add/replace request lacks its provider materialization input')
+        if self.source_reference_plan is not None:
+            from ...assembly.source_composition import SourceCompositionPlanV1
+            reference = self.source_reference_plan
+            if (type(reference) is not SourceCompositionPlanV1 or reference.mode != 'reference'
+                    or reference.task_source.source_id != self.scene_source.source_id
+                    or reference.task_source.closure_sha256 != self.source_closure_digest):
+                raise ValueError('reference source composition differs from RuntimeSource')
+            if self.composition_runtime_input is not None:
+                raise ValueError('reference and replacement compositions are mutually exclusive')
+            if self.position_subject_binding is None or self.position_subject_binding.identity_hash != reference.position_binding_identity_sha256:
+                raise ValueError('reference source position mapping identity differs from its plan')
+        if self.position_subject_binding is not None:
+            from ...assembly.source_composition import PositionSubjectControlBindingV1
+            binding = self.position_subject_binding
+            if type(binding) is not PositionSubjectControlBindingV1:
+                raise TypeError('position subject binding requires its exact typed value')
+            if (binding.plan.artifact_identity_hash != self.task_artifact_hash
+                    or binding.plan.source_closure_digest != self.source_closure_digest):
+                raise ValueError('position subject binding differs from RuntimeSource identity')
+            declared_joints = {semantic: native for semantic, _entity, _joint, native, _actuator
+                               in binding.joint_native_ownership}
+            if dict(self.joints) != declared_joints:
+                raise ValueError('position semantic joint mapping differs from declared subject ownership')
+            native_resources = {(entity, actuator): native for entity, actuator, native
+                                in binding.resource_native_names}
+            for semantic, entity, _joint, _native, actuator in binding.joint_native_ownership:
+                if semantic in self.joint_targets and self.joint_targets[semantic] != native_resources[(entity, actuator)]:
+                    raise ValueError('position joint target maps to the wrong subject actuator')
+        if self.composition_runtime_input is not None:
+            from ...assembly.source_composition import CompositionRuntimeInputV1
+            value = self.composition_runtime_input
+            if type(value) is not CompositionRuntimeInputV1:
+                raise TypeError('composition input must be CompositionRuntimeInputV1')
+            if self.execution_source_receipt is None:
+                raise ValueError('composition input requires a verified task source receipt')
+            binding = self.position_subject_binding
+            if binding is not None and binding.identity_hash != value.plan.position_binding_identity_sha256:
+                raise ValueError('composition source position mapping identity differs from its plan')
+            if value.control_binding_plan is not None and (
+                    binding is None or binding.plan.identity_hash != value.control_binding_plan.identity_hash
+                    or binding.subject_identity_sha256 != value.subject_binding_identity_sha256):
+                raise ValueError('composition input requires the same declared position subject binding')
+            if (value.plan.task_source.source_id != self.scene_source.source_id
+                    or value.plan.task_source.closure_sha256 != self.source_closure_digest):
+                raise ValueError('composition plan differs from task RuntimeSource identity')
+            if self.fixed_attachment_plan is not None or self.scene_definition is not None:
+                raise ValueError('composition input cannot alias an existing fixed or canonical source')
         for field in (
             'joints', 'bodies', 'frames', 'free_joints', 'joint_targets',
             'torque_actuators', 'position_actuators', 'actuator_units',
@@ -340,6 +605,8 @@ class RuntimeSource:
             if (any(self.actuator_units[name] != 'N*m' for name in self.torque_actuators.values())
                     or any(self.actuator_units[name] != 'm' for name in self.position_actuators.values())):
                 raise ValueError('direct-control unit differs from actuator role')
+        if self.mixed_actuator_plan is not None and self.position_subject_binding is not None:
+            raise ValueError('position subject and mixed actuator writers cannot share a RuntimeSource')
         if self.mixed_actuator_plan is not None:
             from ...controllers.canonical.contracts import MixedActuatorPlanV1
             plan = self.mixed_actuator_plan
@@ -417,6 +684,31 @@ class RuntimeSource:
 
 
 @dataclass(frozen=True)
+class PositionSubjectPlanV1:
+    """Source-bound Position subjects and their compiled Controller plan."""
+
+    plan: object
+    subject_identity_sha256: str
+    subjects: tuple
+
+    def __post_init__(self):
+        from .control import ControlBindingPlanV1, position_subject_identity
+        from .physical_control import ControlledSubjectV1
+        if type(self.plan) is not ControlBindingPlanV1 or not self.plan._compiled:
+            raise TypeError('Position subjects require a compiled Controller plan')
+        if (type(self.subjects) is not tuple or not self.subjects
+                or any(type(subject) is not ControlledSubjectV1 for subject in self.subjects)):
+            raise TypeError('Position plan requires declared controlled subjects')
+        if position_subject_identity(self.plan, self.subjects) != self.subject_identity_sha256:
+            raise ValueError('Position subjects differ from their compiled identity')
+        owners = {(subject.entity_id, writer) for subject in self.subjects
+                  for writer in subject.controller_writers}
+        plan_owners = {(entity, writer) for entity, _resource, writer in self.plan.resource_writers}
+        if owners != plan_owners:
+            raise ValueError('Position subjects differ from Controller resource owners')
+
+
+@dataclass(frozen=True)
 class UsdRuntimeSourceV1:
     """Provider-neutral, versioned construction input for a verified USD delivery.
 
@@ -434,6 +726,7 @@ class UsdRuntimeSourceV1:
     frames: Mapping[str, str]
     free_joints: Mapping[str, str]
     joint_targets: Mapping[str, str]
+    position_subject_plan: PositionSubjectPlanV1 | None = None
 
     def __post_init__(self):
         if self.schema_version != 'usd-runtime-source-v1':
@@ -476,6 +769,18 @@ class UsdRuntimeSourceV1:
         self.scene_definition.validate()
         self.scene_source.validate()
         self.task_artifact.validate_scene(self.scene_definition)
+        if self.position_subject_plan is not None:
+            binding = self.position_subject_plan
+            if type(binding) is not PositionSubjectPlanV1:
+                raise TypeError('USD Position subjects require a typed source plan')
+            plan = binding.plan
+            if (plan.scene_identity_hash != self.scene_definition.identity_hash
+                    or plan.artifact_identity_hash != self.task_artifact.identity_hash
+                    or plan.source_closure_digest != self.source_closure_digest
+                    or any(subject.source_id != self.source_id
+                           or subject.source_closure_sha256 != self.source_closure_digest
+                           for subject in binding.subjects)):
+                raise ValueError('USD Position subjects differ from their Scene, Artifact or source')
         if self.scene_source.scene_identity_sha256 != self.scene_definition.identity_hash:
             raise ValueError('USD RuntimeSource does not bind the exact SceneDefinition')
         if self.scene_source.task_source_identity_sha256 != self.task_artifact.task_source_identity_hash:
@@ -532,3 +837,151 @@ class UsdRuntimeSourceV1:
     def assert_fresh(self) -> None:
         self.validate()
         self.scene_source.assert_fresh()
+
+
+def usd_articulation_paths(articulation, *, geometry_root='Geometry'):
+    """Lower declared articulation edges to a USD geometry hierarchy."""
+    paths = {articulation.root_frame_id: f'{geometry_root}/{articulation.root_frame_id}'}
+    remaining = list(articulation.joints)
+    while remaining:
+        ready = [joint for joint in remaining if joint.parent_frame.frame_id in paths]
+        if not ready:
+            raise ValueError('subject articulation cannot resolve USD body paths')
+        for joint in ready:
+            child = joint.child_frame.frame_id
+            if child in paths:
+                raise ValueError('subject articulation has duplicate USD body paths')
+            paths[child] = f'{paths[joint.parent_frame.frame_id]}/{child}'
+            remaining.remove(joint)
+    return paths
+
+
+def scalar_joint_source_bindings(scene, artifact):
+    """Resolve declared scalar Scene joints against the Task Artifact."""
+    joints = {f'{articulation.entity_id}/{joint.joint_id}': joint.joint_id
+              for articulation in scene.articulations
+              for joint in articulation.joints
+              if joint.kind in {'revolute', 'continuous', 'prismatic'}}
+    if set(joints) != set(artifact.legacy_joint_bindings):
+        raise ValueError('source joint map must cover every TaskArtifact scalar Joint exactly')
+    return joints
+
+
+def bind_declared_usd_paths(scene, artifact, *, robot_uid, geometry_root, entry_prim,
+                            base_semantic, robot_frames, world_bodies, world_frames,
+                            free_body_semantics):
+    """Resolve Task and Robot declarations to one USD source binding."""
+    articulations = [item for item in scene.articulations if item.entity_id == robot_uid]
+    if len(articulations) != 1:
+        raise ValueError('USD source requires exactly one selected Robot articulation')
+    articulation = articulations[0]
+    paths = usd_articulation_paths(articulation, geometry_root=geometry_root)
+    bodies = {base_semantic: paths[articulation.root_frame_id],
+              **{name: f'{entry_prim}/{path}' for name, path in world_bodies.items()}}
+    frames = {name: f'{paths[parent]}/{local}'
+              for name, (parent, local) in robot_frames.items()}
+    if set(frames) & set(world_frames):
+        raise ValueError('USD frame declarations must have distinct semantic owners')
+    frames.update({name: f'{entry_prim}/{path}' for name, path in world_frames.items()})
+    if set(bodies) & set(frames) or base_semantic in world_bodies:
+        raise ValueError('USD body and frame declarations must have distinct semantic owners')
+    if set(bodies) | set(frames) != set(artifact.legacy_frame_bindings):
+        raise ValueError('USD body/frame map must cover every TaskArtifact runtime Frame')
+    if set(artifact.initialization.poses_world) != set(free_body_semantics):
+        raise ValueError('USD reset must bind exactly the declared floating bodies')
+    if not set(free_body_semantics) <= set(world_bodies):
+        raise ValueError('USD floating body must have a declared world path')
+    return (scalar_joint_source_bindings(scene, artifact), bodies, frames,
+            {name: bodies[name] for name in free_body_semantics})
+
+
+def build_usd_runtime_source(*, loaded, provider, provider_build_identity, options,
+                             task_source_identity_sha256, scene, artifact, joints,
+                             bodies, frames, free_joints, joint_targets):
+    """Bind admitted USD bytes and declared native mappings to a Task source."""
+    from ...assembly.usd_delivery import resolve_provider_representation
+
+    representation = resolve_provider_representation(
+        loaded, provider=provider, provider_build_identity=provider_build_identity, options=options)
+    scene_source = UsdTaskSceneSourceV1('usd-task-scene-source-v1', loaded, representation,
+                                        task_source_identity_sha256, scene.identity_hash)
+    return UsdRuntimeSourceV1('usd-runtime-source-v1', artifact, scene, scene_source,
+                              joints, bodies, frames, free_joints, joint_targets)
+
+
+def validate_usd_task_reset_identities(task_source, artifact, source, reset_plan, *, error_message):
+    """Check the shared source/scene/artifact/reset identity closure.
+
+    Callers validate the contract types and each object's own fields first;
+    provider and task-specific admission remain with their respective owners.
+    """
+    scene = source.scene_definition
+    if (source.task_artifact.identity_hash != artifact.identity_hash
+            or artifact.scene_identity_hash != scene.identity_hash
+            or source.scene_source.task_source_identity_sha256 != task_source.identity_hash
+            or source.scene_source.scene_identity_sha256 != scene.identity_hash
+            or reset_plan.role_binding.task_source_identity_hash != task_source.identity_hash
+            or reset_plan.role_binding.scene_identity_hash != scene.identity_hash
+            or reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
+        raise ValueError(error_message)
+
+
+@dataclass(frozen=True)
+class UsdRuntimeInputV1:
+    """Source-bound USD session inputs; admission policy remains in runtime."""
+    schema_version: str
+    task_source: object
+    artifact: TaskArtifactV1
+    runtime_source: UsdRuntimeSourceV1
+    execution: object
+    reset_plan: object
+    controller_profile: str
+    horizon: int
+    delivery_manifest_sha256: str
+    admission_policy: Mapping | None = None
+
+    def construction_identity_fields(self):
+        """Project the immutable source and reset identities for construction receipts."""
+        source = self.runtime_source
+        return {
+            'artifact': self.artifact.to_mapping(),
+            'artifact_sha256': self.artifact.identity_hash,
+            'runtime_source_id': source.source_id,
+            'runtime_source_closure_sha256': source.source_closure_digest,
+            'runtime_source_bindings': {
+                name: dict(getattr(source, name))
+                for name in ('joints', 'bodies', 'frames', 'free_joints', 'joint_targets')
+            },
+            'execution_spec_v1': self.execution.to_mapping(),
+            'reset_plan_identity_sha256': self.reset_plan.identity_hash,
+        }
+
+    def validate(self):
+        from ...artifacts import ExecutionSpecV1
+        from ...artifacts.execution import EpisodeResetPlanV1
+        from ...environment.task_source import TaskSourceV1
+        if (type(self.task_source) is not TaskSourceV1
+                or type(self.artifact) is not TaskArtifactV1
+                or type(self.runtime_source) is not UsdRuntimeSourceV1
+                or type(self.execution) is not ExecutionSpecV1
+                or type(self.reset_plan) is not EpisodeResetPlanV1):
+            raise TypeError("USD RuntimeInput requires exact TaskSource/Artifact/USD/Execution/reset contracts")
+        self.artifact.validate()
+        self.runtime_source.validate()
+        self.execution.validate()
+        self.reset_plan.validate()
+        self.reset_plan.role_binding.validate()
+        self.reset_plan.reset_sample.validate()
+        if self.runtime_source.task_artifact is not self.artifact:
+            raise ValueError("USD RuntimeSource must reference the exact TaskArtifact")
+        if (self.runtime_source.scene_source.task_source_identity_sha256
+                != self.task_source.identity_hash
+                or self.runtime_source.scene_source.scene_identity_sha256
+                != self.runtime_source.scene_definition.identity_hash):
+            raise ValueError("USD RuntimeSource must bind the exact TaskSource and Scene")
+        if (self.artifact.task_source_identity_hash != self.task_source.identity_hash
+                or self.artifact.scene_identity_hash != self.runtime_source.scene_definition.identity_hash
+                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
+                or self.reset_plan.role_binding.scene_identity_hash != self.runtime_source.scene_definition.identity_hash
+                or self.reset_plan.reset_sample.task_artifact_hash != self.artifact.identity_hash):
+            raise ValueError("USD RuntimeInput TaskSource/Scene/Artifact/reset identities disagree")

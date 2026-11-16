@@ -1,7 +1,7 @@
 """Bounded provider-neutral static triangle source; dynamic cameras are separate."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 import numpy as np
@@ -327,6 +327,131 @@ class DynamicCameraRenderSourceV1:
 
 
 @dataclass(frozen=True)
+class DynamicCameraRenderSourceV2(DynamicCameraRenderSourceV1):
+    """Scene-bound free-body extension; v1 serialization and behavior are unchanged.
+
+    Free poses are body-origin world transforms in metres and wxyz. Sites are
+    admitted as published frames but do not own geometry or a free transform.
+    """
+    free_bindings: tuple[tuple[str, str, str, str, str], ...]
+    published_frame_keys: tuple[tuple[str, str], ...]
+    runtime_source: object = None
+    artifact: object = None
+
+    @classmethod
+    def from_runtime_source(cls, source, *, artifact, joint_bindings, frame_bindings):
+        from ...runtime.sessions.source import RuntimeSource
+        if not isinstance(source, RuntimeSource):
+            raise TypeError('dynamic render source requires RuntimeSource')
+        if source.scene_definition is None or source.source_closure_digest is None:
+            raise ValueError('dynamic render source requires a canonical source closure')
+        from ...runtime.sessions.source import (position_frame_bindings_from_artifact,
+                                                 position_joint_bindings_from_artifact)
+        if artifact.identity_hash != source.task_artifact_hash:
+            raise ValueError('render source TaskArtifact identity mismatch')
+        if (dict(frame_bindings) != position_frame_bindings_from_artifact(artifact, source)
+                or dict(joint_bindings) != position_joint_bindings_from_artifact(source.scene_definition, artifact, source)):
+            raise ValueError('render mappings differ from Artifact/source bindings')
+        if set(joint_bindings) != set(source.joints) | set(source.free_joints):
+            raise ValueError('render Joint definitions must exactly cover source')
+        if set(frame_bindings) != set(source.bodies) | set(source.frames):
+            raise ValueError('render Frame definitions must exactly cover source')
+        scene_joints = {(j.parent_frame.entity_id, j.joint_id): j
+                        for a in source.scene_definition.articulations or () for j in a.joints}
+        scene_frames = {(f.entity_id, f.frame_id) for f in source.scene_definition.frames or ()}
+        if (len({(v.parent_frame.entity_id, v.joint_id) for v in joint_bindings.values()}) != len(joint_bindings)
+                or len({(v.entity_id, v.frame_id) for v in frame_bindings.values()}) != len(frame_bindings)):
+            raise ValueError('source Joint/Frame mappings must be one-to-one')
+        for definition in joint_bindings.values():
+            if scene_joints.get((definition.parent_frame.entity_id, definition.joint_id)) != definition:
+                raise ValueError('Joint binding differs from its Scene definition')
+        if not {(v.entity_id, v.frame_id) for v in frame_bindings.values()} <= scene_frames:
+            raise ValueError('Frame binding differs from its Scene definition')
+        joints = tuple(DynamicRenderJointBindingV1(
+            joint_bindings[k].parent_frame.entity_id, joint_bindings[k].joint_id, native)
+            for k, native in sorted(source.joints.items()))
+        frames = tuple(DynamicRenderFrameBindingV1(
+            frame_bindings[k].entity_id, frame_bindings[k].frame_id, native)
+            for k, native in sorted(source.bodies.items()))
+        free = tuple((joint_bindings[k].parent_frame.entity_id, joint_bindings[k].joint_id,
+                      native, joint_bindings[k].child_frame.entity_id,
+                      joint_bindings[k].child_frame.frame_id)
+                     for k, native in sorted(source.free_joints.items()))
+        result = cls('camera-dynamic-source-v2', source.task_artifact_hash,
+                     source.scene_definition.identity_hash, source.scene_source.source_id,
+                     source.source_closure_digest, source.scene_source, source.scene_definition,
+                     joints, frames, free,
+                     tuple(sorted((v.entity_id, v.frame_id) for v in frame_bindings.values())),
+                     source, artifact)
+        result.validate()
+        return result
+
+    def validate(self):
+        if self.schema_version != 'camera-dynamic-source-v2':
+            raise ValueError('unsupported dynamic render source schema')
+        DynamicCameraRenderSourceV1.validate(replace(self, schema_version='camera-dynamic-source-v1'))
+        keys = [(v[0], v[1]) for v in self.free_bindings]
+        body_keys = {(v.entity_id, v.frame_id) for v in self.frame_bindings}
+        if (len(keys) != len(set(keys)) or len({v[2] for v in self.free_bindings}) != len(keys)
+                or set(keys) & {(v.entity_id, v.joint_id) for v in self.joint_bindings}
+                or len(self.published_frame_keys) != len(set(self.published_frame_keys))
+                or not body_keys <= set(self.published_frame_keys)):
+            raise ValueError('dynamic free Joint/Frame bindings must be unique and complete')
+        definitions = {(j.parent_frame.entity_id, j.joint_id): j
+                       for a in self.scene_definition.articulations or () for j in a.joints}
+        for entity, joint, native, frame_entity, frame_id in self.free_bindings:
+            for value in (entity, joint, native, frame_entity, frame_id): _name(value)
+            definition = definitions.get((entity, joint))
+            if (definition is None or definition.kind != 'floating'
+                    or (definition.child_frame.entity_id, definition.child_frame.frame_id) != (frame_entity, frame_id)
+                    or (frame_entity, frame_id) not in body_keys):
+                raise ValueError('free Joint must resolve to its declared body Frame')
+        scene_frames = {(f.entity_id, f.frame_id) for f in self.scene_definition.frames or ()}
+        if not set(self.published_frame_keys) <= scene_frames:
+            raise ValueError('published Frame binding is not in the Scene')
+
+    def validate_binding_provenance(self):
+        """Require exact Artifact-derived names before any native renderer build."""
+        from ...artifacts import TaskArtifactV1
+        from ...runtime.sessions.source import (RuntimeSource, position_frame_bindings_from_artifact,
+                                                 position_joint_bindings_from_artifact)
+        source, artifact = self.runtime_source, self.artifact
+        if not isinstance(source, RuntimeSource) or not isinstance(artifact, TaskArtifactV1):
+            raise TypeError('v2 native binding requires its RuntimeSource and TaskArtifactV1')
+        if (artifact.identity_hash != self.task_artifact_hash
+                or source.task_artifact_hash != self.task_artifact_hash
+                or source.scene_definition != self.scene_definition
+                or source.scene_source != self.scene_source
+                or source.source_closure_digest != self.source_closure_digest):
+            raise ValueError('v2 source provenance differs from its materialized inputs')
+        frames = position_frame_bindings_from_artifact(artifact, source)
+        joints = position_joint_bindings_from_artifact(self.scene_definition, artifact, source)
+        expected_joints = tuple(DynamicRenderJointBindingV1(joints[k].parent_frame.entity_id,
+                                joints[k].joint_id, native) for k,native in sorted(source.joints.items()))
+        expected_frames = tuple(DynamicRenderFrameBindingV1(frames[k].entity_id, frames[k].frame_id, native)
+                                for k,native in sorted(source.bodies.items()))
+        expected_free = tuple((joints[k].parent_frame.entity_id, joints[k].joint_id, native,
+                               joints[k].child_frame.entity_id, joints[k].child_frame.frame_id)
+                              for k,native in sorted(source.free_joints.items()))
+        expected_published = tuple(sorted((v.entity_id,v.frame_id) for v in frames.values()))
+        if (self.joint_bindings != expected_joints or self.frame_bindings != expected_frames
+                or self.free_bindings != expected_free or self.published_frame_keys != expected_published):
+            raise ValueError('v2 mapping differs from Artifact/source provenance')
+
+    @property
+    def identity_hash(self):
+        self.validate()
+        payload = {'schema_version': self.schema_version,
+                   'task_artifact_hash': self.task_artifact_hash, 'scene_identity_hash': self.scene_identity_hash,
+                   'source_identity': self.source_identity, 'source_closure_digest': self.source_closure_digest,
+                   'joint_bindings': tuple(v.to_mapping() for v in self.joint_bindings),
+                   'frame_bindings': tuple(v.to_mapping() for v in self.frame_bindings),
+                   'free_bindings': self.free_bindings,
+                   'published_frame_keys': self.published_frame_keys}
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
 class RenderStateProjectionV1:
     """One read-only canonical state projection consumed by a renderer."""
 
@@ -350,6 +475,13 @@ class RenderStateProjectionV1:
             'joint_positions': self.joint_positions,
             'frame_poses': self.frame_poses,
         }
+
+
+@dataclass(frozen=True)
+class RenderStateProjectionV2(RenderStateProjectionV1):
+    """V2 includes free-body world poses in frame_poses."""
+    def to_mapping(self):
+        return {'schema_version': 'render-state-projection-v2', **super().to_mapping()}
 
 
 @dataclass(frozen=True)
@@ -390,6 +522,16 @@ class RenderStateSyncReceiptV1:
         }
 
 
+@dataclass(frozen=True)
+class RenderStateSyncReceiptV2(RenderStateSyncReceiptV1):
+    """Owned renderer-only model with copied CPU state and synchronous update."""
+    def to_mapping(self):
+        return {**super().to_mapping(), 'resource_owner': 'renderer-only',
+                'state_transfer': 'cpu-copy-synchronous-kinematics',
+                'topology_generation': self.geometry_version,
+                'limitations': ('rigid-only', 'no-physics-step', 'no-shared-state')}
+
+
 def project_render_state_v1(source: DynamicCameraRenderSourceV1, state: CanonicalStateViewV1) -> RenderStateProjectionV1:
     """Bind Entity-qualified scalar state values to one dynamic render source."""
 
@@ -401,9 +543,13 @@ def project_render_state_v1(source: DynamicCameraRenderSourceV1, state: Canonica
     if state.sample_clock.clock_domain != 'evaluation_boundary' or state.sample_clock.sample_index != state.boundary.control_step:
         raise ValueError('dynamic camera requires one evaluation-boundary state publication')
 
+    state.validate()
+    if isinstance(source, DynamicCameraRenderSourceV2):
+        state.validate_against_scene(source.scene_definition)
     expected_joints = {(item.entity_id, item.joint_id): item for item in source.joint_bindings}
+    free_keys = {(v[0], v[1]) for v in source.free_bindings} if isinstance(source, DynamicCameraRenderSourceV2) else set()
     observed_joints = {(item.entity_id, item.joint_id): item for item in state.joints}
-    if set(observed_joints) != set(expected_joints):
+    if set(observed_joints) != set(expected_joints) | free_keys:
         raise ValueError('dynamic camera state Joint identities do not exactly match the render source')
     joint_positions = []
     for key in sorted(expected_joints):
@@ -418,7 +564,7 @@ def project_render_state_v1(source: DynamicCameraRenderSourceV1, state: Canonica
 
     expected_frames = {(item.entity_id, item.frame_id): item for item in source.frame_bindings}
     observed_frames = {(item.frame.entity_id, item.frame.frame_id): item for item in state.frames}
-    if set(observed_frames) != set(expected_frames):
+    if set(observed_frames) != (set(source.published_frame_keys) if isinstance(source, DynamicCameraRenderSourceV2) else set(expected_frames)):
         raise ValueError('dynamic camera state Frame identities do not exactly match the render source')
     frame_poses = []
     for key in sorted(expected_frames):
@@ -430,9 +576,22 @@ def project_render_state_v1(source: DynamicCameraRenderSourceV1, state: Canonica
             raise ValueError(f'dynamic camera state contains a non-finite Frame pose for {key!r}')
         frame_poses.append((binding.entity_id, binding.frame_id, binding.native_body_name, position, quaternion))
 
+    if isinstance(source, DynamicCameraRenderSourceV2):
+        for entity, joint, _native, frame_entity, frame_id in source.free_bindings:
+            value = observed_joints[(entity, joint)]
+            pose = observed_frames[(frame_entity, frame_id)].pose_world
+            if value.kind != 'floating' or len(value.position) != 7:
+                raise ValueError('free Joint state must have floating 7-position')
+            q = np.asarray(value.position[3:], dtype=np.float64)
+            frame_q = np.asarray(pose.quaternion_wxyz, dtype=np.float64)
+            if (not np.isfinite(value.position).all() or abs(float(np.linalg.norm(frame_q)) - 1.) > 1e-6
+                    or np.linalg.norm(np.asarray(value.position[:3]) - pose.position) > 1e-8
+                    or min(np.linalg.norm(q-frame_q), np.linalg.norm(q+frame_q)) > 1e-8):
+                raise ValueError('free Joint and body-origin world Frame pose disagree')
     payload = {'joint_positions': tuple(joint_positions), 'frame_poses': tuple(frame_poses)}
     transform_version = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
-    return RenderStateProjectionV1(
+    projection_type = RenderStateProjectionV2 if isinstance(source, DynamicCameraRenderSourceV2) else RenderStateProjectionV1
+    return projection_type(
         source.identity_hash, source.geometry_version, state.boundary.boundary_id,
         transform_version, state.boundary, state.sample_clock,
         tuple(joint_positions), tuple(frame_poses),
@@ -468,7 +627,9 @@ class CameraCaptureIdentityV1(Contract):
             if not re.fullmatch(r'[0-9a-f]{64}', digest):
                 raise ValueError('camera capture identity requires lowercase SHA-256 references')
         _name(self.camera_id)
-        _choice(self.capture_phase, {'post_control_step'}, 'capture phase')
+        _choice(self.capture_phase, {'reset_initial', 'post_control_step'}, 'capture phase')
+        if self.capture_phase == 'reset_initial' and self.state_boundary.control_step != 0:
+            raise ValueError('reset-initial capture requires control step zero')
         if self.sample_clock.clock_domain != 'evaluation_boundary':
             raise ValueError('camera capture identity requires an evaluation boundary clock')
         if self.sample_clock.sample_index != self.state_boundary.control_step:

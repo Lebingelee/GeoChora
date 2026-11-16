@@ -33,6 +33,51 @@ class CartesianPosePlannerConfig:
     settle_steps: int = 16
     max_steps: int = 200
 
+    @classmethod
+    def from_si_rates(
+        cls,
+        *,
+        control_dt_s: float,
+        translation_speed_m_s: float,
+        translation_acceleration_m_s2: float,
+        rotation_speed_rad_s: float,
+        rotation_acceleration_rad_s2: float,
+        settle_duration_s: float,
+        max_plan_duration_s: float,
+    ) -> "CartesianPosePlannerConfig":
+        """Resolve physical-time limits into the shared per-control-tick profile."""
+        values = (
+            control_dt_s, translation_speed_m_s, translation_acceleration_m_s2,
+            rotation_speed_rad_s, rotation_acceleration_rad_s2,
+            settle_duration_s, max_plan_duration_s,
+        )
+        if not all(math.isfinite(float(value)) for value in values):
+            raise ValueError("Cartesian planner rates and durations must be finite")
+        dt = float(control_dt_s)
+        if dt <= 0.0 or min(
+            float(translation_speed_m_s), float(translation_acceleration_m_s2),
+            float(rotation_speed_rad_s), float(rotation_acceleration_rad_s2),
+            float(max_plan_duration_s),
+        ) <= 0.0 or float(settle_duration_s) < 0.0:
+            raise ValueError("Cartesian planner rates and durations must be positive")
+
+        def ticks(duration_s: float, *, allow_zero: bool = False) -> int:
+            rounded = int(math.ceil(float(duration_s) / dt - 1e-10))
+            return max(0 if allow_zero else 1, rounded)
+
+        return cls(
+            max_translation_per_step=float(translation_speed_m_s) * dt,
+            max_translation_acceleration_per_step=(
+                float(translation_acceleration_m_s2) * dt**2
+            ),
+            max_rotation_per_step=float(rotation_speed_rad_s) * dt,
+            max_rotation_acceleration_per_step=(
+                float(rotation_acceleration_rad_s2) * dt**2
+            ),
+            settle_steps=ticks(float(settle_duration_s), allow_zero=True),
+            max_steps=ticks(float(max_plan_duration_s)),
+        )
+
     def __post_init__(self) -> None:
         if self.max_translation_per_step <= 0.0:
             raise ValueError("max_translation_per_step must be positive")

@@ -3,15 +3,15 @@
 **Import path**：`task_env.RuntimeBoundary`、`task_env.runtime`  
 **任务域**：Appendix  
 **稳定性**：Advanced boundary  
-**职责**：限定 TaskEnv 与 GeoPhys runtime 的唯一物理边界。  
-**调用者/消费者**：`BaseTaskEnv`、runtime bootstrap。
+**职责**：限定 classic TaskEnv 与 GeoPhys runtime 的物理边界。
+**调用者/消费者**：统一环境的组件任务和 runtime bootstrap；selected 任务使用 RuntimeSession 接线。
 **源码**：`environment/protocols.py`、`runtime/`
 
 ## `RuntimeBoundary`
 
 **Kind**：Protocol；**Defined in**：`environment/protocols.py`
 
-成员为 `apply_reset_state(state)`、`apply_control(command)`、`step(*, substeps)`、`read_snapshot(request)`、`snapshot_state()`、`restore_state(state)`、`prewarm(profile="interactive")`。这是 framework integration contract，而不是用户控制入口。
+成员包括 `apply_reset_state(state, *, static_world_child_poses=None)`、`apply_control(command)`、`set_actuator_force_limits(actuator_ids, limit_N)`、`step(*, substeps)`、`read_snapshot(request)`、`snapshot_state()`、`restore_state(state)`、`prewarm(profile="interactive")`。这是 framework integration contract，而不是用户控制入口。selected 的 `RuntimeSession`／provider adapter 使用不同的 artifact、source 和 control contract；两种运行时组件接入同一 episode owner；不把该 Protocol 描述成所有 provider 共用的物理接口。
 
 `GeoPhysRuntimeBoundary`、`TaskRuntimeBootstrap`、`bootstrap_task_runtime` 是 advanced runtime API；不将 solver 内部布局、Taichi field、private runtime 方法、`ctrl` 或 `qpos` 写成 planner/recorder 可访问路径。
 

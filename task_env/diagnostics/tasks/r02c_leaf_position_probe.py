@@ -511,7 +511,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
         ARM_WRITER_ID, HAND_WRITER_ID, action_for_interval, build_leaf_position_candidate,
     )
     from task_env.tasks.reference_env import SelectedReferenceEnv
-    import task_env.tasks.reference_env as reference_env_module
+    import task_env.environment.reference_env as reference_env_module
 
     results.update({
         "status": "RUNNING", "provider": "mujoco", "version": "3.8.1",

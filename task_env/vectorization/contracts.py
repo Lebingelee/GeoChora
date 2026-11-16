@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from collections.abc import Mapping, Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, TYPE_CHECKING
 
-import gymnasium as gym
+if TYPE_CHECKING:
+    import gymnasium as gym
 import numpy as np
 
 from ..environment.task_definition import TaskBatchEvaluation

@@ -1,0 +1,803 @@
+{
+  "schema_version": "geochora-v211-capability-plan-v1",
+  "version": "2.1.1",
+  "status": "CURRENT_BOUNDED_WITH_HISTORICAL_PLAN",
+  "updated_date": "2026-11-13",
+  "baseline": {
+    "core_commit": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
+    "geophys_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+    "evidence_matrix": "../../v2.1.0/capabilities/capability-matrix.json",
+    "policy": "Existing bounded evidence remains source-scoped; no new native capability is claimed by this plan."
+  },
+  "definitions": {
+    "NOT_RUN": "No new evidence for this target.",
+    "IMPLEMENTED": "Source implementation only; no native capability implied.",
+    "TESTED_BOUNDED": "Exact declared intersection passed the recorded check.",
+    "PARTIAL": "Some checks passed; specified required gates remain incomplete.",
+    "FAIL": "A required gate failed.",
+    "BLOCKED": "Specified dependency or external condition prevents progress.",
+    "DEFERRED": "Maintainer approved moving the specified scope to a later version."
+  },
+  "evidence_required_fields": [
+    "core_commit",
+    "provider_commit_or_runtime_build",
+    "task_and_source_identity",
+    "controller_and_action_schema",
+    "renderer_and_camera_identity",
+    "backend_and_device",
+    "batch_mode_and_size",
+    "resolved_configuration_identity",
+    "oracle_and_tolerance",
+    "raw_evidence_reference",
+    "independent_readback",
+    "close_outcome"
+  ],
+  "target_resolution": {
+    "freeze_at": [
+      "1a",
+      "1d"
+    ],
+    "runtime_versions": {
+      "mujoco_cpu": {
+        "candidate": "MuJoCo 3.8.1 / CPU",
+        "task_env_requirement": "mujoco>=3.8.1,<3.9.0",
+        "historical_f06_version": "3.8.1",
+        "geophys_requirement": "mujoco>=3.15.0",
+        "shared_environment_status": "CONFLICTING_DECLARED_RANGES; GEOPHYS_NATIVE_SOLVER_DOES_NOT_CONSUME_UNSELECTED_MUJOCO"
+      },
+      "geophys_cpu": {
+        "candidate": "GeoPhys CPU",
+        "provider_gitlink": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "taichi_forge_requirement": "taichi-forge==0.6.3"
+      },
+      "isaacsim_physx_cuda": {
+        "candidate": "Isaac Sim 6.2.0.0 / PhysX / CUDA",
+        "cuda_device": "cuda:0",
+        "source_requirement": "F06 admission requires explicit source delivery manifest",
+        "maintainer_compatibility_scope": {
+          "decision_date": "2026-11-05",
+          "planning_ref": "../planning/isaac-deployment-compatibility.md",
+          "v211_versions": [
+            "6.1.0",
+            "6.2.0"
+          ],
+          "common_adapter_implementation_status": "PARTIAL",
+          "native_validation_by_version": {
+            "6.1.0": "NOT_RUN",
+            "6.2.0": "PARTIAL"
+          },
+          "future_versions": {
+            "5.1.0": "DEFERRED"
+          },
+          "scope": "Planned shared state-only PhysX adapter and portable deployment; does not promote existing targets, historical evidence or all legacy candidates.",
+          "native_validation_note": "3b attempt001: F06 10 transitions and independent reader complete, N08 direction FAIL; Sol review pending. 6.1 remains NOT_RUN."
+        }
+      }
+    },
+    "renderer_names": {
+      "generic_ui": {
+        "modes": [
+          "human",
+          "rgb_array"
+        ],
+        "owner": "TaskEnvRenderProvider",
+        "task_observation": false,
+        "ui_effect": "Presents current state through TaskEnvRenderProvider; no physics step; observer camera is separate by default."
+      },
+      "same_provider_camera": {
+        "profile": "p1_4_native_camera_cpu_v0",
+        "scope": "static same-provider RGB/depth capture; not evidence of selected PickCube synchronization",
+        "consumer_status": "legacy static same-provider capture; not selected PickCube reset/step evidence"
+      },
+      "cross_camera": {
+        "candidate": "GeoPhys CPU physics -> MuJoCo native OpenGL",
+        "profiles": [
+          "d03_mujoco_native_dynamic_opengl_v1",
+          "d04_mujoco_native_dynamic_opengl_rgbd_v1",
+          "d04_mujoco_native_dynamic_opengl_entity_instance_segmentation_v1"
+        ],
+        "source_constraint": "Scene-v3 scalar joints only; free_joints rejected",
+        "current_free_joint_support": false
+      },
+      "isaacsim": {
+        "selected_task_camera_observation": null,
+        "reason": "No selected PickCube camera consumer route was found in the audited source."
+      },
+      "native_task_render_candidates": {
+        "mujoco_cpu": {
+          "profile": "p1_4_native_camera_cpu_v0",
+          "capture": "static same-provider capture",
+          "human_window": "generic TaskEnvRenderProvider only; not connected to selected PickCube",
+          "synchronized_pickcube_observation": "not implemented; future 5c"
+        },
+        "geophys_cpu": {
+          "profile": "p1_4_native_camera_cpu_v0",
+          "capture": "static same-provider capture",
+          "dynamic_profile": "GeoPhys CPU -> MuJoCo native OpenGL D03/D04",
+          "human_window": "generic TaskEnvRenderProvider only; not evidence of task observation",
+          "synchronized_pickcube_observation": "not supported by current scalar-only projection; free-joint PickCube excluded"
+        },
+        "isaacsim_physx_cuda": {
+          "profile": null,
+          "capture": null,
+          "human_window": null,
+          "synchronized_pickcube_observation": null,
+          "reason": "No selected-task Isaac camera/render owner; audited app profile is headless and camera-disabled."
+        }
+      }
+    },
+    "parallel_backend_list": [
+      {
+        "provider": "geophys",
+        "physics_backend": "cpu",
+        "status": "existing GeoPhys merged-scene native batch candidate"
+      },
+      {
+        "provider": "geophys",
+        "physics_backend": "cuda",
+        "status": "same physical provider on another device backend; does not count as a second physics provider"
+      },
+      {
+        "provider": "isaacsim",
+        "physics_backend": "cuda:0",
+        "status": "recommended second-provider batch candidate; no current TaskEnv batch adapter"
+      }
+    ],
+    "parallel_modes": [
+      "local / device transfer",
+      "remote / spawn / host_numpy (default)",
+      "remote / forkserver / host_numpy",
+      "fork is rejected"
+    ],
+    "cross_pairing_status": "CANDIDATE_REQUIRES_CONFIRMATION",
+    "cross_pairing_candidate": {
+      "physics": "GeoPhys CPU",
+      "renderer": "MuJoCo native OpenGL",
+      "consumer": "Position candidate DynamicCameraObservationConsumerV1",
+      "pickcube_status": "unsupported by current dynamic projection because PickCube declares a floating cube free joint",
+      "current_provider_pin_evidence": "not established; historical D05b evidence used GeoPhys a53a8cf rather than current gitlink 67da1165; current dynamic source rejects free_joints",
+      "required_future_extension": "Typed floating-body/frame pose to renderer-only visual model mapping; prove exactly one GeoPhys physics advance and same-boundary RGB."
+    },
+    "parallel_gap": "Only GeoPhys merged rigid batch is connected; current parallel registrations are Pendulum and TwoWheelBalance. Isaac TaskEnv batch adapter absent. Remote same-step autoreset preserves terminal_observation/reset_info, but RemoteBatchVecEnv.get_images repeats a single worker frame across slots; this is not row-specific task RGB.",
+    "reason": "G01/1a-1d bounded design deliveries independently reviewed; all five protocols remain draft pending maintainer confirmation. No native/build/runtime/image evidence added; 13 implementation targets NOT_STARTED and 9 final cells NOT_RUN.",
+    "render_protocol_resolution": {
+      "status": "BOUNDED_DESIGN_REVIEWED_PENDING_MAINTAINER_CONFIRMATION",
+      "render_completion_targets": [
+        {
+          "id": "window_presentation",
+          "route_requirement": "Configured observer camera/window; .render() presents latest completed boundary; no physics advance"
+        },
+        {
+          "id": "offscreen_rgb_capture",
+          "route_requirement": "Real frame with camera/state identity, phase/clock, completion and owned-or-leased storage"
+        },
+        {
+          "id": "synchronized_task_rgb_observation",
+          "route_requirement": "Required task RGB on every reset initial boundary and every normal step; no extra caller .render()"
+        }
+      ],
+      "selected_pickcube_status": "renderer=none; no selected PickCube window or synchronized task-camera route is established",
+      "reset_capture_phase_gap": "Current consumer config labels reset-initial capture post_control_step; future 5c must add call-time reset_initial identity. Not implementation evidence.",
+      "shared_scene_policy": "Provider/session retains native scene/model/App ownership; renderer borrows a typed generation-bound limited lease and consumes only completed public state.",
+      "independent_renderer_policy": "Renderer-owned visual model/data may perform required kinematics but no second physics advance and no mutation of live physics state.",
+      "rgb_policy": "Canonical output must specify dimensions/layout/channel/color/range/dtype/device/completion/lifetime; owned storage by default, borrowed lease/fence explicit; zero/shape-only is not success.",
+      "batch_image_layout": "env -> worker -> local row -> camera -> image; same-step terminal frame before mask reset, reset frame after reset; preserve terminal_observation/reset_info; never broadcast one worker frame as distinct row observations.",
+      "close_policy": "Renderer stops capture/presentation and releases own resources/leases; original provider/App/worker owner closes shared resources after final lease.",
+      "future_owners": {
+        "5a": "render capability/build, route binding, visual/frame mapping incl. free-body pose",
+        "5b": "observer/window, display events, app/device/context lease",
+        "5c": "reset/step capture phase, synchronized task RGB, frame lifetime/fault/cache",
+        "6c": "batch row-to-camera image correspondence and same-step terminal/reset frames"
+      },
+      "public_api_policy": "Env.render returns ndarray or None by construction-fixed mode; internal presentation/capture/close receipts remain on adapter-Core/diagnostic paths. Keep existing configured RGB dtype/range; no implicit global uint8 migration."
+    }
+  },
+  "targets": [
+    {
+      "id": "PROTOCOL",
+      "gate": "1d",
+      "scope": "Core / physics / render protocols",
+      "criterion": "Five reviewed contracts and declared ownership / unsupported behavior",
+      "provider": null,
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "G01 bounded designs reviewed and maintainer-confirmed as APPROVED_IMPLEMENTATION_BASELINE. Production protocol APIs remain unimplemented; documentation approval is not native evidence."
+      ]
+    },
+    {
+      "id": "PHYS-MJ",
+      "gate": "3b",
+      "scope": "PickCube × MuJoCo × CPU",
+      "criterion": "Public build/reset/step/state/record/close",
+      "provider": "mujoco",
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Current shared-environment dependency declarations conflict with GeoPhys: Core requires MuJoCo <3.9 while GeoPhys declares >=3.15.",
+        "The 1a audit did not start a runtime or repeat historical F06 evidence."
+      ]
+    },
+    {
+      "id": "PHYS-GP",
+      "gate": "3b",
+      "scope": "PickCube × GeoPhys × CPU",
+      "criterion": "Public build/reset/step/state/record/close",
+      "provider": "geophys",
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Current GeoPhys gitlink is 67da1165149486d3ae3e779c13ce31af49e17d50; no current-pin native run was performed in 1a."
+      ]
+    },
+    {
+      "id": "PHYS-IS",
+      "gate": "3b",
+      "scope": "PickCube × Isaac Sim + PhysX × CUDA",
+      "criterion": "Public build/reset/step/state/record/close",
+      "provider": "isaac_sim_physx",
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Isaac Sim 6.2.0.0, PhysX, CUDA cuda:0 and explicit source delivery remain the bounded source candidate; no native run was performed in 1a.",
+        "Maintainer requires v2.1.1 shared 6.1/6.2 implementation; 6.1 SDK absent and native NOT_RUN. See planning/isaac-deployment-compatibility.md; no full version-by-task matrix is added."
+      ]
+    },
+    {
+      "id": "RESET",
+      "gate": "3c",
+      "scope": "Declared scalar backend switching",
+      "criterion": "A→B→A across declared edges; no old-state migration",
+      "provider": null,
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Same public Env must perform admitted route switching; internal session/worker/environment rebuild allowed. Core sampler continues on seed=None; private provider RNG is not migrated."
+      ]
+    },
+    {
+      "id": "CONTROL",
+      "gate": "4c",
+      "scope": "Common effort and reset Controller selection",
+      "criterion": "Named effort, declared gripper mapping, feedback/model, new action spec and fixed obs",
+      "provider": null,
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Current R3/native position compatibility is not canonical effort. Planned Panda controller maps 8D input to seven arm torques plus two named finger forces; preserve source coupling and verify representability.",
+        "JointEffort and BodyWrench are separate capabilities; nested Robot bindings and explicit contribution composition are required. Minimum BodyWrench runtime intersection/oracles freeze in 4a; no automatic all-pairings matrix."
+      ]
+    },
+    {
+      "id": "RENDER-MJ",
+      "gate": "5c",
+      "scope": "PickCube × MuJoCo native renderer",
+      "criterion": "Window + RGB capture + synchronized RGB observation",
+      "provider": "mujoco",
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Selected PickCube admits only renderer=none. Generic human/rgb_array UI rendering is a separate owner and does not populate task observations.",
+        "No synchronized selected PickCube native-renderer observation route was verified."
+      ]
+    },
+    {
+      "id": "RENDER-GP",
+      "gate": "5c",
+      "scope": "PickCube × GeoPhys declared renderer",
+      "criterion": "Window + RGB capture + synchronized RGB observation",
+      "provider": "geophys",
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "The existing p1_4 camera path is static and same-provider. The state-bound dynamic camera consumer is currently limited to the Position candidate and cross-renders through MuJoCo OpenGL.",
+        "Current dynamic projection rejects free joints, excluding PickCube's floating cube."
+      ]
+    },
+    {
+      "id": "RENDER-IS",
+      "gate": "5c",
+      "scope": "PickCube × Isaac native rendering",
+      "criterion": "Window + RGB capture + synchronized RGB observation",
+      "provider": "isaac_sim_physx",
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "No selected PickCube synchronized task-camera observation owner was identified; viewport availability is not capture evidence."
+      ]
+    },
+    {
+      "id": "RENDER-CROSS",
+      "gate": "5c",
+      "scope": "One real physics/renderer cross pairing",
+      "criterion": "Candidate GeoPhys physics × MuJoCo renderer; freeze at 1a/1d",
+      "provider": "geophys",
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Dynamic candidate is GeoPhys CPU -> MuJoCo native OpenGL, best_effort, scalar joints only. PickCube has a free joint and is rejected by current projection.",
+        "Historical bounded evidence is tied to an older GeoPhys pin; current-pin reproducibility is not established."
+      ]
+    },
+    {
+      "id": "BATCH",
+      "gate": "6c",
+      "scope": "At least two physical backends; at least one native batch",
+      "criterion": "Build/reset/step/render/obs; supported partial reset and whole-batch switching",
+      "provider": null,
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": [
+        "Only GeoPhys merged rigid batch is connected; registered tasks are Pendulum and TwoWheelBalance. MuJoCo and Isaac Sim TaskEnv batch adapters were not found.",
+        "GeoPhys CPU/CUDA are device variants of one provider, not two physics providers.",
+        "Remote autoreset is same-step and exposes terminal_observation/reset_info; the mode is not explicitly advertised in vector metadata. Merged-scene construction disables its render source; remote get_images repeats the worker's single returned frame for each slot."
+      ]
+    },
+    {
+      "id": "REUSE",
+      "gate": "7a",
+      "scope": "NutAssembly on its supported backends",
+      "criterion": "Reusable public routes and bounded compatibility checks",
+      "provider": null,
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": []
+    },
+    {
+      "id": "FINAL",
+      "gate": "7b",
+      "scope": "PickCube three backends × three seeds",
+      "criterion": "9/9 lifecycle-valid task success; separate runtime/solution/record/close outcomes",
+      "provider": null,
+      "implementation_status": "NOT_STARTED",
+      "validation_status": "NOT_RUN",
+      "resolved_configuration": null,
+      "evidence_refs": [],
+      "result": null,
+      "limitations": []
+    }
+  ],
+  "final_pickcube_cells": [
+    {
+      "id": "mujoco_cpu-seed31",
+      "route": "mujoco_cpu",
+      "seed": 31,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "mujoco_cpu-seed32",
+      "route": "mujoco_cpu",
+      "seed": 32,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "mujoco_cpu-seed33",
+      "route": "mujoco_cpu",
+      "seed": 33,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "geophys_cpu-seed31",
+      "route": "geophys_cpu",
+      "seed": 31,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "geophys_cpu-seed32",
+      "route": "geophys_cpu",
+      "seed": 32,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "geophys_cpu-seed33",
+      "route": "geophys_cpu",
+      "seed": 33,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "isaac_sim_physx_cuda-seed31",
+      "route": "isaac_sim_physx_cuda",
+      "seed": 31,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "isaac_sim_physx_cuda-seed32",
+      "route": "isaac_sim_physx_cuda",
+      "seed": 32,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    },
+    {
+      "id": "isaac_sim_physx_cuda-seed33",
+      "route": "isaac_sim_physx_cuda",
+      "seed": 33,
+      "status": "NOT_RUN",
+      "input_identity": null,
+      "runtime_valid": null,
+      "task_success": null,
+      "solution_complete": null,
+      "record_readback_valid": null,
+      "close_valid": null,
+      "evidence_refs": []
+    }
+  ],
+  "qualification_claim": false,
+  "publication_claim": false,
+  "current_state_ref": "../maintenance/current-state.md",
+  "evidence_reconciliation": {
+    "status": "U4_CODE_ACCEPTED_U5_PENDING",
+    "date": "2026-11-13",
+    "planning_snapshot_date": "2026-11-03",
+    "execution_ref": "../planning/post-5c-e11-e16-remaining-ledger.md",
+    "policy": "current_support is limited to named evidence; historical targets/cells retain their original planning semantics; no qualification or publication claim."
+  },
+  "historical_planning_fields": {
+    "fields": [
+      "baseline",
+      "target_resolution",
+      "targets",
+      "final_pickcube_cells"
+    ],
+    "meaning": "Frozen planning snapshot from 2026-11-03; NOT_RUN cells are final G07 goals, not statements that no earlier bounded evidence exists. Do not rewrite historical results."
+  },
+  "current_support": {
+    "status": "MAINTAINER_ACCEPTED_BOUNDED_POST_5C",
+    "accepted_scope": "G01–G05 and E00–E16 retain maintainer bounded acceptance, with the original evidence identities and approved exceptions. U3 and later Isaac solution-002 use the accepted same-run joint completion evidence; they are not pending a new U3 decision. Subsequent C1–C5 implementation at 7f8796b4 has bounded review and impact verification recorded in ../maintenance/reviews/20261114_post_optimization_c5_final.md and ../maintenance/reviews/20261114_g05_pre_g06_readiness_7f8796b4.md; this does not expand supported intersections or Qualification.",
+    "source_of_history": "../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md",
+    "configuration_and_formal_tasks": [
+      "pick-cube-p16-reference-v1",
+      "nut-assembly-outcome-reference-v1",
+      "pendulum-v1",
+      "two-wheel-balance-v1"
+    ],
+    "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped. Isaac 6.2 PhysX CUDA × Isaac RTX also supports a qualified frame-mounted task camera in the measured PickCube seed31 controlled-lift diagnostic (430 transitions, 431 RGB observations); MuJoCo/GeoPhys moving task cameras remain unsupported. This diagnostic is not the state-only full Solution run or a general renderer qualification. Post-optimization C4 separately exercised reset, one nonzero step, two same-boundary captures, second reset and close on that Isaac wrist RGB route; its seven listed frozen source hashes match 7f8796b4, and the closed H5 was independently reread. See ../maintenance/reviews/20261114_post_optimization_c4_task_rgb.md. C5 full Solutions remain state-only; other native/cross/window evidence is reused at its original source identity, not claimed as a final-HEAD rerun.",
+    "batch_scope": "G06a attempt002 SOL_ACCEPTED_BOUNDED_6A at Core 3bc9e2a7 / GeoPhys a2c85b7f: MJWarp Pendulum B=3 device canonical action, fixed-B same-step autoreset, owned CUDA uint8 Rasterizer cameras and opt-in device Recorder with full-boundary H5 readback. G06b unreviewed native batch evidence covers both tasks on the three providers. GeoPhys PickCube is limited to explicit discrete mode and the tested task configuration; controlled contact and independent camera/H5 readback were exercised, while loaded contact showed substantial penetration for other actions and continuous mesh contact is unsupported. Isaac cube/cube, robot/robot and cross-type robot/cube filtering have independent overlapping on/off controls. G06b/c, complete canonical six cells and R3 remain unaccepted. GeoPhys main merge/AOT are maintainer-deferred, not PASS. Review: ../maintenance/reviews/20261115_g06a_attempt002_acceptance.md",
+    "g07_scope": "Three providers × three seeds remains an unrun final gate; these single-seed records do not fill final_pickcube_cells.",
+    "record_completion_scope": "Five routes use same-run joint evidence: independent H5 readback and caller completion with verified identities. Four canonical H5 files lack completion field; Isaac v3 field is null. No H5-only completion claim; independent review supports bounded maintainer-authorized acceptance.",
+    "complete_solution_intersections": [
+      {
+        "id": "pick-mujoco-r1",
+        "task_uid": "pick-cube-p16-reference-v1",
+        "source_kind": "selected MJCF source",
+        "task_artifact_sha256": "d5f89a693aaada78796567703d7063c8a9da5e5cc9dcce3beebebe756ba286fe",
+        "controller_identity": "2d708027bb967a7e4ab87a18f79307ea4c0055c16f861c35072e0e4e8a3d5d0c",
+        "solution_identity": "1eccb772d274ee372cdeaf4d044656630d6959ab8574565f43febebea76e2e80",
+        "provider": "mujoco",
+        "backend": "cpu",
+        "device": "cpu",
+        "renderer": "none",
+        "task_rgb": "not recorded",
+        "batch_mode": "scalar",
+        "seed": 31,
+        "horizon": 1000,
+        "control_dt_s": 0.01,
+        "controller_profile": "r3_continuous_v1",
+        "runtime_valid": true,
+        "task_success": true,
+        "solution_complete_from_caller": true,
+        "completion_eligible_from_caller": true,
+        "record_readback_valid": true,
+        "transitions": 960,
+        "boundaries": 961,
+        "record_sha256": "9a429ce009fdb3d408be0e2936da253770511e5d1f640a7f7fcd80635588369d",
+        "env_close_from_caller": true,
+        "app_close": "not applicable",
+        "source_revision": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8 (dirty working tree; frozen source hashes in plan)",
+        "plan_sha256": "0d8da36fa7dca080de7cdd57622161d1488bdaa93d445a6c38497980f922b12e",
+        "evidence": "../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md",
+        "raw_directory": "workspace/maintenance/v211_e11_e16_u3_20261113_001/pick-mujoco-r1",
+        "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim"
+      },
+      {
+        "id": "pick-geophys-r1",
+        "task_uid": "pick-cube-p16-reference-v1",
+        "source_kind": "selected MJCF source",
+        "task_artifact_sha256": "d5f89a693aaada78796567703d7063c8a9da5e5cc9dcce3beebebe756ba286fe",
+        "controller_identity": "2d708027bb967a7e4ab87a18f79307ea4c0055c16f861c35072e0e4e8a3d5d0c",
+        "solution_identity": "1eccb772d274ee372cdeaf4d044656630d6959ab8574565f43febebea76e2e80",
+        "provider": "geophys",
+        "backend": "cpu",
+        "device": "cpu",
+        "renderer": "none",
+        "task_rgb": "not recorded",
+        "batch_mode": "scalar",
+        "seed": 31,
+        "horizon": 1000,
+        "control_dt_s": 0.01,
+        "controller_profile": "r3_continuous_v1",
+        "runtime_valid": true,
+        "task_success": true,
+        "solution_complete_from_caller": true,
+        "completion_eligible_from_caller": true,
+        "record_readback_valid": true,
+        "transitions": 951,
+        "boundaries": 952,
+        "record_sha256": "8e0902433c60d87e3d8183905a5e80080cc8dd169227d357f58b22bf7a3eb794",
+        "env_close_from_caller": true,
+        "app_close": "not applicable",
+        "source_revision": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8 (dirty working tree; frozen source hashes in plan)",
+        "plan_sha256": "0d8da36fa7dca080de7cdd57622161d1488bdaa93d445a6c38497980f922b12e",
+        "evidence": "../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md",
+        "raw_directory": "workspace/maintenance/v211_e11_e16_u3_20261113_001/pick-geophys-r1",
+        "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim"
+      },
+      {
+        "id": "nut-mujoco-r1",
+        "task_uid": "nut-assembly-outcome-reference-v1",
+        "source_kind": "selected MJCF source",
+        "task_artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+        "controller_identity": "4133a1d4e8112ed41feb6472eaa1f3e7234e1432db34d37f62ee7a67427bad87",
+        "solution_identity": "b9fec6b9494f6c7265264e42cf93f34b5ad31f8792acc0da22fab025c6915ec3",
+        "provider": "mujoco",
+        "backend": "cpu",
+        "device": "cpu",
+        "renderer": "none",
+        "task_rgb": "not recorded",
+        "batch_mode": "scalar",
+        "seed": 19,
+        "horizon": 6000,
+        "control_dt_s": 0.01,
+        "controller_profile": "R3 Outcome",
+        "runtime_valid": true,
+        "task_success": true,
+        "solution_complete_from_caller": true,
+        "completion_eligible_from_caller": true,
+        "record_readback_valid": true,
+        "transitions": 2377,
+        "boundaries": 2378,
+        "record_sha256": "539609ec20eab16049f5c21b111547cb18c128fd1d1f191a7f4d3340f1d5e090",
+        "env_close_from_caller": true,
+        "app_close": "not applicable",
+        "source_revision": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8 (dirty working tree; frozen source hashes in plan)",
+        "plan_sha256": "0d8da36fa7dca080de7cdd57622161d1488bdaa93d445a6c38497980f922b12e",
+        "evidence": "../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md",
+        "raw_directory": "workspace/maintenance/v211_e11_e16_u3_20261113_001/nut-mujoco-r1",
+        "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim"
+      },
+      {
+        "id": "nut-geophys-r1",
+        "task_uid": "nut-assembly-outcome-reference-v1",
+        "source_kind": "selected MJCF source",
+        "task_artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+        "controller_identity": "a2cb296c84b8f2f0993f7a706606f7d94866a50c48112c8cac3a4ecf764b1019",
+        "solution_identity": "f7e88162585138393ba58b59b47f73d89ed252f5100727064c052af2a08d12e7",
+        "provider": "geophys",
+        "backend": "cpu",
+        "device": "cpu",
+        "renderer": "none",
+        "task_rgb": "not recorded",
+        "batch_mode": "scalar",
+        "seed": 19,
+        "horizon": 6000,
+        "control_dt_s": 0.01,
+        "controller_profile": "R3 Outcome",
+        "runtime_valid": true,
+        "task_success": true,
+        "solution_complete_from_caller": true,
+        "completion_eligible_from_caller": true,
+        "record_readback_valid": true,
+        "transitions": 2442,
+        "boundaries": 2443,
+        "record_sha256": "b87abe1e7a2a467e47dab5b56ddb0147ab7e931f634cc7a07161ea11cf10c6f0",
+        "env_close_from_caller": true,
+        "app_close": "not applicable",
+        "source_revision": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8 (dirty working tree; frozen source hashes in plan)",
+        "plan_sha256": "0d8da36fa7dca080de7cdd57622161d1488bdaa93d445a6c38497980f922b12e",
+        "evidence": "../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md",
+        "raw_directory": "workspace/maintenance/v211_e11_e16_u3_20261113_001/nut-geophys-r1",
+        "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim"
+      },
+      {
+        "id": "pick-isaac-solution-002",
+        "task_uid": "pick-cube-p16-reference-v1",
+        "source_kind": "installed USD delivery",
+        "task_artifact_sha256": "124b4ea126ce8061422de37f8dc7a291374863bbd039422e98602a9345625394",
+        "controller_identity": "f2820d59aa2148b43ee9eacd0b95b986adca0e07395f32bba8c318f93be5c34a",
+        "solution_identity": "c000f7053ad76d916734505e7aae8a9f5c9d4b168568f32cea46031d701a1821",
+        "provider": "isaacsim",
+        "backend": "cuda",
+        "device": "cuda:0",
+        "renderer": "none",
+        "task_rgb": "not recorded",
+        "batch_mode": "scalar",
+        "seed": 31,
+        "horizon": 1000,
+        "control_dt_s": 0.01,
+        "controller_profile": "r3_continuous_v1",
+        "runtime_valid": true,
+        "task_success": true,
+        "solution_complete_from_caller": true,
+        "completion_eligible_from_caller": true,
+        "record_readback_valid": true,
+        "transitions": 951,
+        "boundaries": 952,
+        "record_sha256": "95add33866ad97627ad0deb6e44fc53cae75aa2fcadb80ec59c28781387d92f4",
+        "env_close_from_caller": true,
+        "app_close": "native IO, USD lease and App close completed in same-run receipt; SDK implicit startup/reset advances unknown",
+        "source_revision": "ef10e3480b894b65a291b21f839c718549a45798 plus frozen working-tree source SHA in plan; later committed as 0506ae26",
+        "plan_sha256": "2d91cad33af8f222e41f03488e19b735e839d8b089cf96a0909c9dba942354e1",
+        "evidence": "../maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md",
+        "raw_directory": "workspace/maintenance/v211_isaac_gripper_rework_20261113_001/solution-002",
+        "limitations": "single seed, state-only formal Solution; completion from same-run caller, H5 outcome solution_completed null and external_stop/truncated projection; no D0 or qualification; bounded independent review and maintainer-authorized acceptance"
+      }
+    ],
+    "historical_bounded_short_routes": [
+      {
+        "task_uid": "pendulum-v1",
+        "provider": "mujoco",
+        "backend": "cpu",
+        "controller": "declared effort",
+        "source": "task-declared source; exact hashes in frozen plan",
+        "renderer": "not asserted by this route",
+        "evidence_scope": "reset, one interval, second reset and close; not full task success",
+        "source_revision": "76536d2a0625aa79ff85fce0f1777d98ea0a3689",
+        "plan": "workspace/maintenance/v211_u5_final_mujoco_20261112_001/plan.json",
+        "plan_sha256": "7ca72193b140b360ea2ff133e1afbf923168da3edba1db232dfadace7473dde5"
+      },
+      {
+        "task_uid": "two-wheel-balance-v1",
+        "provider": "mujoco",
+        "backend": "cpu",
+        "controller": "declared effort",
+        "source": "task-declared source; exact hashes in frozen plan",
+        "renderer": "not asserted by this route",
+        "evidence_scope": "reset, one interval, second reset and close; not full task success",
+        "source_revision": "76536d2a0625aa79ff85fce0f1777d98ea0a3689",
+        "plan": "workspace/maintenance/v211_u5_final_mujoco_20261112_001/plan.json",
+        "plan_sha256": "7ca72193b140b360ea2ff133e1afbf923168da3edba1db232dfadace7473dde5"
+      },
+      {
+        "task_uid": "pendulum-v1",
+        "provider": "geophys",
+        "backend": "cpu",
+        "controller": "declared effort",
+        "source": "task-declared source; exact dirty-source hashes in frozen plan",
+        "renderer": "MuJoCo renderer-only task RGB",
+        "evidence_scope": "one interval, reset, recording, RGB and close; native substeps not independently counted",
+        "source_revision": "f83c06015ec8be699e72182997bf6f3343c0179a plus frozen working-tree inputs",
+        "plan": "workspace/maintenance/v211_e05_e10_u7_20261113_001/final-native/native-plan.json",
+        "plan_sha256": "08dc79d9ed4029c5b989194edd0339d541b4a417babc1e5d5879f9481b95fa7c"
+      },
+      {
+        "task_uid": "pendulum-v1",
+        "provider": "isaacsim",
+        "backend": "cuda",
+        "device": "cuda:0",
+        "controller": "declared effort",
+        "source": "installed USD; exact delivery manifest hash in frozen plan",
+        "renderer": "headless RTX task RGB",
+        "evidence_scope": "one interval, reset, recording, RGB and close; implicit SDK advances unknown",
+        "source_revision": "f83c06015ec8be699e72182997bf6f3343c0179a plus frozen working-tree inputs",
+        "plan": "workspace/maintenance/v211_e05_e10_u7_20261113_001/isaac-record-retry/plan.json",
+        "plan_sha256": "76debafe4f3129e456998104b620f39d4bcf3c671e4ccc64993f23dedf7b2041"
+      }
+    ],
+    "historical_solution_diagnostics": [
+      {
+        "id": "pick-isaac-r3",
+        "task_uid": "pick-cube-p16-reference-v1",
+        "source_kind": "installed USD delivery",
+        "task_artifact_sha256": "124b4ea126ce8061422de37f8dc7a291374863bbd039422e98602a9345625394",
+        "controller_identity": "f2820d59aa2148b43ee9eacd0b95b986adca0e07395f32bba8c318f93be5c34a",
+        "solution_identity": "1eccb772d274ee372cdeaf4d044656630d6959ab8574565f43febebea76e2e80",
+        "provider": "isaacsim",
+        "backend": "cuda",
+        "device": "cuda:0",
+        "renderer": "none",
+        "task_rgb": "not recorded",
+        "batch_mode": "scalar",
+        "seed": 31,
+        "horizon": 1000,
+        "control_dt_s": 0.01,
+        "controller_profile": "r3_continuous_v1",
+        "runtime_valid": true,
+        "task_success": false,
+        "solution_complete_from_caller": false,
+        "completion_eligible_from_caller": false,
+        "record_readback_valid": true,
+        "transitions": 1000,
+        "boundaries": 1001,
+        "record_sha256": "3f163081760f6ad8a49abb593c6a1266dc47f20bd72751bf49e5bd1e30951d48",
+        "env_close_from_caller": true,
+        "app_close": "caller reports close succeeded; worker close follows transport path; full SDK shutdown log not independently established",
+        "source_revision": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8 (dirty working tree; frozen source hashes in plan)",
+        "plan_sha256": "76e75ff15035938d373ecda22c432d615cac3d594cda3dc5639875e66b285ac1",
+        "evidence": "../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md",
+        "raw_directory": "workspace/maintenance/v211_e11_e16_u3_20261113_001/pick-isaac-r3",
+        "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim; v3 Outcome completion absent; review open"
+      }
+    ],
+    "frame_mounted_camera_evidence": "../maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md"
+  }
+}

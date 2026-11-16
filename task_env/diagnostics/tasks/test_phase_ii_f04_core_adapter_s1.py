@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import tempfile
 
 import numpy as np
 import pytest
@@ -23,6 +24,37 @@ from task_env.runtime.sessions.native_io import (
 from task_env.diagnostics.tasks.f04_candidate_s1_support import (
     _action_for, _limits, _native_order, build_candidate,
 )
+
+
+@pytest.mark.parametrize('mismatch', ['task_source', 'scene', 'reset_artifact'])
+def test_usd_runtime_input_rejects_mismatched_reset_identity_before_materialization(mismatch):
+    from dataclasses import replace
+    from task_env.artifacts.execution import ResetSample
+    from task_env.runtime.sessions.api import _validate_exact_admission_binding, materialize
+    from task_env.runtime.sessions.source import UsdRuntimeInputV1
+
+    candidate = build_candidate('menagerie-panda')
+    plan = candidate.reset_plan
+    value = UsdRuntimeInputV1(
+        'pick-cube-isaac-runtime-input-v1', candidate.task_source, candidate.artifact,
+        candidate.runtime_source, candidate.execution, plan, 'test-profile', 1,
+        candidate.runtime_source.scene_source.loaded_delivery.manifest_bytes_sha256,
+    )
+    _validate_exact_admission_binding(value, candidate.artifact, candidate.execution,
+                                      candidate.runtime_source, 'unexpected outer mismatch')
+    if mismatch == 'task_source':
+        plan = replace(plan, role_binding=replace(plan.role_binding, task_source_identity_hash='0' * 64))
+    elif mismatch == 'scene':
+        plan = replace(plan, role_binding=replace(plan.role_binding, scene_identity_hash='0' * 64))
+    else:
+        sample = plan.reset_sample.to_mapping()
+        del sample['sample_id']
+        sample['task_artifact_hash'] = '0' * 64
+        plan = replace(plan, reset_sample=ResetSample.create(**sample))
+    wrong = replace(value, reset_plan=plan)
+    with pytest.raises(ValueError, match='TaskSource/Scene/Artifact/reset identities disagree'):
+        materialize(candidate.artifact, candidate.execution, source=candidate.runtime_source,
+                    _session_admission_input=wrong)
 
 
 def _flatten_public_observation(value, prefix=""):
@@ -354,6 +386,23 @@ def test_f04_attempt003_worker_opening_uses_real_core_normalized_action_route(
                    for name in (set(sys.modules) - before_modules) for prefix in forbidden)
 
 
+@pytest.fixture(scope="module")
+def f04_tamper_deliveries(tmp_path_factory):
+    """Reuse one isolated delivery per family and remove it after this module."""
+    source = (Path(__file__).resolve().parents[3] /
+              "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/assets")
+    with tempfile.TemporaryDirectory(prefix="f04-tamper-", dir=tmp_path_factory.getbasetemp()) as tmp:
+        copies = {}
+
+        def delivery(family):
+            if family not in copies:
+                copies[family] = Path(tmp) / family
+                shutil.copytree(source / family, copies[family])
+            return copies[family]
+
+        yield delivery
+
+
 @pytest.mark.parametrize("family,mutated_relative", (
     ("local_official_panda_r009", "metadata/physx_task_scene_recipe.json"),
     ("local_official_panda_r009", "metadata/f04_local_usd_checker.py"),
@@ -362,16 +411,15 @@ def test_f04_attempt003_worker_opening_uses_real_core_normalized_action_route(
     ("local_menagerie_panda_r009", "support/official/report.json"),
     ("local_menagerie_panda_r009", "support/converter_manifest.json"),
 ))
-def test_f04_local_delivery_tampering_fails_core_loader(tmp_path, family, mutated_relative):
+def test_f04_local_delivery_tampering_fails_core_loader(f04_tamper_deliveries, family, mutated_relative):
     from task_env.assembly.usd_delivery import load_usd_asset_delivery
 
-    root = (Path(__file__).resolve().parents[3] /
-            "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/assets" /
-            family)
-    copied = tmp_path / family
-    shutil.copytree(root, copied)
+    copied = f04_tamper_deliveries(family)
     target = copied / mutated_relative
     original = target.read_bytes()
-    target.write_bytes(original + b"\n# F04 S1 tamper\n")
-    with pytest.raises((ValueError, OSError)):
-        load_usd_asset_delivery(copied / "usd_delivery.json")
+    try:
+        target.write_bytes(original + b"\n# F04 S1 tamper\n")
+        with pytest.raises((ValueError, OSError)):
+            load_usd_asset_delivery(copied / "usd_delivery.json")
+    finally:
+        target.write_bytes(original)

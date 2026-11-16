@@ -79,16 +79,21 @@ def run_seed(env_class, provider, seed, horizon):
         phase = 'reset'
         row['phase'] = phase
         row['reset_attempted'] = True
-        _, info = env.reset(seed=seed)
+        obs, info = env.reset(seed=seed)
         row['reset_succeeded'] = True
-        env.prepare_expert()
+        if not getattr(getattr(env, 'binding', None), 'external_solution_actions', False):
+            raise TypeError('feasibility probe requires a caller-driven Solution action route')
+        solution = env.value['solution_factory']()
+        if solution.identity != env.value.get('solution_identity'):
+            raise ValueError('constructed Solution identity differs from compiled task')
+        solution.reset(obs, info, env.metadata)
         phase = 'execution'
         row['phase'] = phase
         while True:
             fault = env.execution_fault
-            solution = env.solution
             row.update(capture_episode_facts(env, info, terminated=row['terminated'],
-                                             truncated=row['truncated'], transitions=row['steps']))
+                                             truncated=row['truncated'], transitions=row['steps'],
+                                             solution=solution))
             row.update(stage=solution.stage, failure_reason=solution.failure_reason)
             if fault is not None:
                 record_fault(fault)
@@ -112,7 +117,9 @@ def run_seed(env_class, provider, seed, horizon):
                 row.update(reason=reason)
                 break
             row['step_attempts'] += 1
-            _, _, terminated, truncated, info = env.step_expert()
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
             row.update(terminated=terminated, truncated=truncated)
             row['steps'] += 1
     except Exception as error:
@@ -318,7 +325,7 @@ def main(argv=None):
         print(json.dumps({'status': report.status, 'output': str(args.output), 'totals': report.details.get('totals')}))
         return {'pass': 0, 'fail': 1, 'error': 2}[report.status]
     args.horizon = args.horizon or 6000
-    from task_env.tasks.reference_env import SelectedReferenceEnv
+    from task_env.environment.reference_env import SelectedReferenceEnv
     import task_env
     repo = args.core_repo.resolve()
     if Path(task_env.__file__).resolve().parent.parent != repo:

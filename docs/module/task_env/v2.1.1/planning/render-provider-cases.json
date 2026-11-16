@@ -1,0 +1,398 @@
+{
+  "schema_version": "geochora-v211-render-provider-cases-v1",
+  "status": "APPROVED_IMPLEMENTATION_BASELINE",
+  "package": "V211_G01_1d_attempt001",
+  "purpose": "静态设计反例与正例；不代表运行、adapter、renderer 或 native capability 已验证。",
+  "identity_fields_required": [
+    "artifact_id",
+    "source_closure_id",
+    "route_id",
+    "materialization_generation",
+    "env_id",
+    "worker_id",
+    "row_id",
+    "episode_id",
+    "reset_sample",
+    "control_step",
+    "state_revision",
+    "capture_phase",
+    "sample_clock",
+    "camera_id",
+    "camera_config_revision",
+    "topology_generation"
+  ],
+  "positive_cases": [
+    {
+      "id": "P1",
+      "title": "native shared scene 与相机分离",
+      "context": {
+        "route": "MuJoCo CPU + same-provider native renderer (future selected-task route)",
+        "scene": "scene-7",
+        "env": "env-0",
+        "worker": "worker-0",
+        "row": 0,
+        "cameras": [
+          "observer-0",
+          "task-front"
+        ],
+        "owners": {
+          "scene_model": "physics-session-4",
+          "window": "render-session-9",
+          "task_camera": "render-session-9"
+        }
+      },
+      "timeline": [
+        {
+          "t": "build",
+          "input": "combined physics/controller/state/render/window requirements",
+          "reply": "all required static rows accepted; build receipt names shared-scene lease generation 2 and render-owned window generation 1",
+          "disposition": "proposed; no evidence"
+        },
+        {
+          "t": "reset",
+          "input": "episode-3 reset_sample=0, state_revision=1, capture_phase=reset_initial",
+          "reply": "renderer consumes state revision 1; task-front captures reset frame; observer camera remains independent",
+          "disposition": "one physics owner, two separate camera identities"
+        },
+        {
+          "t": "render",
+          "input": "observer camera orbit at same state boundary",
+          "reply": "public human render returns None; internal presentation receipt is queryable; task-front identity unchanged",
+          "disposition": "no physics advance and no task camera mutation"
+        },
+        {
+          "t": "close",
+          "input": "env closes",
+          "reply": "render releases own window and shared-scene lease; physics owner remains responsible for scene model",
+          "disposition": "no double close"
+        }
+      ],
+      "acceptance": "proposed_after_adapter_and_native_review",
+      "current_evidence": "generic TaskEnvRenderProvider exists; no selected PickCube shared scene route established"
+    },
+    {
+      "id": "P2",
+      "title": "GeoPhys physics × MuJoCo render-only free cube",
+      "context": {
+        "route": "GeoPhys CPU physics × MuJoCo native OpenGL renderer",
+        "scene": "PickCube Scene-v3 with Panda and floating cube",
+        "env": "env-0",
+        "worker": "worker-0",
+        "row": 0,
+        "entity": "cube-v1",
+        "frame": "cube-v1/body-origin (case-local Frame ID; native mapping is proposed)",
+        "physics_owner": "GeoPhys RuntimeSession",
+        "renderer_owner": "MuJoCoDynamicCameraSession (render-only model)",
+        "world_frame": "world; right-handed z-up",
+        "pose_convention": "T_world_from_body_origin; quaternion wxyz; position meters; not COM",
+        "camera": "task-front",
+        "frame_declaration": "cube-v1/body-origin belongs to the floating cube visual body; this is planning context, not a claim about compiled IDs"
+      },
+      "timeline": [
+        {
+          "t": "build",
+          "input": "source closure plus Panda scalar joints and cube Frame pose mapping",
+          "reply": "future typed visual binding maps cube world pose to render-only MuJoCo body; explicit no-second-physics capability",
+          "disposition": "current projection rejects free_joints; proposed extension required"
+        },
+        {
+          "t": "step",
+          "input": "state boundary step=8, revision=19; cube pose position=(0.20,0.10,0.04) m and quaternion=(1,0,0,0) in declared order/frame",
+          "reply": "renderer applies named visual pose and permitted render-only kinematics without mj_step/solver integration, live Controller callbacks or mutation of GeoPhys state",
+          "disposition": "same state identity; physics advances exactly once in GeoPhys"
+        },
+        {
+          "t": "capture",
+          "input": "task-front camera, post_control_step, same state revision 19",
+          "reply": "RGB frame carries route/source/camera/state identity and completion fence",
+          "disposition": "candidate accepted only after implementation oracle"
+        }
+      ],
+      "acceptance": "proposed_after_free_body_mapping_extension",
+      "current_evidence": "current dynamic source rejects nonempty free_joints; no PickCube cross-render success"
+    },
+    {
+      "id": "P3",
+      "title": "reset first image, step image and repeated capture clocks",
+      "context": {
+        "route": "any admitted synchronous route",
+        "scene": "scene-2",
+        "env": "env-0",
+        "worker": "worker-0",
+        "row": 0,
+        "camera": "front-0",
+        "camera_config_revision": 4,
+        "episode": "episode-12",
+        "observer_camera": "observer-0",
+        "render_mode": "human",
+        "timebase": {
+          "physics_dt_s": 0.002,
+          "control_substeps": 5,
+          "control_dt_s": 0.01
+        }
+      },
+      "timeline": [
+        {
+          "t": "reset",
+          "input": {
+            "reset_sample": 5,
+            "control_step": 0,
+            "state_revision": 0,
+            "physics_simulation_time_s": 0.0
+          },
+          "reply": {
+            "capture_phase": "reset_initial",
+            "sample_clock": {
+              "clock_domain": "evaluation_boundary",
+              "sample_index": 0,
+              "simulation_time_s": 0.0,
+              "schema_version": "state-sample-clock-v1"
+            },
+            "frame": "F0"
+          },
+          "disposition": "returned reset observation contains F0"
+        },
+        {
+          "t": "step",
+          "input": {
+            "completed_control_intervals": 1,
+            "completed_native_steps": 5
+          },
+          "reply": {
+            "control_step": 1,
+            "state_revision": 1,
+            "capture_phase": "post_control_step",
+            "sample_clock": {
+              "clock_domain": "evaluation_boundary",
+              "sample_index": 1,
+              "simulation_time_s": 0.01,
+              "schema_version": "state-sample-clock-v1"
+            },
+            "frame": "F1"
+          },
+          "disposition": "returned normal transition contains F1; F1 identity differs from F0"
+        },
+        {
+          "t": "render",
+          "input": "human render observer-0 twice without stepping; task camera remains front-0 config revision 4",
+          "reply": "both calls return None; internal presentation receipts retain physics time .010/control_step 1/state_revision 1; task frame F1 and task camera config unchanged",
+          "disposition": "no physics advance; observer presentation is distinct from task capture/cache"
+        }
+      ],
+      "acceptance": "proposed_contract",
+      "current_evidence": "current identity validation cannot distinguish reset-initial from post-control-step; call-time phase extension required"
+    },
+    {
+      "id": "P4",
+      "title": "two envs × two cameras with same-step terminal/reset and untouched row",
+      "context": {
+        "route": "future native batch adapter",
+        "scene": "batch-scene-1",
+        "worker": "worker-0",
+        "rows": {
+          "env-0": 0,
+          "env-1": 1
+        },
+        "cameras": [
+          "front",
+          "wrist"
+        ],
+        "layout": "env → worker → local row → camera → image"
+      },
+      "timeline": [
+        {
+          "t": "pre-step",
+          "input": "env-0 episode-A step=4 revision=50; env-1 episode-B step=9 revision=90",
+          "reply": "each camera has row-bound state identity",
+          "disposition": "four image identities, not one repeated worker image"
+        },
+        {
+          "t": "advance",
+          "input": "one batched interval; env-1 terminates; env-0 continues",
+          "reply": "env-0 becomes step=5 revision=51; env-1 terminal boundary step=10 revision=91",
+          "disposition": "terminal frames captured before mask reset"
+        },
+        {
+          "t": "retain-before-autoreset",
+          "input": "terminal frames must survive the next shared batch buffer overwrite",
+          "reply": "before mask reset or any overwrite, terminal owner copies or retains both env-1 camera images and their old episode-B terminal identities",
+          "disposition": "no stale borrow; no cross-episode join"
+        },
+        {
+          "t": "autoreset",
+          "input": "reset mask selects only env-1",
+          "reply": "env-1 reset episode-C reset_sample=0 control_step=0 revision=0, reset frames for both cameras; env-0 stays at its post-step/pre-reset episode-A step=5 revision=51 with the same clock/Controller state",
+          "disposition": "return observations use env-0 step frame and env-1 reset frame; info env-1 holds terminal_observation + reset_info"
+        }
+      ],
+      "acceptance": "proposed_contract",
+      "current_evidence": "generic remote get_images repeats one worker frame for slots; no row-specific task camera batch adapter"
+    },
+    {
+      "id": "P5",
+      "title": "reset renderer A→B→A preserves observation contract",
+      "scope_revision": "Maintainer 2026-11-07: preserved historical future case; same-Env renderer switching is deferred to an unscheduled later task and is not a 5c or automatic 6c gate. Current 5c fixes the renderer from Env creation until close.",
+      "context": {
+        "env": "env-0",
+        "worker": "worker-0",
+        "observation": "fixed task RGB HWC float32 [0,1] (H=96,W=128), one task camera",
+        "routes": [
+          "A: GeoPhys CPU physics + future dynamic native GeoPhys RayTraceEngine renderer",
+          "B: same GeoPhys CPU physics + future MuJoCo native OpenGL render-only renderer"
+        ],
+        "physics_route": "GeoPhys CPU unchanged across A/B/A; scalar environment example",
+        "lifetime_policy": "example reuses physics materialization P7 and resets physics from the task initializer each time; renderer generation changes 1/2/3; no old episode state migration"
+      },
+      "timeline": [
+        {
+          "t": "episode A",
+          "input": "episode-A, physics materialization P7, renderer generation 1, camera config revision 1",
+          "reply": "capture A1 bound to A/state revision 10",
+          "disposition": "owned/retained image may remain in its owning record"
+        },
+        {
+          "t": "reset B",
+          "input": "preflight renderer B, release only old render-owned resources/lease, replace renderer, then reset task physics from new initializer",
+          "reply": "same GeoPhys physics route/materialization P7; renderer generation 2 and new episode B/reset sample/state; capture B initial image; old A borrowed leases/cache invalidated",
+          "disposition": "state is initialized anew; no old-state migration"
+        },
+        {
+          "t": "reset A",
+          "input": "static preflight A then rebuild",
+          "reply": "same GeoPhys physics route/materialization P7; renderer generation 3; new episode A2 from fresh task reset; observation schema unchanged",
+          "disposition": "A1 cannot satisfy A2 capture"
+        }
+      ],
+      "acceptance": "proposed_after_each_route_admitted",
+      "current_evidence": "Both selected dynamic renderers and PickCube cross capture need implementation; this does not establish current renderer-only reset support. Combined physics+renderer switches remain future 3c/5c integration checks."
+    }
+  ],
+  "negative_cases": [
+    {
+      "id": "N1",
+      "title": "unsupported source/renderer pair",
+      "context": {
+        "route": "GeoPhys native RayTraceEngine on unsupported visual representation or PickCube free cube with current cross projection",
+        "env": "env-0",
+        "row": 0
+      },
+      "input": "required task RGB and unsupported free-body/asset mapping",
+      "reply": "static admission says unsupported or unknown with reason before native effect",
+      "disposition": "reject build; never claim capability from registration or camera shape",
+      "current_owner": "admission + render source mapping",
+      "check_stage": "future 5a static query"
+    },
+    {
+      "id": "N2",
+      "title": "stale episode/state/camera frame",
+      "context": {
+        "env": "env-0",
+        "worker": "worker-0",
+        "row": 0,
+        "current_episode": "episode-9",
+        "current_revision": 42,
+        "frame_episode": "episode-8",
+        "frame_revision": 88,
+        "camera_config_revision": 3
+      },
+      "input": "consumer presents old borrowed frame after reset/camera reconfiguration",
+      "reply": "identity validator rejects stale episode/state/config generation",
+      "disposition": "fault required task RGB; never substitute prior image",
+      "current_owner": "capture identity + Env cache",
+      "check_stage": "future 5c identity oracle"
+    },
+    {
+      "id": "N3",
+      "title": "App update advances physics",
+      "context": {
+        "env": "env-0",
+        "route": "Isaac Sim candidate",
+        "clock_before": 17,
+        "clock_after": 18,
+        "clock_domain": "native_physics_step",
+        "physics_dt_s": 0.002,
+        "simulation_time_before_s": 0.034,
+        "simulation_time_after_s": 0.036
+      },
+      "input": "render/present/camera warmup invokes App update",
+      "reply": "physics clock delta detected or public render-only/pause path is proven",
+      "disposition": "reject route if update cannot be separated; no hidden transition",
+      "current_owner": "Isaac App/runtime + render adapter",
+      "check_stage": "future 5b/5c; no App launched in 1d"
+    },
+    {
+      "id": "N4",
+      "title": "required capture failure after physics completed",
+      "context": {
+        "env": "env-0",
+        "episode": "episode-5",
+        "control_step": 6,
+        "physics_completed_interval": 6,
+        "last_revision": 27,
+        "render_update": "complete",
+        "capture": "failed"
+      },
+      "input": "camera failure after step interval advanced",
+      "reply": "fault receipt preserves completed interval, state clock and partial effects",
+      "disposition": "no normal transition, old frame, zero image or rollback claim; require rebuild/reset/close",
+      "current_owner": "SelectedReferenceEnv lifecycle + capture consumer",
+      "check_stage": "future 5c fault oracle"
+    },
+    {
+      "id": "N5",
+      "title": "borrowed or async image consumed before completion/expiry",
+      "context": {
+        "worker": "worker-2",
+        "row": 1,
+        "camera": "wrist",
+        "device": "cuda:0",
+        "lease_generation": 4,
+        "completion": "pending"
+      },
+      "input": "Recorder/vector return reads image before fence or after next buffer write",
+      "reply": "pending completion must be waited on before access; a still-valid completed lease may be copied/retained before expiry; an expired lease is rejected and cannot be repaired by reading the overwritten buffer",
+      "disposition": "no incomplete/stale data published",
+      "current_owner": "renderer buffer owner + batch transport",
+      "check_stage": "future 5c lifetime oracle"
+    },
+    {
+      "id": "N6",
+      "title": "duplicate close or old lease release",
+      "context": {
+        "app_owner": "worker-app-0",
+        "app_leases": [
+          "session-A:g3",
+          "session-B:g3"
+        ],
+        "renderer_lease": "scene:g2"
+      },
+      "input": "session A close called twice while B still active; stale g1 lease release arrives",
+      "reply": "A close idempotently releases only its lease; stale generation is rejected; App stays open until last lease owner releases",
+      "disposition": "no duplicate native destruction",
+      "current_owner": "renderer/session/App owners",
+      "check_stage": "future 5b lifecycle oracle"
+    },
+    {
+      "id": "N7",
+      "title": "worker frame broadcast or terminal/reset identity mix",
+      "context": {
+        "worker": "worker-0",
+        "rows": [
+          0,
+          1
+        ],
+        "cameras": [
+          "front",
+          "wrist"
+        ],
+        "env-1": "terminal then autoreset"
+      },
+      "input": "single worker image duplicated to both rows or terminal frame assigned new episode",
+      "reply": "row/camera/state identity mismatch rejected; terminal frame retained before mask reset",
+      "disposition": "env-0 advances in the batched interval and remains unchanged only during the following mask reset; env-1 returned obs is reset frame, info stores old terminal_observation and reset_info",
+      "current_owner": "RemoteBatchVecEnv/batch camera adapter/Recorder",
+      "check_stage": "future 6c plus 5c camera contract"
+    }
+  ],
+  "execution_note": "All cases were checked as design values only. No provider import, native build, window, runtime, solver, GPU, physics step or implementation test was run."
+}

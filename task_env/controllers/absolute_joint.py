@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from gymnasium.spaces import Box
+from ..environment.gym_compat import Box
 
 from ..environment import ActionConfig, ControlCommand, RuntimeSnapshot
 from ..robots.gripper import PandaGripperController

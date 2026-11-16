@@ -1,10 +1,10 @@
 # Task Composition
 
-**Import path**：`task_env.worlds`、`task_env.objects`、`task_env.robots`、`task_env.controllers`、`task_env.assembly`  
+**Import path**：`task_env.tasks.worlds`、`task_env.objects`、`task_env.robots`、`task_env.controllers`、`task_env.assembly`
 **任务域**：Task Composition  
-**稳定性**：Public API / Extension API  
+**稳定性**：组件扩展接口；具体接口的适用范围见各页
 **职责**：将纯描述组件编译为场景及稳定 `TaskReferences`。  
-**调用者/消费者**：`BaseTaskEnv`、scene compiler。  
+**调用者/消费者**：classic `BaseTaskEnv`、scene compiler；selected 的任务声明和装配也使用相关组件。
 **源码**：`task_env/{worlds,objects,robots,controllers,assembly}/`
 
 world、passive object、active agent 的组件 API 只声明资产和稳定名称；controller 是 active agent 的控制接口。编译后的 `TaskReferences` 把名称解析为只读 ID，供 action、observation 和 task definition 消费。

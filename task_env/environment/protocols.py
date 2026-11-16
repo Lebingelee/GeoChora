@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from functools import cached_property
 from typing import Any, ClassVar, Protocol
 
 import numpy as np
 
-from .task_definition import TaskBatchEvaluation, TaskStateView
+from .task_definition import CanonicalTaskStateView, TaskBatchEvaluation, TaskStateView
 from .types import (
     AppliedControl,
     AssetManifest,
@@ -25,10 +26,62 @@ from .types import (
 )
 
 
-class AgentComponent(ABC):
-    """机器人组件的纯描述基类。"""
+class DefaultCanonicalControllerMixin:
+    """Give each subject its own stable, initially unbound Controller."""
+
+    @cached_property
+    def default_controller(self):
+        # Lazy import keeps the foundational component contract independent of
+        # Controller package initialization.
+        from ..controllers.canonical.default_identity import DefaultCanonicalController
+        return DefaultCanonicalController()
+
+
+class RobotComponent(DefaultCanonicalControllerMixin, ABC):
+    """Shared Robot identity; concrete capabilities are declared by each Robot."""
 
     uid: ClassVar[str]
+    component_controller_kinds: ClassVar[tuple[str, ...]] = ()
+    controller_profiles: ClassVar[tuple[str, ...]] = ()
+
+    @classmethod
+    def declared_controller_profiles(cls):
+        """Return the Controller profiles this Robot can bind."""
+        return tuple(cls.controller_profiles)
+
+    def artifact_entity(self, scene):
+        """Project this Robot's declared Scene identity into a Task Artifact."""
+        from ..artifacts import EntityDefinition
+
+        entities = tuple(item for item in scene.entities if item.entity_id == self.uid)
+        articulations = tuple(item for item in scene.articulations if item.entity_id == self.uid)
+        if len(entities) != 1 or len(articulations) != 1:
+            raise ValueError('Task requires one declared Robot entity and articulation')
+        entity, articulation = entities[0], articulations[0]
+        assets = tuple(item for item in scene.assets
+                       if (item.asset_id, item.asset_version) == (entity.asset_id, entity.asset_version))
+        if len(assets) != 1:
+            raise ValueError('Robot entity must resolve to exactly one Scene asset')
+        names = tuple(self.state_joint_names)
+        if names != tuple(joint.joint_id for joint in articulation.joints):
+            raise ValueError('Robot state joints differ from its Scene articulation')
+        return EntityDefinition(self.uid, 'embodiment', assets[0].source_reference,
+            tuple(f'{self.uid}/{name}' for name in articulation.link_frame_ids),
+            tuple(f'{self.uid}/{name}' for name in names), 'source_owned', 'source_owned', {})
+
+
+class AgentComponent(RobotComponent):
+    """Legacy source-component capabilities for Robots that provide them."""
+
+    def single_mjcf_source(self):
+        """Resolve an explicitly declared single-file Robot source."""
+        manifest = self.asset_manifest()
+        if manifest.owner_uid != self.uid or len(manifest.mjcf_sources) != 1:
+            raise ValueError('Robot must declare one MJCF source under its own identity')
+        source = manifest.mjcf_sources[0].resolve()
+        if not any(source.is_relative_to(root.resolve()) for root in manifest.asset_roots):
+            raise ValueError('Robot MJCF source is outside its declared asset roots')
+        return source
 
     @abstractmethod
     def asset_manifest(self) -> AssetManifest:
@@ -137,7 +190,7 @@ class SensorProvider(Protocol):
 
 
 class TaskDefinition(Protocol):
-    """任务语义边界；同时消费 scalar/batch ``TaskStateView``。"""
+    """任务语义边界；消费声明的索引数组或具名 canonical state view。"""
 
     uses_unified_state_view: bool
     device_state_required_fields: tuple[str, ...]
@@ -146,15 +199,15 @@ class TaskDefinition(Protocol):
     def reset(
         self,
         *,
-        state: TaskStateView,
+        state: TaskStateView | CanonicalTaskStateView,
         reset_mask: np.ndarray | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation: ...
 
     def evaluate(
         self,
         *,
-        state: TaskStateView,
+        state: TaskStateView | CanonicalTaskStateView,
         action: Any,
         elapsed_steps: int | np.ndarray,
-        previous_state: TaskStateView | None = None,
+        previous_state: TaskStateView | CanonicalTaskStateView | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation: ...

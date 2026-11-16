@@ -1,0 +1,231 @@
+{
+  "schema_version": "geochora-v211-control-command-planning-cases-v1",
+  "document_status": "APPROVED_IMPLEMENTATION_BASELINE",
+  "notice": "Planning examples only; not runtime schema/API/validator or native evidence.",
+  "cases": [
+    {
+      "id": "P1",
+      "kind": "positive_design",
+      "purpose": "嵌套Robot组件与Panda8→9映射",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "subject": "robot/panda/{arm,gripper}",
+        "input_dimension": 8,
+        "outputs": [
+          "7 named arm torques N*m",
+          "2 named finger forces N"
+        ],
+        "native": "source-bound tendon/mimic"
+      },
+      "expected": "Resolve stable semantic channels; controller allocates forces; admit only representable constrained pairs; no Core hardcoded dimensions.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "P2",
+      "kind": "positive_design",
+      "purpose": "多个Controller控制不重叠部位",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "controllers": [
+          "arm_controller",
+          "gripper_controller"
+        ],
+        "ownership": "disjoint declared channel groups"
+      },
+      "expected": "One Core aggregation/submission authority; controller implementations consume public state/model; native articulation layout need not match component tree.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "P3",
+      "kind": "positive_design",
+      "purpose": "关节effort与body外力并存",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "joint_effort": "named robot arm torques",
+        "body_wrench": {
+          "target": "robot/tool-body",
+          "frame": "world",
+          "force_N": [
+            1,
+            0,
+            0
+          ],
+          "torque_Nm": [
+            0,
+            0,
+            0
+          ],
+          "point": "explicit world COM",
+          "interval": "one control interval"
+        },
+        "policy": "declared independent contributions"
+      },
+      "expected": "Apply each contribution once; source identities and units/frames retained; ACK remains distinct from force measurement.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "P4",
+      "kind": "positive_design",
+      "purpose": "普通物体BodyWrench及偏置作用点",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "target": "cube-v1/body",
+        "force_N": [
+          0,
+          0,
+          1
+        ],
+        "point": "body-local offset with explicit coordinates",
+        "moment_reference": "body origin",
+        "frame": "body",
+        "duration": "declared interval"
+      },
+      "expected": "Query body force/torque/point/frame separately; transform torque to native reference; native clear/add/reapply prevents accumulation; reset clears load.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "P5",
+      "kind": "positive_design",
+      "purpose": "同一Env切换Controller后清历史",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "reset": "controller A -> direct effort B -> A",
+        "observation": "fixed construction schema",
+        "model": "replaceable public model implementation"
+      },
+      "expected": "Publish action-spec generation, reinitialize from realized reset state, clear pending contributions/integrators; no live SDK branch in Controller.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "N1",
+      "kind": "negative_design",
+      "purpose": "未经声明多个writer覆盖同一通道",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "target": "same joint/interval",
+        "writers": [
+          "servo-A",
+          "servo-B"
+        ],
+        "policy": null
+      },
+      "expected": "Reject before write; declared sum with common units/frame is separately allowed.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "N2",
+      "kind": "negative_design",
+      "purpose": "耦合夹爪请求任意独立力",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "native": "single tendon with constrained paired-force mapping",
+        "request": "arbitrary incompatible two-finger force vector"
+      },
+      "expected": "Reject representability mismatch; do not remove source constraint or relabel position as effort.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "N3",
+      "kind": "negative_design",
+      "purpose": "同一外力与投影重复施加",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "body_wrench": "contribution-X",
+        "joint_effort": "J^T*wrench for same contribution-X"
+      },
+      "expected": "Reject duplicate physical contribution; do not count two independent effects.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "N4",
+      "kind": "negative_design",
+      "purpose": "持续力错误累计或reset后残留",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "native_buffer": "additive/persistent",
+        "fault": "add same held load every substep without clear; retain after reset"
+      },
+      "expected": "Reject/fail mapping check; hold has constant intended resultant, each native step applies once; old episode load invalid.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "N5",
+      "kind": "negative_design",
+      "purpose": "BodyWrench作用点/Frame不明",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "target": "cube-v1",
+        "force": [
+          0,
+          0,
+          1
+        ],
+        "frame": null,
+        "moment_reference": null
+      },
+      "expected": "Reject before native write; cannot infer COM/local/world conventions.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "N6",
+      "kind": "negative_design",
+      "purpose": "未来load未注册或错拓扑",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "load": "surface pressure or particle force",
+        "schema": "unknown required",
+        "topology": "stale"
+      },
+      "expected": "Reject required schema/capability/topology mismatch; no arbitrary dict fallback.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    },
+    {
+      "id": "N7",
+      "kind": "negative_design",
+      "purpose": "把模型ACK或缺测当力观测",
+      "context_refs": [
+        "contracts/control-and-feedback.md",
+        "contracts/physics-provider.md"
+      ],
+      "input": {
+        "ack": "native write succeeded",
+        "measurement": "unavailable"
+      },
+      "expected": "ACK proves only write; required measurement rejects/faults, optional returns typed reason; position never becomes measured contact force.",
+      "execution_status": "DESIGN_ONLY_NOT_RUN"
+    }
+  ]
+}

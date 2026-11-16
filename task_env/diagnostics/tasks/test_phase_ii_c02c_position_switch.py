@@ -72,6 +72,73 @@ def _build_active_recording(tmp_path, *, horizon=5):
     return base
 
 
+@pytest.mark.parametrize('record_fails', [False, True])
+def test_switch_projects_event_and_postcommit_fault_without_provider(monkeypatch, record_fails):
+    from dataclasses import dataclass
+    from task_env.runtime.sessions import control
+
+    @dataclass
+    class Config:
+        gain: float
+
+    def profile(identity, gain):
+        return SimpleNamespace(profile_id='position', writer_id='arm',
+                               identity=identity, config=Config(gain))
+
+    old, candidate = profile('old', 1.0), profile('new', 2.0)
+    boundary = SimpleNamespace(episode_id='episode', boundary_id='boundary', control_step=0,
+                               to_mapping=lambda: {'control_step': 0})
+    clock = SimpleNamespace(clock_domain='evaluation_boundary', sample_index=0,
+                            to_mapping=lambda: {'sample_index': 0})
+    typed = SimpleNamespace(view=SimpleNamespace(boundary=boundary, sample_clock=clock))
+    state = SimpleNamespace(control_step=0, simulation_time=0.0)
+    session = SimpleNamespace(snapshot=lambda: state, _position_profiles_by_writer={})
+    events = []
+
+    def add_event(event):
+        if record_fails:
+            raise RuntimeError('record failure')
+        events.append(event)
+
+    recorder = SimpleNamespace(active=True, config=SimpleNamespace(schema_version='v3'),
+                               transition_count=0, observation_count=1, pending=None,
+                               next_boundary_event_sequence=lambda _: 0,
+                               validate_boundary_event=lambda event: event.validate(),
+                               add_boundary_event=add_event)
+    env = SimpleNamespace(
+        _closed=False, _execution_fault=None, position_profile=True,
+        dual_entity_position=False, _stopped=False, _position_episode_end=None,
+        _pending_position_switch=None, session=session, _published_position_typed_state=typed,
+        typed_state=typed, _published_position_state=state, state=state, horizon=2,
+        recorder=recorder, position_profiles=(old,), controller=old,
+        position_plan=SimpleNamespace(identity_hash='plan'), position_scene=object(),
+        position_joint_bindings=(), position_frame_bindings=(),
+        value={'controller': old, 'source': SimpleNamespace(source_closure_digest='source')},
+        _latch_fault=lambda *args, **kwargs: SimpleNamespace(to_mapping=lambda: {'fault': True}),
+    )
+    monkeypatch.setattr(control, '_prepare_position_profile_replacement', lambda *a, **k: candidate)
+    monkeypatch.setattr(control, '_commit_position_profile_replacement',
+                        lambda session, prepared: session._position_profiles_by_writer.update(arm=prepared))
+    if record_fails:
+        with pytest.raises(RuntimeError, match='record failure'):
+            SelectedReferenceEnv.switch_position_controller(env, candidate)
+        receipt = env._position_controller_switch_fault_receipt
+        assert receipt['request']['requested_controller_identity'] == 'new'
+        assert receipt['previous_controller']['action_config'] == {'gain': 1.0}
+        assert receipt['effective_event_recorded'] is False
+        assert receipt['execution_fault'] == {'fault': True}
+        assert env._pending_position_switch is None and events == []
+    else:
+        event = SelectedReferenceEnv.switch_position_controller(env, candidate)
+        assert events == [event]
+        assert event.payload['request']['requested_controller_identity'] == 'new'
+        assert event.payload['previous_controller']['action_config'] == {'gain': 1.0}
+        assert event.payload['effective_controller']['action_config'] == {'gain': 2.0}
+        assert event.payload['result']['first_control_application'] == 'pending_next_step'
+        assert env._pending_position_switch['controller_identity'] == 'new'
+    assert env.controller is candidate and session._position_profiles_by_writer['arm'] is candidate
+
+
 def test_switch_is_boundary_only_seeds_fresh_memory_and_records_first_new_target(tmp_path, monkeypatch):
     base = _build_active_recording(tmp_path)
     env = base.env
@@ -458,3 +525,33 @@ def test_post_switch_target_ack_without_recorded_transition_is_not_promoted(tmp_
     assert pending['target_identity_hash'] == pending['applied_target_hash']
     assert pending['observed_runtime_boundary'] == 1
     env.close()
+
+
+def test_pending_switch_receipt_distinguishes_ack_from_committed_transition():
+    from types import SimpleNamespace as NS
+    from task_env.recorders.position_metadata import pending_controller_switch_receipt
+
+    pending = {'switch_id': 's1', 'effective_control_step': 4,
+               'effective_boundary_id': 'b4', 'controller_identity': 'controller-new'}
+    never = pending_controller_switch_receipt(
+        pending, published_step=4, execution_fault=None, last_transition=None,
+        runtime_step=lambda: (_ for _ in ()).throw(AssertionError("unexpected runtime read")),
+    )
+    assert never['status'] == 'not_attempted_before_episode_end'
+    assert 'status' not in pending
+    target = NS(identity_hash='target')
+    command = NS(controller_identity='controller-new', source_boundary=NS(boundary_id='b4'),
+                 target=target)
+    acknowledged = pending_controller_switch_receipt(
+        pending, published_step=4, execution_fault=object(),
+        last_transition=(None, command, NS(target_hash='target')), runtime_step=lambda: 5,
+    )
+    assert acknowledged['status'] == 'target_ack_observed_but_transition_not_recorded'
+    assert acknowledged['target_identity_hash'] == acknowledged['applied_target_hash'] == 'target'
+    assert acknowledged['observed_runtime_boundary'] == 5
+    unconfirmed = pending_controller_switch_receipt(
+        pending, published_step=4, execution_fault=object(),
+        last_transition=(None, command, NS(target_hash='wrong')), runtime_step=lambda: (_ for _ in ()).throw(AssertionError("unexpected runtime read")),
+    )
+    assert unconfirmed['status'] == 'not_confirmed_in_complete_transition'
+    assert 'applied_target_hash' not in unconfirmed

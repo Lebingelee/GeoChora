@@ -103,6 +103,11 @@ class PandaPositionServoProfileV1:
     writer_id = POSITION_PROFILE_ID
     tcp_profile = PANDA_HAND_ORIGIN_TCP_V1
 
+    def selected_position_capability(self):
+        """Provide the selected binding's construction and initialization owner."""
+        from ...runtime.sessions.control import SelectedPositionCapabilityV1
+        return SelectedPositionCapabilityV1(self)
+
     def __init__(
         self, *, artifact, source, scene, model, config,
         entity_id='panda-main', joint_ids=None, finger_joint_ids=None,
@@ -237,14 +242,12 @@ class PandaPositionServoProfileV1:
         self._constructed_identity = self.identity
         self._constructed_config = config
         self._constructed_algorithm_identity = self._algorithm.identity
-        self._constructed_arm_reference_identity = (
-            None if self._arm_reference is None else self._arm_reference.identity
-        )
+        self._preview_constructed_target_limits = tuple(
+            tuple(float(value) for value in row) for row in self._algorithm.arm_target_limits)
         self._plan_identity_hash = None
         self._episode_id = None
         self._reset_sample_id = None
         self._next_control_step = None
-        self._activation_boundary_id = None
 
     def _validate_source(self, source):
         from ...runtime.sessions.source import UsdRuntimeSourceV1
@@ -268,7 +271,7 @@ class PandaPositionServoProfileV1:
     def from_source(cls, artifact, source, *, config: ActionConfig | None = None,
                     nullspace_reference_gain=0.0,
                     arm_tracking_method='canonical_position_v1',
-                    arm_tracking_profile=None):
+                    arm_tracking_profile=None, entity_id='panda-main'):
         if not isinstance(artifact, TaskArtifactV1):
             raise TypeError('PositionServoV1 requires TaskArtifactV1')
         if artifact.timebase.physics_dt != 0.002 or artifact.timebase.control_substeps != 5 or artifact.timebase.control_dt != 0.01:
@@ -282,12 +285,14 @@ class PandaPositionServoProfileV1:
             raise ValueError('PositionServoV1 source ID is not bound to its Scene')
         if not isinstance(source.source_closure_digest, str) or len(source.source_closure_digest) != 64:
             raise ValueError('PositionServoV1 requires a source closure digest')
-        if any(source.joints.get(name) != native for name, native in _EXPECTED_JOINT_BINDINGS.items()):
+        expected_joints = {f'{entity_id}/{name}': name for name in _JOINT_IDS}
+        expected_targets = {f'{entity_id}/joint{i}': f'actuator{i}' for i in range(1, 8)}
+        if any(source.joints.get(name) != native for name, native in expected_joints.items()):
             raise ValueError('PositionServoV1 requires exact Panda arm/finger Joint source bindings')
-        if source.bodies.get('panda-main/hand') != 'hand':
+        if source.bodies.get(f'{entity_id}/hand') != 'hand':
             raise ValueError('PositionServoV1 hand state must bind to the actual hand body')
         if (any(source.joint_targets.get(name) != actuator
-                for name, actuator in _EXPECTED_TARGET_BINDINGS.items())
+                for name, actuator in expected_targets.items())
                 or 'actuator8' not in tuple(source.open_actuators)):
             raise ValueError('PositionServoV1 requires exact actuator1–7 and actuator8 source bindings')
 
@@ -299,7 +304,7 @@ class PandaPositionServoProfileV1:
         )
         model = PandaKinematics(materialized_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
         return cls(
-            artifact=artifact, source=source, scene=scene, model=model, config=config,
+            artifact=artifact, source=source, scene=scene, model=model, config=config, entity_id=entity_id,
             nullspace_reference_gain=nullspace_reference_gain,
             arm_tracking_method=arm_tracking_method,
             arm_tracking_profile=arm_tracking_profile,
@@ -350,11 +355,10 @@ class PandaPositionServoProfileV1:
             if not (source.scene_source.source_verified or source.scene_source.locally_validated):
                 raise ValueError('deferred native receipt requires a loader-verified upstream or fixed local F04 USD source')
             if execution.physics_profile not in {
-                    'isaac-gpu-physx-f04-position-v1',
                     'geophys-usd-position-f05-native-v1',
                     'isaac-gpu-physx-f05-dg04-native-mimic-v1',
                     'isaac-gpu-physx-pickcube-f06-v1'}:
-                raise ValueError('deferred native receipt requires an exact admitted F04, F05, DG04 or F06 profile')
+                raise ValueError('deferred native receipt requires an exact admitted F05, DG04 or F06 profile')
         elif (native_drive_receipt.scene_identity_sha256,
               native_drive_receipt.source_closure_sha256,
               native_drive_receipt.execution_identity_sha256,
@@ -522,6 +526,25 @@ class PandaPositionServoProfileV1:
             nullspace_reference_gain=nullspace_reference_gain,
         )
 
+    def prepare_action_request(self, action, *, scene, plan):
+        """Project this Controller's pose action into its bound control groups."""
+        import numpy as np
+        from .contracts import ControlGroupActionV1, StructuredActionRequestV1
+
+        vector = np.asarray(action, dtype=float)
+        if vector.shape != (8,) or not np.isfinite(vector).all():
+            raise ValueError('Position Controller requires a finite eight-dimensional planned action')
+        schema_id = self.controller_binding().action_schema.schema_id
+        request = StructuredActionRequestV1(
+            'structured-action-request-v1', scene.identity_hash, plan.identity_hash,
+            (ControlGroupActionV1('control-group-action-v1', self.entity_id, 'arm', schema_id,
+                                  tuple(float(value) for value in vector[:7])),
+             ControlGroupActionV1('control-group-action-v1', self.entity_id, 'gripper', schema_id,
+                                  (float(vector[7]),))),
+        )
+        request.validate()
+        return request
+
     def controller_binding(self):
         return ControllerBindingV1(
             'controller-binding-v1', self.writer_id, _action_schema(),
@@ -638,7 +661,6 @@ class PandaPositionServoProfileV1:
         self._episode_id = boundary.episode_id
         self._reset_sample_id = boundary.reset_sample_id
         self._next_control_step = 0
-        self._activation_boundary_id = boundary.boundary_id
         q_reference = [
             state.joint_position[f'panda-v1/joint{index}']
             for index in range(1, 8)
@@ -648,62 +670,6 @@ class PandaPositionServoProfileV1:
         if self._arm_reference is not None:
             self._arm_reference.reset(state)
         return boundary.boundary_id
-
-    def _prepare_switch_activation(self, publication, plan):
-        """Prepare fresh instance memory for a live, already-complete boundary.
-
-        This deliberately does not call ``reset()``: reset remains an episode
-        initialization contract and continues to accept only the step-zero
-        publication. The returned tuple is inert until the selected lifecycle
-        commits this instance as the active writer.
-        """
-        if any(value is not None for value in (
-            self._plan_identity_hash, self._episode_id, self._reset_sample_id,
-            self._next_control_step, self._activation_boundary_id,
-        )):
-            raise ValueError('PositionServoV1 switch candidate must be a fresh instance')
-        if (self.identity != self._constructed_identity
-                or self.config != self._constructed_config
-                or self._algorithm.identity != self._constructed_algorithm_identity
-                or self._algorithm.config != self._constructed_config
-                or (None if self._arm_reference is None else self._arm_reference.identity)
-                    != self._constructed_arm_reference_identity):
-            raise ValueError('PositionServoV1 candidate identity or algorithm parameters changed after construction')
-        self._validate_source(self.source)
-        plan_identity = self._validate_plan(plan)
-        state = self._adapt_publication(publication)
-        boundary = publication.view.boundary
-        clock = publication.view.sample_clock
-        if (clock.clock_domain != 'evaluation_boundary'
-                or clock.sample_index != boundary.control_step
-                or boundary.control_step < 0):
-            raise ValueError('PositionServoV1 switch requires a complete evaluation boundary')
-        return (
-            self.identity, plan_identity, boundary.episode_id,
-            boundary.reset_sample_id, boundary.control_step, boundary.boundary_id,
-            [state.joint_position[f'panda-v1/joint{index}'] for index in range(1, 8)],
-        )
-
-    def _activate_switch_memory(self, prepared):
-        """Install prevalidated mid-episode cursor state on this fresh instance."""
-        identity, plan_identity, episode_id, reset_sample_id, control_step, boundary_id, q_reference = prepared
-        if identity != self.identity or self._next_control_step is not None:
-            raise ValueError('PositionServoV1 prepared switch activation no longer matches this instance')
-        self._plan_identity_hash, self._episode_id, self._reset_sample_id = (
-            plan_identity, episode_id, reset_sample_id,
-        )
-        self._next_control_step = control_step
-        self._activation_boundary_id = boundary_id
-        self._algorithm.set_nullspace_reference(q_reference)
-        self._algorithm.reset_pose_target_memory(q_reference)
-        if self._arm_reference is not None:
-            self._arm_reference.reset(SimpleNamespace(
-                control_step=control_step,
-                joint_position={
-                    f'panda-v1/joint{index}': q_reference[index - 1]
-                    for index in range(1, 8)
-                },
-            ))
 
     def compute(self, publication, requested: RequestedAction, plan):
         self._validate_source(self.source)
@@ -730,9 +696,12 @@ class PandaPositionServoProfileV1:
                 arm_position=r3_arm,
                 arm_servo_position=r3_arm,
             )
-        # The shared legacy position algorithm consumes panda-v1 semantic
-        # names. The v1 Artifact and RuntimeSource use entity-qualified
-        # identities; lower the same seven values to this Entity's Joint keys.
+        bound_target = self._bind_canonical_target(base_target, publication, plan_identity)
+        self._next_control_step += 1
+        return canonical, bound_target
+
+    def _bind_canonical_target(self, base_target, publication, plan_identity):
+        # Bind the shared Panda algorithm's semantic names to this source entity.
         source_order = tuple(f'{self.entity_id}/{joint_id}' for joint_id in self.joint_ids)
         algorithm_order = tuple(f'panda-v1/joint{index}' for index in range(1, 8))
         target = replace(
@@ -745,10 +714,73 @@ class PandaPositionServoProfileV1:
             controller_identity=self.identity,
             gripper=replace(base_target.gripper, semantic_id=self.gripper_semantic_id),
         )
-        bound_target = PositionControlTargetV1(
+        return PositionControlTargetV1(
             'position-control-target-v1', self.writer_id, self.identity,
             plan_identity, self.source.source_closure_digest,
-            boundary, publication.view.sample_clock, target,
+            publication.view.boundary, publication.view.sample_clock, target,
         )
+
+    def preview_absolute_joint_targets(self, publication, requests, plan):
+        """Compute immutable S0-bound targets without advancing Controller memory.
+
+        This capability deliberately excludes accumulated pose and R3 reference
+        Controllers. It does not authorize provider writes or consume a boundary;
+        the selected interval owner must still perform admission and commit.
+        """
+        from .controller import CanonicalPandaController
+        if (type(self._algorithm) is not CanonicalPandaController
+                or self._arm_reference is not None
+                or self._algorithm.pose_target_method != 'achieved_state_dls_v1'
+                or self.identity != self._constructed_identity
+                or self.config != self._constructed_config
+                or self._algorithm.identity != self._constructed_algorithm_identity
+                or self._algorithm.config != self._constructed_config
+                or self._algorithm.model is not self.model
+                or tuple(tuple(float(value) for value in row)
+                         for row in self._algorithm.arm_target_limits) != self._preview_constructed_target_limits
+                or any(name in vars(self._algorithm) for name in ('compute', '_compute_arm'))):
+            raise ValueError('Position preview requires the pure absolute-joint Controller capability')
+        if type(requests) is not tuple or not requests:
+            raise ValueError('Position preview requires a nonempty immutable request tuple')
+        self._validate_source(self.source)
+        plan_identity = self._validate_plan(plan)
+        if self._next_control_step is None or self._plan_identity_hash != plan_identity:
+            raise RuntimeError('PositionServoV1 reset is required for this binding plan')
+        state = self._adapt_publication(publication)
+        boundary = publication.view.boundary
+        if (boundary.episode_id != self._episode_id
+                or boundary.reset_sample_id != self._reset_sample_id
+                or boundary.control_step != self._next_control_step):
+            raise ValueError('PositionServoV1 target source boundary is stale or out of order')
+        for request in requests:
+            if type(request) is not RequestedAction or request.mode != 'absolute_joint':
+                raise ValueError('Position preview only admits typed absolute-joint requests')
+            request.validate()
+            if (type(request.values) is not tuple
+                    or any(type(value) not in (int, float) or not math.isfinite(value)
+                           for value in request.values)):
+                raise ValueError('Position preview requires immutable finite numeric actions')
+        results = []
+        for request in requests:
+            canonical, base_target = self._algorithm.compute(state, request)
+            results.append((canonical, self._bind_canonical_target(base_target, publication, plan_identity)))
+        return tuple(results)
+
+    def commit_absolute_joint_preview(self, publication, plan, sequence, scene_receipt):
+        """Advance this Controller once after its exact sequence was staged."""
+        from ...runtime.sessions.control_submission import PositionControlSequenceV1
+        if type(sequence) is not PositionControlSequenceV1:
+            raise TypeError('Position preview commit requires its typed control sequence')
+        sequence.validate()
+        recomputed = self.preview_absolute_joint_targets(publication,
+            tuple(item.request for item in sequence.action.slices), plan)
+        target_hashes = tuple(target.identity_hash for _, target in recomputed)
+        if (target_hashes != tuple(target.identity_hash for _, _, target in sequence.slices)
+                or type(scene_receipt) is not dict or scene_receipt.get('status') != 'acknowledged'
+                or scene_receipt.get('inner_position_command_sha256',
+                                     scene_receipt.get('inner_command_sha256')) != sequence.identity_hash
+                or scene_receipt.get('inner_action_sha256') != sequence.action.identity_hash
+                or tuple(scene_receipt.get('inner_target_sha256', ())) != target_hashes
+                or scene_receipt.get('interval', {}).get('boundary') != publication.view.boundary.to_mapping()):
+            raise ValueError('Position preview commit differs from the acknowledged scene interval')
         self._next_control_step += 1
-        return canonical, bound_target

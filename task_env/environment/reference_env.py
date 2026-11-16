@@ -1,0 +1,4244 @@
+"""Explicit selected-reference adapter, delegating task semantics and policies.
+
+This adapter owns one scalar CPU session. It defines no TaskArtifact or task
+success predicate. Expert execution and external-action execution cannot be
+mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
+"""
+from __future__ import annotations
+
+from dataclasses import asdict, is_dataclass, replace
+from contextlib import contextmanager
+from typing import Any
+from collections import OrderedDict
+from collections.abc import Mapping
+from pathlib import Path
+import hashlib
+from types import SimpleNamespace
+from uuid import uuid4
+import numpy as np
+from .gym_compat import Box, Dict
+
+from ..observations.selected_reference import _position_task_evaluation_state
+from ..controllers.canonical.contracts import RequestedAction, REFERENCE_POSE_ACTION_SCHEMA, digest
+from ..controllers.canonical.feedback import (
+    boundary_interval_clock_tolerance as _boundary_interval_clock_tolerance,
+    selected_control_application_receipt,
+)
+from .protocols import TaskEnvironmentComponent
+from .gym_compat import GymEnvBase
+from .configuration import resolve_env_config, resolve_execution_plan
+from .config import ResolvedEnvConfig
+from .metadata import task_info_for_solution
+from .metadata import TaskEnvMetadata, build_stage0_metadata, gym_metadata_dict, validate_task_info
+from ..registry import AGENT_REGISTRY, OBJECT_REGISTRY, SCENE_REGISTRY
+from .reference_binding import ReferenceTaskBinding
+from .types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
+from .lifecycle import EpisodeExecutionState, SingleTaskLifecycleAdapter, TaskLifecycleAdapter
+from .types import ControlCommand, SnapshotRequest, TaskCompositionSpec, TaskEvaluation
+from ..planners.completion import ExpertExecutionInfo
+from ..runtime.sessions.api import close_session_and_runtime_owner, materialize
+from ..runtime.sessions.control import ControlBinding, materialize_control
+from ..runtime.sessions.source import (
+    position_frame_bindings_from_artifact as _position_frame_bindings_from_artifact,
+)
+
+METADATA = {'action_schema': REFERENCE_POSE_ACTION_SCHEMA}
+_RESET_SEED_UNSET = object()
+_INFER_POSITION_TASK_SUCCESS = object()
+from ..render.base.contracts import TASK_RGB_PAIRINGS as _TASK_RGB_PAIRS
+
+
+def _artifact_for_reset(current_artifact, rebuilt_value, runtime_input=None):
+    """Keep the reset Artifact identity bound to a versioned runtime input."""
+    rebuilt_artifact = rebuilt_value['artifact']
+    if rebuilt_artifact != current_artifact:
+        raise ValueError('selected Artifact changed between construction and reset')
+    if runtime_input is None:
+        return current_artifact
+    exact_artifact = runtime_input.artifact
+    if rebuilt_artifact is not exact_artifact:
+        raise ValueError('reset Artifact is not identical to its exact RuntimeInput artifact')
+    return exact_artifact
+
+
+def _json_value(value: Any) -> Any:
+    """Copy public metadata into JSON-compatible builtin values."""
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_json_value(item) for item in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
+    """Scalar task environment assembled from task and runtime components."""
+    binding: ReferenceTaskBinding | None = None
+    uid = 'base-task-env'
+    task_uid = 'base-task-v1'
+    scene_uid = 'tabletop-v1'
+    agent_uids: tuple[str, ...] = ()
+    object_uids: tuple[str, ...] = ()
+    success_definition = 'none'
+    supports_structured_control_recording = False
+    selected_execution_defaults = {}
+    metadata = {'render_modes': [], 'stage': 'stage4_gym_contract'}
+    render_mode = None
+    action_space = None
+    observation_space = None
+
+    def _physical_execution(self):
+        """Return the physical execution declared or committed for this Env."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is not None:
+            committed = selection.committed
+            return selection.declaration if committed is None else committed.execution
+        return getattr(self, 'value', {}).get('physical_execution')
+
+    @property
+    def controller(self):
+        """The Controller currently admitted to submit actions for this Env."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is not None:
+            committed = selection.committed
+            return None if committed is None else committed.execution.controllers[0]
+        physical = getattr(self, 'value', {}).get('physical_execution')
+        if physical is not None:
+            return physical.controllers[0]
+        return getattr(self, '_selected_controller', None)
+
+    @property
+    def _last_episode_end(self):
+        return self._episode_execution_state().episode_end
+
+    @_last_episode_end.setter
+    def _last_episode_end(self, value):
+        self._episode_execution_state().episode_end = value
+
+    def _build_runtime_with_rollback(self) -> None:
+        try:
+            from ..runtime import bootstrap_task_runtime
+
+            self._reset_sampler = self.create_reset_sampler()
+            self._runtime_assembly = bootstrap_task_runtime(
+                config=self.config,
+                composition=self._composition_spec,
+                scene=self.scene,
+                agents=self.agents,
+                objects=self.objects,
+                scene_composer=self.create_scene_composer(),
+                reset_sampler=self._reset_sampler,
+                create_render_source=self.render_mode is not None,
+            )
+            self._runtime = self._runtime_assembly.boundary
+            compiled_scene = self._runtime_assembly.compiled_scene
+            # Task definitions are created before action/observation binding so
+            # the three task extension points are the only task-owned factories.
+            self._task_definition = self.create_task_definition(compiled_scene)
+            if self.config.render.camera_obs:
+                from ..observations import CameraObservationProvider, CameraSensor
+
+                self._camera_sensors = tuple(
+                    CameraSensor(
+                        spec=spec,
+                        references=self._runtime_assembly.compiled_scene.references,
+                    )
+                    for spec in self.config.render.cameras
+                )
+                self._sensor_provider = CameraObservationProvider(
+                    render_source=self._runtime_assembly.render_source,
+                    config=self.config.render,
+                    camera_sensors=self._camera_sensors,
+                    task_rgb_camera_name=(
+                        None if self._component_task_rgb is None
+                        else self._component_task_rgb[0].name
+                    ),
+                )
+            resolved_agents = compiled_scene.references.agents
+            if len(resolved_agents) > 1:
+                raise StageUnavailableError(
+                    "Stage 10b supports env.robot only for a single resolved robot; "
+                    "multi-robot controller ownership is not implemented."
+                )
+            resolved_agent = next(
+                (agent for agent in self.agents if agent.uid in resolved_agents), None,
+            )
+            bind_runtime = getattr(resolved_agent, 'bind_runtime', None)
+            if callable(bind_runtime):
+                self._robot, action_spec = bind_runtime(
+                    references=resolved_agents[resolved_agent.uid], config=self.config,
+                    boundary=self._runtime_assembly.boundary,
+                )
+                self._env_metadata = replace(self._env_metadata, external_action=action_spec)
+                self.action_space = self._robot.controller.action_space
+            else:
+                task_action_factory = getattr(
+                    self._task_definition,
+                    "create_action_adapter",
+                    None,
+                )
+                if callable(task_action_factory):
+                    self._action_adapter = task_action_factory(compiled_scene)
+                else:
+                    self._action_adapter = self.create_action_adapter(compiled_scene)
+                if self._action_adapter is not None:
+                    self.action_space = self._action_adapter.action_space
+                    action_contract = getattr(self._action_adapter, "action_contract", None)
+                    if action_contract is None:
+                        raise StageUnavailableError(
+                            "non-robot action adapters must expose action_contract"
+                        )
+                    self._env_metadata = replace(
+                        self._env_metadata,
+                        external_action=action_contract,
+                    )
+                else:
+                    self.action_space = Box(
+                        low=-1.0,
+                        high=1.0,
+                        shape=(0,),
+                        dtype=np.float32,
+                    )
+
+            if self._action_adapter is None and not self.config.agents.agent_uids:
+                self.action_space = Box(
+                    low=-1.0,
+                    high=1.0,
+                    shape=(0,),
+                    dtype=np.float32,
+                )
+            task_observation_factory = getattr(
+                self._task_definition,
+                "create_observation_builder",
+                None,
+            )
+            if callable(task_observation_factory):
+                self._observation_builder = task_observation_factory(
+                    compiled_scene,
+                    observation_config=self.config.observation,
+                    render_config=self.config.render,
+                )
+            else:
+                self._observation_builder = self.create_observation_builder(
+                    compiled_scene
+                )
+            self.observation_space = self._observation_builder.observation_space
+            if self._component_task_rgb is not None:
+                self._configure_component_task_rgb_space()
+            self.metadata = gym_metadata_dict(
+                self._env_metadata,
+                observation_schema=self._observation_builder.schema,
+                stage="stage4_gym_contract",
+            )
+            self._configure_render_metadata()
+            if self._component_task_rgb is not None:
+                self._configure_component_task_rgb_metadata()
+            reference_profile = _json_value(self.reference_profile())
+            if reference_profile:
+                self.metadata["reference_profile"] = reference_profile
+            self._task_lifecycle = SingleTaskLifecycleAdapter(
+                runtime=self._runtime,
+                episode_state=self._episode_execution_state(),
+                task_definition=self._task_definition,
+                control_substeps=self.config.runtime.control_substeps,
+                expected_control_dt_s=(
+                    self.config.runtime.physics_dt
+                    * self.config.runtime.control_substeps
+                ),
+                horizon=self.config.episode.horizon,
+                ignore_done=self.config.episode.ignore_done,
+                sample_reset_state=self._sample_episode_reset_state_for_lifecycle,
+                snapshot_request=self._snapshot_request,
+                reset_components=self._reset_episode_components,
+                convert_action=self._convert_action,
+                observation_fallback=self._build_observation_fallback,
+                observation_transform=(
+                    self._augment_component_task_rgb
+                    if self._component_task_rgb is not None
+                    else None
+                ),
+                episode_limits=lambda: (
+                    self.config.episode.horizon,
+                    self.config.episode.ignore_done,
+                ),
+            )
+        except BaseException as construction_error:
+            attach_execution_fault(
+                construction_error,
+                ExecutionFaultV1.from_exception(
+                    "runtime_construction",
+                    construction_error,
+                ),
+            )
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                add_note = getattr(construction_error, "add_note", None)
+                if callable(add_note):
+                    add_note(f"construction rollback also failed: {cleanup_error!r}")
+            raise
+
+    @staticmethod
+    def selected_task_configuration():
+        """Return task-owned configuration used to resolve the formal request."""
+        return None
+
+    @classmethod
+    def selected_default_config(cls, task_config=None):
+        """Provide the common environment defaults for a formal task request."""
+        return cls.default_config()
+
+    @classmethod
+    def default_config(cls) -> ResolvedEnvConfig:
+        return resolve_env_config(
+            task_uid=cls.task_uid,
+            scene_uid=cls.scene_uid,
+            agent_uids=cls.agent_uids,
+            object_uids=cls.object_uids,
+            success_definition=cls.success_definition,
+        )
+
+    @classmethod
+    def default_config_path(cls) -> Path | None:
+        """Return the task-owned public default YAML, when the task has one."""
+
+        task_dir = cls.task_uid.rsplit("-v", 1)[0].replace("-", "_")
+        candidate = Path(__file__).resolve().parents[1] / "tasks" / task_dir / "default.yaml"
+        return candidate if candidate.is_file() else None
+
+    def placement_notes(self) -> tuple[str, ...]:
+        return ()
+
+    def reference_profile(self) -> dict[str, Any]:
+        """Return the versioned task physics/semantic profile for metadata.
+
+        The base task has no reference profile.  Non-arm classic-control tasks
+        override this hook so the profile travels with Gym metadata and H5
+        ``env_meta`` without adding task-specific branches to the base class.
+        """
+
+        return {}
+
+    def create_scene_composer(self):
+        return None
+
+    def create_reset_sampler(self):
+        return None
+
+    def create_action_adapter(self, compiled_scene):
+        """Create a neutral native-action adapter for non-robot tasks."""
+
+        del compiled_scene
+        return None
+
+    def create_observation_builder(self, compiled_scene):
+        """Create the task observation builder after scene references resolve."""
+
+        from ..observations import StateObservationBuilder
+
+        return StateObservationBuilder(
+            references=compiled_scene.references,
+            config=self.config.observation,
+            render_config=self.config.render,
+        )
+
+    def create_task_definition(self, compiled_scene):
+        del compiled_scene
+        return None
+
+    @property
+    def execution_plan(self):
+        """Return the static plan resolved before provider construction."""
+
+        return self._execution_plan
+
+    @property
+    def robot(self):
+        """The single resolved robot owned by this environment runtime."""
+
+        if self._has_component_assembly():
+            self._require_runtime()
+        if self._robot is None:
+            raise StageUnavailableError(
+                "This environment does not expose a single resolved robot."
+            )
+        return self._robot
+
+    def get_env_metadata(self) -> TaskEnvMetadata:
+        return self._env_metadata
+
+    def create_ui_render_provider(self):
+        """Create the optional UI backend without involving camera sensors."""
+
+        if self.render_mode is None:
+            return None
+        if self._ui_render_provider is None:
+            render_source = getattr(self._runtime_assembly, "render_source", None)
+            if render_source is None:
+                raise StageUnavailableError(
+                    "UI rendering was requested but the runtime did not expose a render source"
+                )
+            from ..render import TaskEnvRenderProvider
+
+            self._ui_render_provider = TaskEnvRenderProvider(
+                render_source=render_source,
+                config=self.config.render,
+            )
+        return self._ui_render_provider
+
+    def _configure_render_metadata(self) -> None:
+        if self.render_mode is None:
+            self.metadata["render_modes"] = []
+            self.metadata.pop("render_mode", None)
+            return
+        self.metadata["render_modes"] = ["human", "rgb_array"]
+        self.metadata["render_mode"] = self.render_mode
+        self.metadata["render_backend"] = self.config.render.backend
+        self.metadata["render_resolution"] = (
+            int(self.config.render.width),
+            int(self.config.render.height),
+        )
+
+    def render(self, mode: str | None = None):
+        """Render the configured single-environment UI frame.
+
+        This intentionally does not return a camera observation. RGB/depth policy
+        observations are captured by ``task_env.observations`` during reset/step.
+        """
+
+        from ..render import RenderUnavailableError, normalize_render_mode
+
+        if getattr(self, '_human_display_unavailable', False):
+            self._episode_execution_state().require_open('environment is closed')
+            if self._execution_fault is not None:
+                raise RuntimeError('selected execution is faulted; reset() is required before rendering')
+            normalized = normalize_render_mode(mode or self.render_mode)
+            if normalized.value != self.render_mode:
+                raise ValueError('TaskEnv render mode is fixed at construction')
+            raise RenderUnavailableError('human display is not available for this environment')
+
+        if getattr(self, '_legacy_observer_requested', False):
+            self._episode_execution_state().require_open('environment is closed')
+            if self._execution_fault is not None or self.session is None:
+                raise RuntimeError('observer requires a healthy reset session')
+            normalized = normalize_render_mode(mode or self.render_mode)
+            if normalized.value != self.render_mode:
+                raise ValueError('TaskEnv render mode is fixed at construction')
+            try:
+                return self.session.render_legacy_rgb(self.config.render)
+            except BaseException as error:
+                self._latch_fault('observer_render', error, before_state=self.state,
+                                  transition_status='rejected')
+                raise
+
+        if getattr(self, '_selected_observer_camera', None) is not None:
+            execution_state = self._episode_execution_state()
+            execution_state.require_open('environment is closed')
+            if execution_state.fault is not None:
+                raise RuntimeError('selected execution is faulted; reset() is required before rendering')
+            normalized = normalize_render_mode(mode or self.render_mode)
+            if normalized.value != self.render_mode:
+                raise ValueError('TaskEnv render mode is fixed at construction')
+            try:
+                return self._ui_render_provider.render(mode=normalized, snapshot=None)
+            except BaseException as error:
+                self._latch_fault(
+                    'observer_render', error,
+                    before_state=getattr(self, '_published_position_state', None),
+                    transition_status='rejected',
+                )
+                raise
+
+        requested_mode = mode
+        if requested_mode is None:
+            requested_mode = self.render_mode or "human"
+        normalized_mode = normalize_render_mode(requested_mode)
+        if self.render_mode is not None and normalized_mode.value != self.render_mode:
+            raise ValueError(
+                "TaskEnv render mode is fixed at construction: "
+                f"{self.render_mode!r}, got {normalized_mode.value!r}"
+            )
+        provider = self.create_ui_render_provider()
+        if provider is None:
+            raise RenderUnavailableError(
+                "UI rendering is not configured for this TaskEnv; camera observations "
+                "are available through observation/sensor configuration instead."
+            )
+        return provider.render(mode=normalized_mode, snapshot=self._last_snapshot)
+
+    @property
+    def task_references(self):
+        self._require_runtime()
+        return self._runtime_assembly.compiled_scene.references
+
+    def _require_runtime(self):
+        if self._runtime is None:
+            raise StageUnavailableError(
+                "TaskEnv runtime was not built; construct with build_runtime=True."
+            )
+        return self._runtime
+
+    def _require_task_lifecycle(self) -> SingleTaskLifecycleAdapter:
+        if self._task_lifecycle is None:
+            raise StageUnavailableError(
+                "TaskEnv scalar lifecycle was not built; construct with build_runtime=True."
+            )
+        return self._task_lifecycle
+
+    @property
+    def episode_end(self):
+        """Return the most recent immutable Event/Outcome finalizer result."""
+
+        lifecycle = getattr(self, '_task_lifecycle', None)
+        if lifecycle is not None and lifecycle.episode_end is not None:
+            return lifecycle.episode_end
+        return self._last_episode_end
+
+    def _snapshot_request(self) -> SnapshotRequest:
+        return SnapshotRequest(
+            site_jacobians=self._robot is not None,
+            actuator_force=(
+                self._robot is not None
+                and self.config.robot.gripper.kind == "experimental_rate_limited"
+            ),
+            contact_summary=bool(
+                getattr(self._task_definition, "requires_contact_summary", False)
+            ),
+            simulation_time=True,
+        )
+
+    def _reset_episode_components(self, snapshot) -> None:
+        self._last_sensor_snapshot = None
+        self._last_sensor_observation = None
+        self._last_camera_metadata = {}
+        if self._robot is not None:
+            self._robot.controller.reset(snapshot)
+            reset_gripper = getattr(self._robot.gripper, "reset", None)
+            if callable(reset_gripper):
+                reset_gripper(snapshot)
+        if self._action_adapter is not None:
+            self._action_adapter.reset(snapshot)
+        if self._sensor_provider is not None:
+            self._sensor_provider.reset()
+
+    def _convert_action(self, action, snapshot):
+        if self._robot is None and self._action_adapter is None and self.config.agents.agent_uids:
+            raise StageUnavailableError(
+                "This environment has no Stage 2 ActionAdapter."
+            )
+        if self._action_adapter is not None:
+            return self._action_adapter.convert(action, snapshot)
+        if self._robot is None:
+            requested = np.asarray(action, dtype=np.float32)
+            if requested.shape != (0,):
+                raise ValueError(f"action shape must be {(0,)}, got {requested.shape}")
+            if not np.isfinite(requested).all():
+                raise ValueError("action must contain only finite values")
+            ctrl = (
+                np.zeros(0, dtype=np.float32)
+                if snapshot.ctrl is None
+                else np.asarray(snapshot.ctrl, dtype=np.float32).copy()
+            )
+            return ControlCommand(
+                actuator_ctrl=ctrl,
+                external_action=requested,
+                requested_action=requested,
+                controller_target=ctrl,
+                universal_action=np.zeros(0, dtype=np.float32),
+                mode="no_op",
+            )
+        return self._robot.controller.convert(action, snapshot)
+
+    def _build_observation_fallback(self, snapshot):
+        if self._observation_builder is None:
+            raise StageUnavailableError("This environment has no Stage 3 ObservationBuilder.")
+        self._last_camera_metadata = {}
+        sensor_observation = None
+        if self._sensor_provider is not None:
+            sensor_observation = self._sensor_provider.capture(snapshot)
+            self._last_camera_metadata = dict(sensor_observation.camera_metadata)
+        self._last_sensor_snapshot = snapshot
+        self._last_sensor_observation = sensor_observation
+        return self._observation_builder.build(snapshot, sensor_observation)
+
+    def _augment_component_task_rgb(self, snapshot, observation):
+        """Attach RGB from the same lifecycle snapshot before publication."""
+        task_rgb = self._component_task_rgb
+        if task_rgb is None:
+            return observation
+        if not isinstance(observation, Mapping):
+            raise TypeError("task RGB requires a mapping-valued task observation")
+        result = dict(observation)
+        if "task_rgb" in result:
+            raise ValueError("task observation already contains the reserved task_rgb key")
+        sensor_observation = (
+            self._last_sensor_observation
+            if self._last_sensor_snapshot is snapshot
+            else None
+        )
+        if sensor_observation is None:
+            if self._sensor_provider is None:
+                raise RuntimeError("task RGB was configured without a camera observation provider")
+            sensor_observation = self._sensor_provider.capture(snapshot)
+            self._last_camera_metadata = dict(sensor_observation.camera_metadata)
+            self._last_sensor_snapshot = snapshot
+            self._last_sensor_observation = sensor_observation
+        camera, _renderer, _generation = task_rgb
+        camera_metadata = sensor_observation.camera_metadata.get(camera.name)
+        realized = getattr(camera_metadata, 'renderer_readback', None)
+        if realized is None:
+            raise ValueError('component task RGB lacks independently verified renderer camera readback')
+        try:
+            frame = sensor_observation.rgb[camera.name]
+        except KeyError as error:
+            raise ValueError(
+                f"synchronous SensorObservation did not publish task camera {camera.name!r}"
+            ) from error
+        image = np.asarray(frame)
+        expected_shape = (camera.height, camera.width, 3)
+        if image.shape != expected_shape or image.dtype != np.float32:
+            raise ValueError(
+                f"task RGB must be float32 HWC with shape {expected_shape}, got "
+                f"{image.dtype} {image.shape}"
+            )
+        if not np.isfinite(image).all() or np.any(image < 0.0) or np.any(image > 1.0):
+            raise ValueError("task RGB must contain finite normalized values in [0, 1]")
+        result["task_rgb"] = np.array(image, dtype=np.float32, order="C", copy=True)
+        if not self.observation_space.contains(result):
+            raise ValueError("task observation with synchronous task RGB violates observation_space")
+        return result
+
+    @staticmethod
+    def _require_simulation_time_s(snapshot) -> float:
+        value = getattr(snapshot, "simulation_time", None)
+        if value is None or not np.isfinite(float(value)):
+            raise ValueError("TaskEnv info requires finite simulation_time_s from RuntimeSnapshot")
+        return float(value)
+
+    def _camera_capture_info(self, *, elapsed_steps: int, simulation_time_s: float):
+        if not self._last_camera_metadata:
+            return None
+        cameras = {
+            str(name): _json_value(asdict(value) if is_dataclass(value) else value)
+            for name, value in self._last_camera_metadata.items()
+        }
+        return {
+            "source": "SensorObservation.camera_metadata",
+            "observation_boundary": {
+                "elapsed_steps": int(elapsed_steps),
+                "simulation_time_s": float(simulation_time_s),
+            },
+            "cameras": cameras,
+        }
+
+    def _component_task_rgb_receipt(
+        self, *, lifecycle, control_step: int, simulation_time_s: float,
+    ):
+        task_rgb = self._component_task_rgb
+        if task_rgb is None:
+            return None
+        camera, _renderer, generation = task_rgb
+        if (
+            self._last_sensor_snapshot is not self._last_snapshot
+            or self._last_sensor_observation is None
+            or camera.name not in self._last_sensor_observation.rgb
+        ):
+            raise RuntimeError("task RGB receipt has no capture for the published lifecycle boundary")
+        camera_metadata = self._last_sensor_observation.camera_metadata.get(camera.name)
+        realized = getattr(camera_metadata, 'renderer_readback', None)
+        if realized is None:
+            raise RuntimeError("task RGB receipt has no native camera optical readback")
+        return {
+            "schema_version": "task-rgb-observation-v1",
+            "source": "SensorObservation.rgb and native renderer camera readback",
+            "camera_name": camera.name,
+            "requested_camera": _json_value(asdict(camera)),
+            "realized_camera": _json_value(asdict(realized)),
+            "renderer": _renderer,
+            "render_backend": self.config.render.backend,
+            "renderer_generation": generation,
+            "observation_boundary": {
+                "episode_id": lifecycle.episode_id,
+                "control_step": int(control_step),
+                "simulation_time_s": float(simulation_time_s),
+            },
+            "capture": {
+                "status": "completed_before_observation_publication",
+                "api": "CameraObservationProvider.capture/bind_task_camera/update_task_camera/read_task_camera/read_task_camera_frame(synchronized=True)",
+                "synchronized": True,
+            },
+        }
+
+    def _format_step_result(self, lifecycle, result):
+        snapshot = result.snapshot
+        evaluation = result.evaluation
+        command = result.command
+        applied = result.applied
+        self._last_snapshot = snapshot
+        self._elapsed_steps = result.elapsed_steps
+        action_info = {
+            "requested": command.requested_action,
+            "external": command.external_action,
+            "controller_target": command.controller_target,
+            "requested_ctrl": applied.requested_ctrl,
+            "applied_ctrl": applied.applied_ctrl,
+            "mode": command.mode,
+        }
+        if self.config.observation.include_diagnostics:
+            action_info.update(
+                {
+                    "clipped": bool(command.action_clipped or applied.clipped),
+                    "action_clipped": command.action_clipped,
+                    "ctrl_clipped": applied.clipped,
+                }
+            )
+        simulation_time_s = self._require_simulation_time_s(snapshot)
+        info = {
+            "is_success": evaluation.success,
+            "elapsed_steps": self._elapsed_steps,
+            "task_metrics": evaluation.metrics,
+            "reward_terms": evaluation.reward_terms,
+            "task_reward": evaluation.reward,
+            "task_failure": evaluation.failure,
+            "action": action_info,
+            "success_definition": self.config.task.success_definition,
+            "requested_action": command.requested_action,
+            "external_action": command.external_action,
+            "controller_target": command.controller_target,
+            "requested_ctrl": applied.requested_ctrl,
+            "applied_ctrl": applied.applied_ctrl,
+            "observation_schema": self._observation_builder.schema,
+            "simulation_time_s": simulation_time_s,
+        }
+        if result.episode_end is not None:
+            self._last_episode_end = result.episode_end
+            info["episode_end_v1"] = result.episode_end.to_mapping()
+        if self.config.observation.include_diagnostics:
+            info["action_clipped"] = command.action_clipped
+            info["ctrl_clipped"] = applied.clipped
+        # ``universal_action`` is the one canonical action after the
+        # controller/native adapter boundary.  Its schema is task-family
+        # specific: Panda keeps its historical eight-dimensional layout,
+        # while native non-arm tasks expose their runtime actuator vector.
+        info["universal_action"] = command.universal_action
+        action_info["universal_action"] = command.universal_action
+        camera_capture = self._camera_capture_info(
+            elapsed_steps=self._elapsed_steps,
+            simulation_time_s=simulation_time_s,
+        )
+        if camera_capture is not None:
+            info["camera_capture"] = camera_capture
+        task_rgb_receipt = self._component_task_rgb_receipt(
+            lifecycle=lifecycle,
+            control_step=self._elapsed_steps,
+            simulation_time_s=simulation_time_s,
+        )
+        if task_rgb_receipt is not None:
+            info["task_rgb_v1"] = task_rgb_receipt
+        validate_task_info(info, phase="step")
+        return result.observation, evaluation.reward, result.terminated, result.truncated, info
+
+    def _placeholder_evaluation(self) -> TaskEvaluation:
+        return TaskLifecycleAdapter.placeholder_evaluation()
+
+    def _reset_task_evaluation(self, snapshot) -> TaskEvaluation:
+        if self._task_lifecycle is None:
+            return self._placeholder_evaluation()
+        evaluation = self._task_lifecycle.reset_task(
+            state=snapshot,
+            reset_mask=np.ones(1, dtype=np.bool_),
+            legacy_snapshot=snapshot,
+        )
+        return TaskLifecycleAdapter.coerce_scalar_evaluation(evaluation)
+
+    def _sample_episode_reset_state_for_lifecycle(
+        self,
+        seed: int | None,
+        rng: np.random.Generator,
+    ):
+        return self._sample_episode_reset_state(seed=seed, rng=rng)
+
+    def _sample_episode_reset_state(
+        self,
+        *,
+        seed: int | None,
+        rng: np.random.Generator | None = None,
+    ):
+        """Resolve one episode reset without changing the compiled baseline.
+
+        A task sampler may opt into per-episode state sampling with
+        ``sample_episode_state``.  The hook is deliberately at the public
+        reset boundary: it receives only the immutable compiled scene and the
+        Gym RNG, returns a value-object state, and cannot advance physics.
+        Existing task samplers that only implement construction-time
+        ``resolve_initial_state`` keep their original deterministic behavior.
+        """
+
+        runtime = self._require_runtime()
+        sampler = self._reset_sampler
+        reset_rng = self.np_random if rng is None else rng
+        sample_state = getattr(sampler, "sample_episode_state", None)
+        if not callable(sample_state):
+            return runtime.initial_state, {}
+        state, parameters = sample_state(
+            compiled_scene=self._runtime_assembly.compiled_scene,
+            initial_state=runtime.initial_state,
+            rng=reset_rng,
+            seed=seed,
+        )
+        if not isinstance(parameters, dict):
+            raise TypeError("episode reset sampler must return a dict of parameters")
+        return state, _json_value(parameters)
+
+    def _evaluate_task(self, previous_snapshot, action, snapshot) -> TaskEvaluation:
+        if self._task_lifecycle is None:
+            return self._placeholder_evaluation()
+        evaluation = self._task_lifecycle.evaluate_task(
+            state=snapshot,
+            action=action,
+            elapsed_steps=int(self._elapsed_steps),
+            previous_state=previous_snapshot,
+            legacy_previous_snapshot=previous_snapshot,
+            legacy_current_snapshot=snapshot,
+        )
+        return TaskLifecycleAdapter.coerce_scalar_evaluation(evaluation)
+
+    @staticmethod
+    def _coerce_scalar_evaluation(evaluation: Any) -> TaskEvaluation:
+        return TaskLifecycleAdapter.coerce_scalar_evaluation(evaluation)
+
+    def _build_observation(self, snapshot):
+        if self._task_lifecycle is None:
+            raise StageUnavailableError("This environment has no task lifecycle adapter.")
+        return self._task_lifecycle.build_observation(
+            snapshot,
+            fallback=lambda: self._build_observation_fallback(snapshot),
+        )
+
+
+    @classmethod
+    def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
+        if (getattr(cls, 'uses_selected_public_config', False)
+                or getattr(cls, 'uses_component_task_config', False)):
+            return cls.from_resolved_config(config, render_mode=render_mode, **kwargs)
+        if getattr(cls, 'binding', None) is None:
+            from .configuration import resolve_task_env_config
+            resolved = resolve_task_env_config(cls, config)
+            if resolved.runtime.batch_physics_layout != 'merged_scene':
+                raise StageUnavailableError(
+                    'batch_physics_layout is only valid for make_parallel_env(); '
+                    'single TaskEnv construction requires merged_scene')
+            return cls(config=resolved, render_mode=render_mode, **kwargs)
+        values = {} if config is None else dict(config)
+        if kwargs or render_mode is not None or set(values) - {'provider', 'backend', 'horizon'}:
+            raise ValueError('legacy class binding admits state-only provider/backend/horizon only')
+        return cls(**values)
+
+    @classmethod
+    def _build_selected_binding(cls, config, *, robot=None):
+        """Select one Robot declaration for task compilation and source composition."""
+        from ..registry import make_agent
+        if robot is None or robot.uid != config.robot_uid:
+            robot = make_agent(config.robot_uid)
+        binding = cls.selected_binding(config, robot=robot)
+        try:
+            binding = replace(binding, robot=robot)
+            return cls._bind_robot_source_composer(binding, config)
+        except BaseException as error:
+            cls._release_failed_task_construction(None, binding, error)
+            raise
+
+    @classmethod
+    def _bind_robot_source_composer(cls, binding, config):
+        roots = getattr(cls, 'robot_source_roots', None)
+        if roots is None or binding.scalar_control_binding is None:
+            return binding
+        from ..runtime.sessions.source_composition_adapters import (
+            SourceCompositionCapabilityUnavailable, declared_robot_source_composer,
+        )
+        try:
+            composer = declared_robot_source_composer(config,
+                robot_uid=config.robot_uid,
+                existing_robot_entity=cls.default_robot_source_uid, task_body_names=roots,
+                task_site_transfers=cls.robot_source_site_transfers, robot=binding.robot)
+        except SourceCompositionCapabilityUnavailable:
+            if config.robot_uid != cls.default_robot_source_uid:
+                raise
+            return binding
+        return replace(binding, compose_robot_source=composer)
+
+    @classmethod
+    def from_resolved_config(cls, config, *, render_mode=None,
+                             task_rgb_camera=None, task_renderer=None,
+                             observer_camera=None, task_camera=None, **kwargs):
+        """Resolve one public configuration, then construct its Env owner."""
+        from .config import ResolvedSelectedConfig
+        from .configuration import resolve_task_env_config
+        if type(config) is ResolvedSelectedConfig and config.task_uid != cls.uid:
+            raise TypeError('selected construction requires its own resolved configuration')
+        config = resolve_task_env_config(cls, config)
+        selected = type(config) is ResolvedSelectedConfig
+        if not selected and type(config) is not ResolvedEnvConfig:
+            raise TypeError('environment construction requires resolved configuration')
+        from ..render.base.contracts import validate_camera_declarations, normalize_render_mode
+        # Legacy component render_mode still means its existing display route;
+        # explicit observer declarations belong to the selected source contract.
+        if selected or observer_camera is not None or task_camera is not None:
+            validate_camera_declarations(render_mode=render_mode, observer_camera=observer_camera,
+                task_camera=task_camera, task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
+        camera, renderer = task_rgb_camera, task_renderer
+        if (camera is None) != (renderer is None):
+            raise ValueError('task RGB camera and fixed renderer must be declared together')
+        if not selected:
+            provider = kwargs.pop('provider', 'geophys')
+            backend = kwargs.pop('backend', config.runtime.backend)
+            build_runtime = kwargs.pop('build_runtime', True)
+            manifest = kwargs.pop('source_delivery_manifest', None)
+            if kwargs:
+                raise ValueError(f'unsupported environment options: {sorted(kwargs)}')
+            if type(build_runtime) is not bool:
+                raise TypeError('build_runtime must be a boolean')
+            if provider != 'geophys' or backend != config.runtime.backend or manifest is not None:
+                raise ValueError('component construction uses its configured GeoPhys route')
+            if config.runtime.batch_physics_layout != 'merged_scene':
+                raise StageUnavailableError('single TaskEnv construction requires merged_scene')
+            return cls(config=config, render_mode=render_mode, build_runtime=build_runtime,
+                       task_rgb_camera=camera, task_renderer=renderer)
+        from contextlib import ExitStack
+        with ExitStack() as preparation:
+            if kwargs:
+                raise ValueError('selected reference admits no unsupported extra kwargs')
+            observer_route = None
+            if render_mode is not None:
+                from ..render.camera.task_rgb import selected_observer_route
+                observer_route = selected_observer_route(config, render_mode)
+                render_mode = normalize_render_mode(render_mode).value
+            provider, backend = config.physics_provider, config.environment.runtime.backend
+            if camera is not None and (provider, backend, renderer) not in _TASK_RGB_PAIRS:
+                raise ValueError('unsupported fixed task RGB renderer and physics pairing')
+            environment = config.environment
+            import json
+            from ..runtime.sessions.provenance import preflight_selected_source
+            preflight_selected_source(config.execution_spec_v2,
+                requested=(None if config.requested_execution_json is None
+                           else json.loads(config.requested_execution_json)), task_uid=cls.uid)
+            if provider == 'isaacsim' and config.execution_spec_v2.deployment == 'in_process':
+                from ..runtime.sessions.isaac_native_io import prepare_isaac_source
+                preparation.enter_context(prepare_isaac_source(
+                    rendering=render_mode is not None or camera is not None))
+            binding = cls._build_selected_binding(config)
+            horizon = environment.episode.horizon
+            env = cls.from_task_binding(binding, provider=provider, backend=backend, horizon=horizon,
+                seed=environment.episode.seed if environment.episode.seed is not None else 31)
+            try:
+                env.resolved_public_config = config
+                env.config = environment
+                if binding.task_reset_sampler is not None:
+                    env._env_metadata = replace(build_stage0_metadata(env.uid, environment),
+                        external_action=binding.external_action_contract,
+                        physics_engine={'geophys': 'GeoPhys', 'mujoco': 'MuJoCo',
+                                        'isaacsim': 'Isaac Sim PhysX'}[provider],
+                        camera_specs=(camera,) if camera is not None else environment.render.cameras)
+                    env.metadata['reference_profile'] = env.reference_profile()
+                    env._legacy_camera_observations = bool(environment.render.camera_obs)
+                    if render_mode is not None and observer_camera is None:
+                        env.render_mode = render_mode
+                        env._human_display_unavailable = True
+                        env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
+                            render_mode=render_mode, human_display_available=False)
+                        if render_mode == 'rgb_array':
+                            env._legacy_observer_requested = True
+                            env.metadata.update(render_backend=environment.render.backend,
+                                render_resolution=(environment.render.width, environment.render.height))
+                if camera is not None:
+                    from .config import CameraSpec
+                    from ..observations.canonical_camera import CameraGeometry
+                    geometry = (CameraGeometry.from_camera_spec(camera, task_artifact_hash=env.artifact.identity_hash)
+                                if type(camera) is CameraSpec else camera)
+                    env._configure_task_rgb(geometry, renderer)
+                    if type(camera) is CameraSpec:
+                        env._task_camera_spec = camera
+                if task_camera is not None:
+                    import copy
+                    from ..observations.canonical_camera import CameraGeometry
+                    from .config import CameraSpec
+                    geometry = (CameraGeometry.from_camera_spec(task_camera, task_artifact_hash=env.artifact.identity_hash)
+                                if type(task_camera) is CameraSpec else task_camera)
+                    if geometry.task_artifact_hash != env.artifact.identity_hash:
+                        raise ValueError('task camera TaskArtifact linkage mismatch')
+                    env._declared_task_camera = copy.deepcopy(geometry)
+                if observer_camera is not None:
+                    from ..observations.canonical_camera import CameraGeometry
+                    from .config import CameraSpec
+                    geometry = (CameraGeometry.from_camera_spec(observer_camera, task_artifact_hash=env.artifact.identity_hash)
+                                if type(observer_camera) is CameraSpec else observer_camera)
+                    env._configure_selected_observer(render_mode, geometry, observer_route=observer_route)
+            except BaseException as error:
+                try:
+                    env.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'environment construction cleanup also failed: {cleanup_error!r}')
+                raise
+            return env
+
+    @classmethod
+    def from_task_binding(cls, binding, *, provider, backend, horizon, seed=31):
+        """Compile a declared task and construct its single environment owner.
+
+        Public configurations and typed advanced inputs share this boundary;
+        their input decoders retain responsibility for capability admission.
+        """
+        if not isinstance(binding, ReferenceTaskBinding):
+            raise TypeError('task construction requires ReferenceTaskBinding')
+        initial = None
+        try:
+            initial = binding.reset_reconstruction_strategy(provider, backend, horizon).initial(seed=seed)
+            declared = initial.get('execution_spec_v1')
+            binding = binding.bind_compiled_control(initial)
+        except BaseException as error:
+            cls._release_failed_task_construction(initial, binding, error)
+            raise
+        return cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
+                   _execution_spec_v1=declared, _initial_value=initial)
+
+    @staticmethod
+    def _release_failed_task_construction(value, binding, error):
+        source = value.get('source') if isinstance(value, Mapping) else None
+        from ..runtime.sessions.source import close_source_and_task_resources
+        close_source_and_task_resources(source, binding, error=error)
+
+    def _selected_execution_context(self):
+        resolved = getattr(self, 'resolved_public_config', None)
+        if resolved is not None:
+            return resolved.execution_spec_v2, resolved.requested_execution_json
+        return None, None
+
+
+    def _bind_selected_controller(self, value):
+        from ..runtime.sessions.control import bind_selected_controller
+
+        selected = bind_selected_controller(
+            value, binding=self.binding, provider=self.provider, backend=self.backend,
+        )
+        self.position_profiles = selected.position_profiles
+        self.position_profile = selected.position
+        self._selected_controller = selected.controller
+        self._selected_controller_binding = selected
+        from ..robots.runtime import RobotRuntime
+        self._robot = RobotRuntime.from_selected(
+            value, selected, robot=self.binding.robot,
+            physical_selection=getattr(self, '_physical_reset_selection', None))
+        if self._robot is None:
+            raise ValueError('task construction requires a source-owned Robot subject binding')
+
+    def _episode_execution_state(self):
+        state = self.__dict__.get('_episode_state')
+        if state is None:
+            state = self.__dict__['_episode_state'] = EpisodeExecutionState()
+        return state
+
+    @property
+    def _closed(self):
+        return self._episode_execution_state().closed
+
+    @_closed.setter
+    def _closed(self, value):
+        self._episode_execution_state().closed = value
+
+    @property
+    def _stopped(self):
+        return self._episode_execution_state().stopped
+
+    @_stopped.setter
+    def _stopped(self, value):
+        self._episode_execution_state().stopped = value
+
+    @property
+    def _position_episode_end(self):
+        return self._episode_execution_state().episode_end
+
+    @_position_episode_end.setter
+    def _position_episode_end(self, value):
+        self._episode_execution_state().episode_end = value
+
+    @property
+    def _selected_episode_id(self):
+        return self._episode_execution_state().episode_id
+
+    @_selected_episode_id.setter
+    def _selected_episode_id(self, value):
+        self._episode_execution_state().episode_id = value
+
+    @property
+    def _execution_fault(self):
+        return self._episode_execution_state().fault
+
+    @_execution_fault.setter
+    def _execution_fault(self, value):
+        self._episode_execution_state().fault = value
+
+    def _format_component_reset(self, lifecycle, result, seed):
+        snapshot = result.snapshot
+        evaluation = result.evaluation
+        reset_parameters = result.reset_parameters
+        self._last_snapshot = snapshot
+        self._elapsed_steps = lifecycle.elapsed_steps
+        self._last_episode_end = None
+        try:
+            simulation_time_s = self._require_simulation_time_s(snapshot)
+            info = {
+                "seed": seed,
+                "reset_parameters": reset_parameters,
+                "task_uid": self.config.task.task_uid,
+                "stage": "stage4_gym_contract",
+                "is_success": evaluation.success,
+                "elapsed_steps": self._elapsed_steps,
+                "task_metrics": evaluation.metrics,
+                "reward_terms": evaluation.reward_terms,
+                "task_reward": evaluation.reward,
+                "task_failure": evaluation.failure,
+                "success_definition": self.config.task.success_definition,
+                "resolved_control_metadata": self.metadata["action_schema"],
+                "observation_schema": self._observation_builder.schema,
+                "simulation_time_s": simulation_time_s,
+                "episode_id": lifecycle.episode_id,
+                "termination_policy": lifecycle.termination_policy.to_mapping(),
+            }
+            if result.previous_episode_end is not None:
+                info["previous_episode_end_v1"] = result.previous_episode_end.to_mapping()
+            camera_capture = self._camera_capture_info(
+                elapsed_steps=self._elapsed_steps,
+                simulation_time_s=simulation_time_s,
+            )
+            if camera_capture is not None:
+                info["camera_capture"] = camera_capture
+            task_rgb_receipt = self._component_task_rgb_receipt(
+                lifecycle=lifecycle,
+                control_step=self._elapsed_steps,
+                simulation_time_s=simulation_time_s,
+            )
+            if task_rgb_receipt is not None:
+                info["task_rgb_v1"] = task_rgb_receipt
+            validate_task_info(info, phase="reset")
+            return result.observation, info
+        except BaseException as error:
+            lifecycle._latch_fault(
+                "gymnasium_reset_result",
+                error,
+                after_snapshot=snapshot,
+                control_step_before=0,
+                control_step_after=0,
+            )
+            raise
+
+    def _format_component_step(self, lifecycle, result):
+        try:
+            return self._format_step_result(lifecycle, result)
+        except BaseException as error:
+            lifecycle.revoke_unpublished_step(result)
+            lifecycle._latch_fault(
+                "gymnasium_result",
+                error,
+                before_snapshot=result.previous_snapshot,
+                after_snapshot=result.snapshot,
+                control_step_before=max(0, result.elapsed_steps - 1),
+                control_step_after=result.elapsed_steps,
+                interval_attempted=True,
+                interval_completed=True,
+            )
+            self._last_snapshot = result.snapshot
+            self._elapsed_steps = result.elapsed_steps
+            raise
+
+    def _component_record_metadata(self) -> dict[str, Any]:
+        """Return the JSON-compatible public projection used by recorders only."""
+        metadata = {
+            "env_metadata": _json_value(self.metadata),
+            "resolved_config": _json_value(asdict(self.config)),
+        }
+        metadata["universal_action_schema"] = _json_value(
+            self.metadata.get("universal_action_schema", {})
+        )
+        return metadata
+
+    def _close_component_resources(self) -> None:
+        # Runtime lifecycle may already be closed independently.  The Env
+        # still owns auxiliary UI/sensor resources and must release them once.
+        if getattr(self, "_resources_closed", False):
+            return
+        ui_provider = getattr(self, "_ui_render_provider", None)
+        sensor_provider = getattr(self, "_sensor_provider", None)
+        lifecycle = getattr(self, "_task_lifecycle", None)
+        runtime = getattr(self, "_runtime", None)
+        self._ui_render_provider = None
+        self._sensor_provider = None
+        self._task_lifecycle = None
+        self._runtime = None
+        self._runtime_assembly = None
+
+        owners = [ui_provider, sensor_provider]
+        # SingleTaskLifecycleAdapter is the sole closer of the RuntimeBoundary.
+        # Before it exists (including partial construction), the environment
+        # falls back to closing a boundary that was already returned by bootstrap.
+        owners.append(lifecycle if lifecycle is not None else runtime)
+        first_error: BaseException | None = None
+        for owner in owners:
+            close = getattr(owner, "close", None)
+            if not callable(close):
+                continue
+            try:
+                close()
+            except BaseException as exc:
+                if first_error is None:
+                    first_error = exc
+        episode_end = getattr(lifecycle, "episode_end", None)
+        if episode_end is not None:
+            self._last_episode_end = episode_end
+        self._resources_closed = True
+        if first_error is not None:
+            raise first_error
+
+    def _has_component_assembly(self):
+        return getattr(self, '_uses_component_assembly',
+                       getattr(type(self), 'uses_component_task_config', False)
+                       or '_task_lifecycle' in self.__dict__)
+
+    @staticmethod
+    def _prepare_component_task_rgb(config, camera, renderer):
+        """Resolve the bounded component RGB route without changing physics."""
+        from .config import CameraSpec
+
+        if not isinstance(config, ResolvedEnvConfig):
+            raise TypeError("component task RGB requires ResolvedEnvConfig")
+        if not isinstance(camera, CameraSpec):
+            raise TypeError("component task RGB camera must be a CameraSpec")
+        if renderer != "geophys":
+            raise ValueError("component task RGB currently admits the fixed GeoPhys renderer only")
+        if config.runtime.backend != "cpu":
+            raise ValueError("component task RGB requires the GeoPhys CPU physics route")
+        if not camera.rgb or camera.depth or camera.rgb_layout != "HWC" or camera.rgb_dtype != "float32":
+            raise ValueError("component task RGB requires HWC float32 RGB without depth")
+        if config.render.camera_obs and config.render.backend != "rasterizer":
+            raise ValueError(
+                "existing component camera observations must already use rasterizer for task RGB"
+            )
+        cameras = list(config.render.cameras)
+        existing = next((item for item in cameras if item.name == camera.name), None)
+        if existing is not None and existing != camera:
+            raise ValueError(
+                f"task RGB camera name {camera.name!r} conflicts with the resolved CameraSpec"
+            )
+        if existing is None:
+            cameras.append(camera)
+        if len(cameras) != 1 or cameras[0] != camera:
+            raise ValueError(
+                "component task RGB currently requires one task camera because GeoPhys owns one task-camera binding"
+            )
+        render = replace(
+            config.render,
+            camera_obs=True,
+            backend="rasterizer",
+            cameras=tuple(cameras),
+        )
+        return replace(config, render=render), (camera, renderer, uuid4().hex)
+
+    def _configure_component_task_rgb_space(self) -> None:
+        camera, _renderer, _generation = self._component_task_rgb
+        spaces = OrderedDict(self.observation_space.spaces)
+        if "task_rgb" in spaces:
+            raise ValueError("task observation already declares the reserved task_rgb key")
+        spaces["task_rgb"] = Box(
+            low=0.0,
+            high=1.0,
+            shape=(camera.height, camera.width, 3),
+            dtype=np.float32,
+        )
+        self.observation_space = Dict(spaces)
+
+    def _configure_component_task_rgb_metadata(self) -> None:
+        camera, renderer, generation = self._component_task_rgb
+        self.metadata = dict(self.metadata)
+        self.metadata["task_rgb_v1"] = {
+            "schema_version": "task-rgb-observation-v1",
+            "observation_key": "task_rgb",
+            "camera": _json_value(asdict(camera)),
+            "renderer": renderer,
+            "render_backend": self.config.render.backend,
+            "renderer_generation": generation,
+            "color_space": "float32 RGB normalized to [0,1]; primaries and transfer are uncalibrated",
+            "ownership": "owned host copy",
+            "capture": "same RuntimeSnapshot; synchronized raster read completes before publication",
+        }
+
+    def _initialize_components(
+        self,
+        config: ResolvedEnvConfig | None = None,
+        *,
+        render_mode=None,
+        build_runtime: bool = True,
+        task_rgb_camera=None,
+        task_renderer=None,
+    ) -> None:
+        self._closed = False
+        self._last_episode_end = None
+        self.config = config if config is not None else self.default_config()
+        if (task_rgb_camera is None) != (task_renderer is None):
+            raise ValueError("task RGB camera and fixed renderer must be declared together")
+        self._component_task_rgb = None
+        if task_rgb_camera is not None:
+            self.config, self._component_task_rgb = self._prepare_component_task_rgb(
+                self.config, task_rgb_camera, task_renderer
+            )
+        # Import only the lightweight render contract during environment
+        # construction. Concrete renderer backends stay out of the physics
+        # bootstrap.
+        from ..render.base.contracts import normalize_render_mode
+
+        self.render_mode = (
+            None
+            if render_mode is None
+            else normalize_render_mode(render_mode).value
+        )
+        self._ui_render_provider = None
+        self.scene = SCENE_REGISTRY.create(self.config.scene.scene_uid)
+        self.agents = tuple(
+            AGENT_REGISTRY.create(uid) for uid in self.config.agents.agent_uids
+        )
+        self.objects = tuple(
+            OBJECT_REGISTRY.create(uid) for uid in self.config.objects.object_uids
+        )
+        self._composition_spec = TaskCompositionSpec(
+            task_uid=self.config.task.task_uid,
+            scene_uid=self.config.scene.scene_uid,
+            agent_uids=self.config.agents.agent_uids,
+            object_uids=self.config.objects.object_uids,
+            placement_notes=self.placement_notes(),
+            success_definition=self.config.task.success_definition,
+        )
+        self._execution_plan = resolve_execution_plan(
+            type(self),
+            self.config,
+            agents=self.agents,
+            render_mode=self.render_mode,
+        )
+        self._env_metadata = build_stage0_metadata(self.uid, self.config)
+        self._runtime_assembly = None
+        self._runtime = None
+        self._reset_sampler = None
+        self._robot = None
+        self._action_adapter = None
+        self._observation_builder = None
+        self._task_definition = None
+        self._task_lifecycle = None
+        self._camera_sensors = ()
+        self._sensor_provider = None
+        self._last_sensor_snapshot = None
+        self._last_sensor_observation = None
+        self._last_camera_metadata = {}
+        self._last_snapshot = None
+        self._elapsed_steps = 0
+        self.metadata = gym_metadata_dict(self._env_metadata, stage="stage4_gym_contract")
+        reference_profile = _json_value(self.reference_profile())
+        if reference_profile:
+            self.metadata["reference_profile"] = reference_profile
+        self._configure_render_metadata()
+        if build_runtime:
+            self._build_runtime_with_rollback()
+
+
+    def _bind_selected_task_definition(self):
+        """Bind semantics to the current Artifact at construction or reset."""
+        factory = self.binding.task_definition_factory
+        self._task_definition = None if factory is None else factory(self.artifact)
+        self._task_lifecycle = (None if factory is None else TaskLifecycleAdapter(
+            task_definition=self._task_definition, horizon=self.horizon,
+            ignore_done=self.binding.physical_ignore_done))
+
+    def _initialize_selected_value(self):
+        """Initialize task-declared metadata before the selected Env is published."""
+        self.artifact = self.value['artifact']
+        self.solution = self.value['solution']
+        if self.binding.physical_reset_capability is not None:
+            self._physical_reset_selection = self.binding.physical_reset_capability.bind(self.value)
+        self._bind_selected_controller(self.value)
+        self._bind_selected_task_definition()
+        self.dual_entity_position = len(self.position_profiles) == 2
+        if (not self.position_profile and self._physical_execution() is None):
+            if type(self.binding.scalar_control_binding) is not ControlBinding:
+                raise TypeError('selected scalar control requires its declared ControlBinding')
+        self._task_rgb_state_binding = None
+        self._task_rgb_typed_state = None
+        self.typed_state = None
+        self.metadata = {'env_id': self.uid,
+            'task_artifact_hash': self.artifact.identity_hash,
+            'construction_id': self.value['construction_id'],
+            'control_dt': self.artifact.timebase.control_dt}
+        if self.binding.observation_metadata is not None:
+            self.metadata['observation_schema'] = dict(self.binding.observation_metadata)
+        self.supports_structured_control_recording = False
+        self.metadata['action_schema'] = dict(self.binding.action_schema)
+        self.action_space = self.binding.action_space_factory()
+        observation_spaces = self.binding.observation_space_factory(self)
+        self.observation_space = Dict(observation_spaces)
+
+    def __init__(self, config=None, *, render_mode=None, build_runtime=True,
+                 provider='geophys', backend='cpu', horizon=6000,
+                 _binding=None,
+                 _execution_spec_v1=None,
+                 _initial_value=None, task_rgb_camera=None, task_renderer=None):
+        if getattr(type(self), 'uses_selected_public_config', False) and _binding is None:
+            raise TypeError('construct formal tasks through make_env and its resolved configuration')
+        self._uses_component_assembly = bool(
+            (getattr(type(self), 'uses_component_task_config', False) and _binding is None)
+            or config is not None
+            or (_binding is None and self.binding is None
+                and type(self) is SelectedReferenceEnv)
+        )
+        if self._uses_component_assembly:
+            self._initialize_components(
+                config,
+                render_mode=render_mode,
+                build_runtime=build_runtime,
+                task_rgb_camera=task_rgb_camera,
+                task_renderer=task_renderer,
+            )
+            return
+        try:
+            if task_rgb_camera is not None or task_renderer is not None:
+                raise ValueError("selected task RGB is configured through the public make_env factory")
+            if render_mode is not None or build_runtime is not True:
+                raise ValueError('selected reference rendering and component runtime options require a component task')
+            if type(horizon) is not int or not 1 <= horizon <= 6000:
+                raise ValueError('selected reference horizon is outside its admitted range')
+            if _binding is not None:
+                if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
+                    raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
+                self.binding = _binding
+            if not isinstance(self.binding, ReferenceTaskBinding):
+                raise TypeError('selected reference requires an explicit task binding')
+            if _execution_spec_v1 is not None:
+                from ..artifacts import ExecutionSpecV1
+                if type(_execution_spec_v1) is not ExecutionSpecV1:
+                    raise TypeError('versioned selected construction requires ExecutionSpecV1')
+                _execution_spec_v1.validate()
+                if (provider, backend) != (
+                        _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend):
+                    raise ValueError('selected construction provider/backend differs from ExecutionSpecV1')
+                from ..runtime.sessions.api import validate_selected_position_route
+                validate_selected_position_route(_execution_spec_v1)
+            self._declared_execution_spec_v1 = _execution_spec_v1
+            if (_execution_spec_v1 is None
+                    and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
+                raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
+            self._reset_reconstruction = self.binding.reset_reconstruction_strategy(
+                provider, backend, horizon)
+            self.provider, self.backend, self.horizon = provider, backend, horizon
+            self._execution_fault = None
+            if _initial_value is not None:
+                if (not isinstance(_initial_value, dict)
+                        or _initial_value.get('execution_spec_v1') != _execution_spec_v1):
+                    raise ValueError('precompiled selected value must match its execution specification')
+                self.value = _initial_value
+            else:
+                self.value = self._reset_reconstruction.initial()
+            self._initialize_selected_value()
+            self.session = None
+            self._external_solution_owner = None
+            self._active_native_interval_receipt = None
+            self._closed = False
+            self._episode_mode = None
+            self._stopped = True
+            self._position_episode_end = None
+            self._compiled_layout_pre_reset = None
+            self._compiled_layout_post_reset = None
+            self._clear_position_publication()
+            self.recorder = None
+            self.recording_path = None
+
+        except BaseException as error:
+            self._release_failed_task_construction(
+                getattr(self, 'value', _initial_value), _binding or self.binding, error)
+            fault = ExecutionFaultV1.from_exception('selected_construction', error)
+            self._execution_fault = fault
+            attach_execution_fault(error, fault)
+            raise
+
+    @property
+    def execution_fault(self):
+        """Return the latched selected-route execution fault, if any."""
+
+        return self._execution_fault
+
+    def _require_execution_healthy(self) -> None:
+        """Reject normal execution on a faulted Env; reset is its recovery route."""
+
+        self._episode_execution_state().require_step(
+            closed_message='environment is closed',
+            fault_prefix='selected execution is faulted; reset() is required',
+        )
+
+    @property
+    def reset_failure_receipt(self):
+        """Return an owned record of reset effects; unknown writes are not rollback."""
+        from copy import deepcopy
+        return deepcopy(getattr(self, '_reset_failure_receipt', None))
+
+
+
+    def _latch_fault(
+        self,
+        phase,
+        error,
+        *,
+        before_state=None,
+        after_state=None,
+        interval_attempted=False,
+        interval_completed=False,
+        observer_confirmed_substeps=None,
+        recorder_confirmed_substeps=None,
+        native_substeps_expected=None,
+        transition_status='not_assessed',
+        readback_error=None,
+    ):
+        fault = ExecutionFaultV1.from_exception(
+            phase,
+            error,
+            control_step_before=(
+                None if before_state is None else int(before_state.control_step)
+            ),
+            control_step_after=(
+                None if after_state is None else int(after_state.control_step)
+            ),
+            simulation_time_before_s=(
+                None if before_state is None else before_state.simulation_time
+            ),
+            simulation_time_after_s=(
+                None if after_state is None else after_state.simulation_time
+            ),
+            expected_control_dt_s=self.artifact.timebase.control_dt,
+            interval_attempted=interval_attempted,
+            interval_completed=interval_completed,
+            observer_confirmed_substeps=observer_confirmed_substeps,
+            recorder_confirmed_substeps=recorder_confirmed_substeps,
+            native_substeps_expected=native_substeps_expected,
+            transition_status=transition_status,
+            readback_error=readback_error,
+        )
+        self._episode_execution_state().latch_fault(fault, stop=True)
+        attach_execution_fault(error, fault)
+        return fault
+
+    @property
+    def composition_spec(self):
+        if self._has_component_assembly():
+            return self._composition_spec
+        return self.value['source'].composition
+
+    def _position_requirements(self):
+        return self._position_state_declaration.position_state_requirements()
+
+    def _prepare_task_rgb_state_binding(self):
+        """Resolve the complete renderer projection from the current source identity."""
+        if getattr(self, '_task_rgb_config', None) is None:
+            self._task_rgb_state_binding = None
+            return None
+        from ..render.camera.api import prepare_task_rgb_state_binding
+
+        result = prepare_task_rgb_state_binding(
+            self._task_rgb_config[1], self.value.get('source'), artifact=self.artifact,
+        )
+        self._task_rgb_state_binding = result
+        return result
+
+    def _publish_task_rgb_typed_state(self, state=None):
+        """Publish the renderer's independent projection at the current boundary."""
+        self._task_rgb_typed_state = None
+        state = self.state if state is None else state
+        binding = getattr(self, '_task_rgb_state_binding', None)
+        if binding is None:
+            binding = self._prepare_task_rgb_state_binding()
+        source, artifact_hash, scene, joints, frames, requirements, _render_source = binding
+        if (source is not self.value.get('source') or artifact_hash != self.artifact.identity_hash
+                or scene is not source.scene_definition):
+            raise ValueError('selected task RGB state binding is stale or foreign')
+        current_boundary = self.session.state_boundary_identity()
+        publication = self.session.snapshot_v1(
+            scene=scene, joint_bindings=joints, frame_bindings=frames,
+            requirements=requirements,
+        )
+        from ..artifacts import CanonicalStatePublicationV1
+        expected_control_step = int(state.control_step)
+        expected_simulation_time = float(state.simulation_time)
+        if (type(publication) is not CanonicalStatePublicationV1
+                or not publication.lifetime.may_be_retained
+                or publication.view.boundary != current_boundary
+                or publication.view.boundary.control_step != expected_control_step
+                or abs(publication.view.sample_clock.simulation_time_s
+                       - expected_simulation_time) > _boundary_interval_clock_tolerance(
+                           expected_simulation_time,
+                           publication.view.sample_clock.simulation_time_s,
+                           self.artifact.timebase.control_dt,
+                           self.artifact.timebase.physics_dt,
+                           self.artifact.timebase.control_substeps,
+                       )):
+            raise ValueError('selected task RGB typed state is stale or differs from Runtime readback')
+        publication.view.validate_against_scene(scene)
+        publication.view.validate_requirements(requirements)
+        self._task_rgb_typed_state = publication
+        return publication
+
+    def _execute_reset_operations(self, prepare):
+        """Commit every reset entry through one publication/capture lifecycle."""
+        defer_rgb = (not self._has_component_assembly()
+                     and getattr(self, '_task_rgb_config', None) is not None)
+        if defer_rgb:
+            self._defer_task_rgb_capture = True
+        try:
+            operations = prepare()
+            after_commit = operations.pop('after_commit', None)
+            result = self._episode_execution_state().execute_reset(**operations)
+        finally:
+            if defer_rgb:
+                self._defer_task_rgb_capture = False
+        self._reset_failure_receipt = None
+        if after_commit is not None:
+            try:
+                result = after_commit(self.state, result)
+            except BaseException as error:
+                operations['on_failure']('task_rgb_capture_after_reset_commit', error)
+                raise
+        return result
+
+    def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
+        self._episode_execution_state().require_open('environment is closed')
+        component_lifecycle = None
+
+        def prepare():
+            nonlocal component_lifecycle, seed
+            if self._has_component_assembly():
+                seed = None if seed is _RESET_SEED_UNSET else seed
+                GymEnvBase.reset(self, seed=seed)
+                self._last_camera_metadata = {}
+                component_lifecycle = self._require_task_lifecycle()
+                return component_lifecycle.prepare_reset(seed=seed, options=options, rng=self.np_random)
+            return self._prepare_reference_reset(seed=seed, options=options)
+
+        if not self._has_component_assembly():
+            return self._reset_selected_task(seed=seed, options=options)
+        result = self._execute_reset_operations(prepare)
+        return self._format_component_reset(component_lifecycle, result, seed)
+
+    def _reset_selected_task(self, *, seed, options, external_solution=None):
+        resolved = getattr(self, 'resolved_public_config', None)
+        environment = resolved.environment if resolved is not None else getattr(self, 'config', None)
+        configured_seed = None if environment is None else environment.episode.seed
+        if seed is _RESET_SEED_UNSET and configured_seed is not None:
+            seed = configured_seed
+        requested_seed = seed
+        sampled = self.binding.task_reset_sampler is not None
+        preflight_complete = False
+        if sampled:
+            from copy import deepcopy
+            previous_rng = getattr(self, '_np_random', None)
+            previous_rng_seed = getattr(self, '_np_random_seed', None)
+            previous_rng_state = (None if previous_rng is None
+                                  else deepcopy(previous_rng.bit_generator.state))
+
+        def prepare():
+            nonlocal preflight_complete
+            operations = self._prepare_reference_reset(
+                seed=seed, options=options, external_solution=external_solution)
+            preflight_complete = True
+            return operations
+
+        try:
+            if sampled:
+                requested_seed = None if seed is _RESET_SEED_UNSET else seed
+                GymEnvBase.reset(self, seed=requested_seed)
+                seed = int(self.np_random_seed)
+                self._reset_reconstruction.sampled_reset = self.binding.task_reset_sampler(self.np_random)
+            result = self._execute_reset_operations(prepare)
+            if sampled:
+                from .task_definition import EpisodeTerminationPolicyV1
+                observation, info = result
+                info.update(reset_parameters=self.binding.task_reset_metadata(self.value['reset_plan'].reset_sample),
+                    seed=requested_seed, task_uid=self.config.task.task_uid, stage='stage4_gym_contract',
+                    episode_id=self.session.episode_id, resolved_control_metadata=self.metadata['action_schema'],
+                    termination_policy=EpisodeTerminationPolicyV1().to_mapping())
+                result = observation, info
+            return result
+        except BaseException:
+            if sampled and not preflight_complete:
+                if previous_rng is not None:
+                    previous_rng.bit_generator.state = previous_rng_state
+                self._np_random = previous_rng
+                self._np_random_seed = previous_rng_seed
+            raise
+        finally:
+            if sampled:
+                self._reset_reconstruction.sampled_reset = None
+
+    def physical_action_spec(self):
+        """Return the currently committed reset-scoped physical action identity."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is None:
+            raise StageUnavailableError('this route does not support physical reset selection')
+        self._episode_execution_state().require_open('environment is closed')
+        return selection.describe()
+
+    def physical_sequence_spec(self):
+        """Describe an admitted physical sequence at the current live boundary."""
+        self._require_execution_healthy()
+        if self.session is None or self._stopped:
+            raise RuntimeError('reset required before querying physical sequence capability')
+        from ..runtime.sessions.physical_control import PhysicalControlExecutionV1
+        profile = self._physical_execution()
+        if type(profile) is not PhysicalControlExecutionV1:
+            raise StageUnavailableError('this route has no admitted physical execution')
+        from ..runtime.sessions.physical_sequence import describe_physical_sequence_capability
+        return describe_physical_sequence_capability(self, profile)
+
+    def bind_physical_action(self, values):
+        """Bind scalar action values to the current physical spec and generation."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is None:
+            raise StageUnavailableError('this route does not support physical reset selection')
+        self._episode_execution_state().require_open('environment is closed')
+        action = selection.bind_action(values)
+        selection.validate_action(action)
+        return action
+
+    def reset_for_solution(self, solution, *, seed=_RESET_SEED_UNSET, options=None):
+        """Reset this selected route for one caller-owned Solution instance.
+
+        The task binding validates that the supplied mutable Solution matches
+        the actual current Artifact/source/readiness configuration before the
+        RuntimeSession is reconstructed. A faulted Env may request this explicit
+        rebuild; the fault remains latched until reset publication completes.
+        """
+        if self.binding.validate_external_solution is None:
+            raise StageUnavailableError('this selected task has no external Solution lifecycle')
+        self._episode_execution_state().require_open('environment is closed')
+        self.binding.validate_external_solution(self.value, solution)
+        return self._reset_selected_task(seed=seed, options=options, external_solution=solution)
+
+    def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
+        self._episode_execution_state().require_open('environment is closed')
+        if getattr(self, '_task_rgb_config', None) is not None and isinstance(options, Mapping) and 'renderer' in options:
+            raise ValueError('the task RGB renderer is fixed for the lifetime of this Env')
+        prior_fault = self._episode_execution_state().fault
+        prior_fault_mapping = None if prior_fault is None else prior_fault.to_mapping()
+        defer_task_rgb = bool(getattr(self, '_defer_task_rgb_capture', False))
+        reset_solution = None
+        from .reference_binding import prepare_selected_reset
+        physical_selection = getattr(self, '_physical_reset_selection', None)
+        physical_candidate = None
+        if physical_selection is not None:
+            if options is not None and (not isinstance(options, Mapping) or set(options) - {'controller'}):
+                raise ValueError('physical reset options support only controller')
+            requested_controller = None if options is None else options.get('controller')
+            physical_candidate = physical_selection.prepare(requested_controller)
+            options = None
+        profile = (physical_candidate.execution if physical_candidate is not None
+                   else self._physical_execution())
+        if profile is not None:
+            declared_physical = self.value.get('physical_execution')
+            committed = None if physical_selection is None else physical_selection.committed
+            if (declared_physical is not None and profile is not declared_physical
+                    and (physical_selection is None or (
+                        declared_physical is not physical_selection.declaration
+                        and (committed is None or declared_physical is not committed.execution)))):
+                raise ValueError('physical execution differs from the selected declaration')
+            profile.preflight(provider=self.provider, backend=self.backend,
+                              artifact=self.artifact, source=self.value['source'])
+        if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
+            raise RuntimeError('finalize current recording before reset')
+        switch_candidate = None
+        candidate_value = None
+        candidate_binding = self.binding
+        candidate_reconstruction = self._reset_reconstruction
+        prepared_reset_plan_required = getattr(
+            getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False)
+        resolved = getattr(self, 'resolved_public_config', None)
+        prepare_switch = getattr(self.binding, 'prepare_reset_switch', None)
+        switching = prepare_switch is not None
+        if switching:
+            if options is not None and (not isinstance(options, Mapping) or set(options) - {'execution'}):
+                raise ValueError('reset options support only execution')
+            target = None if options is None else options.get('execution')
+            requested_seed = None if seed is _RESET_SEED_UNSET else seed
+            rng_state = getattr(self, '_switch_rng_state', None)
+            switch_candidate = prepare_switch(type(self), resolved, requested_seed, rng_state, target)
+            task_rgb = getattr(self, '_task_rgb_config', None)
+            if task_rgb is not None:
+                target_config = switch_candidate.config
+                pair = (target_config.physics_provider, target_config.environment.runtime.backend, task_rgb[1])
+                if pair not in _TASK_RGB_PAIRS:
+                    raise ValueError('reset physics selection is incompatible with the fixed task RGB renderer')
+            seed = switch_candidate.task_seed
+            options = {}
+            candidate_binding = type(self)._build_selected_binding(
+                switch_candidate.config, robot=self.binding.robot)
+            candidate_reconstruction = candidate_binding.reset_reconstruction_strategy(
+                switch_candidate.config.physics_provider,
+                switch_candidate.config.environment.runtime.backend, self.horizon)
+            selection = switch_candidate.config.execution_spec_v2
+            requested_json = switch_candidate.config.requested_execution_json
+            if selection.deployment == 'isolated_worker':
+                from ..runtime.sessions.provenance import preflight_interpreter_before_source
+                import json
+                preflight_interpreter_before_source(selection, requested=json.loads(requested_json), task_uid=self.uid)
+            candidate_value = candidate_reconstruction.build_switch_candidate(seed)
+        else:
+            seed = prepare_selected_reset(
+                self.binding, seed=seed, seed_unset=_RESET_SEED_UNSET, options=options,
+                value=self.value, requires_reset_plan=prepared_reset_plan_required,
+            )
+            selection, requested_json = self._selected_execution_context()
+        deployment_receipt = None
+        if selection is not None:
+            try:
+                import json
+                from ..runtime.sessions.provenance import (
+                    DeploymentPreflightError, describe_execution_selection, preflight_selected_deployment,
+                )
+                requested = None if requested_json is None else json.loads(requested_json)
+                if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                    requested = dict(requested or {})
+                    requested['controller'] = {'gravity_compensation': True}
+                preflight_value = candidate_value if switching else self.value
+                if physical_candidate is not None:
+                    preflight_value = physical_candidate.bind_value(preflight_value)
+                facts = dict(requested=requested, task_uid=self.uid, artifact=preflight_value['artifact'],
+                             source=preflight_value['source'],
+                             controller=preflight_value.get('controller'), seed=seed)
+                if selection.deployment == 'isolated_worker':
+                    if self.dual_entity_position:
+                        receipt = describe_execution_selection(selection, **facts)
+                        receipt['phase'] = 'static_preflight'
+                        raise DeploymentPreflightError('worker_profile_not_implemented', receipt)
+                deployment_receipt = preflight_selected_deployment(
+                    selection, **facts, binding=candidate_binding, value=preflight_value)
+            except BaseException as error:
+                if switching:
+                    from ..runtime.sessions.source import source_resource_receipt
+                    receipt = source_resource_receipt(candidate_value.get('source'))
+                    if receipt is not None:
+                        try:
+                            receipt.close()
+                        except BaseException as cleanup_error:
+                            error.add_note(f'candidate source cleanup also failed: {cleanup_error!r}')
+                raise
+        previous_episode_end = self._position_episode_end
+        if (self.session is not None
+                and getattr(self, '_selected_reset_stop_capability', False)
+                and getattr(self, '_published_position_typed_state', None) is not None
+                and previous_episode_end is None):
+            try:
+                previous_episode_end = self.stop('reset')
+            except BaseException as error:
+                if switching:
+                    from ..runtime.sessions.source import source_resource_receipt
+                    receipt = source_resource_receipt(candidate_value.get('source'))
+                    if receipt is not None:
+                        try:
+                            receipt.close()
+                        except BaseException as cleanup_error:
+                            error.add_note(f'candidate source cleanup also failed: {cleanup_error!r}')
+                raise
+        # Retire any published boundary by its existence, not by the type of
+        # Controller that produced it. Every reset starts with empty publication
+        # and switch slots, including resets that change selected capabilities.
+        self._position_episode_end = None
+        self._clear_position_publication()
+        # Retire both publications at the destructive episode boundary. The
+        # next reset readback republishes Controller state; task RGB builds a
+        # separate projection only when its observation is assembled.
+        self.typed_state = None
+        self._task_rgb_typed_state = None
+        self.last_position_transition = None
+        previous_session, self.session = self.session, None
+        previous_value = self.value
+        previous_session_close_attempted = False
+        reset_effects = {'schema_version': 'selected-reset-failure-effects-v1',
+                         'previous_session_present': previous_session is not None,
+                         'previous_session_close_attempted': False,
+                         'previous_session_close_completed': False,
+                         'replacement_materialization_attempted': False,
+                         'reset_write_attempted': False, 'reset_write_status': 'not_attempted',
+                         'replacement_session_close_attempted': False,
+                         'replacement_session_close_completed': False}
+        selected_reset_plan = None
+        task_uid = success_definition = None
+        failure_phase = 'camera_reset_close'
+
+        def prepare():
+            nonlocal seed, previous_session_close_attempted, failure_phase, selected_reset_plan
+            nonlocal task_uid, success_definition
+            if switching:
+                self._switch_rng_state = switch_candidate.rng_state
+                self._switch_task_seed = switch_candidate.task_seed
+                self._switch_provider_seed = switch_candidate.provider_seed
+                self._switch_generation = getattr(self, '_switch_generation', 0) + 1
+                if (not hasattr(self, '_switch_topology_generation')
+                        or self.provider != switch_candidate.config.physics_provider):
+                    self._switch_topology_generation = getattr(self, '_switch_topology_generation', 0) + 1
+            self._deployment_receipt = deployment_receipt
+            self._close_camera_consumer()
+            self._task_rgb_state_binding = None
+            failure_phase = 'reset_close'
+            if previous_session is not None:
+                previous_session_close_attempted = True
+                reset_effects['previous_session_close_attempted'] = True
+                previous_session.close()
+                reset_effects['previous_session_close_completed'] = True
+            if physical_candidate is not None:
+                physical_selection.commit(physical_candidate)
+                self.action_space = physical_selection.action_space()
+                self.metadata['physical_action_spec_v1'] = physical_selection.describe()
+                capability = self.binding.physical_reset_capability
+                if capability is not None:
+                    self.metadata['action_schema'] = capability.action_schema(physical_candidate.kind)
+                else:
+                    self.metadata['action_schema'] = dict(physical_selection.describe())
+                observe_action = getattr(self.binding, 'physical_action_observer', None)
+                if observe_action is not None:
+                    observe_action(self, None, physical_selection.describe())
+                self._last_physical_submission = None
+            failure_phase = 'selected_reconstruction'
+            # A new construction resets all controller/arm-hold/servo owner memory.
+            if switching:
+                self.binding = candidate_binding
+                self._reset_reconstruction = candidate_reconstruction
+                self.resolved_public_config = switch_candidate.config
+                self.provider = switch_candidate.config.physics_provider
+                self.backend = switch_candidate.config.environment.runtime.backend
+                self.artifact = candidate_value['artifact']
+                self._declared_execution_spec_v1 = candidate_value.get('execution_spec_v1')
+            def verify_rebuilt_source(value):
+                if deployment_receipt is not None:
+                    from ..runtime.sessions.transport import source_binding_facts
+                    if (getattr(value.get('source'), 'source_closure_digest', None)
+                            != deployment_receipt['identity_facts']['source_closure']
+                            or source_binding_facts(value['source'])
+                            != deployment_receipt['identity_facts']['source_bindings']):
+                        raise ValueError('selected source closure or bindings changed after preflight')
+            def set_reconstruction_phase(phase):
+                nonlocal failure_phase
+                failure_phase = phase
+            self._reset_reconstruction.use_binding(self.binding)
+            rebuilt = self._reset_reconstruction.reconstruct(
+                previous_value, self.artifact, seed, external_solution, _artifact_for_reset,
+                verify_source=verify_rebuilt_source, set_phase=set_reconstruction_phase,
+                prepared=candidate_value if switching else None)
+            self.value, self.artifact = rebuilt.value, rebuilt.artifact
+            if physical_candidate is not None:
+                self.value = physical_candidate.bind_value(self.value)
+            seed, self.solution = rebuilt.seed, rebuilt.solution
+            self._external_solution_owner = external_solution
+            previous_action_schema = self.binding.action_schema
+            if physical_selection is None:
+                self.binding = self.binding.bind_compiled_control(self.value)
+            if self.binding.action_schema != previous_action_schema:
+                self.metadata['action_schema'] = dict(self.binding.action_schema)
+                self.action_space = self.binding.action_space_factory()
+            self._bind_selected_controller(self.value)
+            self._bind_selected_task_definition()
+            from .reference_binding import selected_task_reset_identity
+            task_uid, success_definition = selected_task_reset_identity(self)
+            if deployment_receipt is not None:
+                from ..runtime.sessions.api import assess_selected_request
+                from ..runtime.sessions.provenance import describe_execution_selection
+                rebuilt = describe_execution_selection(
+                    selection, requested=requested, task_uid=self.uid, artifact=self.artifact,
+                    source=self.value['source'],
+                    controller=self.value.get('controller'), seed=seed)
+                if (rebuilt['identity_facts']['artifact_identity'] != deployment_receipt['identity_facts']['artifact_identity']
+                        or rebuilt['identity_facts']['controller_identities'] != deployment_receipt['identity_facts']['controller_identities']):
+                    raise ValueError('selected Artifact or Controller changed after preflight')
+                reassessed = assess_selected_request(
+                    selection=selection, artifact=self.artifact, source=self.value['source'],
+                    value=self.value, binding=self.binding,
+                    dependency_status=deployment_receipt['dependency']['status'],
+                    request_identity=deployment_receipt['request_identity'])
+                plan = self.value.get('controller_binding_plan')
+                if (reassessed.to_mapping()['rows'] != deployment_receipt['identity_facts']['assessment_rows']
+                        or (None if plan is None else getattr(plan, 'identity_hash', None) or plan.identity_sha256)
+                        != deployment_receipt['identity_facts']['control_binding_plan']):
+                    raise ValueError('selected declarations or Controller plan changed after preflight')
+            self.dual_entity_position = len(self.position_profiles) == 2
+            failure_phase = 'reset_sample'
+            from .reference_binding import resolve_selected_reset_effect
+            self.sample, selected_reset_plan = resolve_selected_reset_effect(
+                self.binding, self.value, self.artifact, seed)
+            if ((not switching and prepared_reset_plan_required
+                    or getattr(getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False))
+                    and selected_reset_plan is None):
+                raise ValueError('rebuilt Controller capability requires a declared reset plan')
+            if selected_reset_plan is None:
+                self._selected_episode_id = uuid4().hex
+            from .reference_binding import resolve_reset_execution
+            self.execution = resolve_reset_execution(
+                self.binding, self.value, self._declared_execution_spec_v1,
+                seed=seed, provider=self.provider, backend=self.backend,
+            )
+            if switching:
+                from dataclasses import replace
+                self.execution = replace(self.execution, provider_seed=switch_candidate.provider_seed)
+
+        def materialize_runtime():
+            nonlocal failure_phase
+            failure_phase = 'session_materialization'
+            reset_effects['replacement_materialization_attempted'] = True
+            self._task_rgb_state_binding = None
+            self._position_state_declaration = None
+            if getattr(self, '_task_rgb_config', None) is not None:
+                self._prepare_task_rgb_state_binding()
+
+            def start_worker():
+                from ..runtime.sessions.transport import (
+                    request_identity, source_execution_facts, start_selected_worker,
+                )
+                from ..utils._paths import GEOCHORA_ROOT, GEOPHYS_PROVIDER_ROOT
+                replay = self._recorded_execution_configuration()
+                config = {key: value for key, value in replay.items() if key != 'env_id'}
+                # The worker uses the original adapter in its own process; its
+                # deployment itself is already represented by this request.
+                for name in ('host', 'engine', 'solver_family', 'solver_algorithm', 'coupler',
+                             'batch_layout', 'deployment', 'interpreter', 'native_dt'):
+                    config['execution'].pop(name, None)
+                payload = {
+                    'uid': self.uid, 'config': config, 'seed': seed,
+                    'selection': selection.to_mapping(), 'execution': self.execution.to_mapping(),
+                    'facts': source_execution_facts(self.artifact, self.execution,
+                                                    self.value['source'], self.value['controller']),
+                    'preflight_request_identity': deployment_receipt['request_identity'],
+                    'preflight_identity_facts': deployment_receipt['identity_facts'],
+                    'core_root': str(GEOCHORA_ROOT), 'geophys_src': str(GEOPHYS_PROVIDER_ROOT / 'src'),
+                    'environment': deployment_receipt['environment'],
+                }
+                # Native startup and the first control interval can compile
+                # provider kernels; keep a finite operation deadline for both.
+                session = start_selected_worker(selection.interpreter, payload,
+                    timeout=300.0 if selection.physics_provider == 'isaacsim' else 120.0)
+                deployment_receipt['worker_request_identity'] = request_identity(payload)
+                return session
+            from ..runtime.sessions.selected_materialization import build_selected_runtime
+            build = build_selected_runtime(self, self._selected_controller_binding, selection,
+                                           start_worker, materialize, materialize_control)
+            if build.skip_gravity:
+                return
+            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                self.session.configure_gravity_compensation()
+
+        def reset_runtime():
+            nonlocal failure_phase
+            if deployment_receipt is not None:
+                from ..runtime.sessions.provenance import bind_selected_build_checks
+                failure_phase = 'build_layout_receipt'
+                bind_selected_build_checks(deployment_receipt, self.session.build_layout_facts,
+                    materialization_id=self.session.provider_materialization_id)
+            failure_phase = 'runtime_reset'
+            reset_effects['reset_write_attempted'] = True
+            reset_effects['reset_write_status'] = 'unknown'
+            from .reference_binding import execute_selected_reset_effect
+            self.realized = execute_selected_reset_effect(
+                self.session, self.sample, selected_reset_plan)
+            reset_effects['reset_write_status'] = 'completed'
+            self._compiled_layout_post_reset = None
+            if self.binding.post_reset_session_validator is not None:
+                self._compiled_layout_post_reset = self.binding.post_reset_session_validator(
+                    self.session, self.value,
+                )
+            if self.binding.runtime_episode_identity:
+                # Native task samples and the published Solution boundary
+                # must share the RuntimeSession's actual episode identity.
+                self._selected_episode_id = self.session.episode_id
+
+        def read_state():
+            nonlocal failure_phase
+            failure_phase = 'snapshot_readback'
+            self.state = self.session.snapshot()
+            self.feedback = None
+            for capability in self._selected_state_capabilities:
+                failure_phase = capability.failure_phase
+                result = capability.initialize(self.session, self.state)
+                if result.typed_publication is not None:
+                    self.typed_state = result.typed_publication
+                if result.feedback is not None:
+                    self.feedback = result.feedback
+                if result.materialization_receipt is not None:
+                    self.leaf_materialization = result.materialization_receipt
+            return self.state
+
+        def observe(_state):
+            nonlocal failure_phase, reset_solution
+            failure_phase = 'reset_observation'
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info['provider'] = self.provider
+            if 'reset_parameters' not in self.info:
+                sample_mapping = getattr(self.sample, 'to_mapping', None)
+                if not callable(sample_mapping):
+                    raise ValueError('selected reset sample cannot provide public reset parameters')
+                self.info['reset_parameters'] = {
+                    'schema_version': 'selected-reset-parameters-v1',
+                    'reset_sample': sample_mapping(),
+                }
+            # Task observation projections may intentionally contain only the
+            # task-specific payload. Complete the common Gym reset envelope
+            # from the values committed by this reset transaction before a
+            # deferred renderer validates and publishes the same boundary.
+            evaluation = self.evaluation
+            from ..environment.types import ObservationSchema
+            observation_schema = self.info.get('observation_schema')
+            if defer_task_rgb:
+                from ..observations.selected_reference import selected_reference_observation_schema
+                observation_schema = selected_reference_observation_schema(
+                    self, self.obs, base_schema=(observation_schema
+                        if isinstance(observation_schema, ObservationSchema) else None))
+            elif not isinstance(observation_schema, ObservationSchema):
+                observation_schema = getattr(
+                    getattr(self, '_observation_builder', None), 'schema', None,
+                )
+            if not isinstance(observation_schema, ObservationSchema):
+                from ..observations.selected_reference import selected_reference_observation_schema
+                observation_schema = selected_reference_observation_schema(self, self.obs)
+            reset_info_defaults = {
+                'seed': None if seed is _RESET_SEED_UNSET else seed,
+                'task_uid': task_uid,
+                'stage': 'stage4_gym_contract',
+                'is_success': evaluation.success,
+                'elapsed_steps': int(self.state.control_step),
+                'task_metrics': evaluation.metrics,
+                'reward_terms': evaluation.reward_terms,
+                'task_reward': evaluation.reward,
+                'task_failure': evaluation.failure,
+                'success_definition': success_definition,
+                'resolved_control_metadata': self.metadata['action_schema'],
+                'observation_schema': observation_schema,
+                'simulation_time_s': float(self.state.simulation_time),
+            }
+            for key, value in reset_info_defaults.items():
+                self.info.setdefault(key, value)
+            if defer_task_rgb or not isinstance(self.info.get('observation_schema'), ObservationSchema):
+                self.info['observation_schema'] = observation_schema
+            if physical_candidate is not None:
+                self.info['physical_action_spec_v1'] = physical_selection.describe()
+            if (self.value.get('physical_execution') is not None
+                    and previous_episode_end is not None):
+                self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
+            if switching:
+                from .reset_switch import reset_switch_receipt
+                self.info['reset_switch_v1'] = reset_switch_receipt(
+                    switch_candidate, provider=self.provider, provider_seed=self.execution.provider_seed,
+                    configuration_generation=self._switch_generation,
+                    topology_generation=self._switch_topology_generation)
+            if (not self.position_profile and self._physical_execution() is None):
+                self._publish_execution_info(self.info)
+            self._last_position_terminated = False
+            self._last_position_truncated = False
+            self._last_position_request = None
+            if self.position_profile:
+                from ..recorders.position_metadata import position_record_reset_info
+                self._position_reset_info = position_record_reset_info(self)
+                if physical_candidate is not None:
+                    self._position_reset_info['physical_action_spec_v1'] = physical_selection.describe()
+                self.info.update(self._position_reset_info)
+                self._publish_task_position_execution_info(self.info)
+                if previous_episode_end is not None:
+                    self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
+            elif physical_candidate is not None:
+                self.info['physical_action_spec_v1'] = physical_selection.describe()
+                self._publish_task_position_execution_info(self.info)
+                if previous_episode_end is not None:
+                    self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
+            if self._current_control_step() != 0 or self.state.simulation_time != 0:
+                raise ValueError('reference reset must not advance physics')
+            reset_solution = external_solution if external_solution is not None else self.solution
+            if reset_solution is not None and not defer_task_rgb:
+                failure_phase = 'solution_reset'
+                reset_solution.reset(self.obs, task_info_for_solution(self.info), self.metadata,
+                                    **self.binding.reset_expert_kwargs(self))
+            return self.obs
+
+        def publish(_state, _observation):
+            nonlocal failure_phase
+            task_camera = getattr(self, '_declared_task_camera', None)
+            if task_camera is not None and self.provider != 'mujoco':
+                failure_phase = 'task_camera_binding'
+                self.session.bind_task_camera(task_camera, self.typed_state.view)
+            failure_phase = 'arm_schedule_reset'
+            if all(callable(getattr(self._selected_controller, name, None))
+                   for name in ('begin', 'target', 'applied')):
+                # The Controller itself owns acknowledged arm hold/ramp memory.
+                self.arm_schedule = self._selected_controller
+            else:
+                self.arm_schedule = (self.binding.schedule_factory(self)
+                                     if self.binding.schedule_factory is not None else None)
+            self._active_native_interval_receipt = None
+            self._episode_mode = None
+            self._position_episode_end = None
+            self._publish_position_boundary(
+                self.state, getattr(self, 'typed_state', None), self.evaluation)
+            if self.value.get('physical_execution') is not None:
+                self._physical_published_state = self.state
+                self._physical_published_typed_state = self.typed_state
+                self._physical_published_evaluation = self.evaluation
+                self._last_episode_end = None
+            self.recorder = None
+            if external_solution is not None:
+                # The caller's instance is the only active mutable Solution
+                # owner for this episode; the task value has no active copy.
+                self.solution = None
+            return self.obs, self.info
+
+        def after_commit(state, result):
+            nonlocal failure_phase
+            if not defer_task_rgb:
+                return result
+            failure_phase = 'task_rgb_capture_after_reset_commit'
+            observation, info = result
+            image, receipt = self._capture_task_rgb_boundary(state)
+            self.obs = dict(observation)
+            self.obs['task_rgb'] = image
+            self.info = dict(info)
+            self.info['task_rgb_v1'] = receipt
+            # RGB completes after the state boundary commits. The returned
+            # observation and info are new mappings; state is not republished.
+            if not self.observation_space.contains(self.obs):
+                raise ValueError('committed reset observation with task RGB violates observation_space')
+            self.info['observation_schema'].validate(self.obs)
+            validate_task_info(self.info, phase='reset')
+            if reset_solution is not None:
+                failure_phase = 'solution_reset'
+                reset_solution.reset(self.obs, task_info_for_solution(self.info), self.metadata,
+                                     **self.binding.reset_expert_kwargs(self))
+            return self.obs, self.info
+
+        def on_failure(_phase, error):
+            nonlocal previous_session_close_attempted
+            cleanup_errors = []
+
+            def record_cleanup_error(operation, cleanup_error):
+                cleanup_errors.append({
+                    'operation': operation,
+                    'exception_type': type(cleanup_error).__name__,
+                    'message': str(cleanup_error),
+                })
+                add_note = getattr(error, 'add_note', None)
+                if callable(add_note):
+                    add_note(f'{operation} also failed: {cleanup_error!r}')
+
+            self._external_solution_owner = None
+            try:
+                self._close_camera_consumer()
+            except BaseException as cleanup_error:
+                record_cleanup_error('selected reset camera cleanup', cleanup_error)
+            failed_session, self.session = self.session, None
+            # Either session can retain a process-level owner even after its
+            # session closes. Keep both reachable for the final Env close.
+            for session in (previous_session, failed_session):
+                if callable(getattr(session, 'close_runtime_owner', None)):
+                    abandoned = getattr(self, '_failed_runtime_sessions', None)
+                    if abandoned is None:
+                        abandoned = self._failed_runtime_sessions = []
+                    abandoned.append(session)
+            if failed_session is not None:
+                reset_effects['replacement_session_close_attempted'] = True
+                try:
+                    failed_session.close()
+                    reset_effects['replacement_session_close_completed'] = True
+                except BaseException as cleanup_error:
+                    record_cleanup_error('selected replacement-session cleanup', cleanup_error)
+            if previous_session is not None and not previous_session_close_attempted:
+                previous_session_close_attempted = True
+                reset_effects['previous_session_close_attempted'] = True
+                try:
+                    previous_session.close()
+                    reset_effects['previous_session_close_completed'] = True
+                except BaseException as cleanup_error:
+                    record_cleanup_error('selected prior-session cleanup', cleanup_error)
+            if switching:
+                # A candidate can own a source lease even if closing the old
+                # session fails before it is installed on this environment.
+                seen = set()
+                for value in (candidate_value, previous_value):
+                    from ..runtime.sessions.source import source_resource_receipt
+                    receipt = source_resource_receipt(value.get('source'))
+                    if receipt is None or id(receipt) in seen:
+                        continue
+                    seen.add(id(receipt))
+                    try:
+                        receipt.close()
+                    except BaseException as cleanup_error:
+                        record_cleanup_error('selected reset source cleanup', cleanup_error)
+            self._reset_failure_receipt = {
+                **reset_effects,
+                'failure_phase': failure_phase,
+                'failure': {
+                    'exception_type': type(error).__name__,
+                    'message': str(error),
+                },
+                'prior_execution_fault': prior_fault_mapping,
+                'cleanup_errors': cleanup_errors,
+            }
+            error.reset_failure_receipt = self.reset_failure_receipt
+            self._latch_fault(failure_phase, error)
+
+        operations = dict(
+            prepare=prepare, materialize=materialize_runtime, reset_runtime=reset_runtime,
+            read_state=read_state, observe=observe, publish=publish, on_failure=on_failure,
+        )
+        if defer_task_rgb:
+            operations['after_commit'] = after_commit
+        return operations
+
+    def expert_execution_info(self):
+        """Return the required, validated R1 readiness at the current boundary."""
+        if getattr(self, 'position_profile', False):
+            binding = getattr(self, 'binding', None)
+            project = getattr(binding, 'position_execution_info', None)
+            result = project(self) if project is not None else None
+            if result is not None:
+                return result
+        if (getattr(self, 'state', None) is None or getattr(self, 'feedback', None) is None
+                or getattr(self, 'position_profile', False)):
+            raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
+        result = ExpertExecutionInfo(
+            'expert-execution-info-v1', self._current_control_step(),
+            self.state.simulation_time, self._selected_controller.readiness(self.state, self.feedback),
+        )
+        result.validate()
+        return result
+
+    def _current_control_step(self) -> int:
+        """Resolve a selected boundary from RuntimeSession identity, with legacy state fallback."""
+        state_step = getattr(getattr(self, 'state', None), 'control_step', None)
+        session = getattr(self, 'session', None)
+        boundary_reader = getattr(session, 'state_boundary_identity', None)
+        source = getattr(session, '_source', None)
+        closure = getattr(source, 'source_closure_digest', None)
+        artifact = getattr(session, '_artifact', None)
+        from ..artifacts import TaskArtifactV1
+        # Some source-bound RuntimeSession implementations expose their
+        # declared artifact/source as public properties. Accept that contract
+        # only when the typed Artifact and Scene agree with the live boundary.
+        public_binding = False
+        uses_public_binding = artifact is None and source is None
+        if uses_public_binding:
+            artifact = getattr(session, 'artifact', None)
+            source = getattr(session, 'source', None)
+            public_binding = isinstance(artifact, TaskArtifactV1) and (
+                getattr(getattr(source, 'scene_definition', None), 'identity_hash', None)
+                == artifact.scene_identity_hash) and (
+                getattr(source, 'task_artifact_hash', None) == artifact.identity_hash) and (
+                isinstance(getattr(source, 'source_closure_digest', None), str)
+                and len(source.source_closure_digest) == 64
+                and all(char in '0123456789abcdef' for char in source.source_closure_digest))
+            if isinstance(artifact, TaskArtifactV1) and not public_binding:
+                raise ValueError('public RuntimeSession Scene differs from its typed Artifact')
+            closure = getattr(source, 'source_closure_digest', None)
+        has_bound_identity = (isinstance(artifact, TaskArtifactV1)
+                              or (isinstance(closure, str) and len(closure) == 64))
+        if uses_public_binding:
+            has_bound_identity = public_binding
+        boundary = boundary_reader() if callable(boundary_reader) and has_bound_identity else None
+        if public_binding and boundary is not None:
+            if (getattr(boundary, 'scene_identity_hash', None) != artifact.scene_identity_hash
+                    or getattr(boundary, 'provider_materialization_id', None)
+                    != getattr(session, 'provider_materialization_id', None)
+                    or getattr(boundary, 'episode_id', None) != getattr(session, 'episode_id', None)):
+                raise ValueError('public RuntimeSession boundary differs from its typed source binding')
+        boundary_step = getattr(boundary, 'control_step', None)
+        if boundary_step is not None:
+            boundary_step = int(boundary_step)
+            if state_step is not None and int(state_step) != boundary_step:
+                raise ValueError('selected RuntimeSnapshot control step differs from RuntimeSession boundary')
+            return boundary_step
+        if state_step is None:
+            raise StageUnavailableError('selected RuntimeSession has no current control boundary')
+        return int(state_step)
+
+    def _publish_task_position_execution_info(self, info):
+        binding = getattr(self, 'binding', None)
+        project = getattr(binding, 'position_execution_info', None)
+        if project is not None:
+            value = project(self)
+            if value is not None:
+                info[binding.position_execution_info_key] = value.to_mapping()
+
+    # Kept for existing in-module callers while public callers use the named
+    # expert_execution_info() contract.
+    def _execution_info(self):
+        return self.expert_execution_info()
+
+    def _source_xml_sha256(self):
+        xml = self.value['source'].scene_source.xml
+        cached = getattr(self, '_boundary_xml_snapshot', None)
+        if cached is None or cached[0] != xml:
+            cached = (xml, hashlib.sha256(xml.encode()).hexdigest())
+            self._boundary_xml_snapshot = cached
+        return cached[1]
+
+    def _execution_boundary(self, execution_info=None):
+        execution_info = self.expert_execution_info() if execution_info is None else execution_info
+        source = self.value['source']
+        source_id = source.scene_source.source_id
+        source_xml_sha256 = self._source_xml_sha256()
+        values = {
+            'schema_version': 'selected-expert-boundary-v1',
+            'episode_id': self._selected_episode_id,
+            'task_artifact_hash': self.artifact.identity_hash,
+            'source_id': source_id,
+            'source_xml_sha256': source_xml_sha256,
+            'source_closure_digest': source.source_closure_digest,
+            'provider_materialization_id': self.session.provider_materialization_id,
+            'controller_identity': self._selected_controller.identity,
+            'solution_identity': self._active_solution_identity(),
+            'reset_sample_id': self.sample.sample_id,
+            'control_step': execution_info.control_step,
+            'simulation_time_s': execution_info.simulation_time,
+        }
+        values['identity_hash'] = digest(values)
+        return values
+
+    def _clear_position_publication(self):
+        self._published_position_state = None
+        self._published_position_typed_state = None
+        self._published_position_evaluation = None
+
+    def _publish_position_boundary(self, state, typed_state, evaluation):
+        self._published_position_state = state
+        self._published_position_typed_state = typed_state
+        self._published_position_evaluation = evaluation
+
+    def _publish_execution_info(self, info):
+        execution_info = self.expert_execution_info()
+        info['expert_execution_info_v1'] = execution_info.to_mapping()
+        info['control_readiness_v1'] = execution_info.control_readiness.to_mapping()
+        info['expert_execution_boundary_v1'] = self._execution_boundary(execution_info)
+
+    def _publish_control_application(self, info, request, canonical, target, applied,
+                                     request_boundary):
+        def read_evaluation_boundary():
+            current_info = ExpertExecutionInfo.from_mapping(info['expert_execution_info_v1'])
+            return current_info.control_step, self._execution_boundary(current_info)
+
+        info['control_application_v1'] = selected_control_application_receipt(
+            request=request, canonical=canonical, target=target, applied=applied,
+            request_boundary=request_boundary, read_evaluation_boundary=read_evaluation_boundary,
+            artifact=self.artifact,
+            controller_identity=self._selected_controller.identity, provider=self.provider,
+            source_id=self.value['source'].scene_source.source_id,
+            reset_sample_id=self.sample.sample_id,
+        )
+
+    def _require_published_execution_info(self):
+        mapping = self.info.get('expert_execution_info_v1')
+        if not isinstance(mapping, dict):
+            raise ValueError('public expert execution readiness is missing')
+        execution_info = ExpertExecutionInfo.from_mapping(mapping)
+        execution_info.validate()
+        current = self.expert_execution_info()
+        if execution_info != current:
+            raise ValueError('public expert execution readiness is stale or belongs to another boundary')
+        readiness = self.info.get('control_readiness_v1')
+        if readiness != execution_info.control_readiness.to_mapping():
+            raise ValueError('public control readiness is missing or inconsistent')
+        boundary = self.info.get('expert_execution_boundary_v1')
+        if boundary != self._execution_boundary(current):
+            raise ValueError('public expert execution boundary identity is stale or mismatched')
+        return execution_info
+
+    def _active_solution_identity(self):
+        owner = self._external_solution_owner if self._external_solution_owner is not None else self.solution
+        identity = getattr(owner, 'identity', None)
+        if not isinstance(identity, str):
+            identity = self.value.get('solution_identity')
+        if not isinstance(identity, str):
+            raise RuntimeError('selected task has no solution identity for recording')
+        return identity
+
+    def _observe_selected_solution(self, solution, observation, reward, terminated,
+                                   truncated, info, extra, *, report):
+        """Commit one Solution observation and publish its completion facts."""
+        solution.observe(observation, reward, terminated, truncated, info, **extra)
+        if report and hasattr(solution, 'outcome_report'):
+            self.info.update(solution.outcome_report())
+        self.info.update(
+            selected_policy_execution_complete=bool(solution.done),
+            selected_policy_execution_failed=bool(solution.failed),
+            expert_failure_reason=solution.failure_reason,
+        )
+
+    def _validate_external_solution(self, solution):
+        if self.binding.validate_external_solution is None:
+            raise StageUnavailableError('this selected task has no external Solution lifecycle')
+        self.binding.validate_external_solution(self.value, solution)
+
+    def observation(self, state):
+        observation, info, evaluation = self.binding.observation_projection(self, state)
+        if (getattr(self, '_task_rgb_config', None) is not None
+                and not getattr(self, '_defer_task_rgb_capture', False)):
+            if self._task_rgb_consumer is None:
+                self._task_rgb_consumer = self._new_task_rgb_consumer()
+            image, receipt = self._capture_task_rgb_boundary(state)
+            observation = dict(observation)
+            observation['task_rgb'] = image
+            info = dict(info)
+            info['task_rgb_v1'] = receipt
+        if getattr(self, '_legacy_camera_observations', False):
+            metadata = self.session.capture_legacy_camera_metadata()
+            info = {**info, 'camera_capture': {
+                'source': 'SensorObservation.camera_metadata',
+                'observation_boundary': {'elapsed_steps': state.control_step,
+                                         'simulation_time_s': float(state.simulation_time)},
+                'cameras': {name: _json_value(asdict(value)) for name, value in metadata.items()}}}
+        if self._selected_execution_context()[0] is not None:
+            info = dict(info)
+            info['execution_configuration_v1'] = self.get_execution_receipt()
+        return observation, info, evaluation
+
+    def _capture_task_rgb_boundary(self, state):
+        if getattr(self, '_task_rgb_consumer', None) is None:
+            self._task_rgb_consumer = self._new_task_rgb_consumer()
+        publication = self._publish_task_rgb_typed_state(state)
+        image, receipt = self._task_rgb_consumer.capture(publication.view)
+        camera = getattr(self, '_task_camera_spec', None)
+        if camera is not None:
+            renderer = self._task_rgb_config[1]
+            receipt = {**receipt, 'camera_name': camera.name,
+                'requested_camera': _json_value(asdict(camera)),
+                'renderer': renderer, 'render_backend': self._task_rgb_capability.backend,
+                'observation_boundary': {'episode_id': publication.view.boundary.episode_id,
+                    'control_step': state.control_step, 'simulation_time_s': float(state.simulation_time)}}
+        return image, receipt
+
+    def _configure_task_rgb(self, camera, renderer):
+        """Fix one task camera and renderer for this Env before its first reset."""
+        from ..observations.canonical_camera import CameraGeometry
+        if type(camera) is not CameraGeometry:
+            raise TypeError('task RGB camera must be CameraGeometry')
+        if getattr(self, '_uses_component_assembly', False):
+            raise ValueError('selected task RGB cannot be applied to component assembly')
+        if not hasattr(self, 'artifact') or not hasattr(self.artifact, 'identity_hash'):
+            raise ValueError('selected task RGB requires a published TaskArtifact identity')
+        camera.validate()
+        if camera.task_artifact_hash != self.artifact.identity_hash:
+            raise ValueError('task RGB camera TaskArtifact linkage mismatch')
+        if (not camera.rgb or camera.depth or camera.rgb_layout != 'HWC'
+                or camera.rgb_dtype != 'float32'):
+            raise ValueError('task RGB requires an HWC float32 RGB camera')
+        observer = getattr(self, '_selected_observer_camera', None)
+        if observer is not None and observer.camera_id == camera.camera_id:
+            raise ValueError('task and observer cameras require distinct identities')
+        import copy
+        camera = copy.deepcopy(camera)
+        if 'task_rgb' in self.observation_space.spaces:
+            raise ValueError('task observation already declares task_rgb')
+        from ..render.camera.task_rgb import prepare_task_rgb_adapter
+        capability, color_setup, native_request = prepare_task_rgb_adapter(
+            camera=camera, renderer=renderer, provider=self.provider, backend=self.backend,
+            artifact=self.artifact, observer=observer)
+        if native_request is not None and getattr(self, '_observer_render_request', None) is None:
+            self._observer_render_request = native_request
+        self._task_rgb_capability = capability
+        spaces = OrderedDict(self.observation_space.spaces)
+        spaces['task_rgb'] = Box(0., 1., shape=(camera.height, camera.width, 3), dtype=np.float32)
+        self.observation_space = Dict(spaces)
+        self._task_rgb_config = (camera, renderer)
+        self._task_rgb_consumer = None
+        self.metadata = dict(self.metadata)
+        color = capability.color_space
+        self.metadata['task_rgb_v1'] = {'camera': camera.to_mapping(), 'renderer': renderer,
+                                        'color_space': color,
+                                        'ownership': 'owned host copy', 'color_setup': color_setup}
+
+    def _new_task_rgb_consumer(self):
+        from ..render.camera.task_rgb import create_task_rgb_consumer
+
+        def binding():
+            return (getattr(self, '_task_rgb_state_binding', None)
+                    or self._prepare_task_rgb_state_binding())
+
+        camera, renderer = self._task_rgb_config
+        return create_task_rgb_consumer(
+            camera=camera, renderer=renderer, provider=self.provider,
+            backend=self.backend, provider_seed_getter=lambda: self.execution.provider_seed,
+            artifact=self.artifact, color_space=self.metadata['task_rgb_v1']['color_space'],
+            session_getter=lambda: self.session,
+            source_getter=lambda: self.value['source'], binding_getter=binding,
+        )
+
+    def _configure_selected_observer(self, render_mode, camera, *, observer_route=None):
+        from types import SimpleNamespace
+        from ..render import TaskEnvRenderProvider
+        from ..render.camera.task_rgb import prepare_observer_adapter
+        task_rgb = getattr(self, '_task_rgb_config', None)
+        task_binding = None if task_rgb is None else (task_rgb[0], self._task_rgb_capability)
+        capability, request = prepare_observer_adapter(
+            camera=camera, render_mode=render_mode, provider=self.provider, backend=self.backend,
+            artifact=self.artifact, task_rgb=task_binding, observer_route=observer_route)
+        self.render_mode = render_mode
+        self._selected_observer_camera = camera
+        if request is not None:
+            self._observer_render_request = request
+        self._ui_render_provider = TaskEnvRenderProvider(
+            render_source=None, config=SimpleNamespace(width=camera.width, height=camera.height),
+            frame_capture=self._capture_selected_observer,
+            frame_color_space=capability.color_space)
+        self.metadata = dict(self.metadata)
+        self.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
+                             render_backend=f'{capability.renderer}-{capability.backend}')
+
+    def _observer_publication(self):
+        """Provide the renderer's V1 view at the current physical boundary."""
+        from ..artifacts import CanonicalStateViewV1
+
+        publication = getattr(self, '_published_position_typed_state', None)
+        if publication is None or self._execution_fault is not None:
+            raise RuntimeError('observer requires a successfully published state')
+        if isinstance(publication.view, CanonicalStateViewV1):
+            return publication
+        if getattr(self, '_task_rgb_state_binding', None) is None:
+            from ..render.camera.api import prepare_task_rgb_state_binding
+            self._task_rgb_state_binding = prepare_task_rgb_state_binding(
+                self.provider, self.value.get('source'), artifact=self.artifact)
+        return self._publish_task_rgb_typed_state(self.state)
+
+    def _capture_selected_observer(self):
+        publication = self._observer_publication()
+        if self.provider in {'isaacsim', 'geophys'}:
+            return self.session.capture_observer(self._selected_observer_camera, publication.view)
+        if getattr(self, '_visual_state_session', None) is None:
+            self.bind_visual_state(self._selected_observer_camera, capture=True)
+        if self._visual_state_session.camera_geometry_identity != self._selected_observer_camera.identity_hash:
+            raise RuntimeError('bound visual session does not match the observer camera')
+        return self._visual_state_session.capture(publication.view)
+
+    def _present_selected_observer(self):
+        return self.session.present_observer(self._observer_publication().view)
+
+    def task_camera_binding(self):
+        """Read the constructed task camera's native binding for this episode."""
+        if self.session is None:
+            raise RuntimeError('task camera readback requires a successfully published state')
+        publication = self._observer_publication()
+        if self.provider == 'mujoco':
+            if getattr(self, '_declared_task_camera', None) is None:
+                raise RuntimeError('no task camera declared')
+            if getattr(self, '_visual_state_session', None) is None:
+                self.bind_visual_state(self._selected_observer_camera, capture=True)
+            return self._visual_state_session.task_camera_binding(publication.view)
+        return self.session.task_camera_binding(publication.view)
+
+    def set_observer_camera(self, camera):
+        """Replace the observer camera without modifying any task camera."""
+        from ..observations.canonical_camera import CameraGeometry
+        if not isinstance(camera, CameraGeometry):
+            raise TypeError('observer must be CameraGeometry')
+        camera.validate()
+        previous = getattr(self, '_selected_observer_camera', None)
+        if previous is None:
+            raise RuntimeError('observer rendering was not configured at construction')
+        task_camera = getattr(self, '_declared_task_camera', None)
+        if task_camera is not None and camera.camera_id == task_camera.camera_id:
+            raise ValueError('task and observer cameras require distinct identities')
+        task_rgb = getattr(self, '_task_rgb_config', None)
+        if task_rgb is not None and camera.camera_id == task_rgb[0].camera_id:
+            raise ValueError('task and observer cameras require distinct identities')
+        if (camera.task_artifact_hash != self.artifact.identity_hash or
+                (camera.width, camera.height, camera.rgb, camera.depth, camera.rgb_layout, camera.rgb_dtype) !=
+                (previous.width, previous.height, True, False, 'HWC', 'float32')):
+            raise ValueError('observer camera must preserve artifact and output contract')
+        self._ui_render_provider.invalidate_frame()
+        session = getattr(self, '_visual_state_session', None)
+        if session is not None:
+            if task_camera is not None and self.provider == 'mujoco':
+                session.set_observer_camera(camera)
+            else:
+                session.close()
+                self._visual_state_session = None
+        self._selected_observer_camera = camera
+
+    def render_receipt(self):
+        self._episode_execution_state().require_open('environment is closed')
+        provider = getattr(self, '_ui_render_provider', None)
+        if provider is None or provider.last_frame_receipt is None:
+            raise RuntimeError('no completed observer render')
+        publication = getattr(self, '_published_position_typed_state', None)
+        identity = provider.last_frame_receipt['capture_identity']
+        if (publication is None or self._execution_fault is not None or self.session is None or
+                identity['state_boundary'] != self.session.state_boundary_identity().to_mapping() or
+                identity['camera_geometry_identity_hash'] != self._selected_observer_camera.identity_hash):
+            provider.invalidate_frame()
+            raise RuntimeError('observer render receipt no longer matches the current publication')
+        import copy
+        return copy.deepcopy(provider.last_frame_receipt)
+
+    def bind_visual_state(self, camera, *, capture=False):
+        """Bind an independent MuJoCo visual model to the latest published state.
+
+        Explicit update is separate from task RGB and never advances physics.
+        This bounded route is available after a MuJoCo CPU reset with a
+        renderer-compatible published state.
+        """
+        self._episode_execution_state().require_open('environment is closed')
+        if (self.provider, self.backend) != ('mujoco', 'cpu'):
+            raise ValueError('visual binding requires a MuJoCo CPU publication')
+        publication = self._observer_publication()
+        if getattr(self, '_visual_state_session', None) is not None:
+            raise RuntimeError('visual state is already bound; reset or close first')
+        from ..artifacts import ExecutionSpecV1, RendererSelectionV1
+        if type(capture) is not bool:
+            raise TypeError('capture must be bool')
+        from ..render.camera import (DynamicCameraRenderSourceV2, V211_DYNAMIC_PROFILE, V211_RGB_PROFILE,
+                                     V211_PHYSICS_PROFILE, create_dynamic_camera_session)
+        if getattr(self, 'position_profile', False):
+            joints, frames = self.position_joint_bindings, self.position_frame_bindings
+        else:
+            binding = self._task_rgb_state_binding
+            joints, frames = binding[3], binding[4]
+        source = DynamicCameraRenderSourceV2.from_runtime_source(
+            self.value['source'], artifact=self.artifact, joint_bindings=joints, frame_bindings=frames)
+        selection = RendererSelectionV1('renderer-selection-v1', 'mujoco', 'native-opengl',
+                                        V211_RGB_PROFILE if capture else V211_DYNAMIC_PROFILE, None)
+        execution = ExecutionSpecV1('execution-spec-v1', 'mujoco', 'cpu', V211_PHYSICS_PROFILE,
+                                    self.execution.provider_seed, 'best_effort', selection, physics_device='cpu')
+        session = create_dynamic_camera_session(camera, execution, source=source,
+                                                initial_state=publication.view,
+                                                task_camera=getattr(self, '_declared_task_camera', None))
+        self._visual_state_session = session
+        self._visual_binding_last_close = None
+        self._visual_binding_last_fault = False
+        return session.last_sync
+
+    def sync_visual_state(self):
+        """Consume the latest successful Env publication without advancing it."""
+        self._episode_execution_state().require_open('environment is closed')
+        session = getattr(self, '_visual_state_session', None)
+        if session is None:
+            raise RuntimeError('visual state binding and published boundary are required')
+        publication = self._observer_publication()
+        return session.sync_state(publication.view)
+
+    def visual_binding_status(self):
+        """Report visual binding fault and renderer cleanup without exposing handles."""
+        session = getattr(self, '_visual_state_session', None)
+        if session is None:
+            return {'bound': False, 'faulted': getattr(self, '_visual_binding_last_fault', False),
+                    'close': getattr(self, '_visual_binding_last_close', None)}
+        return {'bound': not session._closed, 'faulted': bool(getattr(session, '_faulted', False)),
+                'close': dict(session.close_status)}
+
+    def visual_model_info(self):
+        """Describe the currently bound renderer-only visual model."""
+        self._episode_execution_state().require_open('environment is closed')
+        session = getattr(self, '_visual_state_session', None)
+        if session is None:
+            raise RuntimeError('visual state is not bound')
+        return session.visual_model_info()
+
+    def visual_body_pose(self, entity_id, frame_id):
+        """Read an owned renderer body-origin world pose for a bound Frame."""
+        self._episode_execution_state().require_open('environment is closed')
+        session = getattr(self, '_visual_state_session', None)
+        if session is None:
+            raise RuntimeError('visual state is not bound')
+        return session.visual_body_pose(entity_id, frame_id)
+
+    def _close_camera_consumer(self):
+        task_consumer = getattr(self, '_task_rgb_consumer', None)
+        self._task_rgb_consumer = None
+        visual, self._visual_state_session = getattr(self, '_visual_state_session', None), None
+        first = None
+        for resource in (task_consumer, visual):
+            if resource is not None:
+                try:
+                    resource.close()
+                except BaseException as error:
+                    if first is None:
+                        first = error
+                    else:
+                        first.add_note(f'visual cleanup also failed: {error!r}')
+                finally:
+                    if resource is visual:
+                        self._visual_binding_last_close = dict(visual.close_status)
+                        self._visual_binding_last_fault = bool(getattr(visual, '_faulted', False))
+        if first is not None:
+            raise first
+
+    @contextmanager
+    def _selected_com_wrench_scope(self, caller_requests):
+        """Stage Task-owned and caller-owned loads for exactly one interval."""
+        factory = getattr(getattr(self, 'binding', None), 'task_com_wrench_factory', None)
+        if caller_requests is None and factory is None:
+            yield
+            return
+        task_started = False
+        external = None
+        try:
+            if self.recorder is not None and not getattr(
+                    self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
+                raise StageUnavailableError('COM wrenches are not represented by the active Recorder')
+            if self._has_component_assembly() or self.binding.interval_mode != 'grouped':
+                raise StageUnavailableError('COM wrenches require the selected grouped interval')
+            if self.session is None:
+                raise RuntimeError('reset required before staging COM wrenches')
+            task_requests = ()
+            if factory is not None:
+                task_started = True
+                task_requests = factory(self)
+                if type(task_requests) is not tuple:
+                    raise TypeError('Task COM wrench factory must return an immutable tuple')
+            caller_requests = () if caller_requests is None else caller_requests
+            if type(caller_requests) is not tuple:
+                raise TypeError('caller COM wrenches must be an immutable tuple')
+            if not caller_requests and not task_requests and factory is not None:
+                yield
+                return
+            from ..runtime.sessions.mujoco_external_wrench import MuJoCoExternalComPort
+            external = MuJoCoExternalComPort(self.session, caller_requests, task_requests=task_requests)
+            self.session._external_com_port = external
+            yield
+        except BaseException as error:
+            # An arbitrary Task callback may have mutated its own state even
+            # if no provider step occurred; no rollback contract exists.
+            if task_started and self._episode_execution_state().fault is None:
+                self._latch_fault('task_com_wrench_preparation', error, before_state=self.state)
+            raise
+        finally:
+            if external is not None:
+                external.finish()
+
+    def step(self, action, *, external_com_wrenches=None):
+        """Advance one interval, optionally with caller COM wrenches on MuJoCo CPU.
+
+        Wrenches are an immutable tuple of ``ExternalComWrenchV1`` or
+        ``ExternalComWrenchSegmentV1`` or ``ExternalComWrenchSumSegmentV1``
+        keyed by a source body. They act only
+        for the declared half-open range in this interval. The selected grouped
+        position path must already have a source-bound scene submission;
+        other providers, native-feedback intervals and active Recorders fail
+        before a force is staged. Ordinary ``step(action)`` is unchanged.
+        """
+        self._require_execution_healthy()
+        with self._selected_com_wrench_scope(external_com_wrenches):
+            component_lifecycle = None
+            if self._has_component_assembly():
+                self._episode_execution_state().require_open("environment is closed")
+                component_lifecycle = self._require_task_lifecycle()
+                self._last_camera_metadata = {}
+                operations = component_lifecycle.prepare_step(action)
+            else:
+                operations = self._prepare_selected_step(action)
+            if component_lifecycle is not None:
+                result = self._episode_execution_state().execute_interval(**operations)
+                return self._format_component_step(component_lifecycle, result)
+            return self._episode_execution_state().execute_selected_interval(self, **operations)
+
+    def _prepare_selected_step(self, action):
+        self._episode_execution_state().require_step(
+            closed_message='environment is closed',
+            fault_prefix='selected execution is faulted; reset() is required',
+        )
+        from ..planners.contracts import ExpertAction, validate_caller_solution_action
+        if self.binding.external_solution_actions and type(action) is ExpertAction:
+            if self._episode_mode in {'expert', 'external_solution'}:
+                raise RuntimeError('cannot mix caller actions with selected Solution execution')
+            if self.solution is not None or self._external_solution_owner is not None:
+                raise RuntimeError('caller actions require reset without an Env-owned Solution')
+            if self._stopped or self.session is None:
+                raise RuntimeError('reset required or episode already stopped')
+            physical_selection = getattr(self, '_physical_reset_selection', None)
+            if physical_selection is not None:
+                if self.physical_action_spec()['kind'] != 'r3-pose':
+                    raise ValueError('the selected Solution requires the R3 pose input spec')
+                validate_caller_solution_action(
+                    action, boundary=lambda: self.info.get('state_boundary_identity'),
+                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
+                    solution_identity=self.value.get('solution_identity'), control_request_mode='position',
+                )
+                from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+                return prepare_selected_control_action(
+                    self, self.bind_physical_action(action.action), proposal=action, caller_driven=True)
+            from ..runtime.sessions.control_lifecycle import has_position_control_capability
+            if has_position_control_capability(self):
+                if self.binding.position_execution_info is None or len(self.position_profiles) != 1:
+                    raise StageUnavailableError('caller-driven Solution actions are unavailable on this Position profile')
+                validate_caller_solution_action(
+                    action, boundary=lambda: self.info.get('state_boundary_identity'),
+                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
+                    solution_identity=self.value.get('solution_identity'),
+                    control_request_mode='position',
+                )
+                from ..runtime.sessions.control_lifecycle import project_position_action
+                request = project_position_action(self, action.action)
+                from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+                return prepare_selected_control_action(self, request, proposal=action, caller_driven=True)
+            self._require_published_execution_info()
+            validate_caller_solution_action(
+                action, boundary=self.info['expert_execution_boundary_v1'],
+                solution_identity=self.value.get('solution_identity'),
+                control_request_mode=('required' if self.binding.control_request_required
+                                      else 'forbidden'),
+            )
+            from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+            return prepare_selected_control_action(self, action.action, proposal=action, caller_driven=True)
+        if not self.binding.external_actions:
+            raise RuntimeError(self.binding.external_action_error)
+        if self._episode_mode in {'expert', 'external_solution'}:
+            raise RuntimeError('cannot mix external actions with selected Solution execution')
+        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+        return prepare_selected_control_action(self, action)
+
+    def _prepare_physical_control(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
+        """Prepare one named physical interval through the selected session."""
+        from ..artifacts.state import CanonicalStatePublicationV1, CanonicalStatePublicationV2
+        from ..controllers.canonical.physical_commands import PhysicalCommandContextV1, PhysicalControlReceiptV1
+        from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, prepare_physical_command_batch
+
+        if self._stopped or self.session is None:
+            raise RuntimeError('reset required or episode already stopped')
+        if (self.state.control_step >= self.horizon
+                and not getattr(self.binding, 'physical_ignore_done', False)):
+            raise RuntimeError('selected physical-control horizon is exhausted')
+        profile = self._physical_execution()
+        if type(profile) is not PhysicalControlExecutionV1:
+            raise TypeError('selected physical route requires an admitted physical execution profile')
+        plan = profile.compiled.binding
+        source = self.value['source']
+        if (self.artifact.identity_hash != plan.artifact_sha256
+                or getattr(source, 'source_id', None) != plan.source_id
+                or getattr(source, 'source_closure_digest', None) != plan.source_closure_sha256):
+            raise ValueError('selected physical execution source or Artifact differs from binding')
+        assess = getattr(self.session, 'assess_physical_control', None)
+        write = getattr(self.session, 'apply_physical_command_batch', None)
+        if not callable(assess) or not callable(write):
+            raise StageUnavailableError('RuntimeSession does not expose an admitted physical-control port')
+        if getattr(self.session, 'physical_control_generation', None) != profile.generation:
+            raise ValueError('physical-control session generation differs from profile')
+        if getattr(self.session, '_physical_controller_versions', None) != profile.controller_versions():
+            raise ValueError('physical Controller versions differ from materialization')
+        publication = self.session.snapshot_v2(scene=profile.scene,
+            joint_bindings=profile.joint_bindings, frame_bindings=profile.frame_bindings,
+            requirements=profile.requirements)
+        if type(publication) is not CanonicalStatePublicationV2:
+            raise TypeError('physical Controller needs a typed state publication')
+        if not publication.lifetime.may_be_retained:
+            raise ValueError('physical Controller requires an owned state snapshot')
+        view = publication.view
+        if view.boundary != self.session.state_boundary_identity():
+            raise ValueError('physical Controller state is stale')
+        view.validate_against_scene(profile.scene)
+        view.validate_requirements(profile.requirements)
+        clock_tolerance = _boundary_interval_clock_tolerance(
+            self.state.simulation_time, view.sample_clock.simulation_time_s,
+            self.artifact.timebase.control_dt, self.artifact.timebase.control_dt, 1)
+        if (self.state.control_step != view.boundary.control_step
+                or abs(float(self.state.simulation_time) - view.sample_clock.simulation_time_s) > clock_tolerance):
+            raise ValueError('selected and typed state clocks differ')
+        context = PhysicalCommandContextV1('physical-command-context-v1', plan.source_id,
+            plan.source_closure_sha256, plan.artifact_sha256, view.boundary, view.sample_clock,
+            0, profile.generation, self.artifact.timebase.control_dt, self.artifact.timebase.control_dt)
+        if getattr(self, '_last_physical_submission', None) == context:
+            raise ValueError('physical command interval was already submitted')
+        assessment = assess(plan)
+        if getattr(assessment, 'phase', None) not in {'native_build', 'runtime'}:
+            raise ValueError('physical session write requires native-build or runtime capability assessment')
+        from ..controllers.canonical.physical_sequence import PhysicalActionSequenceV1
+        if type(action) is PhysicalActionSequenceV1:
+            from ..runtime.sessions.physical_sequence import prepare_selected_physical_sequence
+            return prepare_selected_physical_sequence(self, action, profile=profile, view=view,
+                context=context, assessment=assessment, proposal=proposal,
+                observer_solution=observer_solution, clock_tolerance=clock_tolerance)
+        # Controller computation can mutate owner state even when a subsequent
+        # mapping or capability preflight rejects the batch. There is no
+        # general Controller rollback contract, so the lifecycle must latch a
+        # fault if preparation fails from this point onward.
+        self._physical_controller_preparation_started = True
+        batch = profile.controller_batch(action, view, context)
+        submitted = PhysicalControlReceiptV1('physical-control-receipt-v1', context,
+            batch.identity_hash, 'submitted', tuple(item.contribution.contribution_id
+            for item in (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)),
+            'core-selected', 'per-channel')
+        buffer_policy = None
+        if any(item.contribution.persistence == 'hold_reapply'
+               for item in (*batch.joint_efforts, *batch.body_wrenches)):
+            get_buffer_policy = getattr(self.session, 'physical_buffer_policy', None)
+            if not callable(get_buffer_policy):
+                raise StageUnavailableError('RuntimeSession has no held-load buffer policy')
+            buffer_policy = get_buffer_policy(plan)
+        joint_receipt = None
+        if batch.joint_efforts:
+            get_joint_receipt = getattr(self.session, 'physical_joint_build_receipt', None)
+            if not callable(get_joint_receipt):
+                raise StageUnavailableError('RuntimeSession has no verified physical joint mapping')
+            joint_receipt = get_joint_receipt(plan)
+        body_receipt = None
+        if batch.body_wrenches:
+            get_body_receipt = getattr(self.session, 'physical_body_build_receipt', None)
+            if not callable(get_body_receipt):
+                raise StageUnavailableError('RuntimeSession has no verified physical body mapping')
+            body_receipt = get_body_receipt(plan)
+        if any(getattr(receipt, 'provenance', None) != 'native_build'
+               for receipt in (joint_receipt, body_receipt) if receipt is not None):
+            raise ValueError('synthetic mapping cannot authorize a session write')
+        resolved = prepare_physical_command_batch(profile.compiled, batch, expected_context=context,
+                                                   assessment=assessment, state=view,
+                                                   body_build_receipt=body_receipt,
+                                                   joint_build_receipt=joint_receipt,
+                                                   buffer_policy=buffer_policy)
+        before = self.state
+        attempted = False
+        completed = False
+        ack = None
+        physical_publication_after = None
+        record_append_attempted = False
+        recording_before = self._recording_counts(self.recorder)
+
+        def apply_control():
+            nonlocal attempted, ack
+            # The shared commit owner marks this boundary before calling the
+            # provider so a partial failure cannot be replayed.
+            self._last_physical_submission = context
+            attempted = True
+            from ..runtime.sessions.control_submission import submit_control_command
+            contributions = (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)
+            writers = tuple(sorted({item.contribution.owner_id for item in contributions}))
+            resources = tuple(sorted({
+                *(f'{item.entity_id}/{item.joint_id}' for item in resolved.joints),
+                *(f'{item.entity_id}/{item.body_id}' for item in resolved.body_wrenches),
+                *(str(getattr(item, 'target_key', type(item).__name__)) for item in resolved.extensions),
+            }))
+            units = tuple(sorted({
+                *(item.unit for item in resolved.joints),
+                *(('N', 'N*m') if resolved.body_wrenches else ()),
+                *(str(getattr(item, 'unit', 'provider-extension')) for item in resolved.extensions),
+            }))
+            mixed = getattr(self.session, '_prepared_mixed_position', None)
+            def lower_physical_and_position():
+                native_ack = write(resolved)
+                if mixed is not None:
+                    mixed.stage()
+                return native_ack
+            ack = submit_control_command(
+                self.session, resolved, command_kind='physical-effort-batch',
+                command_sha256=batch.identity_hash, source_id=plan.source_id,
+                source_closure_sha256=plan.source_closure_sha256,
+                artifact_sha256=plan.artifact_sha256, boundary=view.boundary,
+                sample_clock=view.sample_clock, controller_generation=profile.generation,
+                controller_identities=tuple(controller.identity for controller in profile.controllers),
+                writer_ids=writers, resource_ids=resources, units=units,
+                lowering=f'{type(self.session).__module__}.{type(self.session).__qualname__}.apply_physical_command_batch',
+                lower=lower_physical_and_position)
+            if (type(ack) is not PhysicalControlReceiptV1 or ack.stage != 'native_write_ack'
+                    or ack.context != context or ack.batch_sha256 != batch.identity_hash
+                    or ack.contribution_ids != resolved.accepted_receipt.contribution_ids):
+                raise ValueError('physical RuntimeSession returned an invalid write acknowledgement')
+            if mixed is not None:
+                mixed.commit(self.session._last_scene_control_submission)
+                self.session._prepared_mixed_position = None
+                self.session._prepared_position_sequence = None
+            return ack
+
+        def advance(_ack):
+            nonlocal completed, physical_publication_after
+            self.state = self.session.step()
+            completed = True
+            if profile.subjects:
+                physical_publication_after = self.session.snapshot_v2(
+                    scene=profile.scene, joint_bindings=profile.joint_bindings,
+                    frame_bindings=profile.frame_bindings, requirements=profile.requirements)
+                if (type(physical_publication_after) is not CanonicalStatePublicationV2
+                        or not physical_publication_after.lifetime.may_be_retained
+                        or physical_publication_after.view.boundary != self.session.state_boundary_identity()
+                        or physical_publication_after.view.boundary.control_step != self.state.control_step
+                        or abs(physical_publication_after.view.sample_clock.simulation_time_s
+                               - float(self.state.simulation_time)) > clock_tolerance):
+                    raise ValueError('physical control post-step state is stale or foreign')
+                physical_publication_after.view.validate_against_scene(profile.scene)
+                physical_publication_after.view.validate_requirements(profile.requirements)
+                if getattr(self.binding, 'physical_observation_binding', None) is None:
+                    self.typed_state = physical_publication_after
+            observation_binding = getattr(self.binding, 'physical_observation_binding', None)
+            if observation_binding is not None:
+                scene, joints, frames, requirements = observation_binding(self)
+                publication_after = self.session.snapshot_v1(
+                    scene=scene, joint_bindings=joints, frame_bindings=frames,
+                    requirements=requirements)
+                if (type(publication_after) is not CanonicalStatePublicationV1
+                        or not publication_after.lifetime.may_be_retained
+                        or publication_after.view.boundary != self.session.state_boundary_identity()
+                        or publication_after.view.boundary.control_step != self.state.control_step
+                        or abs(publication_after.view.sample_clock.simulation_time_s
+                               - float(self.state.simulation_time)) > clock_tolerance):
+                    raise ValueError('physical control post-step publication is stale or foreign')
+                self.typed_state = publication_after
+        def evaluate(_state):
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info = dict(self.info)
+            selection = getattr(self, '_physical_reset_selection', None)
+            if selection is not None:
+                spec = selection.describe()
+                observe_action = getattr(self.binding, 'physical_action_observer', None)
+                if observe_action is not None:
+                    observe_action(self, action, spec)
+                self.info['physical_action_spec_v1'] = spec
+                boundary = (physical_publication_after.view.boundary if physical_publication_after is not None
+                            else self.typed_state.view.boundary)
+                self.info['state_boundary_identity'] = boundary.to_mapping()
+                self._publish_task_position_execution_info(self.info)
+            if getattr(self.binding, 'physical_direct_effort_feedback', False):
+                if len(profile.controllers) != 1:
+                    raise ValueError('direct effort compatibility requires one declared Controller')
+                feedback = getattr(profile.controllers[0], 'compatibility_feedback', None)
+                if not callable(feedback):
+                    raise TypeError('declared direct effort feedback is unavailable')
+                self.info.update(feedback(resolved, ack, mode=self.binding.action_schema['mode'],
+                    include_diagnostics=self.config.observation.include_diagnostics))
+            if (getattr(self.session, '_last_scene_control_submission', None) or {}).get('schema_version') == 'scene-control-submission-receipt-v2':
+                from copy import deepcopy
+                self.info['position_physical_sequence_v1'] = deepcopy(self.session._last_position_sequence_progress)
+            self.info['physical_control_v1'] = {
+                'submitted_batch': batch.to_mapping(),
+                'submitted': submitted.to_mapping(),
+                'accepted': resolved.accepted_receipt.to_mapping(),
+                'admitted_joint_efforts': [asdict(item) for item in resolved.joints],
+                'native_write_ack': ack.to_mapping(),
+            }
+            return self.evaluation
+
+        def publish(_control, _state, _evaluation, _observation):
+            nonlocal record_append_attempted
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=bool(self.evaluation.failure or
+                    (getattr(self.binding, 'physical_terminate_on_success', False)
+                     and self.evaluation.success)), task_truncated=False,
+                control_step=self.state.control_step, horizon=self.horizon,
+                ignore_done=getattr(self.binding, 'physical_ignore_done', False))
+            self._episode_mode = 'external_solution' if proposal is not None and not caller_driven else 'external'
+            self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
+            if proposal is not None and not caller_driven:
+                self._observe_selected_solution(
+                    observer_solution, self.obs, float(self.evaluation.reward), terminated, truncated,
+                    task_info_for_solution(self.info), {}, report=False)
+            if self.recorder is not None and getattr(self.recorder, 'active', False):
+                from ..recorders.physical_metadata import record_physical_transition
+                record_append_attempted = True
+                record_physical_transition(self, action, batch, resolved, ack,
+                                           terminated=terminated, truncated=truncated)
+            if getattr(self.binding, 'physical_observation_binding', None) is not None:
+                self._last_position_terminated = terminated
+                self._last_position_truncated = truncated
+                self._publish_position_boundary(
+                    self.state, self.typed_state, self.evaluation)
+            if self.value.get('physical_execution') is not None:
+                self._physical_published_state = self.state
+                self._physical_published_typed_state = self.typed_state
+                self._physical_published_evaluation = self.evaluation
+                if ((terminated or truncated)
+                        and getattr(self.binding, 'physical_terminate_on_success', False)):
+                    from ..trajectory.canonical.episode import make_episode_end_v1
+                    boundary = self.typed_state.view.boundary
+                    self._last_episode_end = make_episode_end_v1(
+                        episode_id=boundary.episode_id, final_boundary=int(self.state.control_step),
+                        end_reason='task_terminal' if terminated else 'horizon_reached',
+                        terminated=bool(terminated), truncated=not bool(terminated),
+                        bootstrap_allowed=not bool(terminated),
+                        source='task_env.selected_reference.physical_control_v1',
+                        payload={'control_step': int(self.state.control_step),
+                                 'simulation_time_s': float(self.state.simulation_time)},
+                        event_sequence=0, task_success=bool(self.evaluation.success),
+                        solution_completed=None)
+                    self.info['episode_end_v1'] = self._last_episode_end.to_mapping()
+            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
+
+        def on_failure(phase, error):
+            self.session._prepared_mixed_position = None
+            self.session._prepared_position_sequence = None
+            abort = getattr(self.session, 'abort_physical_control', None)
+            if attempted and callable(abort):
+                try:
+                    abort()
+                except BaseException as cleanup_error:
+                    error.add_note('physical batch cleanup also failed: '
+                                   f'{type(cleanup_error).__name__}: {cleanup_error}')
+            task_rgb_requested = getattr(self, '_task_rgb_config', None) is not None
+            after_state = self.state if completed else None
+            readback_error = None
+            if attempted and not completed:
+                try:
+                    after_state = self.session.snapshot()
+                    self.state = after_state
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            if task_rgb_requested:
+                try:
+                    self._close_camera_consumer()
+                except BaseException as cleanup_error:
+                    error.add_note('task camera cleanup after physical fault also failed: '
+                                   f'{type(cleanup_error).__name__}: {cleanup_error}')
+            self._latch_fault(phase, error, before_state=before, after_state=after_state,
+                interval_attempted=attempted, interval_completed=completed,
+                native_substeps_expected=self.artifact.timebase.control_substeps,
+                readback_error=readback_error,
+                transition_status=self._fault_transition_status(
+                    self.recorder, recording_before, append_attempted=record_append_attempted))
+
+        return dict(apply_control=apply_control, advance=advance, evaluate=evaluate,
+                    publish=publish, on_failure=on_failure)
+
+
+
+    def step_with_solution(self, solution):
+        """Run one caller-owned Solution action through the selected lifecycle.
+
+        The public readiness payload is checked before calling ``act``. The
+        same Solution instance receives post-step ``observe`` before any
+        canonical Recorder append. The instance remains the sole owner of its
+        mutable stage state.
+        """
+        self._episode_execution_state().require_step(
+            closed_message='environment is closed',
+            fault_prefix='selected execution is faulted; reset() is required',
+        )
+        if self._external_solution_owner is None or solution is not self._external_solution_owner:
+            raise ValueError('step_with_solution requires the instance accepted by reset_for_solution')
+        self._validate_external_solution(solution)
+        if self._stopped or self.session is None:
+            raise RuntimeError('reset required or episode already stopped')
+        if self._episode_mode in {'expert', 'external'}:
+            raise RuntimeError('cannot mix external Solution and other selected execution modes')
+        if getattr(solution, 'done', False) or getattr(solution, 'failed', False):
+            raise RuntimeError('external Solution already stopped')
+        if getattr(self, '_physical_reset_selection', None) is not None:
+            if self.physical_action_spec()['kind'] != 'r3-pose':
+                raise ValueError('the selected Solution requires the R3 pose input spec')
+            physical = True
+        else:
+            physical = False
+            try:
+                self._require_published_execution_info()
+            except BaseException as error:
+                self._latch_fault('public_execution_readiness', error, before_state=self.state)
+                raise
+        action, proposal = self._prepare_solution_action(
+            solution, public_observation=True, physical=physical,
+            proposal_phase=('physical_external_solution_proposal' if physical else 'external_solution_proposal'),
+            action_phase=('physical_external_solution_proposal' if physical else 'external_solution_action_validation'),
+            abort_on_error=not physical, strict_proposal_type=physical,
+            action_projector=self.bind_physical_action if physical else None,
+            proposal_label='physical external Solution' if physical else 'external Solution act()')
+        return self._step(action, proposal=proposal, observer_solution=solution)
+
+    def switch_position_controller(self, candidate):
+        """Controller changes are admitted only while resetting an episode."""
+        raise StageUnavailableError('Controller switching is only supported at reset')
+
+    def _prepare_position_profile(self, request, *, proposal=None, observer_solution=None, caller_driven=False):
+        """Run one source-bound Position interval through the selected lifecycle latch."""
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
+        if not getattr(self, 'position_profile', False) or self.session is None:
+            raise RuntimeError('PositionServoV1 reset and RuntimeSession are required')
+        if getattr(self, '_closed', False):
+            raise RuntimeError('environment is closed')
+        if self._stopped or self.state.control_step >= self.horizon:
+            self._stopped = True
+            raise RuntimeError('reset required or PositionServoV1 horizon is exhausted')
+        from ..runtime.sessions.control import execute_position_control_interval
+        from ..controllers.canonical.contracts import StructuredActionRequestV1
+        from ..controllers.canonical.position_sequence import PositionActionSequenceV1
+        if type(request) is PositionActionSequenceV1:
+            if (self.recorder is not None or proposal is not None or observer_solution is not None
+                    or getattr(self, '_task_rgb_config', None) is not None):
+                raise ValueError('Position sequence does not admit Recorder, Solution or task RGB')
+        if isinstance(request, StructuredActionRequestV1):
+            from ..runtime.sessions.control import prepare_structured_action
+            prepare_structured_action(self.position_plan, request)
+        elif proposal is not None:
+            raise TypeError('PositionServoV1 expert requires a StructuredActionRequestV1')
+
+        before_state = self.state
+        interval_attempted = False
+        interval_completed = False
+        transition_counts_before = self._recording_counts(self.recorder)
+        record_append_attempted = False
+        publication_phase = 'position_observation'
+
+        def apply_control():
+            nonlocal interval_attempted
+            interval_attempted = True
+            profiles = tuple(getattr(self, 'position_profiles', (self._selected_controller,)))
+            controller_profiles = profiles if len(profiles) == 2 else profiles[0]
+            requirements = (
+                self._position_requirements()
+                if hasattr(self, 'position_profiles')
+                else getattr(self._selected_controller, 'requirements', None)
+            )
+            return execute_position_control_interval(
+                self.session, controller_profiles, self.position_plan, request, self.typed_state,
+                scene=self.position_scene,
+                joint_bindings=self.position_joint_bindings,
+                frame_bindings=self.position_frame_bindings,
+                requirements=requirements,
+            )
+
+        def advance(result):
+            nonlocal interval_completed
+            if self.dual_entity_position:
+                position_records, self.state, self.typed_state = result
+                canonical = target = applied = None
+            else:
+                canonical, target, applied, self.state, self.typed_state = result
+                position_records = ((canonical, target, applied),)
+            interval_completed = True
+            self.feedback = None
+            self.last_position_transition = (
+                position_records if self.dual_entity_position else (canonical, target, applied)
+            )
+
+        def evaluate(state):
+            self.obs, self.info, self.evaluation = self.observation(state)
+            if type(request) is PositionActionSequenceV1:
+                from copy import deepcopy
+                self.info['position_control_sequence_v1'] = deepcopy(
+                    self.session._last_position_sequence_progress)
+            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                self.info['gravity_compensation_v1'] = self.session.gravity_compensation_receipt
+            return self.evaluation
+
+        def publish(result, state, evaluation, observation):
+            nonlocal record_append_attempted, publication_phase
+            if self.dual_entity_position:
+                position_records = result[0]
+                canonical = target = applied = None
+            else:
+                canonical, target, applied = result[:3]
+                position_records = ((canonical, target, applied),)
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=evaluation.failure, task_truncated=False,
+                control_step=state.control_step, horizon=self.horizon,
+            )
+            self._episode_execution_state().finish_step(
+                terminated=terminated, truncated=truncated,
+            )
+            self._episode_mode = 'expert' if proposal is not None and not caller_driven else 'external'
+            self._last_position_terminated = terminated
+            self._last_position_truncated = truncated
+            self._last_position_request = request
+            self._publish_task_position_execution_info(self.info)
+            if proposal is not None and not caller_driven:
+                publication_phase = 'position_solution_observation'
+                solution_owner = self.solution if observer_solution is None else observer_solution
+                extra = self.binding.observe_expert_kwargs(self, None)
+                self._observe_selected_solution(
+                    solution_owner, observation, evaluation.reward, terminated, truncated,
+                    self.info, extra, report=True)
+                self._stopped = bool(solution_owner.done or solution_owner.failed
+                                     or terminated or truncated)
+            if self.recorder is not None:
+                publication_phase = 'record_position_transition'
+                record_append_attempted = True
+                if self.dual_entity_position:
+                    from ..recorders.position_metadata import record_dual_position_transition
+                    record_dual_position_transition(self,
+                        request, position_records, terminated=terminated, truncated=truncated,
+                    )
+                else:
+                    from ..recorders.position_metadata import record_position_transition
+                    record_position_transition(self,
+                        request, canonical, target, applied,
+                        terminated=terminated, truncated=truncated,
+                    )
+            # No boundary is published until the active recorder append succeeds.
+            self._publish_position_boundary(state, self.typed_state, evaluation)
+            if terminated or truncated:
+                self._position_episode_end = self._make_position_episode_end(
+                    'task_terminal' if terminated else 'horizon_reached',
+                    terminated=bool(terminated),
+                    truncated=not bool(terminated),
+                    bootstrap_allowed=not bool(terminated),
+                )
+                self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
+            return observation, float(evaluation.reward), terminated, truncated, self.info
+
+        def on_failure(phase, error):
+            nonlocal interval_completed
+            if phase == 'position_publication':
+                phase = publication_phase
+            after_state = None
+            readback_error = None
+            try:
+                self._close_camera_consumer()
+            except BaseException as cleanup_error:
+                add_note = getattr(error, 'add_note', None)
+                if callable(add_note):
+                    add_note(f'camera consumer cleanup after Position fault also failed: {cleanup_error!r}')
+            if interval_attempted:
+                try:
+                    after_state = self.session.snapshot()
+                    self.state = after_state
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            if (after_state is not None and before_state is not None
+                    and after_state.control_step == before_state.control_step + 1):
+                interval_completed = True
+            self._latch_fault(
+                phase, error, before_state=before_state, after_state=after_state,
+                interval_attempted=interval_attempted,
+                interval_completed=interval_completed,
+                native_substeps_expected=self.artifact.timebase.control_substeps,
+                transition_status=self._fault_transition_status(
+                    self.recorder, transition_counts_before,
+                    append_attempted=record_append_attempted,
+                ),
+                readback_error=readback_error,
+            )
+
+        return dict(
+            apply_control=apply_control, advance=advance,
+            evaluate=evaluate, publish=publish, on_failure=on_failure,
+            phases=('position_control_compute_apply_step', 'position_control_compute_apply_step',
+                    'position_control_compute_apply_step', 'position_observation',
+                    'position_observation', 'position_publication'),
+        )
+
+    def prepare_expert(self):
+        """Create and reset the task Solution on demand after an environment reset."""
+        if self._execution_fault is not None or self._stopped or self._episode_mode in {'external', 'external_solution'}:
+            raise RuntimeError('reset required before preparing expert execution')
+        if self.solution is None:
+            factory = self.value.get('solution_factory')
+            if not callable(factory):
+                raise RuntimeError('selected profile does not provide expert execution')
+            try:
+                solution = factory()
+                if getattr(solution, 'identity', None) != self.value.get('solution_identity'):
+                    raise ValueError('constructed Solution identity differs from compiled task')
+                solution.reset(self.obs, task_info_for_solution(self.info), self.metadata,
+                               **self.binding.reset_expert_kwargs(self))
+            except BaseException as error:
+                self._latch_fault('solution_reset', error, before_state=self.state)
+                raise
+            self.solution = solution
+        return self.solution
+
+    def step_expert(self):
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
+        if self._stopped or self._episode_mode in {'external', 'external_solution'}:
+            raise RuntimeError('reset required; external and expert execution cannot be mixed')
+        physical_selection = getattr(self, '_physical_reset_selection', None)
+        if physical_selection is not None and self.physical_action_spec()['kind'] != 'r3-pose':
+            raise ValueError('the selected Solution requires the R3 pose input spec')
+        self.prepare_expert()
+        self._episode_mode = 'expert'
+        if self.solution.done or self.solution.failed:
+            raise RuntimeError('expert already stopped')
+        if getattr(self, 'position_profile', False):
+            if not self.binding.external_solution_actions or len(self.position_profiles) != 1:
+                raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
+        elif physical_selection is None and hasattr(self.solution, 'readiness_config'):
+            try:
+                self._require_published_execution_info()
+            except BaseException as error:
+                self._latch_fault('public_execution_readiness', error, before_state=self.state)
+                raise
+        action, proposal = self._prepare_solution_action(
+            self.solution, public_observation=(physical_selection is not None
+                                              or self.binding.expert_uses_public_observation),
+            physical=physical_selection is not None, proposal_phase='expert_proposal',
+            action_phase='expert_action_validation', abort_on_error=True,
+            proposal_label='expert Solution act()')
+        return self._step(action, proposal=proposal, observer_solution=self.solution)
+
+    def _prepare_solution_action(self, solution, *, public_observation, physical,
+                                 proposal_phase, action_phase, abort_on_error,
+                                 strict_proposal_type=False, action_projector=None,
+                                 proposal_label='Solution act()'):
+        """Admit one compatibility Solution proposal and project its action once."""
+        try:
+            proposal = (solution.act(self.obs, task_info_for_solution(self.info))
+                        if public_observation else solution.act())
+            from ..planners.contracts import ExpertAction
+            if (not isinstance(proposal, ExpertAction)
+                    or (strict_proposal_type and type(proposal) is not ExpertAction)):
+                raise TypeError(f'{proposal_label} must return ExpertAction')
+            if physical:
+                from ..planners.contracts import validate_caller_solution_action
+                validate_caller_solution_action(proposal,
+                    boundary=lambda: self.info.get('state_boundary_identity'),
+                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
+                    solution_identity=self.value.get('solution_identity'), control_request_mode='position')
+        except BaseException as error:
+            self._latch_fault(proposal_phase, error, before_state=self.state)
+            if abort_on_error and self.binding.abort_solution_on_runtime_error:
+                try:
+                    solution.abort('runtime_error')
+                except BaseException as abort_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'Solution abort after proposal failure also failed: {abort_error!r}')
+            raise
+        try:
+            if action_projector is not None:
+                action = action_projector(proposal.action)
+            elif getattr(self, 'position_profile', False):
+                from ..runtime.sessions.control_lifecycle import project_position_action
+                action = project_position_action(self, proposal.action)
+            else:
+                action = self.bind_physical_action(proposal.action) if physical else proposal.action
+        except BaseException as error:
+            self._latch_fault(action_phase, error, before_state=self.state)
+            raise
+        return action, proposal
+
+    def _step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
+        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+        try:
+            with self._selected_com_wrench_scope(None):
+                operations = prepare_selected_control_action(
+                    self, action, proposal=proposal, observer_solution=observer_solution,
+                    caller_driven=caller_driven)
+                return self._episode_execution_state().execute_selected_interval(self, **operations)
+        except BaseException as error:
+            # Solution.act() precedes this method and may already have mutated
+            # state, even when a Task-load admission fails before its callback.
+            if proposal is not None and self._episode_execution_state().fault is None:
+                self._latch_fault('solution_preparation', error, before_state=self.state)
+            raise
+
+    def _prepare_reference_step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
+        if self._stopped or self.session is None:
+            raise RuntimeError('reset required or episode already stopped')
+        try:
+            request = self.binding.prepare_action(action)
+            if not isinstance(request, RequestedAction):
+                raise TypeError('selected action binding must return RequestedAction')
+            request.validate()
+        except BaseException as error:
+            if proposal is not None:
+                self._latch_fault('expert_action_validation', error, before_state=self.state)
+            raise
+        if proposal is not None and observer_solution is None and not caller_driven:
+            observer_solution = self.solution
+        requested_mode = (
+            'external' if caller_driven else
+            'external_solution' if proposal is not None and observer_solution is self._external_solution_owner
+            else 'expert' if proposal is not None else 'external'
+        )
+        if self._episode_mode is not None and self._episode_mode != requested_mode:
+            raise RuntimeError('cannot mix external actions with selected expert execution')
+        self._episode_mode = requested_mode
+        stage = proposal.stage if proposal is not None else 'external'
+        diagnostics = dict(proposal.diagnostics) if proposal is not None else {}
+        if (requested_mode in {'external_solution', 'external'} and proposal is not None
+                and proposal.control_request is not None):
+            control_request = proposal.control_request
+            diagnostics['arm_execution_request_v1'] = {
+                'schema_version': control_request.schema_version,
+                'profile_id': control_request.profile_id,
+                'mode': control_request.mode,
+            }
+        native_samples = []
+        substeps = []
+        before_state = self.state
+        transition_counts_before = self._recording_counts(self.recorder)
+        failure_phase = 'recorder_interval_begin'
+        interval_attempted = False
+        interval_completed = False
+        record_append_attempted = False
+        canonical = target = applied = request_boundary = interval_receipt = None
+
+        def submit_position_target(lower, *, lowering):
+            lifecycle = getattr(self.session, '_control_lifecycle_dispatch', None)
+            if (lifecycle is None
+                    or getattr(lifecycle, 'command_kind', None) != 'position-target'):
+                raise RuntimeError('Position control requires the common submission lifecycle')
+            source = self.value['source']
+            from ..artifacts.state import StateSampleClock
+            boundary = self.session.state_boundary_identity()
+            native_state = self.session.snapshot()
+            sample_clock = StateSampleClock(
+                'state-sample-clock-v1', 'evaluation_boundary',
+                int(native_state.control_step), float(native_state.simulation_time),
+            )
+            composition = getattr(source, 'source_composition_request', None)
+            rows = tuple(getattr(composition, 'resource_writers', ()))
+            if rows:
+                from ..runtime.sessions.control_submission import _resource_owners_from_rows
+                resource_owners = _resource_owners_from_rows(
+                    rows, {writer for _, _, writer in rows})
+                writers = tuple(writer for writer, _resources in resource_owners)
+                resources = tuple(sorted(resource for _writer, owned in resource_owners
+                                         for resource in owned))
+            else:
+                writer = getattr(self._selected_controller, 'control_submission_writer_id', None)
+                if type(writer) is not str or not writer:
+                    raise ValueError('declared Position Controller lacks a stable writer identity')
+                resources = tuple(sorted((*target.arm_servo_position.keys(),
+                                          target.gripper.semantic_id)))
+                if not resources:
+                    raise ValueError('canonical position target declares no controlled resources')
+                writers = (writer,)
+                resource_owners = ((writer, resources),)
+            from ..runtime.sessions.control_submission import submit_control_command
+            return submit_control_command(
+                self.session, target, command_kind='position-target',
+                command_sha256=target.identity_hash,
+                source_id=source.source_id,
+                source_closure_sha256=source.source_closure_digest,
+                artifact_sha256=self.artifact.identity_hash,
+                boundary=boundary, sample_clock=sample_clock,
+                controller_generation=lifecycle.controller_generation,
+                controller_identities=(target.controller_identity,),
+                writer_ids=writers, resource_ids=resources,
+                resource_owners=resource_owners,
+                units=('arm-position:rad', 'gripper-position:m'),
+                lowering=lowering, lower=lower,
+                subject_execution_mode=(
+                    'native-feedback' if self.binding.interval_mode == 'native' else 'boundary-hold'
+                ) if getattr(source, 'position_subject_binding', None) is not None else None,
+            )
+
+        def apply_control():
+            nonlocal failure_phase, interval_attempted, interval_completed
+            nonlocal canonical, target, applied, request_boundary
+            request_boundary = (
+                self._execution_boundary(self.expert_execution_info())
+                if not self.position_profile else None
+            )
+            if (self.binding.native_sample_factory is not None
+                    and not callable(getattr(self.session, 'native_control_feedback_sample', None))):
+                raise RuntimeError('selected Provider RuntimeSession does not expose the required native feedback sample contract')
+            if self.binding.control_request_required:
+                failure_phase = 'controller_control_request_validation'
+                if proposal is None or proposal.control_request is None:
+                    raise ValueError('selected control requires its versioned arm execution request')
+                validate_request = getattr(self._selected_controller, 'validate_arm_execution_request', None)
+                if not callable(validate_request):
+                    raise RuntimeError('selected Controller does not own the admitted arm execution request')
+                validate_request(proposal.control_request)
+            elif proposal is not None and getattr(proposal, 'control_request', None) is not None:
+                validate_request = getattr(self._selected_controller, 'validate_arm_execution_request', None)
+                if not callable(validate_request):
+                    raise ValueError('selected Controller does not admit this Solution control request')
+                validate_request(proposal.control_request)
+            if self.recorder is not None and self.binding.recorder_mode == 'execution':
+                failure_phase = 'recorder_interval_begin'
+                self.recorder.begin(self._current_control_step(), self.artifact.timebase.physics_dt,
+                                    self.artifact.timebase.control_substeps)
+            if proposal is not None and getattr(proposal, 'control_request', None) is not None:
+                failure_phase = 'controller_control_request'
+                self._selected_controller.request_arm_execution(proposal.control_request)
+            failure_phase = 'controller_compute'
+            canonical, target = self._selected_controller.compute(self.state, self.feedback, request)
+
+            def observe(index, state, feedback, effective, applied, diag,
+                        provider_feedback_sample=None):
+                observed_diagnostics = dict(diag)
+                if self.binding.native_sample_factory is not None:
+                    if proposal is None or request_boundary is None:
+                        raise RuntimeError('native sample publication requires a source-bound Solution action')
+                    if provider_feedback_sample is None:
+                        raise ValueError('selected native interval lacks Provider force-sample provenance')
+                    native_sample = self.binding.native_sample_factory(
+                        self, stage, index, state, feedback, effective, applied,
+                        observed_diagnostics, provider_feedback_sample, request_boundary,
+                    )
+                    native_samples.append(native_sample)
+                    observed_diagnostics['native_feedback_sample_v1'] = native_sample.to_mapping()
+                substeps.append((index, effective, applied))
+                if self.recorder is not None and self.binding.record_native_substeps:
+                    self.recorder.applied_substep(index, state, feedback, effective, applied,
+                                                   observed_diagnostics)
+            from contextlib import nullcontext
+            from ..runtime.sessions.control import position_subject_interval
+            subject_scope = (position_subject_interval(self.session, target, self.state, controller=self._selected_controller)
+                             if getattr(self.value['source'], 'position_subject_binding', None) is not None
+                             else nullcontext())
+            with subject_scope:
+                if self.binding.interval_mode == 'native':
+                    def lower_native_interval():
+                        nonlocal failure_phase, interval_attempted, interval_completed
+                        failure_phase = 'physics_step'
+                        interval_attempted = True
+                        result = self.session.step_control_interval(
+                            target, self._selected_controller, interval_observer=observe,
+                            arm_schedule=self.arm_schedule)
+                        interval_completed = True
+                        return result
+
+                    result = submit_position_target(
+                        lower_native_interval,
+                        lowering=(f'{type(self.session).__module__}.'
+                                  f'{type(self.session).__qualname__}.step_control_interval(position)'),
+                    )
+                    self.state, target, applied, _ = result
+                else:
+                    failure_phase = 'control_application'
+                    applied = submit_position_target(
+                        lambda: self.session.apply_control(target),
+                        lowering=(f'{type(self.session).__module__}.'
+                                  f'{type(self.session).__qualname__}.apply_control(position)'),
+                    )
+            return applied
+
+        def advance(_applied):
+            nonlocal failure_phase, interval_attempted, interval_completed
+            if self.binding.interval_mode != 'native':
+                failure_phase = 'physics_step'
+                interval_attempted = True
+                self.state = self.session.step()
+                interval_completed = True
+
+        def evaluate(_state):
+            nonlocal failure_phase, interval_receipt
+            failure_phase = 'control_feedback'
+            self.feedback = self.session.control_feedback(self.state)
+            failure_phase = 'observation'
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info['provider'] = self.provider
+            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                self.info['gravity_compensation_v1'] = self.session.gravity_compensation_receipt
+            if not self.position_profile:
+                self._publish_execution_info(self.info)
+                if canonical is not None and target is not None and applied is not None:
+                    self._publish_control_application(
+                        self.info, request, canonical, target, applied, request_boundary,
+                    )
+                    if self.binding.control_request_required and proposal is not None:
+                        control_request = proposal.control_request
+                        self.info['control_application_v1'].update({
+                            'solution_stage': proposal.stage,
+                            'arm_execution_request_v1': {
+                                'schema_version': control_request.schema_version,
+                                'profile_id': control_request.profile_id,
+                                'mode': control_request.mode,
+                            },
+                        })
+            interval_receipt = None
+            if self.binding.native_interval_receipt_factory is not None:
+                failure_phase = 'native_interval_receipt'
+                evaluation_boundary = self._execution_boundary(self.expert_execution_info())
+                interval_receipt = self.binding.native_interval_receipt_factory(
+                    self, request_boundary, evaluation_boundary, tuple(native_samples), tuple(substeps),
+                )
+                interval_receipt.validate()
+                self._active_native_interval_receipt = interval_receipt
+                self.info['native_interval_receipt_v1'] = interval_receipt.to_mapping()
+            return self.evaluation
+
+        def publish(_control, _state, _evaluation, _observation):
+            nonlocal failure_phase, record_append_attempted, diagnostics
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=self.evaluation.failure, task_truncated=False,
+                control_step=self._current_control_step(), horizon=self.horizon,
+            )
+            if proposal is not None and not caller_driven:
+                failure_phase = 'solution_observation'
+                extra = (self.binding.observe_expert_kwargs(self, native_samples, interval_receipt)
+                         if interval_receipt is not None
+                         else self.binding.observe_expert_kwargs(self, native_samples))
+                self._observe_selected_solution(
+                    observer_solution, self.obs, self.evaluation.reward, terminated, truncated,
+                    task_info_for_solution(self.info), extra, report=True)
+                self._stopped = observer_solution.done or observer_solution.failed
+            self._episode_execution_state().finish_step(
+                terminated=terminated, truncated=truncated, preserve_stop=True,
+            )
+            if self.recorder is not None:
+                failure_phase = 'record_interval'
+                record_append_attempted = True
+                if 'gravity_compensation_v1' in self.info:
+                    diagnostics = {**diagnostics, 'gravity_compensation_v1': self.info['gravity_compensation_v1']}
+                if getattr(self._selected_controller, 'last_split_bundle', None) is not None:
+                    scene_receipt = getattr(self.session, '_last_scene_control_submission', None)
+                    if not isinstance(scene_receipt, dict) or scene_receipt.get('status') != 'acknowledged':
+                        raise ValueError('split Position recording requires its scene submission receipt')
+                    diagnostics = {**diagnostics, 'scene_control_submission_v1': scene_receipt}
+                self._record_interval(request, canonical, target, applied, stage, diagnostics,
+                                      terminated, truncated, substeps)
+            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
+
+        def on_failure(_phase, error):
+            after_state = None
+            readback_error = None
+            if interval_attempted:
+                try:
+                    after_state = self.session.snapshot()
+                    self.state = after_state
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            transition_status = self._fault_transition_status(
+                self.recorder,
+                transition_counts_before,
+                append_attempted=record_append_attempted,
+            )
+            observer_count = (
+                len(substeps) if self.binding.interval_mode == 'native' else None
+            )
+            recorder_count = self._recorder_substep_count(
+                self.recorder, transition_counts_before
+            )
+            self._latch_fault(
+                failure_phase,
+                error,
+                before_state=before_state,
+                after_state=after_state,
+                interval_attempted=interval_attempted,
+                interval_completed=interval_completed,
+                observer_confirmed_substeps=observer_count,
+                recorder_confirmed_substeps=recorder_count,
+                native_substeps_expected=(
+                    self.artifact.timebase.control_substeps
+                    if self.binding.interval_mode == 'native'
+                    else None
+                ),
+                transition_status=transition_status,
+                readback_error=readback_error,
+            )
+            failed_solution = observer_solution if observer_solution is not None else self.solution
+            if self.binding.abort_solution_on_runtime_error and failed_solution is not None:
+                try:
+                    failed_solution.abort('runtime_error')
+                except BaseException as abort_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'expert abort after execution fault also failed: {abort_error!r}')
+            # An incomplete interval cannot be finalized as a valid trajectory.
+
+        return dict(
+            apply_control=apply_control, advance=advance,
+            evaluate=evaluate, publish=publish, on_failure=on_failure,
+        )
+
+    @staticmethod
+    def _recording_counts(recorder):
+        if recorder is None:
+            return None
+        transition_count = getattr(recorder, 'transition_count', None)
+        observation_count = getattr(recorder, 'observation_count', None)
+        if type(transition_count) is int and type(observation_count) is int:
+            return transition_count, observation_count
+        value = getattr(recorder, 'value', None)
+        if isinstance(value, dict):
+            return len(value.get('transitions', ())), len(value.get('boundaries', ()))
+        transitions = getattr(recorder, 'transitions', None)
+        boundaries = getattr(recorder, 'boundaries', None)
+        if transitions is not None and boundaries is not None:
+            return len(transitions), len(boundaries)
+        return None
+
+    @classmethod
+    def _fault_transition_status(cls, recorder, before, *, append_attempted):
+        if recorder is None:
+            return 'not_recorded'
+        if not append_attempted:
+            return 'incomplete'
+        after = cls._recording_counts(recorder)
+        if before is not None and after == (before[0] + 1, before[1] + 1):
+            if getattr(recorder, 'pending', None) is None:
+                return 'valid'
+        return 'rejected'
+
+    @staticmethod
+    def _recorder_substep_count(recorder, transition_counts_before=None):
+        def confirmed_count(interval):
+            if not isinstance(interval, dict):
+                return None
+            substeps = interval.get('substeps')
+            if not isinstance(substeps, (list, tuple)):
+                return None
+            count = interval.get('native_step_count')
+            if count is not None and (type(count) is not int or count != len(substeps)):
+                return None
+            return len(substeps)
+
+        pending = getattr(recorder, 'pending', None)
+        if isinstance(pending, dict):
+            return confirmed_count(pending)
+        value = getattr(recorder, 'value', None)
+        if isinstance(value, dict) and transition_counts_before is not None:
+            transitions = value.get('transitions', ())
+            if len(transitions) == transition_counts_before[0] + 1:
+                transition = transitions[-1]
+                if not isinstance(transition, dict):
+                    return None
+                interval = transition.get('interval')
+                return confirmed_count(interval)
+        return None
+
+    def close(self):
+        component = self._has_component_assembly()
+        cleanup = self._close_component_resources if component else self._close_reference_resources
+        return self._episode_execution_state().execute_close(
+            cleanup, stop=not component,
+            allow_closed=component and not getattr(self, '_resources_closed', False),
+        )
+
+    def _close_reference_resources(self):
+        """Release each owned resource once, retaining the first cleanup failure."""
+        first_error = None
+
+        def cleanup(label, operation):
+            nonlocal first_error
+            try:
+                return operation(), None
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(f'{label} also failed: {type(error).__name__}: {error}')
+                return None, error
+
+        ui, self._ui_render_provider = getattr(self, '_ui_render_provider', None), None
+        if ui is not None:
+            cleanup('UI provider close', ui.close)
+        position = bool(getattr(self, 'position_profile', False))
+        healthy = getattr(self, '_execution_fault', None) is None
+
+        def finalize():
+            if position:
+                if getattr(self, '_published_position_state', None) is None:
+                    return
+                if self._position_episode_end is None:
+                    self.stop('environment_close')
+                end = self._position_episode_end
+            else:
+                if (self.value.get('physical_execution') is not None
+                        and getattr(self, '_physical_published_state', None) is not None
+                        and self._last_episode_end is None):
+                    self.stop('environment_close')
+                return
+            recorder = getattr(self, 'recorder', None)
+            if recorder is not None and getattr(recorder, 'active', False):
+                reason = end.outcome.end_reason if end is not None else 'environment_close'
+                self.finish_recording(reason)
+
+        if healthy:
+            cleanup('episode finalization', finalize)
+        cleanup('camera consumer close', self._close_camera_consumer)
+        session, self.session = self.session, None
+        session_was_materialized = session is not None
+        first_error, receipt = close_session_and_runtime_owner(
+            session, first_error=first_error, session_error_label='RuntimeSession close',
+            owner_error_label='Runtime owner close')
+        closed_sessions = {id(session)} if session_was_materialized else set()
+        for abandoned in getattr(self, '_failed_runtime_sessions', ()):
+            if id(abandoned) in closed_sessions:
+                continue
+            closed_sessions.add(id(abandoned))
+            first_error, _ = close_session_and_runtime_owner(
+                abandoned, first_error=first_error,
+                session_error_label='failed reset RuntimeSession close',
+                owner_error_label='failed reset Runtime owner close')
+        self._failed_runtime_sessions = []
+        source = self.value.get('source')
+        from ..runtime.sessions.source import close_source_and_task_resources
+        first_error = close_source_and_task_resources(source, self.binding, error=first_error)
+        if first_error is not None:
+            raise first_error
+
+    def _make_position_episode_end(
+        self, end_reason, *, terminated, truncated, bootstrap_allowed,
+        task_success=_INFER_POSITION_TASK_SUCCESS, payload=None,
+    ):
+        from ..trajectory.canonical.episode import make_episode_end_v1
+
+        typed = self._published_position_typed_state
+        state = self._published_position_state
+        if typed is None or state is None:
+            raise RuntimeError('Position Stop requires a successfully returned reset boundary')
+        boundary = typed.view.boundary
+        from ..recorders.position_metadata import position_episode_end_payload
+        details = position_episode_end_payload(
+            state=state, boundary=boundary,
+            source_closure_digest=self.value['source'].source_closure_digest,
+            controller=self._selected_controller,
+            position_profiles=self.position_profiles if self.dual_entity_position else None,
+            payload=payload,
+        )
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is not None:
+            details['position_compatibility_controller_identity'] = details['controller_identity']
+            details['controller_identity'] = selection.describe()['controller_identity']
+            details['profile_id'] = selection.describe()['kind']
+            details['physical_action_spec_v1'] = selection.describe()
+        if task_success is _INFER_POSITION_TASK_SUCCESS:
+            success = (None if self._published_position_evaluation is None
+                       else bool(self._published_position_evaluation.success))
+        else:
+            success = task_success
+        event_sequence = 0
+        if self.recorder is not None and getattr(self.recorder, 'active', False):
+            event_sequence = self.recorder.next_boundary_event_sequence(int(state.control_step))
+        return make_episode_end_v1(
+            episode_id=boundary.episode_id,
+            final_boundary=int(state.control_step),
+            end_reason=end_reason,
+            terminated=terminated,
+            truncated=truncated,
+            bootstrap_allowed=bootstrap_allowed,
+            source='task_env.selected_reference.position_servo_v1',
+            payload=details,
+            event_sequence=event_sequence,
+            task_success=success,
+            solution_completed=(bool(self._external_solution_owner.done)
+                                if selection is not None and self._external_solution_owner is not None
+                                else None),
+        )
+
+    def stop(self, reason='external_stop'):
+        """Finish once at the last fully published boundary."""
+        state = self._episode_execution_state()
+        state.require_open('cannot stop a closed environment')
+        component_lifecycle = None
+        if self._has_component_assembly():
+            component_lifecycle = self._require_task_lifecycle()
+            operations = component_lifecycle.prepare_stop(reason)
+        else:
+            operations = self._prepare_reference_stop(reason)
+        result = state.execute_stop(reason, **operations)
+        if component_lifecycle is not None:
+            self._last_episode_end = result
+        return result
+
+    def _prepare_reference_stop(self, reason):
+        state = self._episode_execution_state()
+        if self.value.get('physical_execution') is not None:
+            def ensure_boundary():
+                if (self.session is None or getattr(self, '_physical_published_state', None) is None
+                        or getattr(self, '_physical_published_typed_state', None) is None):
+                    raise RuntimeError('reset() must publish a physical boundary before Stop')
+
+            def create_end():
+                from ..trajectory.canonical.episode import make_episode_end_v1
+                selection = getattr(self, '_physical_reset_selection', None)
+                solution = self._external_solution_owner
+                if selection is not None and reason in {'solution_completed', 'solution_failed'}:
+                    if solution is None or (reason == 'solution_completed' and not solution.done) or (
+                            reason == 'solution_failed' and not solution.failed):
+                        raise ValueError('physical Solution stop reason differs from its actual outcome')
+                end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(
+                    reason, selected_reasons=selection is not None)
+                published = self._physical_published_state
+                boundary = self._physical_published_typed_state.view.boundary
+                if boundary.control_step != published.control_step:
+                    raise ValueError('physical Stop boundary differs from the published state')
+                evaluation = self._physical_published_evaluation
+                payload = {'requested_reason': reason, 'control_step': int(published.control_step),
+                           'simulation_time_s': float(published.simulation_time),
+                           'source_id': self.value['source'].source_id,
+                           'source_closure_digest': self.value['source'].source_closure_digest,
+                           'controller_identities': [c.identity for c in self._physical_execution().controllers]}
+                if self._execution_fault is not None:
+                    payload['fault'] = self._execution_fault.to_mapping()
+                self._last_episode_end = make_episode_end_v1(
+                    episode_id=boundary.episode_id, final_boundary=int(published.control_step),
+                    end_reason=end_reason, terminated=terminated, truncated=truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    source='task_env.selected_reference.physical_control_v1', payload=payload,
+                    event_sequence=(self.recorder.next_boundary_event_sequence(int(published.control_step))
+                                    if self.recorder is not None and getattr(self.recorder, 'active', False) else 0),
+                    task_success=bool(evaluation.success),
+                    solution_completed=(bool(solution.done) if solution is not None else None))
+                return self._last_episode_end
+
+            return dict(closed_message='cannot stop a closed selected environment',
+                        ensure_boundary=ensure_boundary, create_end=create_end)
+        if not getattr(self, 'position_profile', False):
+            raise StageUnavailableError(
+                'Stop/Outcome is only admitted for the PositionServoV1 candidate; '
+                'legacy selected production-r1 behavior is unchanged'
+            )
+
+        def ensure_boundary():
+            if self.session is None or self._published_position_typed_state is None:
+                raise RuntimeError('reset() must complete before Stop')
+
+        def create_end():
+            selection = getattr(self, '_physical_reset_selection', None)
+            if selection is not None and reason in {'solution_completed', 'solution_failed'}:
+                solution = self._external_solution_owner
+                if solution is None or (reason == 'solution_completed' and not solution.done) or (
+                        reason == 'solution_failed' and not solution.failed):
+                    raise ValueError('physical Solution stop reason differs from its actual outcome')
+            end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(
+                reason, selected_reasons=selection is not None)
+            if self._execution_fault is not None:
+                fault = self._execution_fault
+                self._position_episode_end = self._make_position_episode_end(
+                    end_reason, terminated=terminated, truncated=truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    task_success=_INFER_POSITION_TASK_SUCCESS,
+                    payload={
+                        'requested_reason': reason,
+                        'fault': fault.to_mapping(),
+                        'observed_runtime_clock': {
+                            'control_step': int(self.state.control_step),
+                            'simulation_time_s': float(self.state.simulation_time),
+                        },
+                    },
+                )
+            else:
+                self._position_episode_end = self._make_position_episode_end(
+                    end_reason, terminated=terminated, truncated=truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    payload={'requested_reason': reason},
+                )
+            return self._position_episode_end
+
+
+        return dict(closed_message='cannot stop a closed selected environment',
+                    ensure_boundary=ensure_boundary, create_end=create_end)
+
+    def _boundary(self):
+        from ..trajectory.canonical.contracts import BoundaryRecord
+        return BoundaryRecord(self.state.control_step, self.state.simulation_time,
+            self.state, self.feedback, self._selected_controller.readiness(self.state, self.feedback),
+            {k: float(v) for k, v in self.info['task_metrics'].items()},
+            bool(self.evaluation.success), bool(self.evaluation.failure))
+
+    def _owners(self):
+        from ..recorders.reference_provenance import coordinator_receipt
+
+        return coordinator_receipt(
+            step=self.state.control_step, time=self.state.simulation_time,
+            artifact_hash=self.artifact.identity_hash,
+            controller_identity=self._selected_controller.identity,
+            solution_identity=self._active_solution_identity(), provider=self.provider,
+            execution_mode=self._episode_mode, task_outcome=self.info,
+            source_sha256=self._recording_adapter_source_sha256,
+        )
+
+    def get_execution_receipt(self):
+        """Return JSON-safe requested/resolved facts, without native-readback claims."""
+        import json
+        from ..runtime.sessions.transport import request_identity
+        if self._has_component_assembly():
+            plan = self.execution_plan
+            selection = plan.execution_spec_v2
+            facts = {'plan': plan.to_mapping(), 'selection': selection.to_mapping()}
+            receipt = {'schema_version': 'deployment-preflight-v1', 'phase': 'static_config',
+                       'request_identity': request_identity(facts), 'requested': None,
+                       'resolved': selection.to_mapping(), 'identity_facts': facts,
+                       'dependency': {'status': 'unknown', 'reason': 'not checked'},
+                       'native_effective': {'status': 'unknown', 'reason': 'native readback not available'},
+                       'evidence': 'none', 'status': 'selection_only'}
+        else:
+            receipt = getattr(self, '_deployment_receipt', None)
+            if receipt is None:
+                selection, requested_json = self._selected_execution_context()
+                if selection is None:
+                    raise StageUnavailableError('execution receipt is unavailable on this compatibility route')
+                from ..runtime.sessions.provenance import describe_execution_selection
+                requested = None if requested_json is None else json.loads(requested_json)
+                receipt = describe_execution_selection(
+                    selection, requested=requested, task_uid=self.uid,
+                    artifact=self.artifact, source=self.value['source'],
+                    controller=self.value.get('controller'), seed=None,
+                )
+        result = json.loads(json.dumps(receipt, sort_keys=True, allow_nan=False))
+        if getattr(self.binding, 'prepare_reset_switch', None) is not None and hasattr(self, '_switch_generation'):
+            from .reset_switch import reset_switch_execution_receipt
+            result['reset_switch_v1'] = reset_switch_execution_receipt(
+                configuration_generation=self._switch_generation,
+                topology_generation=self._switch_topology_generation,
+                task_seed=self._switch_task_seed, provider_seed=self._switch_provider_seed)
+        return result
+
+    def _recorded_execution_configuration(self):
+        from ..recorders.reference_provenance import recorded_execution_configuration
+        return recorded_execution_configuration(
+            uid=self.uid, provider=self.provider, backend=self.backend, horizon=self.horizon,
+            resolved=getattr(self, 'resolved_public_config', None),
+        )
+
+    def start_recording(self, path):
+        if (self.session is None or self.state.control_step != 0 or self.recorder is not None
+                or self._stopped or self._position_episode_end is not None):
+            raise RuntimeError('recording starts exactly once at reset boundary')
+        from ..recorders.recorder import begin_selected_recording
+        self.recording_path, self.recorder = begin_selected_recording(self, path, adapter_path=__file__)
+
+    def _record_interval(self, request, canonical, target, applied, stage, diagnostics,
+                         terminated, truncated, substeps):
+        from ..recorders.reference_provenance import append_selected_transition
+        return append_selected_transition(
+            self.recorder, recorder_mode=self.binding.recorder_mode,
+            record_native_substeps=self.binding.record_native_substeps,
+            timebase=self.artifact.timebase, control_step=self.state.control_step,
+            substeps=substeps, request=request, canonical=canonical, target=target,
+            applied=applied, reward=self.evaluation.reward, terminated=terminated,
+            truncated=truncated, stage=stage, diagnostics=diagnostics,
+            boundary=self._boundary, owners=self._owners, task_metrics=lambda: self.info['task_metrics'],
+        )
+
+    def finish_recording(self, reason):
+        if (getattr(self, '_physical_reset_selection', None) is not None
+                or self.value.get('physical_execution') is not None):
+            from ..recorders.recorder import finalize_structured_recording
+            if self.recorder is None or not getattr(self.recorder, 'active', False):
+                raise RuntimeError('no active recording')
+            if self._last_episode_end is None:
+                self.stop(str(reason))
+            return finalize_structured_recording(
+                self.recorder, self.recording_path, self._last_episode_end, reason, position=True,
+            )
+        if getattr(self, 'position_profile', False):
+            from ..recorders.recorder import finalize_structured_recording
+            if self.recorder is None or not getattr(self.recorder, 'active', False):
+                raise RuntimeError('no active recording')
+            if self._position_episode_end is None:
+                self.stop(str(reason))
+            return finalize_structured_recording(
+                self.recorder, self.recording_path, self._position_episode_end, reason, position=True,
+            )
+        if self.recorder is None or getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
+            raise RuntimeError('no active recording')
+        if self.binding.recorder_mode == 'canonical' and self._execution_fault is not None:
+            raise RuntimeError(
+                'cannot finalize a faulted selected recording as a complete trajectory; '
+                'reset is required'
+            )
+        from ..recorders.reference_provenance import finalize_selected_recording
+        return finalize_selected_recording(
+            self.recorder, self.recording_path, recorder_mode=self.binding.recorder_mode,
+            reason=reason,
+        )
+
+    def get_record_metadata(self):
+        """Return task metadata for the current recording route."""
+        if self._has_component_assembly():
+            return {**self._component_record_metadata(), 'execution_configuration_v1': self.get_execution_receipt()}
+        if self.binding.external_action_contract is not None:
+            schema = {key: value for key, value in self.binding.action_schema.items()
+                      if key not in {'low', 'high'}}
+            return {'env_metadata': {**self.metadata, 'action_schema': schema},
+                'resolved_config': self.value['resolved_configuration'],
+                'universal_action_schema': {'version': schema['schema_version'],
+                    'dimension': len(schema['components']), 'components': schema['components']}}
+        if getattr(self, 'position_profile', False):
+            from ..recorders.position_metadata import position_record_metadata
+            return position_record_metadata(self)
+        return {'execution_configuration_v1': self.get_execution_receipt()}

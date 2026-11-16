@@ -262,6 +262,21 @@ class EffectiveLeafPlanV1:
     fixed_attachment_plan_identity_sha256: str | None = None
     _compiled: bool = field(default=False, init=False, repr=False, compare=False)
 
+    def position_state_requirements(self):
+        """Return the typed state demanded by the compiled effective leaves."""
+        from ...artifacts import StateRequirements
+        if not self._compiled:
+            raise ValueError('leaf state requires a compiled effective plan')
+        requirements = tuple(requirement for entry in self.leaves
+            for requirement in entry.binding.required_state.state_requirements.requirements)
+        consumer = ('r03c-attached-entity-position-leaves-v1'
+                    if self.fixed_attachment_plan_identity_sha256 is not None
+                    else 'r02c-independent-position-leaves-v1')
+        return StateRequirements('state-requirements-v1', 'controller', consumer, requirements)
+
+    def initial_materialization_receipt(self, session):
+        return session.leaf_materialization_receipt
+
     def __post_init__(self):
         if self.schema_version != "effective-leaf-plan-v1":
             raise ValueError("unsupported effective leaf plan schema")

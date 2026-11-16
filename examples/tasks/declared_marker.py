@@ -1,17 +1,92 @@
-"""Declare a new marker task using the shared Panda/table/box construction."""
+"""Register a marker task using the existing Panda/table/box assembly."""
 from __future__ import annotations
 
-from task_env.artifacts import SemanticDefinition, Timebase
-from task_env.assembly.panda_box import PandaBoxDeclaration
-from task_env import make_env as make_registered_env
+from functools import partial
+
+import numpy as np
+
+from task_env.artifacts import PoseWorld, SemanticDefinition, Timebase
+from task_env.artifacts.execution import ResetSample
+from task_env.assembly.panda_box import (
+    PandaBoxDeclaration, compile_panda_box_artifact, compile_panda_box_task,
+)
+from task_env.controllers.canonical import ProductionCanonicalPandaController
+from task_env.controllers.canonical.contracts import reference_pose_action_binding
 from task_env.environment import TaskEvaluation
+from task_env.environment.configuration import resolve_env_config
+from task_env.environment.reference_binding import ReferenceTaskBinding
+from task_env.environment.reference_env import SelectedReferenceEnv
 from task_env.registry import register_env
-from task_env.tasks.declarative_reference import DeclaredPandaBoxEnv
+from task_env.observations.selected_reference import selected_observation_binding
+from task_env.robots.panda import panda_reference_control_binding
+
+
+def _sample_box_reset(declaration, artifact, seed):
+    if type(seed) is not int or seed < 0:
+        raise ValueError('task_seed must be a nonnegative integer')
+    expected = compile_panda_box_artifact(declaration)
+    if artifact.identity_hash != expected.identity_hash:
+        raise ValueError('reset Artifact does not match the task declaration')
+    rng = np.random.Generator(np.random.PCG64(seed))
+    initial = artifact.initialization
+    position = list(initial.poses_world[declaration.object_id].position)
+    for index, dimension in enumerate(initial.randomization):
+        position[index] = float(rng.uniform(*dimension.training_bounds))
+    pose = PoseWorld(tuple(position), initial.poses_world[declaration.object_id].quaternion_wxyz)
+    return ResetSample.create(
+        schema_version='reset-sample-v0', task_artifact_hash=artifact.identity_hash,
+        sampler_id=f'{declaration.task_id}/uniform_xy', sampler_version='pcg64-v0', task_seed=seed,
+        joint_position=dict(initial.joint_position), poses_world={declaration.object_id: pose},
+        velocity_policy='zero_named_joint_and_entity_velocities',
+        control_policy='arm_targets_at_initial_joints_gripper_open', settle_steps=0,
+    )
 
 
 @register_env()
-class MarkerHeightEnv(DeclaredPandaBoxEnv):
+class MarkerHeightEnv(SelectedReferenceEnv):
     """Observe a movable marker and report whether it reaches a height."""
+
+    uses_selected_public_config = True
+    selected_controller_profiles = frozenset()
+    selected_parameter_limits = {}
+    selected_supports_isaac = False
+
+    @classmethod
+    def selected_default_config(cls, task_config=None):
+        d = cls.declaration()
+        return resolve_env_config(
+            task_uid=d.task_id, scene_uid='tabletop-v1', agent_uids=('panda-v1',),
+            object_uids=('cube-v1',), success_definition=d.success_definition,
+            runtime={'backend': 'cpu', 'physics_dt': d.timebase.physics_dt,
+                     'control_substeps': d.timebase.control_substeps, 'prewarm': False},
+            robot={'controller': {'kind': 'absolute_pose', 'reference': 'world',
+                                  'rotation_representation': 'quaternion_wxyz'}},
+            observation={'schema_version': 'task-env-state-v2', 'include_privileged_state': True},
+            render={'camera_obs': False}, episode={'horizon': 6000},
+        )
+
+    @staticmethod
+    def selected_default_controller_profile(task_config=None):
+        return None
+
+    @classmethod
+    def selected_binding(cls, config, *, robot=None):
+        declaration = cls.declaration()
+        if declaration.task_id != cls.uid:
+            raise ValueError('registered UID and declared task identity differ')
+        return ReferenceTaskBinding.from_provider_free_compiler(
+            partial(compile_panda_box_task, declaration, config=config.environment, robot=robot,
+                    controller_factory=ProductionCanonicalPandaController.from_source),
+            task_id=declaration.task_id,
+            construction_schema='declared-panda-box-construction-v1',
+            metadata={'object_id': declaration.object_id},
+            reset_sample=partial(_sample_box_reset, declaration),
+            evaluate=cls.evaluate_task,
+            object_poses=((declaration.object_id, declaration.object_id.replace('-', '_')),),
+            scalar_control_binding=panda_reference_control_binding(),
+            external_actions=True, interval_mode='grouped', recorder_mode='canonical',
+            **reference_pose_action_binding(), **selected_observation_binding(),
+        )
 
     uid = 'marker-height-example-v1'
 
@@ -38,8 +113,3 @@ class MarkerHeightEnv(DeclaredPandaBoxEnv):
         return TaskEvaluation(float(success), success, False,
                               {'marker_height_m': height, 'task_success': success},
                               {'height': float(success)})
-
-
-def make_marker_env(*, config=None):
-    """Construct the registered task through the public Core entry point."""
-    return make_registered_env(MarkerHeightEnv.uid, config=config)

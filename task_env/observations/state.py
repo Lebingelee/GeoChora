@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import OrderedDict
 
 import numpy as np
-from gymnasium.spaces import Box, Dict
+from ..environment.gym_compat import Box, Dict
 
 from ..environment import (
     ObservationConfig,

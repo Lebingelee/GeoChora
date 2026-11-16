@@ -141,6 +141,7 @@ def _home_equality_scenario(source_path: Path) -> dict:
 
 
 def build(suffix: str = "001") -> Path:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     if not suffix.isdigit() or len(suffix) != 3:
         raise ValueError("source-comparison suffix must be a three-digit number")
     run_id = f"DG02_P3_GEOPHYS_MJCF_USD_PUBLIC_SOURCE_PAIR_{suffix}"
@@ -174,7 +175,7 @@ def build(suffix: str = "001") -> Path:
     provider_branch = git("-C", str(PROVIDER), "branch", "--show-current")
     if provider_branch != "codex/phase-ii-01-f05-geophys":
         raise RuntimeError("GeoPhys is not on the isolated F05 provider branch")
-    lock_stream = LOCK.open("a+")
+    lock_stream = LOCK.open("r+")
     try:
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

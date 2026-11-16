@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from gymnasium.spaces import Box
+from ..environment.gym_compat import Box
 
 from ..assembly import AgentReferences
 from ..environment import (

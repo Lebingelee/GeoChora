@@ -7,6 +7,27 @@ from typing import Any
 from ..environment import ResolvedEnvConfig
 
 
+_DEVICE_PROVIDER_TYPES = {
+    'mujoco_warp': ('task_env.runtime.providers.mujoco_warp.batch',
+                    'MuJoCoWarpBatchSession', 'MuJoCoWarpNativeBatch'),
+    'geophys': ('task_env.runtime.providers.geophys.device_batch',
+                'GeoPhysDeviceBatchSession', 'GeoPhysNativeBatch'),
+    'isaacsim': ('task_env.runtime.providers.isaac.batch',
+                 'IsaacDeviceBatchSession', 'IsaacNativeBatch'),
+}
+
+
+def load_device_provider(provider: str, *, worker: bool = False):
+    """Resolve one admitted provider implementation without importing its SDK."""
+    from importlib import import_module
+
+    try:
+        module_name, session_name, worker_name = _DEVICE_PROVIDER_TYPES[provider]
+    except KeyError as error:
+        raise ValueError(f'no device batch implementation for provider {provider!r}') from error
+    return getattr(import_module(module_name), worker_name if worker else session_name)
+
+
 def make_batch_runtime(
     *,
     compiled_scene: object,

@@ -88,6 +88,9 @@ def test_supervisor_preserves_worker_compilation_identity(tmp_path, monkeypatch)
 
     monkeypatch.setattr(validation, 'CORE', tmp_path)
     monkeypatch.setenv('GEOCHORA_NATIVE_LOCK', str(tmp_path / 'native.lock'))
+    (tmp_path / 'native.lock').touch()
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'native.lock')
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', tmp_path / 'absent' / 'legacy.lock')
     spec = BuiltinPickCubeExampleV1.load(
         Path(__file__).resolve().parents[3] / 'examples/tasks/pick_cube_harness.json'
     )
@@ -116,6 +119,12 @@ def test_supervisor_preserves_worker_compilation_identity(tmp_path, monkeypatch)
     assert row['worker_process_group_ended'] is True
 
 
+def _solution_value():
+    """Core-owned Solution factory shape: the caller constructs and resets it."""
+    solution = SimpleNamespace(identity='solution', reset=lambda *_args: None)
+    return {'solution_factory': lambda: solution, 'solution_identity': 'solution'}
+
+
 @pytest.mark.parametrize('actual_seed', (31, 32))
 def test_oracle_binds_position_recording_without_mixed_control_metadata(tmp_path, actual_seed):
     import oracle_candidate as oracle
@@ -131,9 +140,9 @@ def test_oracle_binds_position_recording_without_mixed_control_metadata(tmp_path
             self.value = {'f06_pickcube_isaac_input': SimpleNamespace(
                 execution=execution, delivery_manifest_sha256='manifest'),
                 'reset_plan': SimpleNamespace(identity_hash='reset', reset_sample=sample),
-                'source': source}
+                'source': source, **_solution_value()}
             self.controller = SimpleNamespace(identity='controller')
-            self.solution = SimpleNamespace(identity='solution')
+            self.metadata = {}
             self.execution_fault = None
 
         def reset(self, **_kwargs):
@@ -153,7 +162,7 @@ def test_oracle_binds_position_recording_without_mixed_control_metadata(tmp_path
             events.append('close')
 
     compiled = SimpleNamespace(env_class=lambda: Env, backend='cuda', device='cuda:0')
-    with patch('examples._common.run_expert', return_value={'status': 'FAIL', 'transitions': 1}), \
+    with patch('examples._common.run_caller_solution', return_value={'status': 'FAIL', 'transitions': 1}), \
          patch('examples._common.identity_summary', return_value={}):
         facts = oracle.record_episode(compiled, SimpleNamespace(horizon=5), provider='isaacsim',
                                       seed=31, h5=tmp_path / 'episode.h5', deadline=time.perf_counter() + 10)
@@ -183,11 +192,11 @@ def test_oracle_finalizes_position_with_the_public_lifecycle_reason(tmp_path, ou
     class Env:
         position_profile = True
         controller = SimpleNamespace(identity='controller')
-        solution = SimpleNamespace(identity='solution')
         execution_fault = None
+        metadata = {}
 
         def __init__(self, **_kwargs):
-            pass
+            self.value = _solution_value()
 
         def reset(self, **_kwargs):
             return {}, {}
@@ -208,7 +217,7 @@ def test_oracle_finalizes_position_with_the_public_lifecycle_reason(tmp_path, ou
             pass
 
     compiled = SimpleNamespace(env_class=lambda: Env, backend='cpu', device='cpu')
-    with patch('examples._common.run_expert', return_value=summary), \
+    with patch('examples._common.run_caller_solution', return_value=summary), \
          patch('examples._common.identity_summary', return_value={}):
         facts = oracle.record_episode(compiled, SimpleNamespace(horizon=1), provider='mujoco',
                                       seed=0, h5=tmp_path / 'episode.h5', deadline=time.perf_counter() + 10)

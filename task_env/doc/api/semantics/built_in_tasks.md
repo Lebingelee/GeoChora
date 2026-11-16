@@ -27,7 +27,10 @@ no policy-checkpoint inference or new P1.6 qualification is implied.
 Public construction uses `make_env("nut-assembly-outcome-reference-v1",
 config=...)`. The registered class is `NutAssemblyReferenceEnv` in
 `nut_assembly/task.py`; the task owns one selected guarded expert and
-Outcome Completion V1. It advances only through `step_expert()`.
+Outcome Completion V1. The ordinary example uses a caller-owned Solution and
+`act → step(action) → observe`, with a source-bound action and five native
+feedback samples. Arbitrary unguarded arrays remain unsupported; full physical
+success on this new route has not yet been verified.
 
 Its canonical artifact remains
 `nut-assembly-square-v1/p1_8_e/nominal-v1` with identity
@@ -44,20 +47,20 @@ not as interchangeable environment constructors.
 
 ## Generic Pendulum and TwoWheel tasks
 
-`PendulumEnv` and `TwoWheelBalanceEnv` remain generic Core environments with
-their existing task definitions, lifecycle semantics, and optional registered
-batch routes. Pendulum is the only route used by the current bounded
-`merged_scene`, SB3 and rasterizer examples. Those smokes do not qualify general
-learning, rendering, or GeoPhys Rigid Batch capability.
+`EmptyTaskEnv`, `PendulumEnv` and `TwoWheelBalanceEnv` have their own task
+semantics. Empty has no task action dimensions; Pendulum and TwoWheel use one
+and two torque inputs respectively. Pendulum and TwoWheel use their declared
+Robot and Controller in the formal scalar environment. Their obsolete parallel
+registrations have been retired; unified batch construction is deferred to G06.
 
 ## `PendulumEnv` and `PendulumTaskDefinition`
 
 **Kind**：class / dataclass；**Defined in**：`tasks/pendulum.py`
 
-Pendulum 是无 robot agent 的单铰链 TaskEnv。raw native action 为
+Pendulum 是具有单铰链 Robot 的 TaskEnv。raw native action 为
 `Dict({"torque": Box(shape=(1,), dtype=float32, low=-2.0, high=2.0)})`，对应树路径 `action/torque`，直接对应
 `pendulum_torque` actuator。raw observation 为 `Dict({"state": Dict({"proprioception": Box(3)})})`，对应
-`obs/state/proprioception`。它通过 `PendulumTorqueActionAdapter` 接入中性 action seam；native action 的数值
+`obs/state/proprioception`。它通过声明的 Robot、Controller 和共同控制提交链施加力矩；native action 的数值
 同时作为该 task family 的 generic `universal_action`，不伪装成 Panda 八维 schema。
 
 state-only observation 的 leaf schema 是 `task-env-pendulum-state-v1`，leaf shape 为 `(3,)`，严格顺序为
@@ -72,31 +75,16 @@ actuator interpretation、task family 和 schema version；对应 reference prof
 fall failure，未成功 episode 由 horizon 产生 `truncated`。reward 由 upright、angular-velocity cost、torque
 cost 和 success term 组成。固定 action sequence 的物理语义由同一 inline MJCF 的 MuJoCo reference smoke 对照。
 
-### Pendulum optional batch capability
+### Batch capability
 
-Pendulum 与 TwoWheel 都同时注册在 `ENV_REGISTRY` 与 `PARALLEL_ENV_REGISTRY`。Pendulum 的 single 路径仍为
-`make_env("pendulum-v1") -> BaseTaskEnv -> PendulumTaskDefinition`；parallel 路径为
-`make_parallel_env("pendulum-v1") -> HomogeneousVectorTaskEnv -> BatchTaskLifecycleAdapter ->
-environment.TaskLifecycleAdapter`。
-两条路径共享 `PendulumTaskSemantics` 的 observation leaf 顺序、reward terms、success window、horizon、reset
-采样和 action bounds。当前 Pendulum batch 由 `SceneBatchRuntime` 提供 `BatchState`、`BatchDiagnostics`、
-`BatchResetResult` 和 `BatchStepResult`；`PendulumBatchRuntime` 仅保留旧导入兼容名，上层不解释 kernel 或
-positional readback。S4 已在 public `develop` 退休 GeoChora-owned `StaticTemplateBatchRuntime` route；
-`merged_scene` 是当前唯一的 TaskEnv batch physics factory route，候选尚未集成到 public `develop`。
-
-batch task 的公共任务语义由 `environment.TaskLifecycleAdapter` 与其 batch runtime 子适配器共同处理；task
-definition 只提供统一 `TaskStateView` 上的 reset/evaluate、observation projection 与 action semantics。
-controller 选择仍属于公共 configuration、`BaseTaskEnv` 与
-robot/controller 层，不成为 task-specific batch hook。
-
-PickCube、NutAssembly、Tabletop scene 以及尚无 batch backend 的其他 task 不会通过 parallel factory 创建；它们继续
-使用 single `make_env`/scene composition contract。
+Pendulum 与 TwoWheel 的旧 parallel 注册及 component 工厂已退出；这两项目前不通过旧
+`make_parallel_env` 路线创建。G06 将基于正式 Task／Robot／Controller 构建合同实现并验证并行能力。
 
 ## `TwoWheelBalanceEnv` and `TwoWheelBalanceTaskDefinition`
 
 **Kind**：class / dataclass；**Defined in**：`tasks/two_wheel_balance.py`
 
-双轮平衡车同样不拥有 robot agent，但用于验证多 actuator native action。raw action 为
+双轮平衡车具有声明式 Robot，用于验证多 actuator native action。raw action 为
 `Dict({"torque": Box(shape=(2,), dtype=float32, low=-1.5, high=1.5)})`，对应树路径 `action/torque`，组件顺序
 固定为 `left_wheel_torque, right_wheel_torque`，单位为 `N*m`；adapter 只写入对应的左右 wheel actuator，并
 把完整两维 native vector 作为该 task family 的 generic `universal_action`。

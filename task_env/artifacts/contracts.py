@@ -139,6 +139,55 @@ class Contract:
         return {f.name: _encode(getattr(self, f.name)) for f in fields(self)}
 
 
+_NOT_IMMUTABLE = object()
+
+
+def _immutable_contract_snapshot(value):
+    """Snapshot recognized frozen values; reject unknown mutable containers.
+
+    The snapshot is checked at every access, including against deliberate
+    mutation through Python's low-level dataclass bypasses. It avoids repeated
+    JSON encoding and hashing, not traversal of the static value tree.
+    """
+    if type(value) is float:
+        # Python compares -0.0 and 0.0 equal, but canonical JSON distinguishes
+        # their encodings, so equality of numeric values is insufficient here.
+        return ('float', value.hex())
+    if value is None or type(value) in (str, bool, int):
+        return (type(value).__name__, value)
+    if type(value) is tuple:
+        values = tuple(_immutable_contract_snapshot(item) for item in value)
+        return _NOT_IMMUTABLE if _NOT_IMMUTABLE in values else ('tuple', values)
+    if type(value) is MappingProxyType:
+        values = tuple((_immutable_contract_snapshot(key), _immutable_contract_snapshot(item))
+                       for key, item in sorted(value.items()))
+        return (_NOT_IMMUTABLE if any(key is _NOT_IMMUTABLE or item is _NOT_IMMUTABLE
+                                     for key, item in values) else ('mapping', values))
+    value_type = type(value)
+    if (isinstance(value, Contract) and value_type.__module__ == __name__
+            and globals().get(value_type.__name__) is value_type
+            and getattr(value_type, '__post_init__', None) is Contract.__post_init__
+            and getattr(value_type, '__dataclass_params__', None) is not None
+            and value_type.__dataclass_params__.frozen):
+        values = tuple(_immutable_contract_snapshot(getattr(value, item.name)) for item in fields(value))
+        return _NOT_IMMUTABLE if _NOT_IMMUTABLE in values else (value_type, values)
+    return _NOT_IMMUTABLE
+
+
+def _artifact_identity(artifact):
+    snapshot = _immutable_contract_snapshot(artifact)
+    cached = artifact.__dict__.get('_immutable_identity_hash')
+    if snapshot is not _NOT_IMMUTABLE and cached is not None and cached[0] == snapshot:
+        return cached[1]
+    canonical = json.dumps(artifact.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+    result = hashlib.sha256(canonical.encode()).hexdigest()
+    if snapshot is not _NOT_IMMUTABLE:
+        object.__setattr__(artifact, '_immutable_identity_hash', (snapshot, result))
+    else:
+        artifact.__dict__.pop('_immutable_identity_hash', None)
+    return result
+
+
 @dataclass(frozen=True)
 class PoseWorld(Contract):
     position: tuple[float, float, float]
@@ -1167,20 +1216,23 @@ class ActionIntent(Contract):
     controller_target: str
 
     def validate(self):
-        _choice(self.mode, {'absolute_pose', 'delta_pose', 'absolute_joint'}, 'action mode')
+        _choice(self.mode, {'absolute_pose', 'delta_pose', 'absolute_joint', 'direct_joint_effort'}, 'action mode')
         # Compatibility source: Core ActionModeSpec.__post_init__.
         allowed_references = {
             'absolute_joint': {None},
+            'direct_joint_effort': {None},
             'absolute_pose': {'world', 'base'},
             'delta_pose': {'world', 'base', 'ee'},
         }
         _choice(self.reference, allowed_references[self.mode], 'action reference')
         _choice(self.rotation_representation, {'quaternion_wxyz', 'rotvec', 'none'}, 'rotation')
-        if self.mode == 'absolute_joint' and self.rotation_representation != 'none':
+        if self.mode in {'absolute_joint', 'direct_joint_effort'} and self.rotation_representation != 'none':
             raise ValueError('joint action has no rotation representation')
-        if self.mode != 'absolute_joint' and self.rotation_representation == 'none':
+        if self.mode not in {'absolute_joint', 'direct_joint_effort'} and self.rotation_representation == 'none':
             raise ValueError('pose action requires rotation representation')
-        _choice(self.controller_target, {'arm_joint_position_and_gripper'}, 'controller target')
+        expected_target = ('joint_effort' if self.mode == 'direct_joint_effort'
+                           else 'arm_joint_position_and_gripper')
+        _choice(self.controller_target, {expected_target}, 'controller target')
 
 
 @dataclass(frozen=True)
@@ -1341,8 +1393,7 @@ class TaskArtifact(Contract):
 
     @property
     def identity_hash(self):
-        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
-        return hashlib.sha256(canonical.encode()).hexdigest()
+        return _artifact_identity(self)
 
 
 @dataclass(frozen=True)
@@ -1527,8 +1578,7 @@ class TaskArtifactV1(Contract):
 
     @property
     def identity_hash(self):
-        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
-        return hashlib.sha256(canonical.encode()).hexdigest()
+        return _artifact_identity(self)
 
     @property
     def task_source_mapping(self) -> Mapping:
@@ -1675,10 +1725,55 @@ class ExecutionSpecV1(Contract):
         return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def decode_execution_spec(values: Mapping | ExecutionSpec | ExecutionSpecV1) -> ExecutionSpec | ExecutionSpecV1:
-    """Dispatch only exact legacy-v0 (missing discriminator) or declared v1 mappings."""
 
-    if isinstance(values, (ExecutionSpec, ExecutionSpecV1)):
+@dataclass(frozen=True)
+class ExecutionSpecV2(Contract):
+    """Layered selection; unknown future build facts remain explicit."""
+
+    schema_version: str
+    physics_provider: str
+    physics_backend: str
+    physics_device: str
+    physics_profile: str
+    provider_seed: int | None
+    determinism_mode: str
+    render_default: RendererSelectionV1
+    host: str
+    engine: str
+    solver_family: str
+    solver_algorithm: str
+    coupler: str
+    batch_layout: str
+    deployment: str
+    interpreter: str | None
+    native_dt: float | None
+
+    def validate(self):
+        _choice(self.schema_version, {'execution-spec-v2'}, 'execution schema')
+        for value in (self.physics_provider, self.physics_backend, self.physics_device,
+                      self.physics_profile, self.host, self.engine, self.solver_family,
+                      self.solver_algorithm, self.coupler):
+            _name(value)
+        if self.provider_seed is not None and self.provider_seed < 0:
+            raise ValueError('provider seed must be nonnegative or unknown')
+        _choice(self.determinism_mode, {'strict', 'best_effort', 'none', 'unknown'}, 'determinism')
+        _choice(self.batch_layout, {'scalar', 'native_batch'}, 'batch layout')
+        _choice(self.deployment, {'in_process', 'isolated_worker'}, 'deployment')
+        if self.interpreter is not None and not self.interpreter.strip():
+            raise ValueError('deployment interpreter must be nonempty or unknown')
+        if self.native_dt is not None and self.native_dt <= 0:
+            raise ValueError('native dt must be positive or unknown')
+
+    @property
+    def identity_hash(self) -> str:
+        payload = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def decode_execution_spec(values: Mapping | ExecutionSpec | ExecutionSpecV1 | ExecutionSpecV2) -> ExecutionSpec | ExecutionSpecV1 | ExecutionSpecV2:
+    """Dispatch exact legacy-v0 or explicitly versioned execution mappings."""
+
+    if isinstance(values, (ExecutionSpec, ExecutionSpecV1, ExecutionSpecV2)):
         return values
     if not isinstance(values, Mapping):
         raise TypeError('execution spec decoder requires a validated spec or mapping')
@@ -1687,6 +1782,8 @@ def decode_execution_spec(values: Mapping | ExecutionSpec | ExecutionSpecV1) -> 
         return ExecutionSpec.from_mapping(values)
     if version == 'execution-spec-v1':
         return ExecutionSpecV1.from_mapping(values)
+    if version == 'execution-spec-v2':
+        return ExecutionSpecV2.from_mapping(values)
     raise ValueError(f'unsupported execution spec schema: {version!r}')
 
 
@@ -1736,6 +1833,113 @@ class ProviderCapabilityManifest(Contract):
 
         payload = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
         return hashlib.sha256(payload.encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class CapabilityAssessmentRowV1(Contract):
+    """One request-specific fact; provider, adapter and evidence are separate."""
+    schema_version: str
+    capability_id: str
+    object_ref: str
+    requiredness: str
+    provider_api: str
+    core_adapter: str
+    dependency: str
+    evidence: str
+    phase: str
+    reason: str
+    evidence_ref: str | None
+    build_oracle: str | None
+    caller_restriction: str = 'none'
+    requirement_status: str = 'satisfied'
+
+    def validate(self):
+        _choice(self.schema_version, {'capability-assessment-row-v1'}, 'assessment row schema')
+        for item in (self.capability_id, self.object_ref):
+            _name(item)
+        _choice(self.requiredness, {'required', 'optional'}, 'requiredness')
+        _choice(self.provider_api, {'supported', 'unsupported', 'unknown'}, 'provider API status')
+        _choice(self.core_adapter, {'implemented', 'not_implemented', 'unknown'}, 'adapter status')
+        _choice(self.dependency, {'available', 'unavailable', 'unknown'}, 'dependency status')
+        _choice(self.evidence, {'none', 'bounded_execution', 'qualified'}, 'evidence status')
+        _choice(self.phase, {'declaration', 'static_preflight', 'native_build', 'runtime'}, 'assessment phase')
+        _choice(self.caller_restriction, {'none', 'denied'}, 'caller restriction')
+        _choice(self.requirement_status, {'satisfied', 'unsatisfied', 'unknown'}, 'requirement status')
+        if not self.reason.strip():
+            raise ValueError('assessment reason is required')
+        if self.build_oracle is not None:
+            _name(self.build_oracle)
+        if self.evidence != 'none' and not self.evidence_ref:
+            raise ValueError('bounded or qualified evidence requires a reference')
+
+
+# These are concrete source-to-native layout checks called by the adapters.
+# A caller-provided string is never executed; only matching object/capability
+# pairs produced by the Core assessment can be provisional.
+_LAYOUT_CHECKS = frozenset({
+    'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+    'task_env.runtime.sessions.geophys:check_geophys_named_layout',
+    'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
+})
+_LAYOUT_CAPABILITY_PREFIXES = {
+    'joint_state_query': ('joint:', 'state:joint:'),
+    'free_body': ('free:',),
+    'body_pose_query': ('body:',),
+    'frame_pose_query': ('frame:', 'state:frame:'),
+    'joint_position_actuation': ('actuator:',),
+    'joint_torque_actuation': ('actuator:',),
+}
+
+
+def _layout_check_covers_row(row):
+    prefixes = _LAYOUT_CAPABILITY_PREFIXES.get(row.capability_id, ())
+    if not row.object_ref.startswith(prefixes):
+        return False
+    if row.object_ref.startswith('state:'):
+        parts = row.object_ref.rsplit(':', 3)
+        if len(parts) != 4 or not all(parts):
+            return False
+        field = parts[1]
+        return ((row.capability_id == 'joint_state_query' and field in {'joint_position', 'joint_velocity'})
+                or (row.capability_id == 'frame_pose_query' and field == 'frame_pose_world'))
+    return any(row.object_ref.startswith(prefix) and len(row.object_ref) > len(prefix)
+               for prefix in prefixes)
+
+
+@dataclass(frozen=True)
+class CapabilityAssessmentV1(Contract):
+    schema_version: str
+    request_identity: str
+    phase: str
+    rows: tuple[CapabilityAssessmentRowV1, ...]
+
+    def validate(self):
+        _choice(self.schema_version, {'capability-assessment-v1'}, 'assessment schema')
+        if not _SHA256.fullmatch(self.request_identity):
+            raise ValueError('assessment requires a request SHA-256')
+        _choice(self.phase, {'declaration', 'static_preflight', 'native_build', 'runtime'}, 'assessment phase')
+        keys = [(row.capability_id, row.object_ref) for row in self.rows]
+        if len(keys) != len(set(keys)):
+            raise ValueError('duplicate capability assessment object')
+        if any(row.phase != self.phase for row in self.rows):
+            raise ValueError('assessment row phase mismatch')
+
+    @property
+    def decision(self):
+        pending = False
+        for row in self.rows:
+            if row.requiredness == 'optional':
+                continue
+            if (row.provider_api == 'unsupported' or row.core_adapter != 'implemented'
+                    or row.dependency != 'available' or row.caller_restriction == 'denied'
+                    or row.requirement_status == 'unsatisfied'):
+                return 'rejected'
+            if row.provider_api == 'unknown' or row.requirement_status == 'unknown':
+                if (self.phase in {'native_build', 'runtime'} or row.build_oracle not in _LAYOUT_CHECKS
+                        or not _layout_check_covers_row(row)):
+                    return 'rejected'
+                pending = True
+        return 'pending_native_build' if pending else 'static_admitted'
 
 
 class CapabilityAdmissionError(ValueError):

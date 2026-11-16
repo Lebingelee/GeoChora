@@ -1,6 +1,6 @@
-"""Run one small SB3 PPO update through the existing Pendulum runner.
+"""Historical small SB3 PPO example through the Pendulum runner.
 
-This is an executable CPU smoke, not a learning or convergence qualification.
+The current formal Pendulum has no batch adapter, so this route is unavailable.
 The training loop, batch adapter, checkpoint format and return-curve writer
 remain owned by ``task_env.script.rl.pendulum_ppo``.
 """

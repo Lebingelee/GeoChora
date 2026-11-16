@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import signal
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -15,6 +16,359 @@ if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
 from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+
+
+def test_native_lock_alias_contends_with_legacy_inode(tmp_path, monkeypatch):
+    import fcntl
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
+    with legacy.open('r+') as existing:
+        fcntl.flock(existing, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with validation._open_shared_native_lock() as alias:
+            assert validation._lock_matches_legacy(alias)
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(alias, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(existing, fcntl.LOCK_UN)
+    with validation._open_shared_native_lock() as alias:
+        fcntl.flock(alias, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(alias, fcntl.LOCK_UN)
+
+
+def test_native_lock_alias_rejects_different_inode(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    alias = tmp_path / 'alias.lock'
+    legacy.touch()
+    alias.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', alias)
+    with pytest.raises(RuntimeError, match='does not match legacy lock'):
+        validation._open_shared_native_lock()
+
+
+def test_native_lock_alias_detects_legacy_replacement(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
+    with validation._open_shared_native_lock() as alias:
+        assert validation._lock_matches_legacy(alias)
+        replacement = tmp_path / 'replacement.lock'
+        replacement.touch()
+        replacement.replace(legacy)
+        assert not validation._lock_matches_legacy(alias)
+
+
+def test_native_lock_works_without_legacy_but_never_creates_canonical(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    legacy, canonical = tmp_path / 'legacy', tmp_path / 'canonical'
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', canonical)
+    with pytest.raises(FileNotFoundError):
+        validation._open_shared_native_lock()
+    assert not legacy.exists() and not canonical.exists()
+    canonical.touch()
+    with validation._open_shared_native_lock() as lock:
+        assert validation._lock_matches_legacy(lock)
+        assert not validation._lock_matches_legacy(lock, require_legacy=True)
+    assert not legacy.exists()
+
+
+def test_canonical_replacement_is_detected(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    canonical, replacement = tmp_path / 'canonical', tmp_path / 'replacement'
+    canonical.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', tmp_path / 'missing-legacy')
+    monkeypatch.setattr(validation, 'LOCK', canonical)
+    with validation._open_shared_native_lock() as lock:
+        replacement.touch()
+        replacement.replace(canonical)
+        assert not validation._lock_matches_legacy(lock)
+
+
+def test_replaced_lock_retires_running_worker(tmp_path, monkeypatch):
+    import os
+    import builtin_example_validation as validation
+
+    canonical = tmp_path / 'native.lock'
+    canonical.touch()
+    monkeypatch.setattr(validation, 'CORE', tmp_path)
+    monkeypatch.setattr(validation, 'LOCK', canonical)
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', tmp_path / 'missing-legacy')
+    monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
+    monkeypatch.setattr(validation, '_geophys_source', lambda: tmp_path)
+    monkeypatch.setattr(validation, '_cold_read_h5', lambda *args, **kwargs: None)
+    original_popen = subprocess.Popen
+    workers = []
+
+    def start_worker(*args, **kwargs):
+        worker = original_popen([sys.executable, '-c', 'import time; time.sleep(60)'],
+                                start_new_session=True, preexec_fn=kwargs['preexec_fn'])
+        workers.append(worker)
+        replacement = tmp_path / 'replacement'
+        replacement.touch()
+        replacement.replace(canonical)
+        return worker
+
+    monkeypatch.setattr(validation.subprocess, 'Popen', start_worker)
+    spec, catalog, scope = (tmp_path / name for name in ('spec.json', 'catalog.json', 'scope.json'))
+    spec.write_text(json.dumps(_spec().to_dict()))
+    catalog.write_text('{}')
+    scope.write_text(json.dumps(ExampleWorkingTreeScopeV1(
+        'harness-example-working-tree-scope-v1', ()).to_dict()))
+    result = validation._run_one(spec, catalog, scope, 31, tmp_path / 'output', provider='mujoco')
+    assert result['status'] == 'INVALID'
+    assert result['resource_violation'] == 'shared native lock path changed during worker execution'
+    assert len(workers) == 1 and workers[0].poll() is not None
+    with pytest.raises(ProcessLookupError):
+        os.killpg(workers[0].pid, 0)
+
+
+def test_supervised_worker_uses_isolated_cwd(tmp_path):
+    import os
+    import builtin_example_validation as validation
+
+    with validation._supervised_worker(
+        [sys.executable, '-c', "from pathlib import Path; Path('worker-cwd.txt').write_text('ok')"],
+        environment=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        cwd=tmp_path,
+    ) as (worker, _state):
+        assert worker.wait(timeout=10) == 0
+    assert (tmp_path / 'worker-cwd.txt').read_text() == 'ok'
+
+
+def test_isaac_dependency_overlay_rejects_python_version_mismatch(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    replies = iter(({'version': [3, 12], 'purelib': '/core'},
+                    {'version': [3, 11], 'purelib': '/isaac'}))
+    monkeypatch.setattr(validation.subprocess, 'check_output', lambda *args, **kwargs: json.dumps(next(replies)))
+    with pytest.raises(ValueError, match='versions differ'):
+        validation._isaac_dependency_overlay(tmp_path / 'isaac', tmp_path)
+    assert not (tmp_path / 'isaac_dependency_overlay').exists()
+
+
+def test_isaac_worker_output_allows_only_run_owned_overlay(tmp_path, monkeypatch):
+    import builtin_example_worker as worker
+
+    overlay = tmp_path / 'isaac_dependency_overlay'
+    overlay.mkdir()
+    (tmp_path / 'isaac_dependency_overlay.json').write_text('{}')
+    monkeypatch.setattr(worker, '_ISAAC_SITE', str(overlay))
+    assert worker._prepare_output_directory(tmp_path) == tmp_path
+    unexpected = tmp_path / 'unexpected'
+    unexpected.touch()
+    with pytest.raises(FileExistsError, match='unexpected'):
+        worker._prepare_output_directory(tmp_path)
+
+
+def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkeypatch):
+    import fcntl
+    import os
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
+    spec = tmp_path / 'spec.json'
+    spec.write_text(json.dumps(_spec().to_dict()))
+    catalog = tmp_path / 'catalog.json'
+    catalog.write_text('{}')
+    scope = tmp_path / 'scope.json'
+    scope.write_text(json.dumps(ExampleWorkingTreeScopeV1(
+        'harness-example-working-tree-scope-v1', ()).to_dict()))
+    monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
+    monkeypatch.setattr(validation, '_proc_rss_tree', lambda pid: 0)
+    monkeypatch.setenv('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY', '/not/a/cpu/dependency')
+    monkeypatch.setattr(validation, '_directory_bytes', lambda path: (_ for _ in ()).throw(
+        RuntimeError('synthetic monitor failure')))
+    original_popen = subprocess.Popen
+    launched = []
+
+    def spawn_synthetic_worker(*args, **kwargs):
+        assert 'GEOCHORA_ISAAC_DEPENDENCY_OVERLAY' not in kwargs['env']
+        worker = original_popen([sys.executable, '-c', 'import time; time.sleep(60)'],
+                                start_new_session=True, preexec_fn=kwargs['preexec_fn'])
+        launched.append(worker)
+        return worker
+
+    monkeypatch.setattr(validation.subprocess, 'Popen', spawn_synthetic_worker)
+    with pytest.raises(RuntimeError, match='synthetic monitor failure'):
+        validation._run_one(spec, catalog, scope, 31, tmp_path / 'output', provider='mujoco')
+    assert len(launched) == 1 and launched[0].poll() is not None
+    with pytest.raises(ProcessLookupError):
+        os.killpg(launched[0].pid, 0)
+    with legacy.open('r+') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def test_forced_group_retirement_invalidates_harness_result(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'CORE', tmp_path)
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
+    monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
+    monkeypatch.setattr(validation, '_geophys_source', lambda: tmp_path)
+    monkeypatch.setattr(validation, '_cold_read_h5', lambda *args, **kwargs: None)
+    output = tmp_path / 'output'
+
+    @contextmanager
+    def completed_worker(*args, **kwargs):
+        (output / 'run.json').write_text(json.dumps({'runtime_valid': True}))
+        state = {'forced_retirement': False}
+        yield SimpleNamespace(poll=lambda: 0, wait=lambda: 0), state
+        state['forced_retirement'] = True
+
+    monkeypatch.setattr(validation, '_supervised_worker', completed_worker)
+    spec = tmp_path / 'spec.json'
+    spec.write_text(json.dumps(_spec().to_dict()))
+    catalog = tmp_path / 'catalog.json'
+    catalog.write_text('{}')
+    scope = tmp_path / 'scope.json'
+    scope.write_text(json.dumps(ExampleWorkingTreeScopeV1(
+        'harness-example-working-tree-scope-v1', ()).to_dict()))
+    result = validation._run_one(spec, catalog, scope, 31, output, provider='mujoco')
+    assert result['status'] == 'INVALID'
+    assert result['runtime_valid'] is False
+    assert result['resource_violation'] == 'worker process group required forced retirement'
+
+
+@pytest.mark.parametrize('termination_signal', [signal.SIGTERM, signal.SIGHUP])
+def test_termination_signal_retires_synthetic_worker_before_unlock(tmp_path, termination_signal):
+    import fcntl
+    import os
+    import signal
+    import time
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    alias = tmp_path / 'locks' / 'native.lock'
+    alias.parent.mkdir()
+    os.link(legacy, alias)
+    pid_file = tmp_path / 'worker.pid'
+    script = '''
+import fcntl, os, pathlib, sys, time
+sys.path.insert(0, sys.argv[1])
+import builtin_example_validation as v
+v.LEGACY_LOCK = pathlib.Path(sys.argv[2])
+v.LOCK = pathlib.Path(sys.argv[3])
+with v._open_shared_native_lock() as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with v._supervised_worker([sys.executable, '-c', 'import time; time.sleep(60)'],
+                              environment=os.environ.copy(), stdout=None, stderr=None) as (worker, state):
+        pathlib.Path(sys.argv[4]).write_text(str(worker.pid))
+        time.sleep(60)
+'''
+    supervisor = subprocess.Popen([sys.executable, '-B', '-c', script, str(AGENT_DIR),
+                                   str(legacy), str(alias), str(pid_file)],
+                                  start_new_session=True)
+    worker_pid = None
+    try:
+        deadline = time.monotonic() + 10
+        while not pid_file.exists() and supervisor.poll() is None and time.monotonic() < deadline:
+            time.sleep(.05)
+        assert pid_file.is_file(), 'synthetic worker did not start'
+        worker_pid = int(pid_file.read_text())
+        supervisor.send_signal(termination_signal)
+        assert supervisor.wait(timeout=10) == 128 + termination_signal
+        with pytest.raises(ProcessLookupError):
+            os.killpg(worker_pid, 0)
+        with legacy.open('r+') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, fcntl.LOCK_UN)
+    finally:
+        if supervisor.poll() is None:
+            supervisor.kill()
+            supervisor.wait()
+        if worker_pid is not None:
+            try:
+                os.killpg(worker_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+@pytest.mark.parametrize('termination_signal', [signal.SIGTERM, signal.SIGHUP, signal.SIGKILL])
+def test_detached_runtime_keeps_lock_after_supervisor_death(tmp_path, termination_signal):
+    import fcntl
+    import os
+    import time
+
+    legacy, canonical = tmp_path / 'legacy', tmp_path / 'canonical'
+    canonical.touch()
+    os.link(canonical, legacy)
+    worker_pid, runtime_pid = tmp_path / 'worker.pid', tmp_path / 'runtime.pid'
+    worker_code = r'''import os,pathlib,subprocess,sys,time
+fd=int(os.environ['GEOCHORA_SUPERVISED_NATIVE_LOCK_FD'])
+child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],
+                       pass_fds=(fd,),start_new_session=True)
+pathlib.Path(sys.argv[1]).write_text(str(os.getpid()))
+pathlib.Path(sys.argv[2]).write_text(str(child.pid))
+time.sleep(60)
+'''
+    supervisor_code = r'''import fcntl,os,pathlib,sys,time
+sys.path.insert(0,sys.argv[1]); import builtin_example_validation as v
+v.LOCK=pathlib.Path(sys.argv[2]); v.LEGACY_LOCK=pathlib.Path(sys.argv[3])
+with v._open_shared_native_lock() as lock:
+ fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+ with v._supervised_worker([sys.executable,'-c',sys.argv[4],sys.argv[5],sys.argv[6]],
+      environment=os.environ.copy(),stdout=None,stderr=None,lock_fd=lock.fileno()):
+  time.sleep(60)
+'''
+    parent = subprocess.Popen([sys.executable, '-B', '-c', supervisor_code, str(AGENT_DIR),
+                               str(canonical), str(legacy), worker_code, str(worker_pid), str(runtime_pid)])
+    children = []
+    try:
+        deadline = time.monotonic() + 10
+        while not runtime_pid.exists() and parent.poll() is None and time.monotonic() < deadline:
+            time.sleep(.05)
+        assert runtime_pid.exists() and worker_pid.exists()
+        children = [int(worker_pid.read_text()), int(runtime_pid.read_text())]
+        parent.send_signal(termination_signal)
+        parent.wait(timeout=10)
+        with canonical.open('r+') as contender:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    finally:
+        if parent.poll() is None:
+            parent.kill()
+            parent.wait()
+        for pid in reversed(children):
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    deadline = time.monotonic() + 10
+    with canonical.open('r+') as contender:
+        while True:
+            try:
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                assert time.monotonic() < deadline
+                time.sleep(.05)
 
 
 def _spec(**changes):
@@ -154,7 +508,7 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
              'artifact': _artifact(), 'construction_id': 'f06', 'recipe_identity': 'a' * 64,
              'controller': SimpleNamespace(identity='b' * 64),
              'solution_identity': 'c' * 64, 'source_revision': 'commit',
-             'source_sha256': {'task_env/tasks/pick_cube/isaac.py': 'd' * 64},
+             'source_sha256': {'task_env/runtime/sessions/source.py': 'd' * 64},
              'source': SimpleNamespace(
                  scene_source=SimpleNamespace(source_id='f06-source'),
                  source_closure_digest='e' * 64,
@@ -166,6 +520,9 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
         assert compiled.runtime_source_id == 'f06-source'
         assert compiled.runtime_source_sha256 == 'e' * 64
         assert make_env.call_count == 1 and env.value['source'].source_closure_digest == 'e' * 64
+        execution = make_env.call_args.kwargs['config']['execution']
+        assert execution['deployment'] == 'in_process'
+        assert execution['interpreter'] == sys.executable
 
 
 def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp_path):
@@ -309,14 +666,14 @@ def test_worker_action_trace_records_failed_proposal_boundary(tmp_path):
     env = SimpleNamespace(provider='mujoco', sample=SimpleNamespace(task_seed=31), state=state,
                           info={'task_metrics': {'task_success': False}}, execution_fault=None)
 
-    def fail_step(action, *, proposal=None, observer_solution=None):
+    def fail_step(action):
         raise RuntimeError('diagnostic interval failure')
 
-    env._step = fail_step
+    env.step = fail_step
     capture, _write_trace = _install_action_trace(env, tmp_path / 'step_trace.json')
-    proposal = SimpleNamespace(stage='approach')
+    proposal = SimpleNamespace(stage='approach', action=[0.2, 0.3, 0.4, 1.0, 0.0, 0.0, 0.0, 0.04])
     with pytest.raises(RuntimeError, match='diagnostic interval failure'):
-        env._step([0.2, 0.3, 0.4, 1.0, 0.0, 0.0, 0.0, 0.04], proposal=proposal)
+        env.step(proposal)
     trace = json.loads((tmp_path / 'step_trace.json').read_text())
     assert capture['attempted'] == 1 and capture['completed'] == 0
     assert trace['rows'][0]['control_step_before'] == 7
@@ -325,16 +682,21 @@ def test_worker_action_trace_records_failed_proposal_boundary(tmp_path):
 
 
 def test_pickcube_r3_profile_is_task_versioned_and_records_rate_bound():
-    from task_env.tasks.pick_cube.task import build_reference
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
 
-    built = build_reference(controller_profile='r3_continuous_v1')
+    binding = make_reference_binding(controller_profile='r3_continuous_v1', interval_provider='mujoco')
+    built = binding.build_for_request('mujoco', 'cpu', 31, 1000)
     task_profile = built['resolved_configuration']['task_controller_profile']
     controller_profile = built['controller'].rate_profile_mapping()
     assert task_profile == {
-        'schema_version': 'pick-cube-r3-continuous-profile-v1',
-        'joint_velocity_limit_rad_s': 4.0,
+        'schema_version': 'pick-cube-r3-nut-aligned-profile-v2',
+        'joint_velocity_limit_rad_s': 2.0,
+        'gripper_force_limit_N': 10.0,
+        'gripper_close_transition_s': 1.0 / 3.0,
+        'gripper_close_settle_s': 0.5,
+        'postclose_hold_s': 0.1,
     }
-    assert controller_profile['joint_velocity_limit_rad_s'] == 4.0
+    assert controller_profile['joint_velocity_limit_rad_s'] == 2.0
     assert built['resolved_configuration']['controller_profile'] == 'r3_continuous_v1'
 
 
@@ -408,7 +770,8 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
             self.opened = False
             self.closed = False
 
-        def open(self):
+        def open(self, *, f06_compatibility):
+            assert f06_compatibility is True
             events.append('app_open')
             self.opened = True
 
@@ -477,3 +840,57 @@ def test_extra_diagnostic_seed_keeps_fixed_f06_prefix():
     for seeds in ([0, 31, 32, 33], [31, 32, 33, 31], [31, 32, 33, -1], [31, 32]):
         with pytest.raises(ValueError):
             BuiltinPickCubeExampleV1.from_dict({**base, 'seeds': seeds})
+def test_isaac_worker_refuses_preloaded_usd_without_opening_app(tmp_path, monkeypatch):
+    import builtin_example_worker as worker
+    import task_env.runtime.sessions.isaac_native_io as native
+
+    events = []
+    owner = SimpleNamespace(
+        open=lambda **kwargs: events.append('open'),
+        close=lambda: events.append('close'),
+        close_receipt=lambda: {'close_attempted': True},
+    )
+    monkeypatch.setitem(sys.modules, 'pxr', SimpleNamespace())
+    monkeypatch.setattr(worker, 'core_context', lambda *args: {'core_commit': 'test'})
+    monkeypatch.setattr(native, '_process_app_owner', lambda **kwargs: owner)
+    output = tmp_path / 'run'
+    output.mkdir()
+    (output / 'run_plan.json').write_text(json.dumps({
+        'schema_version': 'harness-builtin-pickcube-example-run-plan-v2',
+        'isaac_app_launch_profile_id': 'f06-headless-no-render-v1',
+    }))
+    spec = _spec(provider='isaacsim', backend='cuda', device='cuda:0',
+                 source_delivery_manifest='/frozen/manifest.json')
+    row = worker.run_one(spec, {'core_repo': str(tmp_path)},
+                         ExampleWorkingTreeScopeV1('harness-example-working-tree-scope-v1', ()),
+                         seed=31, output=output)
+    assert events == ['close']
+    assert row['isaac_app_precompile_start_attempted'] is False
+    assert row['runtime_valid'] is False
+    assert 'before Isaac App startup' in row['errors'][0]['message']
+
+
+def test_isaac_interpreter_selection_without_launch(monkeypatch, tmp_path):
+    from builtin_example_validation import ISAAC_PYTHON, _isaac_python
+
+    monkeypatch.delenv('ISAAC_SIM_PYTHON', raising=False)
+    assert _isaac_python() == ISAAC_PYTHON
+    monkeypatch.setenv('ISAAC_SIM_PYTHON', str(tmp_path / 'environment-python'))
+    assert _isaac_python() == tmp_path / 'environment-python'
+    assert _isaac_python(tmp_path / 'explicit-python') == tmp_path / 'explicit-python'
+
+
+def test_worker_core_interpreter_and_geophys_source_overrides(monkeypatch, tmp_path):
+    import pytest
+    from builtin_example_validation import _core_python, _geophys_source
+
+    python = tmp_path / 'python'
+    source = tmp_path / 'src'
+    monkeypatch.setenv('GEOCHORA_CORE_PYTHON', str(python))
+    monkeypatch.setenv('GEOCHORA_GEOPHYS_SRC', str(source))
+    assert _core_python() == python
+    with pytest.raises(ValueError, match='GeoPhys src directory'):
+        _geophys_source()
+    (source / 'scene').mkdir(parents=True)
+    (source / 'scene' / '__init__.py').write_text('')
+    assert _geophys_source() == source

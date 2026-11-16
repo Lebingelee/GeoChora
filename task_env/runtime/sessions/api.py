@@ -1,7 +1,5 @@
 """Admission precedes every native materialization. No task-ID dispatch."""
 from collections.abc import Callable, Mapping
-from contextlib import contextmanager
-from contextvars import ContextVar
 from dataclasses import replace
 from typing import Protocol
 
@@ -14,8 +12,6 @@ from ...artifacts import (
     FrameReference, JointDefinition, ProviderCapabilityManifest, SceneDefinition,
     StateRequirements, TaskArtifact, TaskArtifactV1, admit_capabilities,
 )
-from ...artifacts.contracts import UsdAssetDeliveryLocalV1
-from ...assembly.usd_delivery import variant_selection_hash
 from ...artifacts.execution import (
     EpisodeResetPlanV1, RealizedInitialState, ResetPlanV1, ResetSample,
     legacy_execution_projection,
@@ -24,81 +20,80 @@ from ...controllers.canonical.feedback import (
     CanonicalControlFeedback, NativeControlFeedbackSampleV1,
 )
 from ...controllers.canonical.contracts import MixedActuatorCommandV1
-from .source import RuntimeSource, UsdRuntimeSourceV1
+from .source import RuntimeSource, UsdRuntimeSourceV1, UsdRuntimeInputV1
+from .isaac_g05 import G05_ISAAC_EFFORT_PROFILE, _validate_g05_isaac_effort_source
+from .mujoco_attachment_admission import _validate_fixed_attachment_materialization_source
+from .isaac_usd_admission import (
+    F06_PICKCUBE_ISAAC_PROFILE, _F06_DELIVERY_MANIFEST_SHA256_V1,
+    _F06_REPRESENTATION_V1, _F06_TASK_POLICY_SHA256_V1,
+    _validate_f06_isaac_delivery, load_f06_isaac_delivery,
+    f06_isaac_robot_geometry_root, _validate_usd_task_policy,
+    _validate_exact_admission_binding, _validate_f06_pickcube_isaac_input,
+    f06_capability_manifest, isaac_cuda_execution_spec,
+    build_usd_task_runtime_input, compile_usd_task_runtime_input,
+)
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
-F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
-F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
-F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
-F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
-F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
-_F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
-    'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
-    'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
-)
-_F04_MENAGERIE_PANDA_SOURCE_REFERENCE = (
-    'mujoco-menagerie://franka_emika_panda/panda.xml'
-)
-_F04_MENAGERIE_PANDA_REVISION = 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7'
-_F04_OFFICIAL_PANDA_LOCAL_REVISION = 's3-prefix-last-modified-2026-10-07T01:07:07Z-through-2026-10-07T01:07:09Z'
-_F04_OFFICIAL_PANDA_SOURCE_CLOSURE_SHA256 = '7ba946a0b02623525dc6b92db9f1000f85fb2e9ea140a0ec6fabb6f818f6c072'
-_F04_MENAGERIE_PANDA_SOURCE_CLOSURE_SHA256 = 'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a'
-_F04_LOCAL_CHECKER_SHA256 = '047fc1e436d846296ae3d051c56e9f17d7d0ed378653989b3bc28dc00e77ec23'
-_F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '158fb4ca7de5c49b0a430f46b08ff5953c5562baec507a04d91e9d55640c1558'
-_F04_MENAGERIE_LOCAL_RECIPE_SHA256 = '3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede'
-_DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
-_GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
-_GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
-_F05_DG04_S1_NATIVE_IO_CONTEXT: ContextVar[object | None] = ContextVar(
-    'task_env_f05_dg04_s1_native_io_context', default=None,
-)
 
 
-class _F05Dg04S1NativeIOContext:
-    """Private S1 scope replacing only the exact DG04 native I/O port."""
+def close_session_and_runtime_owner(
+    session, *, first_error=None, session_error_label, owner_error_label,
+    capture_close_receipt=False,
+):
+    """Close a materialized session and its owner, retaining the first fault.
 
-    def __init__(self, input_v1, factory):
-        from ...tasks.position_candidate.builder import F05Dg04IsaacNativeCandidateInputV1
+    The receipt is observed after session close and before owner close, as the
+    mixed-control session owns that evidence. The caller retains route-specific
+    finalization, source/task cleanup and publication of the receipt.
+    """
+    if session is None:
+        return first_error, None
 
-        if type(input_v1) is not F05Dg04IsaacNativeCandidateInputV1:
-            raise TypeError('DG04 S1 requires its exact versioned source-bound candidate input')
-        input_v1.validate()
-        if not callable(factory):
-            raise TypeError('DG04 S1 factory must be callable')
-        source = input_v1.runtime_source
-        representation = source.scene_source.representation
-        if (source.scene_source.source_verified or not source.scene_source.locally_validated
-                or representation.runtime_admitted or representation.source_verified
-                or representation.provider != 'isaacsim'
-                or representation.provider_build_identity != 'isaacsim-6.2.0.0'):
-            raise ValueError('DG04 S1 cannot promote local validation to runtime admission')
-        self.input_v1, self.factory = input_v1, factory
+    def retain(error, label):
+        nonlocal first_error
+        if first_error is None:
+            first_error = error
+        else:
+            first_error.add_note(f'{label} also failed: {type(error).__name__}: {error}')
 
-    def validate_call(self, artifact, execution, source):
-        declared = self.input_v1
-        if (artifact is not declared.artifact or source is not declared.runtime_source
-                or type(execution) is not ExecutionSpecV1
-                or execution.identity_hash != declared.execution.identity_hash):
-            raise ValueError('DG04 S1 factory differs from its exact candidate identities')
-        declared.validate()
-
-
-@contextmanager
-def _f05_dg04_s1_native_io_context(input_v1, factory):
-    scope = _F05Dg04S1NativeIOContext(input_v1, factory)
-    token = _F05_DG04_S1_NATIVE_IO_CONTEXT.set(scope)
     try:
-        yield scope
-    finally:
-        _F05_DG04_S1_NATIVE_IO_CONTEXT.reset(token)
+        session.close()
+    except BaseException as error:
+        retain(error, session_error_label)
+    receipt = None
+    if capture_close_receipt:
+        try:
+            receipt = getattr(session, 'close_receipt', None)
+        except BaseException as error:
+            retain(error, 'session close receipt read')
+    try:
+        close_owner = getattr(session, 'close_runtime_owner', None)
+        if callable(close_owner):
+            close_owner()
+    except BaseException as error:
+        retain(error, owner_error_label)
+    return first_error, receipt
 
 
-def _current_f05_dg04_s1_native_io_context():
-    return _F05_DG04_S1_NATIVE_IO_CONTEXT.get()
-_GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION = '67da1165149486d3ae3e779c13ce31af49e17d50'
-_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE = 'nutassembly-native-feedback-v1'
+def validate_selected_position_route(execution):
+    """Check the bounded construction envelope, before source-specific admission.
+
+    Passing this check does not admit a source, delivery, provider build, or
+    native session; those retain their independent materialization checks.
+    """
+    route = (execution.physics_provider, execution.physics_backend,
+             execution.physics_device, execution.determinism_mode,
+             execution.physics_profile)
+    if route not in {
+        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F06_PICKCUBE_ISAAC_PROFILE),
+        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', G05_ISAAC_EFFORT_PROFILE),
+    }:
+        raise ValueError('versioned Position construction has an unsupported provider execution route')
+
+
+_DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 
 
 class RuntimeSession(Protocol):
@@ -181,339 +176,28 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
     )
 
 
-def _validate_f04_source_family(delivery) -> None:
-    """Bind the two F04 source families to their exact stable source identities."""
-    definition = delivery.asset_definition
-    if definition.source_reference not in {
-            _F04_OFFICIAL_PANDA_SOURCE_REFERENCE,
-            _F04_MENAGERIE_PANDA_SOURCE_REFERENCE,
-    }:
-        raise ValueError('F04 production materialization is limited to the two frozen Panda source families')
-    if (definition.source_reference == _F04_MENAGERIE_PANDA_SOURCE_REFERENCE
-            and (definition.source_revision != _F04_MENAGERIE_PANDA_REVISION
-                 or delivery.source_revision != _F04_MENAGERIE_PANDA_REVISION)):
-        raise ValueError('F04 Menagerie Panda source must bind the current frozen provider Gitlink')
-    if type(delivery) is UsdAssetDeliveryLocalV1:
-        if delivery.provenance_kind != 'local-validated':
-            raise ValueError('F04 local Panda route requires explicit local-validated provenance')
-        selected_source_variants = dict(delivery.source_variant_selections)
-        if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
-            expected_variants = {
-                '/panda#Gripper': 'alternatefinger',
-                '/panda#Mesh': 'performance',
-                '/panda#Physics': 'physx',
-            }
-            if selected_source_variants != expected_variants:
-                raise ValueError('F04 local official Panda report must bind the exact F01 source variants')
-            if delivery.source_entry_sha256 != 'cbdbfc4481e0420aa30c2e57c39cce91006cb29b93bc2e06becaf4304c20ea30':
-                raise ValueError('F04 local official Panda report binds an unexpected source entry byte')
-            if (delivery.source_revision != _F04_OFFICIAL_PANDA_LOCAL_REVISION
-                    or delivery.source_closure_sha256 != _F04_OFFICIAL_PANDA_SOURCE_CLOSURE_SHA256):
-                raise ValueError('F04 local official Panda report differs from the frozen S3 prefix inventory')
-        else:
-            if selected_source_variants:
-                raise ValueError('F04 local Menagerie report does not admit unreviewed source variants')
-            if (delivery.source_entry_sha256 != '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'
-                    or delivery.source_revision != _F04_MENAGERIE_PANDA_REVISION
-                    or delivery.source_closure_sha256 != _F04_MENAGERIE_PANDA_SOURCE_CLOSURE_SHA256):
-                raise ValueError('F04 local Menagerie report differs from the frozen Panda XML/gitlink')
-        if delivery.source_variant_selection_sha256 != variant_selection_hash(selected_source_variants):
-            raise ValueError('F04 local report source variant identity is inconsistent')
-        if delivery.recipe_path != 'metadata/physx_task_scene_recipe.json':
-            raise ValueError('F04 local delivery must use the frozen task-scene/PhysX recipe path')
-        expected_recipe_sha = (
-            _F04_OFFICIAL_LOCAL_RECIPE_SHA256
-            if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE
-            else _F04_MENAGERIE_LOCAL_RECIPE_SHA256
-        )
-        if (delivery.recipe_sha256 != expected_recipe_sha
-                or delivery.checker_sha256 != _F04_LOCAL_CHECKER_SHA256):
-            raise ValueError('F04 local delivery differs from the exact reviewed source recipe/checker bytes')
-        if delivery.entry_prim != '/panda' or delivery.variant_selections:
-            raise ValueError('F04 local derived stage must be a flattened selected scene rooted at /panda')
-    elif definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
-        expected_variants = {
-            '/panda#Gripper': 'alternatefinger',
-            '/panda#Mesh': 'performance',
-            '/panda#Physics': 'physx',
-        }
-        if dict(delivery.variant_selections) != expected_variants:
-            raise ValueError('F04 official Panda source must bind the exact F01 gripper/mesh/physics variants')
-
-
-def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
-    """Admit only the exact F04 Panda/source/runtime intersection."""
-    if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
-        raise TypeError('F04 Isaac materialization requires TaskArtifactV1 and ExecutionSpecV1')
-    execution.validate()
-    source.validate()
-    delivery = source.scene_source.loaded_delivery
-    definition = delivery.delivery.asset_definition
-    if not (delivery.source_verified or source.scene_source.locally_validated):
-        raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
-    if source.scene_source.locally_validated:
-        if (not delivery.locally_validated or delivery.report.provenance_kind != 'local-validated'
-                or delivery.report.recipe_id != 'f04-physx-task-scene-overlay-v2'
-                or delivery.report.checker_id != 'geochora-f04-local-usd-checker-v2'
-                or delivery.report.checker_sha256 != _F04_LOCAL_CHECKER_SHA256
-                or delivery.report.recipe_sha256 != delivery.delivery.recipe_sha256
-                or not delivery.report.passed):
-            raise ValueError('F04 local source lacks the loader-verified local validation report')
-    _validate_f04_source_family(delivery.delivery)
-    if source.scene_source.representation.provider != 'isaacsim':
-        raise ValueError('F04 adapter requires the exact Isaac Sim representation')
-    if (source.scene_source.representation.provider_build_identity,
-            source.scene_source.representation.representation_format,
-            source.scene_source.representation.runtime_admitted) != (
-            'isaacsim-6.2.0.0', 'usd', False):
-        raise ValueError('F04 source representation must be USD prepared for Isaac Sim 6.2.0.0')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.determinism_mode, execution.physics_profile) != (
-            'isaacsim', 'cuda', 'cuda:0', 'best_effort', F04_ISAAC_POSITION_PROFILE):
-        raise ValueError('unsupported Isaac provider/build/backend/device/profile intersection')
-    if (execution.render_default.provider, execution.render_default.backend,
-            execution.render_default.profile, execution.render_default.device,
-            execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
-        raise ValueError('F04 Isaac Position profile is state-only and does not admit task cameras')
-    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
-            artifact.timebase.control_dt) != (0.002, 5, 0.01):
-        raise ValueError('F04 Isaac Position profile requires 100 Hz / five 2 ms physics steps')
-    if (source.task_artifact.identity_hash != artifact.identity_hash
-            or source.scene_definition.identity_hash != artifact.scene_identity_hash):
-        raise ValueError('F04 USD source does not bind the exact TaskArtifact and Scene')
-    if not (set(artifact.required_capabilities.names) <= set(CAPABILITIES)):
-        raise ValueError('F04 Isaac profile does not implement every TaskArtifact capability')
-
-
-def _validate_f05_geophys_native_position_input(input_v1, artifact, execution, source) -> None:
-    """Admit only the frozen local Menagerie/GeoPhys CPU Position cell."""
-    from ...tasks.position_candidate.builder import F05NativePositionCandidateInputV1
-
-    if type(input_v1) is not F05NativePositionCandidateInputV1:
-        raise TypeError('F05 GeoPhys native materialization requires the exact versioned native input')
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'F05 GeoPhys native materialization differs from its exact candidate identities')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'geophys', 'cpu', 'cpu', F05_GEOPHYS_NATIVE_POSITION_PROFILE, 'best_effort'):
-        raise ValueError('unsupported GeoPhys USD native provider/backend/device/profile intersection')
-    if (source.scene_source.representation.provider,
-            source.scene_source.representation.representation_format,
-            source.scene_source.representation.runtime_admitted,
-            source.scene_source.locally_validated,
-            source.scene_source.source_verified) != ('geophys', 'usd', False, True, False):
-        raise ValueError('F05 native production admission requires the exact locally validated USD source')
-    _validate_f04_source_family(source.scene_source.loaded_delivery.delivery)
-    if source.scene_source.loaded_delivery.delivery.asset_definition.source_reference != _F04_MENAGERIE_PANDA_SOURCE_REFERENCE:
-        raise ValueError('F05 native admission is limited to the frozen Menagerie Panda source')
-    if source.scene_source.representation.provider_build_identity != input_v1.host_model_producer_identity.requested_target_build_identity:
-        raise ValueError('F05 requested target build differs from the source Representation')
-    if execution.render_default.provider != 'none' or execution.camera_overrides:
-        raise ValueError('F05 native Position cell is state-only and cannot create a renderer')
-
-
-def _validate_f05_dg02_geophys_usd_input(input_v1, artifact, execution, source) -> None:
-    """Admit only the exact DG02 source-preserving USD/Core input contract."""
-    from ...tasks.position_candidate.builder import F05Dg02GeoPhysUsdCandidateInputV1
-
-    if type(input_v1) is not F05Dg02GeoPhysUsdCandidateInputV1:
-        raise TypeError('DG02 GeoPhys/USD materialization requires the exact candidate input')
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'DG02 materialization differs from its exact Task/Scene/Execution identities')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'geophys', 'cpu', 'cpu', F05_DG02_GEOPHYS_USD_PROFILE, 'best_effort'):
-        raise ValueError('unsupported DG02 GeoPhys CPU/USD source intersection')
-    if (source.scene_source.representation.provider,
-            source.scene_source.representation.representation_format,
-            source.scene_source.representation.runtime_admitted,
-            source.scene_source.locally_validated,
-            source.scene_source.source_verified) != ('geophys', 'usd', False, True, False):
-        raise ValueError('DG02 production admission requires its exact locally validated source-preserving USD')
-    if (source.scene_source.loaded_delivery.delivery.recipe_sha256
-            != input_v1.runtime_source.scene_source.loaded_delivery.delivery.recipe_sha256):
-        raise ValueError('DG02 delivery recipe identity changed after candidate validation')
-
-
-def _validate_f05_dg04_isaac_native_input(input_v1, artifact, execution, source) -> None:
-    """Admit only the exact source-bound DG04 native PhysX mimic profile."""
-    from ...tasks.position_candidate.builder import F05Dg04IsaacNativeCandidateInputV1
-
-    if type(input_v1) is not F05Dg04IsaacNativeCandidateInputV1:
-        raise TypeError('DG04 Isaac native materialization requires its exact candidate input')
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'DG04 materialization differs from its exact Task/Scene/Execution identities')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'isaacsim', 'cuda', 'cuda:0', F05_DG04_ISAAC_NATIVE_PROFILE, 'best_effort'):
-        raise ValueError('unsupported DG04 Isaac CUDA/native-mimic execution intersection')
-    representation = source.scene_source.representation
-    if (representation.provider, representation.provider_build_identity,
-            representation.representation_format, representation.runtime_admitted,
-            representation.source_verified, source.scene_source.locally_validated,
-            source.scene_source.source_verified) != (
-            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, False, True, False):
-        raise ValueError('DG04 production admission requires its exact locally validated non-upstream USD')
-    if (source.scene_source.loaded_delivery.manifest_bytes_sha256
-            != input_v1.runtime_source.scene_source.loaded_delivery.manifest_bytes_sha256
-            or source.scene_source.loaded_delivery.delivery_sha256
-            != input_v1.runtime_source.scene_source.loaded_delivery.delivery_sha256
-            or dict(source.joints) != dict(source.joint_targets)):
-        raise ValueError('DG04 delivery or exact nine-joint source identity changed after candidate validation')
-    if execution.render_default.provider != 'none' or execution.camera_overrides:
-        raise ValueError('DG04 Core cell is state-only and does not admit a renderer')
-
-
-def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) -> None:
-    """Admit the exact locally validated PickCube desktop USD F06 input."""
-    from ...tasks.pick_cube.isaac import (
-        ISAAC_PROFILE_V1, PickCubeIsaacRuntimeInputV1,
-    )
-
-    if type(input_v1) is not PickCubeIsaacRuntimeInputV1:
-        raise TypeError('F06 Isaac materialization requires its exact PickCube RuntimeInputV1')
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'F06 materialization differs from its exact Task/Scene/Execution identities')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'isaacsim', 'cuda', 'cuda:0', ISAAC_PROFILE_V1, 'best_effort'):
-        raise ValueError('unsupported F06 PickCube Isaac CUDA/PhysX execution intersection')
-    representation = source.scene_source.representation
-    if (representation.provider, representation.provider_build_identity,
-            representation.representation_format, representation.runtime_admitted,
-            representation.source_verified, source.scene_source.locally_validated,
-            source.scene_source.source_verified) != (
-            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, False, True, False):
-        raise ValueError('F06 admission requires its exact locally validated non-upstream USD')
-    if (source.scene_source.loaded_delivery.manifest_bytes_sha256
-            != input_v1.delivery_manifest_sha256
-            or dict(source.joints) != dict(source.joint_targets)):
-        raise ValueError('F06 delivery or exact PickCube source Joint identity changed')
-    if execution.render_default.provider != 'none' or execution.camera_overrides:
-        raise ValueError('F06 Core cell is state-only and does not admit a renderer')
-
-
-def _f05_dg04_isaac_capability_manifest(artifact, *, synthetic_s1=False):
-    from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
-
-    names = sorted(set(artifact.required_capabilities.names) | {
-        'articulated_robot', 'joint_position_actuation', 'joint_state_query',
-        'body_pose_query', 'frame_pose_query',
-    })
-    status = 'tested' if synthetic_s1 else 'implemented'
-    evidence = (
-        'DG04-synthetic-S1-only-no-runtime-admission' if synthetic_s1
-        else 'F05-DG04-versioned-native-PhysX-mimic-Core-cell'
-    )
-    return ProviderCapabilityManifest(
-        'provider-capability-v0', 'isaacsim', '6.2.0.0',
-        'f05-dg04-native-mimic-core-v1', 'cuda', F05_DG04_ISAAC_NATIVE_PROFILE,
-        'none', 'best_effort',
-        tuple(CapabilityClaim(name, status, evidence) for name in names),
-        ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
-        'bounded F05 DG04 source-bound native mimic cell; no provider-wide qualification',
-    )
-
-
 def _f06_pickcube_isaac_capability_manifest(artifact):
-    from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
-    from ...tasks.pick_cube.isaac import ISAAC_PROFILE_V1
-
-    names = sorted(set(artifact.required_capabilities.names) | {
-        'articulated_robot', 'joint_position_actuation', 'joint_state_query',
-        'body_pose_query', 'frame_pose_query', 'free_body',
-    })
-    return ProviderCapabilityManifest(
-        'provider-capability-v0', 'isaacsim', '6.2.0.0',
-        'f06-pickcube-desktop-native-mimic-v1', 'cuda', ISAAC_PROFILE_V1,
-        'none', 'best_effort',
-        tuple(CapabilityClaim(name, 'implemented', 'F06-exact-PickCube-desktop-source-bound-cell')
-              for name in names),
-        ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
-        'bounded F06 PickCube Isaac desktop cell; no provider-wide qualification',
-    )
-
-
-
-
-
-
-def _diagnostic_manifest(artifact, execution, source, profile_id):
-    """Return a process-local admission view for one non-capability diagnostic.
-
-    This does not change ``provider_manifest`` or any production registry. It
-    is deliberately tied to the frozen NutAssembly v0 source and the exact
-    GeoPhys CUDA cadence experiment requested for C05c.
-    """
-    from dataclasses import replace
-
-    if profile_id != _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE:
-        raise ValueError('unknown RuntimeSession diagnostic admission profile')
-    if not isinstance(artifact, TaskArtifact):
-        raise ValueError('NutAssembly cadence diagnostic requires the frozen TaskArtifact v0')
-    if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
-            or artifact.task_id != 'nut-assembly-square-v1'
-            or artifact.timebase.physics_dt != 0.002
-            or artifact.timebase.control_dt != 0.01
-            or artifact.timebase.control_substeps != 5
-            or set(artifact.required_capabilities.names) != set(CAPABILITIES)):
-        raise ValueError('diagnostic admission is limited to the frozen NutAssembly 100 Hz / 2 ms Artifact')
-    if (execution.physics_provider != 'geophys' or execution.backend != 'cuda'
-            or execution.physics_profile != PROFILE or execution.render_provider != 'none'
-            or execution.determinism_mode != 'strict'):
-        raise ValueError('diagnostic admission is limited to GeoPhys CUDA with the existing scalar profile')
-    if (source.task_artifact_hash != artifact.identity_hash
-            or source.scene_source.source_id !=
-            'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
-            or source.config.runtime.backend != 'cuda'
-            or source.config.runtime.physics_dt != 0.002
-            or source.config.runtime.control_substeps != 5
-            or source.config.render.camera_obs
-            or len(source.joint_targets) != 7
-            or tuple(source.open_actuators) != ('actuator8',)):
-        raise ValueError('diagnostic admission source does not match the exact NutAssembly R3 execution source')
-    build = provider_build_identity('geophys')
-    if build['repository_revision'] != _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION:
-        raise ValueError('diagnostic admission requires the fixed GeoPhys a53a8cf repair baseline')
-    cpu_manifest = provider_manifest('geophys')
-    return replace(
-        cpu_manifest,
-        adapter_version='task-env-c05c-geophys-cuda-cadence-diagnostic-v1',
-        backend='cuda',
-        evidence_reference='diagnostic-only-no-capability-or-qualification',
-    )
+    return f06_capability_manifest(artifact, CAPABILITIES)
 
 
 def _session_admission_input_route(input_v1) -> str | None:
     """Classify one exact task-owned input for a versioned Session route."""
     if input_v1 is None:
         return None
-    from ...tasks.position_candidate.builder import (
-        F05Dg02GeoPhysUsdCandidateInputV1,
-        F05Dg04IsaacNativeCandidateInputV1,
-        F05NativePositionCandidateInputV1,
-    )
-    routes = (
-        (F05NativePositionCandidateInputV1, 'f05_native'),
-        (F05Dg02GeoPhysUsdCandidateInputV1, 'f05_dg02'),
-        (F05Dg04IsaacNativeCandidateInputV1, 'f05_dg04'),
-    )
-    for input_type, route in routes:
-        if type(input_v1) is input_type:
-            return route
-    from ...tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
-
-    if type(input_v1) is PickCubeIsaacRuntimeInputV1:
+    if (type(input_v1) is UsdRuntimeInputV1
+            and getattr(input_v1, 'schema_version', None) == 'pick-cube-isaac-runtime-input-v1'):
         return 'f06_pickcube'
     raise TypeError('Session admission requires one exact supported task runtime input')
 
 
-def _validate_exact_admission_binding(input_v1, artifact, execution, source, message):
-    input_v1.validate()
-    if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
-            or type(execution) is not ExecutionSpecV1
-            or execution.identity_hash != input_v1.execution.identity_hash):
-        raise ValueError(message)
+def _require_session_admission_input_route(input_v1, expected, message):
+    """Require the centralized exact input type, retaining each caller's error."""
+    try:
+        actual = _session_admission_input_route(input_v1)
+    except TypeError as error:
+        raise TypeError(message) from error
+    if actual != expected:
+        raise TypeError(message)
 
 
 def _close_failed_native_materialization(
@@ -531,125 +215,6 @@ def _close_failed_native_materialization(
                 f'{label} cleanup after Core admission failure also failed: '
                 f'{type(cleanup_error).__name__}: {cleanup_error}'
             )
-
-
-def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
-    """Admit one exact normal NutAssembly GeoPhys force-feedback profile."""
-    from dataclasses import replace
-    import hashlib
-    import json
-    from pathlib import Path
-    from dataclasses import asdict
-    from ...assembly.assets import _source_closure_digest, _source_closure_manifest
-    from ...controllers.canonical.contracts import digest
-
-    if profile_id != _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE:
-        raise ValueError('unknown normal native-feedback admission profile')
-    if not isinstance(artifact, TaskArtifact):
-        raise ValueError('R05b native feedback requires the frozen NutAssembly TaskArtifact v0')
-    if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
-            or artifact.task_id != 'nut-assembly-square-v1'
-            or artifact.identity_hash != '99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe'
-            or artifact.timebase.physics_dt != 0.002
-            or artifact.timebase.control_dt != 0.01
-            or artifact.timebase.control_substeps != 5
-            or set(artifact.required_capabilities.names) != set(CAPABILITIES)):
-        raise ValueError('R05b admission is limited to the frozen NutAssembly 100 Hz / 2 ms Artifact')
-    if (execution.physics_provider != 'geophys' or execution.backend not in {'cpu', 'cuda'}
-            or execution.physics_profile != PROFILE or execution.render_provider != 'none'
-            or execution.determinism_mode != 'strict'):
-        raise ValueError('R05b admission requires strict GeoPhys CPU/CUDA scalar execution without rendering')
-    receipt = getattr(source, 'execution_source_receipt', None)
-    if receipt is None:
-        raise ValueError('R05b admission requires the versioned immutable execution source receipt')
-    receipt.validate_snapshot()
-    trusted_path = (
-        Path(__file__).resolve().parents[2] / 'tasks' / 'nut_assembly'
-        / 'r05b_trusted_execution_source_manifest.json'
-    )
-    trusted = json.loads(trusted_path.read_text(encoding='utf-8'))
-    if trusted.get('schema_version') != 'r05b-trusted-execution-source-manifest-v1':
-        raise ValueError('R05b trusted source manifest has an unsupported schema')
-    actual_files = list(_source_closure_manifest(receipt.closure_files))
-    if (actual_files != trusted['files']
-            or receipt.source_closure_digest != trusted['source_closure_digest']
-            or _source_closure_digest(receipt.closure_files) != trusted['source_closure_digest']):
-        raise ValueError('R05b source receipt differs from the trusted full source closure')
-    canonical_bytes = receipt.closure_files.get('canonical-source.xml')
-    importer_bytes = receipt.importer_xml
-    expected_importer_bytes = receipt.closure_files.get('scene.xml')
-    if (not isinstance(canonical_bytes, bytes)
-            or hashlib.sha256(canonical_bytes).hexdigest() != trusted['canonical_xml_sha256']
-            or not isinstance(expected_importer_bytes, bytes)
-            or importer_bytes != expected_importer_bytes
-            or hashlib.sha256(importer_bytes).hexdigest() != trusted['importer_xml_sha256']
-            or source.scene_source.xml.encode('utf-8') != canonical_bytes
-            or Path(source.scene_source.base_dir).resolve() != Path(receipt.snapshot_root).resolve()):
-        raise ValueError('R05b canonical/importer source bytes differ from the trusted snapshot')
-    expected_joints = {
-        **{f'panda-v1/joint{index}': f'joint{index}' for index in range(1, 8)},
-        'panda-v1/finger_joint1': 'finger_joint1',
-        'panda-v1/finger_joint2': 'finger_joint2',
-    }
-    expected_bodies = {
-        'square-nut-v1': 'SquareNut', 'square-peg-v1': 'peg1',
-        'round-peg-v1': 'peg2', 'panda-v1/base': 'link0',
-    }
-    if (receipt.source_id != trusted['source_id']
-            or source.joints != expected_joints
-            or source.bodies != expected_bodies
-            or source.frames != {'panda-v1/ee': 'nutassembly_ee_site'}
-            or source.free_joints != {'square-nut-v1': 'SquareNut_joint'}
-            or source.joint_targets != {
-                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
-            }
-            or tuple(source.open_actuators) != ('actuator8',)):
-        raise ValueError('R05b source semantic and actuator mappings differ from the exact allowlist')
-    expected_config_digest = {
-        'cpu': '64e9a4d05abe80c20141a16aa1abf1a3de366ac6e75e2740b6d7313839e537d1',
-        'cuda': '52e2e14a51492a8e534ee0ba88cc7ec9597d6a31816eaba89f1a7a3094baece9',
-    }[execution.backend]
-    if digest(asdict(source.config)) != expected_config_digest:
-        raise ValueError('R05b source configuration differs from exact allowlist')
-    if (source.task_artifact_hash != artifact.identity_hash
-            or source.scene_source.source_id !=
-            'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
-            or receipt.canonical_xml_sha256 !=
-            '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
-            or receipt.canonical_xml_sha256 != trusted['canonical_xml_sha256']
-            or source.config.runtime.backend != execution.backend
-            or source.config.runtime.physics_dt != 0.002
-            or source.config.runtime.control_substeps != 5
-            or source.config.runtime.integrator != 'implicitfast'
-            or source.config.render.camera_obs
-            or len(source.joint_targets) != 7
-            or dict(source.joint_targets) != {
-                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
-            }
-            or tuple(source.open_actuators) != ('actuator8',)):
-        raise ValueError('R05b source/receipt/controller actuator mapping differs from the exact allowlist')
-    build = provider_build_identity('geophys')
-    expected_origin = (Path(__file__).resolve().parents[3] / 'GeoPhys/src/geophys/__init__.py').resolve()
-    if (build['repository_revision'] != _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION
-            or build['dirty_build_sha256'] is not None
-            or Path(build['import_origin']).resolve() != expected_origin):
-        raise ValueError('R05b admission requires the clean committed GeoPhys build from this worktree')
-    cpu_manifest = provider_manifest('geophys')
-    evidence = (
-        f'{_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE}/artifact={artifact.identity_hash}/'
-        f'canonical_xml={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}/'
-        f'provider={build["repository_revision"]}/origin={hashlib.sha256(expected_origin.read_bytes()).hexdigest()}/'
-        f'backend={execution.backend}'
-    )
-    return replace(
-        cpu_manifest,
-        adapter_version='task-env-r05b-geophys-native-feedback-v1',
-        backend=execution.backend,
-        capabilities=tuple(cpu_manifest.capabilities) + (
-            CapabilityClaim('actuator_force_query', 'tested', evidence),
-        ),
-        evidence_reference=evidence,
-    )
 
 
 def _mixed_actuator_manifest(artifact, execution, source):
@@ -710,12 +275,12 @@ def _mixed_actuator_manifest(artifact, execution, source):
     base = provider_manifest(provider)
     claims = tuple(base.capabilities)
     unsupported = base.known_unsupported
-    if provider == 'geophys':
+    if provider in {'mujoco', 'geophys'}:
         if not any(channel.drive_mode == 'joint_torque' for channel in plan.channels):
-            raise ValueError('GeoPhys mixed actuator admission requires a named torque channel')
+            raise ValueError('mixed actuator admission requires a named torque channel')
         claims += (CapabilityClaim(
             'joint_torque_actuation', 'tested',
-            f'{evidence}/provider_adapter=task_env.runtime.sessions.geophys',
+            f'{evidence}/provider_adapter=task_env.runtime.sessions.{provider}',
         ),)
         unsupported = tuple(item for item in unsupported if item != 'joint_torque_actuation')
     if source.contact_geom_groups:
@@ -735,17 +300,43 @@ def _mixed_actuator_manifest(artifact, execution, source):
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *,
                 source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
-                _materialization_authority=None, _diagnostic_profile=None,
-                _session_admission_input=None, _native_feedback_profile=None) -> RuntimeSession:
+                _materialization_authority=None,
+                _session_admission_input=None,
+                _observer_render_request=None, _task_render_requested=False,
+                _legacy_observer_requested=False,
+                _legacy_camera_observations=False,
+                _geophys_contact_mode='provider_default') -> RuntimeSession:
+    if _geophys_contact_mode not in ('provider_default', 'discrete', 'continuous'):
+        raise ValueError('unsupported GeoPhys contact mode')
+    if _geophys_contact_mode != 'provider_default' and execution.physics_provider != 'geophys':
+        raise ValueError('explicit GeoPhys contact mode requires the GeoPhys provider')
+    if type(_legacy_observer_requested) is not bool:
+        raise TypeError('legacy observer request must be boolean')
+    if type(_task_render_requested) is not bool:
+        raise TypeError('task render request must be boolean')
+    if _legacy_observer_requested and execution.physics_provider != 'geophys':
+        raise ValueError('legacy observer is only available with GeoPhys physics')
+    if type(_legacy_camera_observations) is not bool:
+        raise TypeError('legacy camera observation request must be boolean')
+    if _legacy_camera_observations and execution.physics_provider != 'geophys':
+        raise ValueError('legacy camera observations require GeoPhys physics')
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     declared_execution = execution
+    if _observer_render_request is not None:
+        from ...render.base.contracts import ObserverRenderRequestV1
+        if type(_observer_render_request) is not ObserverRenderRequestV1:
+            raise TypeError('observer render requirement must use ObserverRenderRequestV1')
+        _observer_render_request.validate(artifact=artifact, physics_provider=execution.physics_provider,
+                                          physics_backend=(execution.physics_backend if type(execution) is ExecutionSpecV1
+                                                           else execution.backend))
     admission_route = _session_admission_input_route(_session_admission_input)
-    _f05_native_input = _session_admission_input if admission_route == 'f05_native' else None
-    _f05_dg02_geophys_input = _session_admission_input if admission_route == 'f05_dg02' else None
-    _f05_dg04_isaac_native_input = _session_admission_input if admission_route == 'f05_dg04' else None
+    if (_observer_render_request is not None and _observer_render_request.provider == 'isaacsim'
+            and admission_route != 'f06_pickcube'
+            and getattr(declared_execution, 'physics_profile', None) != G05_ISAAC_EFFORT_PROFILE):
+        raise ValueError('Isaac observer request requires an admitted F06 or G05 input')
     _f06_pickcube_isaac_input = _session_admission_input if admission_route == 'f06_pickcube' else None
     if (_f06_pickcube_isaac_input is not None
             or (type(execution) is ExecutionSpecV1
@@ -756,8 +347,10 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             _f06_pickcube_isaac_input, artifact, declared_execution, source,
         )
         expected_manifest = _f06_pickcube_isaac_capability_manifest(artifact)
+        if manifest is None and _materialization_authority is None:
+            manifest = expected_manifest
         if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
-                or _materialization_authority is not None or _diagnostic_profile is not None):
+                or _materialization_authority is not None):
             raise ValueError('F06 exact admission requires the Core-generated source-bound manifest only')
         projected_execution = ExecutionSpec(
             'isaacsim', F06_PICKCUBE_ISAAC_PROFILE, 'none', 'cuda',
@@ -769,6 +362,8 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         native_io = create_isaac_native_runtime_io(
             artifact, declared_execution, source,
             f06_pickcube_input=_f06_pickcube_isaac_input,
+            observer_render_request=_observer_render_request,
+            task_render_requested=_task_render_requested,
         )
         from .native_io import UsdCoreRuntimeSession
         try:
@@ -786,112 +381,6 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         session._declared_execution_spec_v1 = declared_execution
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
         return session
-    if (_f05_dg04_isaac_native_input is not None
-            or (type(execution) is ExecutionSpecV1
-                and execution.physics_profile == F05_DG04_ISAAC_NATIVE_PROFILE)):
-        if _f05_dg04_isaac_native_input is None:
-            raise ValueError('DG04 native PhysX profile requires its exact versioned candidate input')
-        _validate_f05_dg04_isaac_native_input(
-            _f05_dg04_isaac_native_input, artifact, declared_execution, source,
-        )
-        scope = _current_f05_dg04_s1_native_io_context()
-        expected_manifest = _f05_dg04_isaac_capability_manifest(
-            artifact, synthetic_s1=scope is not None,
-        )
-        if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
-                or _materialization_authority is not None or _diagnostic_profile is not None):
-            raise ValueError('DG04 exact admission requires the Core-generated source-bound manifest only')
-        projected_execution = ExecutionSpec(
-            'isaacsim', F05_DG04_ISAAC_NATIVE_PROFILE, 'none', 'cuda',
-            declared_execution.provider_seed, 'best_effort',
-        )
-        admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
-        if scope is not None:
-            scope.validate_call(artifact, declared_execution, source)
-            native_io = scope.factory(
-                artifact=artifact, execution=declared_execution, source=source,
-                input_v1=_f05_dg04_isaac_native_input,
-            )
-            required_methods = (
-                'metadata', 'write_reset', 'read_state', 'write_position_targets',
-                'advance', 'close',
-            )
-            if any(not callable(getattr(native_io, name, None)) for name in required_methods):
-                raise TypeError('DG04 S1 fixture must implement only the exact typed NativeRuntimeIO port')
-        else:
-            from .isaac_native_io import create_isaac_native_runtime_io
-
-            native_io = create_isaac_native_runtime_io(
-                artifact, declared_execution, source,
-                dg04_native_input=_f05_dg04_isaac_native_input,
-            )
-        from .leaf_control import IsaacNativeMimicPositionDriveReceiptV1
-        from .native_io import UsdCoreRuntimeSession
-
-        try:
-            receipt = getattr(native_io, 'drive_receipt', None)
-            expected_provenance = 'synthetic_fixture' if scope is not None else 'native_runtime'
-            if (type(receipt) is not IsaacNativeMimicPositionDriveReceiptV1
-                    or receipt.provenance_kind != expected_provenance
-                    or receipt.execution_identity_sha256 != declared_execution.identity_hash
-                    or receipt.source_closure_sha256 != source.source_closure_digest
-                    or receipt.scene_identity_sha256 != source.scene_definition.identity_hash
-                    or len(receipt.native_dof_names) != 9
-                    or set(receipt.native_dof_names) != set(source.joint_targets.values())):
-                raise ValueError('DG04 model-bound native mimic receipt differs from exact source/execution mapping')
-            session = UsdCoreRuntimeSession(
-                artifact, declared_execution, source, native_io, receipt,
-            )
-        except BaseException as materialization_error:
-            _close_failed_native_materialization(
-                materialization_error, native_io, io_label='DG04 native-I/O',
-                runtime_owner_label='DG04 Isaac App owner' if scope is None else None,
-            )
-            raise
-        session._declared_execution_spec_v1 = declared_execution
-        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-        return session
-    if (_f05_dg02_geophys_input is not None
-            or (type(execution) is ExecutionSpecV1
-                and execution.physics_profile == F05_DG02_GEOPHYS_USD_PROFILE)):
-        if _f05_dg02_geophys_input is None:
-            raise ValueError('DG02 GeoPhys/USD profile requires its exact versioned candidate input')
-        _validate_f05_dg02_geophys_usd_input(
-            _f05_dg02_geophys_input, artifact, declared_execution, source,
-        )
-        if manifest is None or _materialization_authority is not None or _diagnostic_profile is not None:
-            raise ValueError('DG02 exact admission requires its Core-generated capability manifest only')
-        projected_execution = ExecutionSpec(
-            'geophys', F05_DG02_GEOPHYS_USD_PROFILE, 'none', 'cpu',
-            declared_execution.provider_seed, 'best_effort',
-        )
-        admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
-        from .geophys_native_io import create_f05_geophys_native_io
-        from .native_io import UsdCoreRuntimeSession
-
-        native_io = create_f05_geophys_native_io(
-            artifact=artifact, execution=declared_execution,
-            source=source, input_v1=_f05_dg02_geophys_input,
-        )
-        try:
-            receipt = native_io.drive_receipt
-            if receipt.identity_sha256 != _f05_dg02_geophys_input.native_drive_receipt.identity_sha256:
-                raise ValueError('DG02 runtime model receipt differs from the frozen public-model receipt')
-            session = UsdCoreRuntimeSession(
-                artifact, declared_execution, source, native_io, receipt,
-            )
-        except BaseException as materialization_error:
-            _close_failed_native_materialization(
-                materialization_error, native_io, io_label='DG02 native-I/O',
-            )
-            raise
-        session._declared_execution_spec_v1 = declared_execution
-        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-        return session
-    if (type(execution) is ExecutionSpecV1
-            and execution.physics_profile == F05_DG02_GEOPHYS_USD_PROFILE
-            and _f05_dg02_geophys_input is None):
-        raise ValueError('DG02 GeoPhys/USD profile cannot use generic v1 admission')
     if type(source) is UsdRuntimeSourceV1:
         if type(declared_execution) is not ExecutionSpecV1:
             raise TypeError('USD RuntimeSource requires an explicit ExecutionSpecV1')
@@ -902,82 +391,47 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         if (source.task_artifact.identity_hash != artifact.identity_hash
                 or source.scene_definition.identity_hash != artifact.scene_identity_hash):
             raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
-        if _f05_native_input is not None:
-            _validate_f05_geophys_native_position_input(
-                _f05_native_input, artifact, declared_execution, source,
-            )
-            if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
-                raise ValueError('F05 native exact-cell admission cannot combine with caller manifests or diagnostics')
-            from .geophys_native_io import create_f05_geophys_native_io
-            from .native_io import UsdCoreRuntimeSession
-
-            native_io = create_f05_geophys_native_io(
-                artifact=artifact, execution=declared_execution,
-                source=source, input_v1=_f05_native_input,
-            )
+        if not (source.scene_source.source_verified or source.scene_source.locally_validated):
+            raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
+        if not declared_execution.physics_provider == 'isaacsim':
+            raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')
+        if manifest is not None or _materialization_authority is not None:
+            raise ValueError('Isaac materialization does not accept caller-supplied admission authorities')
+        from .isaac_native_io import create_isaac_native_runtime_io
+        from .native_io import UsdCoreRuntimeSession
+        if declared_execution.physics_profile == G05_ISAAC_EFFORT_PROFILE:
+            _validate_g05_isaac_effort_source(artifact, declared_execution, source)
+            native_io = None
             try:
+                native_io = create_isaac_native_runtime_io(
+                    artifact, declared_execution, source,
+                    g05_effort=True, observer_render_request=_observer_render_request,
+                    task_render_requested=_task_render_requested,
+                )
                 session = UsdCoreRuntimeSession(
-                    artifact, declared_execution, source, native_io,
-                    native_io.drive_receipt,
+                    artifact, declared_execution, source, native_io, drive_receipt=None,
                 )
             except BaseException as materialization_error:
                 _close_failed_native_materialization(
-                    materialization_error, native_io, io_label='F05 GeoPhys native-I/O',
+                    materialization_error, native_io, io_label='G05 Isaac effort native-I/O',
+                    runtime_owner_label='G05 Isaac App owner',
                 )
                 raise
             session._declared_execution_spec_v1 = declared_execution
             session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
             return session
-        if declared_execution.physics_profile == F05_GEOPHYS_NATIVE_POSITION_PROFILE:
-            raise ValueError('F05 GeoPhys native profile requires its exact versioned source admission input')
-        if not (source.scene_source.source_verified or source.scene_source.locally_validated):
-            raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
-        if not declared_execution.physics_provider == 'isaacsim':
-            raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')
-        if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
-            raise ValueError('F04 Isaac materialization does not accept caller-supplied admission authorities')
-        _validate_f04_isaac_position_source(artifact, declared_execution, source)
-        from .isaac_native_io import create_isaac_native_runtime_io
-        from .native_io import UsdCoreRuntimeSession
-
-        native_io = None
-        try:
-            native_io = create_isaac_native_runtime_io(artifact, declared_execution, source)
-            session = UsdCoreRuntimeSession(
-                artifact, declared_execution, source, native_io, drive_receipt=None,
-            )
-        except BaseException as materialization_error:
-            _close_failed_native_materialization(
-                materialization_error, native_io, io_label='Isaac native-I/O',
-                runtime_owner_label='Isaac App owner',
-            )
-            raise
-        session._declared_execution_spec_v1 = declared_execution
-        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-        return session
+        raise ValueError('unsupported Isaac USD execution profile')
     execution = legacy_execution_projection(execution)
-    active_profiles = tuple(profile for profile in (
-        _diagnostic_profile, _native_feedback_profile,
-    ) if profile is not None)
-    if len(active_profiles) > 1 or (active_profiles and source.mixed_actuator_plan is not None):
-        raise ValueError('RuntimeSession process-local admissions are mutually exclusive')
-    if _diagnostic_profile is not None:
-        actual = _diagnostic_manifest(artifact, execution, source, _diagnostic_profile)
-    elif _native_feedback_profile is not None:
-        actual = _r05b_native_feedback_manifest(artifact, execution, source, _native_feedback_profile)
-    elif source.mixed_actuator_plan is not None:
+    if source.mixed_actuator_plan is not None:
         actual = _mixed_actuator_manifest(artifact, execution, source)
     else:
         actual = provider_manifest(execution.physics_provider)
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
-        if active_profiles or source.mixed_actuator_plan is not None:
+        if source.mixed_actuator_plan is not None:
             raise ValueError('bounded process-local admission does not accept caller-supplied manifests')
         admit_capabilities(artifact.required_capabilities, manifest, execution)
     admit_capabilities(artifact.required_capabilities, actual, execution)
-    if _native_feedback_profile is not None:
-        from ...artifacts import RequiredCapabilitySet
-        admit_capabilities(RequiredCapabilitySet(('actuator_force_query',)), actual, execution)
     if source.mixed_actuator_plan is not None and source.contact_geom_groups:
         from ...artifacts import RequiredCapabilitySet
         admit_capabilities(RequiredCapabilitySet(('contact_detection',)), actual, execution)
@@ -986,7 +440,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
     if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
             or source.config.runtime.control_substeps != artifact.timebase.control_substeps
             or source.config.runtime.backend != execution.backend
-            or source.config.render.camera_obs):
+            or (source.config.render.camera_obs and not _legacy_camera_observations)):
         raise ValueError('source execution/timebase mismatch')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('source/Artifact mismatch')
@@ -1008,7 +462,21 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         raise ValueError('source joint bindings do not cover initialization')
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
         raise ValueError('source pose bindings do not cover semantics')
-    session = _materialize_admitted(artifact, execution, source, mixed_actuator_plan=source.mixed_actuator_plan)
+    materialization_options = {'mixed_actuator_plan': source.mixed_actuator_plan,
+                               'observer_render_request': _observer_render_request}
+    if _geophys_contact_mode != 'provider_default':
+        materialization_options['geophys_contact_mode'] = _geophys_contact_mode
+    if _legacy_observer_requested:
+        materialization_options['legacy_observer_requested'] = True
+    if _legacy_camera_observations:
+        materialization_options['legacy_camera_observations'] = True
+    session = _materialize_admitted(artifact, execution, source, **materialization_options)
+    if _observer_render_request is not None and _observer_render_request.provider == 'geophys':
+        import hashlib
+        import json
+        session._observer_execution_identity = hashlib.sha256(
+            json.dumps(declared_execution.to_mapping(), sort_keys=True,
+                       separators=(',', ':'), allow_nan=False).encode()).hexdigest()
     if type(declared_execution) is ExecutionSpecV1:
         # Keep the exact V1 declaration alongside the legacy-compatible adapter
         # view. It remains provenance; it is never reconstructed from defaults.
@@ -1054,8 +522,15 @@ def _validate_v1_materialization_source(
         }
         if any(len(roots) != 1 for roots in roots_by_entity.values()):
             raise ValueError('bounded dual Position materialization requires two independent single-root Entities')
-    if artifact.initialization.poses_world:
-        raise ValueError('D01b v1 materialization does not yet admit free-body pose reset fields')
+    if set(artifact.initialization.poses_world) != set(source.free_joints):
+        raise ValueError('free-body reset poses must exactly match source free-joint bindings')
+    for semantic, native in source.free_joints.items():
+        frame = artifact.legacy_frame_bindings.get(semantic)
+        matches = [joint for articulation in scene.articulations or () for joint in articulation.joints
+                   if joint.kind == 'floating' and joint.joint_id == native
+                   and joint.child_frame == frame]
+        if len(matches) != 1:
+            raise ValueError('free-body reset pose must bind one canonical floating Joint')
     if not set(artifact.semantics.required_joints) <= set(source.joints):
         raise ValueError('RuntimeSource does not bind every required TaskArtifact v1 Joint')
 
@@ -1080,142 +555,19 @@ def _validate_v1_materialization_source(
             )
 
 
-def _validate_fixed_attachment_materialization_source(artifact, execution, source) -> None:
-    """Preflight the one fixed Panda Arm+Hand plan before native import/compile."""
-    from ...artifacts import FixedAttachmentPlanV1, LogicalAssemblyV1
-    from ...assembly.fixed_attachment import (
-        R06B_ORDER_ASSET_VERSION, R06B_ORDER_RECIPE_ID, R06B_ORDER_SOURCE_SHA256,
-        fixed_attachment_source_recipe, lower_fixed_attachment_sources,
-        validate_fixed_attachment_scene,
-    )
-
-    plan = source.fixed_attachment_plan
-    if type(plan) is not FixedAttachmentPlanV1 or type(source.fixed_attachment_assembly) is not LogicalAssemblyV1:
-        raise TypeError('fixed Attachment materialization requires the typed R03b plan and Assembly')
-    if execution.physics_provider != 'mujoco' or execution.backend != 'cpu' or execution.render_provider != 'none':
-        raise ValueError('fixed Attachment materialization is bounded to MuJoCo CPU without rendering')
-    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps, artifact.timebase.control_dt) != (
-        0.002, 5, 0.01,
-    ):
-        raise ValueError('fixed Attachment materialization requires the R03b 2 ms / 100 Hz timebase')
-    if source.free_joints:
-        raise ValueError('fixed Attachment must not admit a free root joint')
-    scene = source.scene_definition
-    if scene is None:
-        raise ValueError('fixed Attachment materialization requires a pinned canonical Scene-v3')
-    artifact.validate_scene(scene)
-    validate_fixed_attachment_scene(plan, source.fixed_attachment_assembly, scene)
-    sources = source.fixed_attachment_sources
-    if set(sources) != {'panda-arm', 'panda-hand'}:
-        raise ValueError('fixed Attachment source pair differs from the exact two-Entity recipe')
-    recipe = fixed_attachment_source_recipe(
-        sources['panda-arm'].xml, sources['panda-hand'].xml,
-    )
-    expected_asset_version = (R06B_ORDER_ASSET_VERSION if recipe == R06B_ORDER_RECIPE_ID
-                              else 'menagerie-b846dd12')
-    expected_source_hashes = (
-        (R06B_ORDER_SOURCE_SHA256['panda-arm'], R06B_ORDER_SOURCE_SHA256['panda-hand'])
-        if recipe == R06B_ORDER_RECIPE_ID else (
-            'e7090a5e2384b18a223ef532d98bf914f7f9a6b74dc8bc9f74c8291201074071',
-            'd2a6539d0fd7c55c75c14f11c78f04505ee33f31d93e6112e3ad7120e5ee786a',
-        )
-    )
-    expected_scene_id = ('phase-ii-r06b-order-v1-fixed-attachment'
-                         if recipe == R06B_ORDER_RECIPE_ID else 'phase-ii-r03b-fixed-attachment')
-    expected_assembly_revision = (R06B_ORDER_RECIPE_ID if recipe == R06B_ORDER_RECIPE_ID
-                                  else 'r03b-001')
-    expected_task_ids = ({'phase-ii-r06b-order-v1-fixed-arm-hand',
-                          'phase-ii-r06b-order-v1-attached-leaf-position'}
-                         if recipe == R06B_ORDER_RECIPE_ID else
-                         {'phase-ii-r03b-fixed-arm-hand', 'phase-ii-r03c-attached-leaf-position'})
-    if (
-        plan.parent_entity_id, plan.child_entity_id,
-        plan.parent_asset_id, plan.parent_asset_version,
-        plan.child_asset_id, plan.child_asset_version,
-        plan.parent_source_sha256, plan.child_source_sha256,
-        plan.license_source_sha256, plan.parent_mount_site_name,
-        plan.child_mount_body_name, plan.namespace_prefix,
-        plan.parent_mount.frame_id, plan.child_mount.frame_id,
-        plan.parent_root.frame_id, plan.child_root.frame_id,
-        plan.reset_hand_opening_m, plan.assembly_revision,
-        scene.scene_id,
-    ) != (
-        'panda-arm', 'panda-hand', 'panda-arm-nohand', expected_asset_version,
-        'panda-hand', expected_asset_version,
-        *expected_source_hashes,
-        'a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9',
-        'attachment_site', 'probe_hand_hand', 'probe_hand_',
-        'attachment_site', 'hand', 'link0', 'hand', 0.076,
-        expected_assembly_revision, expected_scene_id,
-    ):
-        raise ValueError('fixed Attachment source pair differs from the accepted R03a source recipe')
-    if artifact.task_id not in expected_task_ids:
-        raise ValueError('fixed Attachment TaskArtifact identity differs from its exact source recipe')
-    if (
-        plan.parent_site_from_child_root.position,
-        plan.parent_site_from_child_root.quaternion_wxyz,
-        plan.attach_frame_from_child_worldbody.position,
-        plan.attach_frame_from_child_worldbody.quaternion_wxyz,
-    ) != (
-        (0.0, 0.0, 0.0), (0.9238795391929064, 0.0, 0.0, 0.38268341623423263),
-        (0.0, 0.0, 0.0), (0.38268341623423263, 0.0, 0.0, -0.9238795391929064),
-    ):
-        raise ValueError('fixed Attachment mount direction or child-frame compensation differs from the source oracle')
-    if plan.collision_policy != 'source_preserved' or plan.extra_cross_entity_overrides:
-        raise ValueError('fixed Attachment collision admission must preserve source filters and exclusions')
-    assets = {(asset.asset_id, asset.asset_version): asset for asset in scene.assets}
-    from ...assembly.fixed_attachment import R06B_ORDER_SOURCE_REFERENCES
-    source_references = (
-        (R06B_ORDER_SOURCE_REFERENCES['panda-arm'], R06B_ORDER_SOURCE_REFERENCES['panda-hand'])
-        if recipe == R06B_ORDER_RECIPE_ID else (
-            'menagerie:franka_emika_panda/panda_nohand.xml',
-            'menagerie:franka_emika_panda/hand.xml',
-        )
-    )
-    for (asset_id, asset_version, source_reference) in zip(
-        (plan.parent_asset_id, plan.child_asset_id),
-        (plan.parent_asset_version, plan.child_asset_version), source_references, strict=True,
-    ):
-        asset = assets[(asset_id, asset_version)]
-        if (asset.source_reference, asset.source_revision, asset.license_id) != (
-            source_reference, 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7', 'Apache-2.0',
-        ):
-            raise ValueError('fixed Attachment Asset provenance differs from the pinned source recipe')
-    if source.task_artifact_hash != artifact.identity_hash:
-        raise ValueError('fixed Attachment RuntimeSource does not bind the exact TaskArtifact')
-    if source.scene_source.source_id != f'scene-definition-v3:{scene.identity_hash}':
-        raise ValueError('fixed Attachment RuntimeSource ID differs from the pinned Scene')
-    if set(source.joints) != set(artifact.initialization.joint_position):
-        raise ValueError('fixed Attachment Joint bindings do not cover the exact reset declaration')
-    if any(source.joints.get(key) != value for key, value in plan.native_joint_names.items()):
-        raise ValueError('fixed Attachment Joint binding differs from its Entity/native map')
-    if source.bodies != plan.native_body_names or source.frames != plan.native_site_names:
-        raise ValueError('fixed Attachment body/Site bindings differ from their explicit maps')
-    expected_arm_targets = {
-        f'{plan.parent_entity_id}/joint{index}': plan.native_actuator_names[
-            f'{plan.parent_entity_id}/actuator{index}'
-        ] for index in range(1, 8)
-    }
-    if dict(source.joint_targets) != expected_arm_targets:
-        raise ValueError('fixed Attachment Arm target mapping differs from its seven named actuator owners')
-    expected_hand_open = (plan.native_actuator_names[f'{plan.child_entity_id}/actuator8'],)
-    if source.open_actuators != expected_hand_open:
-        raise ValueError('fixed Attachment open-actuator mapping differs from source Hand actuator8')
-    # The source and path closure are re-read here, still before importing MuJoCo.
-    lowered = lower_fixed_attachment_sources(
-        parent_source=source.scene_source,
-        source_by_entity=source.fixed_attachment_sources,
-        scene=scene,
-        plan=plan,
-        assembly=source.fixed_attachment_assembly,
-    )
-    if lowered.source_closure_sha256 != source.source_closure_digest:
-        raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
-
-def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None):
+def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None,
+                          observer_render_request=None, legacy_observer_requested=False,
+                          legacy_camera_observations=False, geophys_contact_mode='provider_default'):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
-        return _GeoPhysSession(artifact, source)
+        options = {'observer_render_request': observer_render_request}
+        if geophys_contact_mode != 'provider_default':
+            options['contact_mode'] = geophys_contact_mode
+        if legacy_observer_requested:
+            options['legacy_observer_requested'] = True
+        if legacy_camera_observations:
+            options['legacy_camera_observations'] = True
+        return _GeoPhysSession(artifact, source, **options)
     if execution.physics_provider == 'mujoco':
         from .mujoco import _MuJoCoSession
         return _MuJoCoSession(artifact, source, mixed_actuator_plan=mixed_actuator_plan)
@@ -1226,3 +578,312 @@ def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=No
         from .genesis import _GenesisSession
         return _GenesisSession(artifact, source)
     raise ValueError(f'unknown physics provider: {execution.physics_provider}')
+
+
+def project_feedback_assessment(projected_feedback, artifact, source, actual_capabilities, helper):
+    """Classify each existing typed feedback requirement against source bindings."""
+    result = []
+    for writer_id, requirement in projected_feedback:
+        name, kind = requirement.required_capability, requirement.subject_kind
+        semantic = requirement.entity_id + '/' + requirement.subject_id
+        if kind == 'frame':
+            bindings = getattr(artifact, 'legacy_frame_bindings', {})
+            matches = [key for key, reference in bindings.items()
+                       if reference.entity_id == requirement.entity_id
+                       and reference.frame_id == requirement.subject_id
+                       and key in (set(getattr(source, 'frames', {})) |
+                                   set(getattr(source, 'bodies', {})))]
+            if len(matches) == 1:
+                semantic = matches[0]
+        source_values = (getattr(source, 'joints', {}) if kind == 'joint'
+                         else {**getattr(source, 'bodies', {}), **getattr(source, 'frames', {})}
+                         if kind == 'frame' else {})
+        supported = name in actual_capabilities and kind in {'joint', 'frame'}
+        bound = semantic in source_values
+        subject = ('state:' + kind + ':' + semantic + ':' + requirement.field_name + ':'
+                   + requirement.sample_domain + ':' + writer_id)
+        result.append((name, subject, requirement.requiredness, supported,
+                       'unknown' if bound else 'unsatisfied',
+                       (f'{helper} must resolve the declared Controller feedback object' if supported and bound
+                        else 'selected Core adapter does not implement this declared feedback field' if not supported
+                        else 'declared feedback object has no source binding'),
+                       helper if supported and bound else None))
+    return tuple(result)
+
+
+def assess_selected_request(*, selection, artifact, source, value, binding,
+                            dependency_status, request_identity, caller_manifest=None):
+    """Assess actual selected declarations before any native materialization.
+
+    Provider API and historical evidence are intentionally not inferred from
+    a generic Core manifest. Exact build checks are identified separately.
+    """
+    from ...artifacts import CapabilityAssessmentV1, CapabilityAssessmentRowV1
+    from .control import (ControlBinding, ControlBindingPlanV1, bind_selected_controller,
+                          prepare_position_control_materialization, project_controller_feedback,
+                          declared_source_capabilities)
+    from ...artifacts.contracts import SUPPORTED_STATUSES
+
+    if dependency_status not in {'available', 'unavailable', 'unknown'}:
+        raise ValueError('invalid dependency assessment status')
+    if caller_manifest is not None and not isinstance(caller_manifest, ProviderCapabilityManifest):
+        raise TypeError('caller restriction must be a ProviderCapabilityManifest')
+    actual_capabilities = set(CAPABILITIES)
+    restricted = None if caller_manifest is None else {
+        item.name for item in caller_manifest.capabilities if item.status in SUPPORTED_STATUSES
+    }
+    if caller_manifest is not None and (caller_manifest.provider_name != selection.physics_provider
+                                        or caller_manifest.backend != selection.physics_backend):
+        restricted = set()
+    phase = 'static_preflight'
+    rows = []
+
+    helper = {
+        'mujoco': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+        'geophys': 'task_env.runtime.sessions.geophys:check_geophys_named_layout',
+        'isaacsim': 'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
+    }.get(selection.physics_provider)
+
+    def row(capability, subject, required='required', *, implemented=True,
+            valid='satisfied', reason='Core declaration was checked',
+            oracle=None, restrict=False):
+        rows.append(CapabilityAssessmentRowV1(
+            'capability-assessment-row-v1', capability, subject, required,
+            'supported' if implemented and valid != 'unknown' else 'unknown',
+            'implemented' if implemented else 'not_implemented',
+            dependency_status, 'none', phase, reason, None,
+            oracle if implemented else None, 'denied' if restrict else 'none', valid,
+        ))
+
+    source_problem = None
+    try:
+        artifact.validate()
+        if (value.get('source') is not source or value.get('artifact') is None
+                or value['artifact'].identity_hash != artifact.identity_hash):
+            raise ValueError('selected value/source/Artifact identity mismatch')
+        if source.task_artifact_hash != artifact.identity_hash:
+            raise ValueError('source/Artifact identity mismatch')
+        if selection.physics_provider in {'geophys', 'mujoco'}:
+            if not isinstance(source, RuntimeSource):
+                raise TypeError('MJCF route requires RuntimeSource')
+            if (source.config.runtime.backend != selection.physics_backend
+                    or source.config.runtime.physics_dt != artifact.timebase.physics_dt
+                    or source.config.runtime.control_substeps != artifact.timebase.control_substeps
+                    or source.config.render.camera_obs):
+                raise ValueError('source execution/timebase mismatch')
+            if not set(artifact.initialization.joint_position) <= set(source.joints):
+                raise ValueError('source joint bindings do not cover initialization')
+            if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
+                raise ValueError('source pose bindings do not cover semantics')
+            if isinstance(artifact, TaskArtifactV1):
+                execution = ExecutionSpec(selection.physics_provider, PROFILE, 'none',
+                                          selection.physics_backend, 0, 'strict')
+                if source.fixed_attachment_plan is not None:
+                    _validate_fixed_attachment_materialization_source(artifact, execution, source)
+                else:
+                    _validate_v1_materialization_source(
+                        artifact, execution, source,
+                        _allow_independent_robot_instances=(
+                            isinstance(value.get('controller'), (tuple, list))
+                            and len(value['controller']) > 1),
+                    )
+            elif source.scene_definition is not None and selection.physics_provider != 'geophys':
+                raise ValueError('Scene-v3 legacy projection is currently GeoPhys-only')
+            # Check names against this request's actual MJCF, not only the
+            # number of joints or actuators in its declared binding.
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(source.scene_source.xml)
+            joints = {node.get('name') for tag in ('joint', 'freejoint') for node in root.iter(tag)}
+            bodies = {node.get('name') for node in root.iter('body')}
+            sites = {node.get('name') for node in root.iter('site')}
+            actuators = root.find('actuator')
+            actuators = set() if actuators is None else {node.get('name') for node in actuators}
+            if source.composition_runtime_input is not None:
+                if selection.physics_provider != 'mujoco':
+                    raise ValueError('source composition has no admitted adapter for this provider')
+                from .mujoco_composition import validate_composed_source_names
+                validate_composed_source_names(source)
+            for label, requested, available in (() if (source.fixed_attachment_plan is not None
+                    or source.composition_runtime_input is not None) else (
+                ('joint', (*source.joints.values(), *source.free_joints.values()), joints),
+                ('body', source.bodies.values(), bodies),
+                ('frame', source.frames.values(), sites),
+                ('actuator', (*source.joint_targets.values(), *source.open_actuators,
+                              *source.torque_actuators.values(), *source.position_actuators.values()), actuators),
+            )):
+                missing = set(requested) - available
+                if missing:
+                    raise ValueError(f'selected source missing named {label}: {sorted(missing)}')
+            receipt = source.execution_source_receipt
+            if source.scene_definition is None:
+                if receipt is None or source.source_closure_digest is None:
+                    raise ValueError('asset closure has no source-bound receipt; native import cannot prove the requested closure')
+                receipt.validate_snapshot()
+            elif source.source_closure_digest is None:
+                raise ValueError('versioned Scene source has no declared closure digest')
+        elif selection.physics_provider == 'isaacsim':
+            runtime_input = value.get('session_admission_input')
+            declared_execution = value.get('execution_spec_v1')
+            if type(runtime_input) is UsdRuntimeInputV1:
+                _validate_f06_pickcube_isaac_input(runtime_input, artifact, runtime_input.execution, source)
+            elif (type(declared_execution) is ExecutionSpecV1
+                  and declared_execution.physics_profile == G05_ISAAC_EFFORT_PROFILE
+                  and type(source) is UsdRuntimeSourceV1):
+                if (declared_execution.physics_provider, declared_execution.physics_backend,
+                        declared_execution.physics_device) != (
+                        selection.physics_provider, selection.physics_backend, selection.physics_device):
+                    raise ValueError('USD execution differs from the requested provider selection')
+                _validate_g05_isaac_effort_source(artifact, declared_execution, source)
+            else:
+                raise TypeError('Isaac source requires an admitted runtime input or G05 effort declaration')
+        else:
+            raise ValueError('no selected adapter for provider')
+    except (TypeError, ValueError, OSError, AttributeError) as error:
+        source_problem = f'{type(error).__name__}: {error}'
+    row('source_closure', 'task:' + artifact.task_id,
+        valid='unsatisfied' if source_problem else 'satisfied',
+        reason=source_problem or 'source declarations passed; native importer must verify the closure')
+
+    selected = None
+    control_problem = None
+    plan = value.get('controller_binding_plan')
+    declared_bindings = ()
+    projected_feedback = ()
+    try:
+        if plan is not None:
+            if (type(plan) is not ControlBindingPlanV1 or not plan._compiled
+                    or source.scene_definition is None
+                    or plan.scene_identity_hash != source.scene_definition.identity_hash):
+                raise ValueError('Controller binding plan is not compiled for the selected Scene')
+            declared_bindings = plan.controller_bindings
+            projected_feedback = project_controller_feedback(plan)
+        selected = bind_selected_controller(value, binding=binding,
+                                            provider=selection.physics_provider,
+                                            backend=selection.physics_backend)
+        if selection.deployment == 'isolated_worker' and len(selected.position_profiles) > 1:
+            raise ValueError('selected worker profile is outside the scalar adapter envelope')
+        if value.get('physical_execution') is not None:
+            from .physical_control import PhysicalControlExecutionV1
+            physical = value['physical_execution']
+            position_owner = (selected.position and len(selected.position_capabilities) == 1
+                              and callable(binding.physical_observation_binding)
+                              and (selection.physics_provider, selection.physics_backend)
+                                  in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')})
+            if (type(physical) is not PhysicalControlExecutionV1
+                    or (not position_owner
+                        and not any(selected.controller is item for item in physical.controllers))):
+                raise ValueError('physical Controller is not bound to the selected execution')
+            if selection.deployment == 'isolated_worker':
+                raise ValueError('direct physical execution is not admitted in an isolated worker')
+            physical.validate_source(
+                scene=source.scene_definition, artifact_sha256=artifact.identity_hash,
+                source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
+                source=source,
+            )
+            if getattr(source, 'torque_actuators', None) and selection.physics_provider in {'mujoco', 'geophys'}:
+                # Typed effort execution and its source bindings were checked;
+                # the adapter still verifies native actuator names at build.
+                actual_capabilities.add('joint_torque_actuation')
+            if position_owner:
+                if any(selected.controller is item or selected.controller.identity == item.identity
+                       for item in physical.controllers):
+                    raise ValueError('Position and physical port Controllers must have distinct identities')
+                plan, _, _, _ = prepare_position_control_materialization(
+                    source=source, artifact=artifact, profiles=selected.position_profiles,
+                    plan=value.get('controller_binding_plan'),
+                    select_binding=binding.position_control_binding, value=value,
+                    capabilities=selected.position_capabilities,
+                )
+                declared_bindings = plan.controller_bindings
+                projected_feedback = project_controller_feedback(plan)
+        elif selected.position:
+            if not declared_bindings:
+                declared_bindings = tuple(profile.controller_binding() for profile in selected.position_profiles)
+            plan, _, _, _ = prepare_position_control_materialization(
+                source=source, artifact=artifact, profiles=selected.position_profiles,
+                plan=value.get('controller_binding_plan'),
+                select_binding=binding.position_control_binding, value=value,
+            )
+            projected_feedback = project_controller_feedback(plan)
+        else:
+            if type(binding.scalar_control_binding) is not ControlBinding:
+                raise TypeError('selected scalar Controller binding is missing')
+            if len(source.joint_targets) != 7 or len(source.open_actuators) != 1:
+                raise ValueError('source lacks the scalar position control bindings')
+            import hashlib
+            controller_artifact = getattr(selected.controller, 'source_artifact_hash', None)
+            controller_source = getattr(selected.controller, 'source_xml_sha256', None)
+            if (controller_artifact != artifact.identity_hash
+                    or controller_source != hashlib.sha256(source.scene_source.xml.encode()).hexdigest()):
+                raise ValueError('Controller model does not match the selected Artifact and source')
+    except (TypeError, ValueError, OSError, AttributeError) as error:
+        control_problem = f'{type(error).__name__}: {error}'
+    row('controller_binding', 'controller:' + artifact.task_id,
+        valid='unsatisfied' if control_problem else 'satisfied',
+        reason=control_problem or 'Controller/source declarations passed; build must verify native mapping',
+        oracle=None)
+
+    # Legacy scalar Controller requirements are inferred from its actual source
+    # bindings; versioned controllers contribute their declared feedback below.
+    declared = set(artifact.required_capabilities.names)
+    for name in sorted(declared):
+        available = name in actual_capabilities
+        row(name, 'task:' + artifact.task_id, implemented=available,
+            reason=('selected adapter exposes this declared capability; native evidence remains separate'
+                    if available else 'required capability has no selected Core adapter'),
+            restrict=restricted is not None and name not in restricted)
+
+    for name in declared_source_capabilities(source).names:
+        row(name, 'source:' + artifact.task_id,
+            implemented=name in actual_capabilities,
+            reason='required by the selected source bindings',
+            restrict=restricted is not None and name not in restricted)
+
+    source_objects = (
+        ('joints', 'joint', 'joint_state_query'),
+        ('free_joints', 'free', 'free_body'),
+        ('bodies', 'body', 'body_pose_query'),
+        ('frames', 'frame', 'frame_pose_query'),
+        ('joint_targets', 'actuator', 'joint_position_actuation'),
+        ('torque_actuators', 'actuator', 'joint_torque_actuation'),
+        ('position_actuators', 'actuator', 'joint_position_actuation'),
+    )
+    check_conditions = {
+        'joint': 'resolve the named scalar joint and its valid position/velocity state',
+        'free': 'resolve the named floating body and its valid pose/velocity state',
+        'body': 'resolve the named body and its public pose mapping',
+        'frame': 'resolve the named site or public frame view',
+        'actuator': 'resolve the named actuator and its declared joint mapping',
+    }
+    for field, kind, capability in source_objects:
+        for semantic, native in getattr(source, field, {}).items():
+            row(capability, kind + ':' + semantic, valid='unknown', oracle=helper,
+                reason=(f'{helper} must {check_conditions[kind]} for '
+                        f'{semantic!r} -> {native!r}; missing or incompatible mapping fails build'),
+                restrict=restricted is not None and capability not in restricted)
+    for native in getattr(source, 'open_actuators', ()):
+        row('joint_position_actuation', 'actuator:open:' + native, valid='unknown', oracle=helper,
+            reason=f'{helper} must resolve the declared opening actuator in the actual model',
+            restrict=restricted is not None and 'joint_position_actuation' not in restricted)
+
+    if plan is not None and declared_bindings:
+        for controller_binding in plan.controller_bindings:
+            for group in controller_binding.groups:
+                row('control_group_binding', 'group:' + group.entity_id + '/' + group.group_id,
+                    reason='compiled Scene ControlGroup is assigned to writer ' + controller_binding.writer_id)
+        for entity_id, actuator_id, writer_id in plan.resource_writers:
+            row('control_resource_binding', 'resource:' + entity_id + '/' + actuator_id,
+                reason='compiled Scene actuator resource is assigned to writer ' + writer_id)
+    for name, subject, required, supported, valid, reason, oracle in project_feedback_assessment(
+            projected_feedback, artifact, source, actual_capabilities, helper):
+        row(name, subject, required=required, implemented=supported, valid=valid,
+            reason=reason, oracle=oracle, restrict=restricted is not None and name not in restricted)
+    row('scalar_layout', 'batch:scalar',
+        valid='satisfied' if selection.batch_layout == 'scalar' else 'unsatisfied',
+        reason='selected adapter is scalar; native batch and partial reset are not admitted')
+    render = selection.render_default
+    state_only = (render.provider, render.backend, render.profile, render.device) == ('none', 'cpu', 'none', None)
+    row('state_only_renderer', 'renderer:default',
+        valid='satisfied' if state_only else 'unsatisfied',
+        reason='selected adapter admits state-only rendering' if state_only else 'required renderer is not implemented')
+    return CapabilityAssessmentV1('capability-assessment-v1', request_identity, phase, tuple(rows))

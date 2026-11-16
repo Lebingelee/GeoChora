@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from dataclasses import replace
 import fcntl
@@ -10,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -23,9 +25,10 @@ else:
     from isaac_core_site_overlay import populate_isaac_core_site_overlay
 
 CORE = Path(__file__).resolve().parents[3]
-LOCK = CORE / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock'
-CPU_PYTHON = Path(sys.executable)
 ISAAC_PYTHON = CORE / 'workspace/environments/isaacsim-6.2.0/bin/python'
+LEGACY_LOCK = CORE / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock'
+LOCK = CORE / 'workspace/locks/shared_native_execution.lock'
+CPU_PYTHON = Path(sys.executable)
 MAX_WORKER_LOG_BYTES = 64 * 1024**2
 MAX_RUN_EVIDENCE_BYTES = 2 * 1024**3
 # Isaac 6.2's accepted F06 startup currently advances 18 public physics
@@ -37,22 +40,29 @@ _populate_isaac_core_site_overlay = populate_isaac_core_site_overlay
 
 
 def core_python() -> Path:
-    override = os.environ.get('GEOCHORA_CORE_PYTHON')
-    return Path(override).expanduser() if override else CPU_PYTHON
+    """Harness candidate route: same selection as the built-in example."""
+    return _core_python()
 
 
 def isaac_python() -> Path:
+    """Harness candidate route: GEOCHORA_ISAAC_PYTHON, else the built-in selection."""
     override = os.environ.get('GEOCHORA_ISAAC_PYTHON')
-    return Path(override).expanduser() if override else ISAAC_PYTHON
+    return Path(override).expanduser().absolute() if override else _isaac_python()
 
 
 def native_lock_path() -> Path:
-    """Share one lock between built-in and candidate workers on this machine."""
+    """Share one lock between built-in and candidate workers on this machine.
+
+    Prefer Core's canonical lock inode (the one the built-in example opens), so
+    candidate and built-in native runs exclude each other.
+    """
     override = os.environ.get('GEOCHORA_NATIVE_LOCK')
     if override:
         path = Path(override).expanduser().resolve()
-    elif LOCK.parent.is_dir():
-        path = LOCK
+    elif LOCK.is_file():
+        return LOCK
+    elif LEGACY_LOCK.parent.is_dir():
+        path = LEGACY_LOCK
     else:
         path = CORE / 'workspace/harness/shared_native_execution.lock'
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,6 +72,95 @@ def native_lock_path() -> Path:
 def native_cleanup_blocker_path(lock_path) -> Path:
     lock_path = Path(lock_path)
     return lock_path.with_name(lock_path.name + '.unretired.json')
+
+
+def _lock_matches_legacy(stream, *, require_legacy=False):
+    """Check the canonical inode and any retained compatibility alias."""
+    opened = os.fstat(stream.fileno())
+    current = LOCK.lstat()
+    if not (stat.S_ISREG(opened.st_mode) and stat.S_ISREG(current.st_mode)
+            and (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)):
+        return False
+    try:
+        legacy = LEGACY_LOCK.lstat()
+    except FileNotFoundError:
+        return not require_legacy
+    return (stat.S_ISREG(legacy.st_mode)
+            and (opened.st_dev, opened.st_ino) == (legacy.st_dev, legacy.st_ino))
+
+
+def _open_shared_native_lock():
+    """Open the existing canonical lock without creating a competing inode."""
+    fd = os.open(LOCK, os.O_RDWR | os.O_NOFOLLOW)
+    stream = os.fdopen(fd, 'r+')
+    try:
+        if not _lock_matches_legacy(stream):
+            raise RuntimeError('native lock alias does not match legacy lock')
+    except BaseException:
+        stream.close()
+        raise
+    return stream
+
+
+def _isaac_python(explicit=None):
+    """Choose an external interpreter without probing or starting Isaac."""
+    value = explicit if explicit is not None else os.environ.get('ISAAC_SIM_PYTHON')
+    return Path(value).expanduser().absolute() if value else ISAAC_PYTHON
+
+
+def _core_python():
+    value = os.environ.get('GEOCHORA_CORE_PYTHON')
+    return Path(value).expanduser().absolute() if value else CPU_PYTHON
+
+
+def _isaac_dependency_overlay(executable, output):
+    """Expose only the missing task/recording packages, after SDK packages."""
+    query = ('import json,sys,sysconfig; print(json.dumps({'
+             '"version":list(sys.version_info[:2]),"purelib":sysconfig.get_paths()["purelib"]}))')
+    clean_env = os.environ.copy()
+    clean_env.pop('PYTHONPATH', None)
+    clean_env.pop('GEOCHORA_CORE_SITE', None)
+    clean_env['PYTHONNOUSERSITE'] = '1'
+    core = json.loads(subprocess.check_output([str(_core_python()), '-c', query], env=clean_env, text=True, timeout=10))
+    isaac = json.loads(subprocess.check_output([str(executable), '-c', query], env=clean_env, text=True, timeout=10))
+    if core['version'] != isaac['version']:
+        raise ValueError('Core and Isaac Python versions differ; dependency overlay is unsafe')
+    core_site = Path(core['purelib']).resolve(strict=True)
+    overlay = output / 'isaac_dependency_overlay'
+    overlay.mkdir()
+    names = ['gymnasium', 'farama_notifications', 'h5py', 'h5py.libs']
+    for prefix in ('gymnasium-', 'farama_notifications-', 'h5py-'):
+        names.extend(p.name for p in core_site.iterdir() if p.name.startswith(prefix) and p.name.endswith('.dist-info'))
+    for name in names:
+        source = core_site / name
+        if source.exists():
+            (overlay / name).symlink_to(source, target_is_directory=source.is_dir())
+        elif name in ('gymnasium', 'h5py'):
+            raise ValueError(f'Core dependency is missing: {source}')
+    check = ('import sys,json,tempfile; sys.path.append(sys.argv[1]); '
+             'import numpy,h5py,gymnasium; '
+             'f=tempfile.TemporaryFile(); '
+             'h=h5py.File(f,"w"); h["x"]=numpy.array([0.,1.]); h.close(); '
+             'f.seek(0); h=h5py.File(f,"r"); assert h["x"][:].tolist()==[0.,1.]; h.close(); f.close(); '
+             'assert gymnasium.spaces.Box(-1.,1.,shape=(2,),dtype=numpy.float32).contains(numpy.array([0.,1.],dtype=numpy.float32)); '
+             'print(json.dumps({"modules":{m.__name__:{"version":m.__version__,"path":m.__file__} for m in (numpy,h5py,gymnasium)},'
+             '"hdf5_runtime":h5py.version.hdf5_version,"hdf5_built":h5py.version.hdf5_built_version_tuple}))')
+    result = json.loads(subprocess.check_output([str(executable), '-c', check, str(overlay)],
+                                                 cwd=output, env=clean_env, text=True, timeout=30))
+    numpy_path = Path(result['modules']['numpy']['path']).resolve(strict=True)
+    if not numpy_path.is_relative_to(Path(isaac['purelib']).resolve(strict=True)):
+        raise ValueError(f'Isaac NumPy is outside the SDK site-packages: {numpy_path}')
+    _write_json(output / 'isaac_dependency_overlay.json', {'core_site': str(core_site),
+                'python_version': core['version'], 'entries': names, 'import_check': result})
+    return overlay
+
+
+def _geophys_source():
+    value = os.environ.get('GEOCHORA_GEOPHYS_SRC')
+    path = Path(value).expanduser().resolve() if value else CORE / 'GeoPhys/src'
+    if not (path / 'scene' / '__init__.py').is_file():
+        raise ValueError(f'GeoPhys src directory is missing scene/__init__.py: {path}')
+    return path
 
 
 def _write_json(path, value):
@@ -145,6 +244,85 @@ def _kill_process_group(process, sig):
         pass
 
 
+def _retire_process_group(process):
+    """Keep the caller's lock held until the supervised group has exited."""
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGHUP})
+    try:
+        interrupted = process.poll() is None
+        if interrupted:
+            try:
+                _kill_process_group(process, signal.SIGTERM)
+            except PermissionError:
+                pass
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    _kill_process_group(process, signal.SIGKILL)
+                except PermissionError:
+                    pass
+                process.wait()
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                return interrupted
+            except PermissionError:
+                # Do not release the lock when group retirement is unknown.
+                interrupted = True
+                time.sleep(.1)
+                continue
+            if time.monotonic() >= deadline:
+                interrupted = True
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    return interrupted
+                except PermissionError:
+                    pass
+            time.sleep(.1)
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
+
+@contextmanager
+def _supervised_worker(command, *, environment, stdout, stderr, cwd=None, lock_fd=None):
+    """Turn termination signals into cleanup and close the startup window."""
+    def interrupted(signum, frame):
+        raise SystemExit(128 + signum)
+
+    previous_handlers = {sig: signal.signal(sig, interrupted) for sig in (signal.SIGTERM, signal.SIGHUP)}
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGHUP})
+    state = {'forced_retirement': False}
+    try:
+        def prepare_child():
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            _set_child_affinity()
+
+        child_environment = dict(environment)
+        child_environment.pop('GEOCHORA_SUPERVISED_NATIVE_LOCK_FD', None)
+        inherited_fds = ()
+        if lock_fd is not None:
+            os.fstat(lock_fd)
+            child_environment['GEOCHORA_SUPERVISED_NATIVE_LOCK_FD'] = str(lock_fd)
+            inherited_fds = (lock_fd,)
+        process = subprocess.Popen(
+            command, cwd=CORE if cwd is None else cwd, env=child_environment, stdout=stdout, stderr=stderr,
+            pass_fds=inherited_fds,
+            start_new_session=True, preexec_fn=prepare_child,
+        )
+        try:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            yield process, state
+        finally:
+            state['forced_retirement'] = _retire_process_group(process)
+    finally:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
+
 def _cold_read_h5(output, receipt, *, provider):
     h5_path = Path(output) / 'episode.h5'
     cold_path = Path(output) / 'cold_read.json'
@@ -159,11 +337,11 @@ def _cold_read_h5(output, receipt, *, provider):
         result['error'] = 'episode H5 is missing'
     else:
         environment = os.environ.copy()
-        environment['PYTHONPATH'] = f'{CORE / "GeoPhys/src"}:{CORE}'
+        environment['PYTHONPATH'] = f'{_geophys_source()}:{CORE}'
         environment['PYTHONDONTWRITEBYTECODE'] = '1'
         try:
             inspected = subprocess.run(
-                [str(core_python()), str(CORE / 'examples/recording/inspect_h5.py'),
+                [str(_core_python()), str(CORE / 'examples/recording/inspect_h5.py'),
                  '--input', str(h5_path)],
                 cwd=CORE, env=environment, capture_output=True, text=True, timeout=30,
                 start_new_session=True,
@@ -218,14 +396,14 @@ def _cold_read_h5(output, receipt, *, provider):
     return result
 
 
-def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
+def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isaac_python=None):
     output.mkdir(parents=True, exist_ok=False)
     stdout_path, stderr_path = output / 'worker.stdout.log', output / 'worker.stderr.log'
     if provider == 'isaacsim':
-        executable = isaac_python()
+        executable = _isaac_python(isaac_python)
         timeout_s = 1200
     else:
-        executable = core_python()
+        executable = _core_python()
         timeout_s = 420
     spec = BuiltinPickCubeExampleV1.load(spec_path)
     catalog = json.loads(Path(catalog_path).read_text())
@@ -288,11 +466,11 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_RESOURCE_GATE',
                 'gpu_free_mib': gpu_start, 'reason': 'less than 5120 MiB free GPU memory'}
     environment = os.environ.copy()
-    isaac_core_site_owner = None
+    environment.pop('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY', None)
     environment.pop('PYTHONPATH', None) if provider == 'isaacsim' else None
     environment['PYTHONDONTWRITEBYTECODE'] = '1'
     if provider != 'isaacsim':
-        environment['PYTHONPATH'] = f'{CORE / "GeoPhys/src"}:{CORE}'
+        environment['PYTHONPATH'] = f'{_geophys_source()}:{CORE}'
     else:
         environment['PYTHONNOUSERSITE'] = '1'
         environment.update({
@@ -300,32 +478,28 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             'OPENBLAS_NUM_THREADS': '4', 'NUMEXPR_NUM_THREADS': '4',
             'TOKENIZERS_PARALLELISM': 'false',
         })
-        core_site = Path(subprocess.check_output(
-            [str(core_python()), '-c',
-             'import sysconfig; print(sysconfig.get_paths()["purelib"])'],
-            cwd=CORE, text=True, timeout=10,
-        ).strip())
-        isaac_core_site_owner = tempfile.TemporaryDirectory(
-            prefix='geochora-isaac-core-site-'
-        )
-        overlay = Path(isaac_core_site_owner.name)
-        plan['isaac_core_site_overlay'] = _populate_isaac_core_site_overlay(
-            core_site, overlay,
-        )
-        environment['GEOCHORA_CORE_SITE'] = str(overlay)
-        _write_json(output / 'run_plan.json', plan)
+        # The SDK interpreter must use its own dependencies.  Importing a
+        # second Python environment's binary modules can mix incompatible ABIs.
+        environment.pop('GEOCHORA_CORE_SITE', None)
+        try:
+            environment['GEOCHORA_ISAAC_DEPENDENCY_OVERLAY'] = str(_isaac_dependency_overlay(executable, output))
+        except Exception as error:
+            _write_json(output / 'run_preflight.json', {
+                'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
+                'status': 'NOT_RUN_DEPENDENCY', 'shared_native_lock_acquired': False,
+                'reason': f'Isaac dependency overlay: {type(error).__name__}: {error}',
+            })
+            return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_DEPENDENCY',
+                    'reason': f'Isaac dependency overlay: {type(error).__name__}: {error}'}
     command = [str(executable), str(Path(__file__).with_name('builtin_example_worker.py')),
                '--spec', str(spec_path), '--catalog', str(catalog_path),
                '--working-tree-scope', str(scope_path), '--seed', str(seed),
                '--output', str(output)]
     wall_start = time.perf_counter()
-    lock_path = native_lock_path()
-    with lock_path.open('a') as lock_stream:
+    with _open_shared_native_lock() as lock_stream:
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            if isaac_core_site_owner is not None:
-                isaac_core_site_owner.cleanup()
             _write_json(output / 'run_preflight.json', {
                 'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
                 'status': 'BLOCKED_NATIVE_LOCK', 'mem_available_start_bytes': mem_start,
@@ -333,98 +507,115 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             })
             return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
                     'reason': 'another process owns the shared native execution lock'}
-        blocker = native_cleanup_blocker_path(lock_path)
+        legacy_was_present = os.path.lexists(LEGACY_LOCK)
+        if not _lock_matches_legacy(lock_stream, require_legacy=legacy_was_present):
+            raise RuntimeError('native lock alias changed while acquiring lock')
+        blocker = native_cleanup_blocker_path(LOCK)
         if blocker.exists():
-            if isaac_core_site_owner is not None:
-                isaac_core_site_owner.cleanup()
             return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
                     'reason': f'unconfirmed native process retirement; inspect {blocker}'}
         _write_json(output / 'run_preflight.json', {
             'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
             'status': 'READY', 'mem_available_start_bytes': mem_start,
             'gpu_free_start_mib': gpu_start, 'shared_native_lock_acquired': True,
-            'shared_native_lock_path': str(lock_path), 'cpu_affinity_slots': 4,
+            'shared_native_lock_path': str(LOCK), 'cpu_affinity_slots': 4,
         })
         with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
-            process = subprocess.Popen(
-                command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
-                start_new_session=True, preexec_fn=_set_child_affinity,
-            )
-            timed_out = False
-            resource_violation = None
-            while process.poll() is None:
-                elapsed = time.perf_counter() - wall_start
-                if elapsed > timeout_s:
-                    timed_out = True
-                    resource_violation = f'wall watchdog {timeout_s}s exceeded'
-                    _kill_process_group(process, signal.SIGTERM)
+            with _supervised_worker(command, environment=environment, stdout=stdout, stderr=stderr,
+                                    cwd=output.resolve(), lock_fd=lock_stream.fileno()) as (process, worker_state):
+                timed_out = False
+                resource_violation = None
+                while process.poll() is None:
                     try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        _kill_process_group(process, signal.SIGKILL)
-                    break
-                try:
-                    available = _mem_available_bytes()
-                    rss = _proc_rss_tree(process.pid)
-                    gpu_free = _gpu_free_mib() if provider == 'isaacsim' else None
-                except Exception as error:
-                    resource_violation = f'resource monitoring unavailable: {type(error).__name__}: {error}'
-                    _kill_process_group(process, signal.SIGTERM)
+                        lock_valid = _lock_matches_legacy(lock_stream, require_legacy=legacy_was_present)
+                    except OSError:
+                        lock_valid = False
+                    if not lock_valid:
+                        resource_violation = 'shared native lock path changed during worker execution'
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
+                    elapsed = time.perf_counter() - wall_start
+                    if elapsed > timeout_s:
+                        timed_out = True
+                        resource_violation = f'wall watchdog {timeout_s}s exceeded'
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
                     try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        _kill_process_group(process, signal.SIGKILL)
-                    break
-                if available < 1024**3:
-                    resource_violation = f'MemAvailable below 1 GiB: {available}'
-                elif rss > 10 * 1024**3:
-                    resource_violation = f'process-group RSS above 10 GiB: {rss}'
-                elif provider == 'isaacsim' and gpu_free < 256:
-                    resource_violation = f'GPU free memory below 256 MiB: {gpu_free}'
-                elif stdout_path.stat().st_size + stderr_path.stat().st_size > MAX_WORKER_LOG_BYTES:
-                    resource_violation = 'worker stdout/stderr exceeded 64 MiB log budget'
-                elif _directory_bytes(output) > MAX_RUN_EVIDENCE_BYTES:
-                    resource_violation = 'run output exceeded 2 GiB evidence budget'
-                if resource_violation:
-                    _kill_process_group(process, signal.SIGTERM)
-                    try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        _kill_process_group(process, signal.SIGKILL)
-                    break
-                time.sleep(1.0)
-            returncode = process.wait()
-            worker_process_wall_s = time.perf_counter() - wall_start
-        # The run lock is retained through direct worker exit and process-group
-        # retirement so an abnormal Kit shutdown cannot overlap a new run.
-        pg_alive = True
-        for _ in range(50):
-            try:
-                os.killpg(process.pid, 0)
-            except ProcessLookupError:
-                pg_alive = False
-                break
-            time.sleep(0.1)
-        if pg_alive:
-            _kill_process_group(process, signal.SIGTERM)
-            time.sleep(0.5)
-            _kill_process_group(process, signal.SIGKILL)
-            resource_violation = resource_violation or 'worker process group did not end after parent exit'
-        fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
-    if isaac_core_site_owner is not None:
-        # The child and all Kit subprocesses have ended; remove the temporary
-        # Core dependency overlay before cold-reading or writing final receipts.
-        isaac_core_site_owner.cleanup()
+                        available = _mem_available_bytes()
+                        rss = _proc_rss_tree(process.pid)
+                        gpu_free = _gpu_free_mib() if provider == 'isaacsim' else None
+                    except Exception as error:
+                        resource_violation = f'resource monitoring unavailable: {type(error).__name__}: {error}'
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
+                    if available < 1024**3:
+                        resource_violation = f'MemAvailable below 1 GiB: {available}'
+                    elif rss > 10 * 1024**3:
+                        resource_violation = f'process-group RSS above 10 GiB: {rss}'
+                    elif provider == 'isaacsim' and gpu_free < 256:
+                        resource_violation = f'GPU free memory below 256 MiB: {gpu_free}'
+                    elif stdout_path.stat().st_size + stderr_path.stat().st_size > MAX_WORKER_LOG_BYTES:
+                        resource_violation = 'worker stdout/stderr exceeded 64 MiB log budget'
+                    elif _directory_bytes(output) > MAX_RUN_EVIDENCE_BYTES:
+                        resource_violation = 'run output exceeded 2 GiB evidence budget'
+                    if resource_violation:
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
+                    time.sleep(1.0)
+                returncode = process.wait()
+                worker_process_wall_s = time.perf_counter() - wall_start
+            group_intervened = worker_state['forced_retirement']
+        try:
+            if not _lock_matches_legacy(lock_stream, require_legacy=legacy_was_present):
+                resource_violation = resource_violation or 'shared native lock path changed during worker execution'
+        except OSError:
+            resource_violation = resource_violation or 'shared native lock path changed during worker execution'
+        pg_alive = False
+        if group_intervened:
+            resource_violation = resource_violation or 'worker process group required forced retirement'
+        # Close our descriptor on context exit; an isolated Runtime descendant
+        # retains the same locked open-file description until it exits. An
+        # explicit LOCK_UN here would release the lock on behalf of the child.
+    lock_available_after_worker = False
+    try:
+        with _open_shared_native_lock() as probe:
+            fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_available_after_worker = True
+    except (OSError, RuntimeError):
+        pass
     _write_json(output / 'lock_receipt.json', {
         'schema_version': 'harness-builtin-pickcube-example-lock-receipt-v1',
-        'shared_native_lock_path': str(lock_path), 'released_after_worker_process_group_exit': not pg_alive,
+        'shared_native_lock_path': str(LOCK),
+        'released_after_worker_process_group_exit': lock_available_after_worker and not pg_alive,
+        'shared_lock_available_after_worker_exit': lock_available_after_worker,
         'lock_held_for_worker': True,
     })
+    if not lock_available_after_worker:
+        return {'seed': seed, 'provider': provider, 'status': 'INVALID',
+                'runtime_valid': False, 'worker_process_group_ended': not pg_alive,
+                'reason': 'shared lock remains held or changed after worker exit; cold read deferred'}
     receipt_path = output / 'run.json'
     receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else None
     cold_read = _cold_read_h5(output, receipt, provider=provider)
     receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else receipt
-    status = 'RUNTIME_VALID' if receipt and receipt.get('runtime_valid') and returncode == 0 else 'INVALID'
+    status = ('RUNTIME_VALID' if receipt and receipt.get('runtime_valid')
+              and returncode == 0 and resource_violation is None else 'INVALID')
     return {
         'seed': seed, 'provider': provider, 'status': status,
         'returncode': returncode, 'timed_out': timed_out,
@@ -441,7 +632,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         'worker_stderr': str(stderr_path.relative_to(CORE)),
         'task_outcome': receipt.get('task_outcome') if receipt else None,
         'compiled': receipt.get('compiled') if receipt else None,
-        'runtime_valid': receipt.get('runtime_valid') if receipt else False,
+        'runtime_valid': status == 'RUNTIME_VALID',
         'isaac_app_launch_profile_id': (
             receipt.get('isaac_app_launch_profile', {}).get('profile_id')
             if receipt and isinstance(receipt.get('isaac_app_launch_profile'), dict) else None
@@ -453,7 +644,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
 
 
 def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_seed=None,
-                      provider_override=None, source_delivery_manifest=None):
+                      provider_override=None, source_delivery_manifest=None, isaac_python=None):
     spec = BuiltinPickCubeExampleV1.load(spec_path)
     if provider_override is not None:
         route = {
@@ -491,6 +682,7 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
         row = _run_one(
             save_inputs / 'example_spec.json', save_inputs / 'catalog.json',
             save_inputs / 'working_tree_scope.json', seed, run_dir, provider=spec.provider,
+            isaac_python=isaac_python,
         )
         rows.append(row)
         # The F06 route gate only counts the fixed seeds; diagnostic seeds are
@@ -554,11 +746,14 @@ def main(argv=None):
     parser.add_argument('--source-delivery-manifest', type=Path,
                         help='required exact F06 PickCube USD manifest for --provider isaacsim')
     parser.add_argument('--only-seed', type=int, choices=(31, 32, 33))
+    parser.add_argument('--isaac-python', type=Path,
+                        help='Isaac interpreter; overrides ISAAC_SIM_PYTHON')
     args = parser.parse_args(argv)
     result = validate_provider(args.spec, args.catalog, args.working_tree_scope,
                                args.output_dir, only_seed=args.only_seed,
                                provider_override=args.provider,
-                               source_delivery_manifest=args.source_delivery_manifest)
+                               source_delivery_manifest=args.source_delivery_manifest,
+                               isaac_python=args.isaac_python)
     print(json.dumps({'provider': result['provider'], 'disposition': result['disposition'],
                       'runtime_valid_count': result['runtime_valid_count'],
                       'task_solved_count': result['task_solved_count']}, sort_keys=True))

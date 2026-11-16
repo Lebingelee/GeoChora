@@ -37,6 +37,25 @@ def _execution(backend='cpu'):
     return ExecutionSpec('geophys', 'p1_2_scalar_cpu_v0', 'none', backend, 0, 'strict')
 
 
+@pytest.mark.parametrize('provider,backend,rate', [
+    ('mujoco', 'cpu', 500), ('geophys', 'other', 500),
+    ('geophys', 'cpu', True), ('geophys', 'cpu', 100.0),
+    ('geophys', 'cpu', 200),
+])
+def test_native_feedback_binding_rejects_unsupported_request_before_source_build(
+        monkeypatch, provider, backend, rate):
+    from task_env.tasks.nut_assembly import specialization
+
+    def unexpected_build(**_kwargs):
+        raise AssertionError('invalid native feedback request built a source')
+
+    monkeypatch.setattr(specialization, 'build_native_feedback_reference', unexpected_build)
+    with pytest.raises(ValueError, match='100/500 Hz'):
+        NutAssemblyReferenceEnv(
+            provider=provider, backend=backend, _native_feedback_request=rate,
+        )
+
+
 @pytest.mark.parametrize('backend', ['cpu', 'cuda'])
 def test_public_r05b_profile_builds_and_passes_real_source_admission(backend):
     env = NutAssemblyReferenceEnv.for_native_feedback_profile(
@@ -241,7 +260,7 @@ def test_normal_profile_rejects_wrong_live_controller_or_law_before_materializat
                     value['artifact'], _execution(), source=source,
                     binding=ControlBinding('panda-v1/gripper', .08),
                     native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=controller, selected_solution=value['solution'],
+                    selected_controller=controller,
                     native_feedback_gripper_control_hz=500,
                 )
         finally:
@@ -254,35 +273,83 @@ def test_normal_profile_rejects_wrong_live_controller_or_law_before_materializat
                     value['artifact'], _execution(), source=source,
                     binding=ControlBinding('panda-v1/gripper', .08),
                     native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=controller, selected_solution=value['solution'],
+                    selected_controller=controller,
                     native_feedback_gripper_control_hz=500,
                 )
         finally:
             actual_controller.config = original_config
-        original_solution_config = value['solution'].config
-        value['solution'].config = replace(
-            original_solution_config,
-            translation_speed_m_s=original_solution_config.translation_speed_m_s + 0.01,
-        )
-        try:
-            with pytest.raises(ValueError, match='exact admitted R3 Controller'):
-                materialize_control(
-                    value['artifact'], _execution(), source=source,
-                    binding=ControlBinding('panda-v1/gripper', .08),
-                    native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=controller, selected_solution=value['solution'],
-                    native_feedback_gripper_control_hz=500,
-                )
-        finally:
-            value['solution'].config = original_solution_config
         with pytest.raises(ValueError, match='exact admitted R3 Controller'):
             materialize_control(
                 value['artifact'], _execution(), source=source,
                 binding=ControlBinding('panda-v1/gripper', .08),
                 native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                selected_controller=controller, selected_solution=value['solution'],
+                selected_controller=controller,
                 native_feedback_gripper_control_hz=100,
             )
+    finally:
+        receipt.close()
+
+
+@pytest.mark.parametrize("rate", [100, 500])
+def test_runtime_materializes_profile_without_solution(monkeypatch, rate):
+    from task_env.runtime.sessions import control
+
+    value = build_native_feedback_reference(backend='cpu', gripper_control_hz=rate,
+                                            include_solution=False)
+    receipt = value['source'].execution_source_receipt
+    session = SimpleNamespace()
+    calls = []
+    monkeypatch.setattr(control, 'materialize',
+                        lambda *args, **kwargs: calls.append((args, kwargs)) or session)
+    try:
+        result = control.materialize_control(
+            value['artifact'], _execution(), source=value['source'],
+            binding=control.ControlBinding('panda-v1/gripper', .08),
+            native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
+            selected_controller=value['controller'], native_feedback_gripper_control_hz=rate,
+        )
+        assert result is session
+        assert len(calls) == 1
+        assert result._force_feedback_required is True
+    finally:
+        receipt.close()
+
+
+def test_nut_binding_rejects_wrong_solution_type_identity_config_and_time():
+    from task_env.tasks.nut_assembly import specialization
+    from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
+
+    value = build_native_feedback_reference(backend='cpu', gripper_control_hz=500)
+    receipt = value['source'].execution_source_receipt
+    solution = value['solution']
+    class SubstitutedSolution(NutAssemblyOutcomeSolutionV1):
+        pass
+    substitute = object.__new__(SubstitutedSolution)
+    substitute.__dict__.update(solution.__dict__)
+    try:
+        specialization._validate_external_solution(value, solution)
+        for wrong in (None, substitute):
+            with pytest.raises(TypeError):
+                specialization._validate_external_solution(value, wrong)
+        original_identity = solution.identity
+        solution.identity = '0' * 64
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
+        solution.identity = original_identity
+        original_config = solution.config
+        solution.config = replace(original_config,
+                                  translation_speed_m_s=original_config.translation_speed_m_s + 0.01)
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
+        solution.config = original_config
+        original_source = solution.source_id
+        solution.source_id = 'wrong-source'
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
+        solution.source_id = original_source
+        solution.control_dt += 0.001
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
     finally:
         receipt.close()
 
@@ -565,7 +632,8 @@ def test_normal_public_profile_laws_drive_real_five_sample_interval(
     env = NutAssemblyReferenceEnv.for_native_feedback_profile(
         backend='cpu', gripper_control_hz=law_hz,
     )
-    solution = env.solution
+    from task_env.tasks.nut_assembly.specialization import build_native_feedback_solution
+    solution = build_native_feedback_solution(backend='cpu', gripper_control_hz=law_hz)
     try:
         env.reset_for_solution(solution, seed=19)
         assert env.controller.gripper_rate_hz == law_hz
@@ -580,6 +648,43 @@ def test_normal_public_profile_laws_drive_real_five_sample_interval(
     finally:
         env.close()
 
+
+
+@pytest.mark.parametrize('law_hz', [100, 500])
+def test_normal_profile_caller_owns_solution_and_executes_public_action(monkeypatch, law_hz):
+    from task_env.tasks.nut_assembly.specialization import build_native_feedback_solution
+
+    _install_provider_free_materialize(monkeypatch)
+    env = NutAssemblyReferenceEnv.for_native_feedback_profile(backend='cpu', gripper_control_hz=law_hz)
+    solution = build_native_feedback_solution(backend='cpu', gripper_control_hz=law_hz)
+    try:
+        assert env.solution is None
+        obs, info = env.reset(seed=19)
+        assert env.solution is None
+        solution.reset(obs, info, env.metadata)
+        proposal = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(proposal)
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert env.solution is None
+        assert info['native_interval_receipt_v1']['completed_substeps'] == 5
+        assert len(info['native_interval_receipt_v1']['samples']) == 5
+        assert env.state.control_step == 1
+    finally:
+        env.close()
+
+
+def test_normal_profile_legacy_solution_is_created_only_on_request(monkeypatch):
+    _install_provider_free_materialize(monkeypatch)
+    env = NutAssemblyReferenceEnv.for_native_feedback_profile(backend='cpu')
+    try:
+        env.reset(seed=19)
+        assert env.solution is None
+        solution = env.prepare_expert()
+        assert env.solution is solution
+        env.step_expert()
+        assert env.state.control_step == 1
+    finally:
+        env.close()
 
 def _run_raw_reader(h5_path, expected_path, output_path):
     return subprocess.run(

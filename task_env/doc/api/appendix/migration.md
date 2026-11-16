@@ -1,10 +1,13 @@
 # Migration
 
-> **Current release planning (2026-10-17):** GeoChora v1.1.0 is the selected
-> release-candidate target under the project-specific versioning policy. It is
-> a Core consolidation release with documented breaking API changes and is
-> not claimed to follow strict SemVer. The sections below describe current
-> migration behavior; the immutable v1.0.0 release documents remain unchanged.
+> **v2.1.1 当前边界：** selected 环境的实现位于
+> `task_env.environment.reference_env`；`task_env.tasks.reference_env` 保留兼容导出。
+> `BaseTaskEnv` 现为 `SelectedReferenceEnv` 同对象兼容导出；三个组件任务接入共同 episode owner。生命周期源码与无引擎契约已获 [Sol 有限接收](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_lifecycle_unification_sol_review.md)，后续维护变更仍待复审。
+> 下方带 P2.0-B 标题的段落保留原迁移历史和当时状态，不能当作本次维护的当前验收结论；
+> 当前状态见 [API 入口](../index.md) 和 [维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
+> Phase C 的标准方向是外部 Solution 产生 action 并交给 `env.step(action)`；
+> 下方历史 `step_expert()` 用法现仅是迁移前的受限兼容，不是标准 Env API。
+> NutAssembly 现有调用方驱动的 `act → step(action) → observe`，只接收带来源边界与控制请求的 `ExpertAction`；裸数组仍受限，完整物理验证待做。
 
 **Import path**：不适用  
 **任务域**：Appendix  
@@ -18,15 +21,14 @@
 | `task_env.action` | `task_env.controllers` |
 | `task_env.agents` | `task_env.robots` |
 | `task_env.core` | `task_env.environment` / `task_env.assembly` |
-| `task_env.scene`、`task_env.scenes` | `task_env.worlds`、`task_env.assembly` |
+| `task_env.scene`、`task_env.scenes` | `task_env.tasks.worlds`、`task_env.assembly` |
 | `task_env.observation` | `task_env.observations` |
 | `task_env.planning` | `task_env.planners` |
 | `task_env.recording` | `task_env.recorders` |
-| `task_env.rendering` | `task_env.renderers` |
-| `task_env.experts` | `task_env.solutions` |
-| `task_env.utils` | 按实际公开子包替换 |
+| `task_env.rendering` | `task_env.render`（具体 renderer 以实际后端支持为准） |
+| `task_env.experts` | 任务拥有各自的 Solution；通用 `ExpertAction` 等契约在 `task_env.planners` |
 
-以上旧路径不保留 compatibility shim。迁移时使用顶层 `task_env.__all__` 或目标子包 `__all__` 核验导入名。
+以上旧路径不保留 compatibility shim。`task_env.utils` 仍存在，按其 `__all__` 使用公开工具；私有 helper 不因此成为稳定接口。迁移时使用顶层 `task_env.__all__` 或目标子包 `__all__` 核验导入名。
 
 ## P2.0-B S3：Go2 retirement
 
@@ -51,8 +53,9 @@ Selected active task UIDs remain `pick-cube-p16-reference-v1` and `nut-assembly-
 The S4.5-A candidate adds runnable root examples under `examples/` using
 `from task_env import make_env`. Selected current commands use only
 `pick-cube-p16-reference-v1` or `nut-assembly-outcome-reference-v1`, explicit
-GeoPhys/MuJoCo providers, and CPU. NutAssembly must advance through guarded
-`step_expert()`; no external gripper action route is added. Recording continues
+GeoPhys/MuJoCo providers, and CPU. At that historical checkpoint the NutAssembly
+example used guarded `step_expert()`; no unguarded external gripper action route
+was added. Recording continues
 to use the task-owned canonical recorder and existing H5 schema. The storage
 reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 
@@ -66,9 +69,9 @@ reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 | `task_env.script.planner` | Retained as a compatibility command that delegates to selected PickCube planning; it does not preserve the historical task factory. |
 | `task_env.script.recorder` | Retained as a compatibility command that delegates to `task_env.script.trajectory.record`; it does not define another recorder or H5 schema. |
 | `task_env.script.trajectory._nut_assembly_config` and `_pick_cube_config` package exports | Removed; task-owned configuration is selected by its Task Artifact and not reconstructed by a script helper. |
-| `task_env.script.trajectory.planning.*` selected routes | Kept and now construct through `make_env`; NutAssembly calls only `step_expert()`. |
+| `task_env.script.trajectory.planning.*` selected routes | At this checkpoint the retained scripts constructed through `make_env`; the NutAssembly script called `step_expert()`. This does not describe all later bounded Solution routes. |
 | `task_env.script.env.single_*` and `parallel_*` | Kept. The single examples use public `make_env`; parallel examples remain generic registered batch workflows. |
-| `task_env.script.trajectory.convert` and `replay` | Kept as offline utilities. Historical H5 replay still requires explicit `--historical`; selected same-source reexecution remains a separate path. |
+| `task_env.script.trajectory.convert` and `replay` | Kept as offline utilities. Historical H5 replay still requires explicit `--historical`; selected same-source reexecution remains a separate path. Its internal construction compatibility boundary is `task_env.environment._historical`, while `task_env.diagnostics.historical_tasks` remains a diagnostic compatibility entry. Retired PickCube requires the immutable historical source; legacy Nut construction is not exact historical source reconstruction. |
 
 Exact pre-change source blobs, SHA-256 values, and recovery refs are recorded in
 [`p2_0_s4_5_a_source_recovery.json`](../../../../docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_a_source_recovery.json).
@@ -89,10 +92,10 @@ is added.
 
 | Retired or retained entry point | Current behavior and migration |
 | --- | --- |
-| `task_env.script.render_single` | Explicit retired-route error; it depended on historical task construction. Use `examples/rendering/pendulum_single_rgb.py` for the bounded current scalar Pendulum route or `examples/rendering/pendulum_parallel_rgb.py` for the bounded batch route; selected manipulation renderer support is not claimed. |
+| `task_env.script.render_single` | Explicit retired-route error; it depended on historical task construction. Use `examples/rendering/pendulum_single_rgb.py` for the scalar Pendulum route. The historical parallel example awaits G06 integration. |
 | `task_env.script.camera.static`, `task_env.script.camera.bound`, and `task_env.script.camera_lighting_probe` | Explicit retired-route errors; these used the historical PickCube task, and the lighting probe read provider-private renderer state. `CameraSpec` and Camera contracts remain. |
 | `task_env.script.camera._common` | Removed; only the retired camera scripts called it. Exact source is recoverable from the S4.5-B base commit in the recovery manifest. |
-| `task_env.script.render_parallel` | Retained as an advanced Pendulum-only batch rendering entry point. The bounded smoke covers GeoPhys CPU, `merged_scene`, rasterizer, RGB-array mode, one world and one step. Other renderers/providers and headed UI are unverified. |
+| `task_env.script.render_parallel` | Historical batch rendering entry point; the old Pendulum parallel registration has retired and a formal batch route awaits G06. |
 | `task_env.script.render_input_probe` | Retained as a standalone Taichi Forge window-input probe. It does not construct a TaskEnv or establish a rendering capability. |
 | `task_env.script.trajectory.convert`, `replay`, and `merge` | Retained as generic offline utilities; historical replay remains explicit and separate from canonical H5 inspection and selected-source reexecution. |
 

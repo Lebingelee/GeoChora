@@ -57,6 +57,25 @@ def test_task_config_precedence_and_pre_resolved_compatibility(tmp_path):
         resolve_task_env_config(FixtureEnv, {"scene": {"scene_uid": "other-v1"}})
 
 
+def test_custom_base_task_subclass_uses_component_configuration_without_marker(monkeypatch):
+    from task_env import BaseTaskEnv, make_env
+    from task_env.registry import ENV_REGISTRY, Registration
+
+    class CustomTask(BaseTaskEnv):
+        uid = 'custom-component-fixture-v1'
+        task_uid = 'custom-component-fixture-v1'
+
+    monkeypatch.setitem(ENV_REGISTRY._entries, CustomTask.uid,
+                        Registration(CustomTask.uid, CustomTask))
+    env = make_env(CustomTask.uid, config={'episode': {'horizon': 7}}, build_runtime=False)
+    try:
+        assert isinstance(env, BaseTaskEnv)
+        assert env.config.episode.horizon == 7
+        assert env._runtime is None
+    finally:
+        env.close()
+
+
 def test_static_execution_plan_is_stable_and_marks_its_evidence_boundary():
     from task_env.environment.configuration import resolve_execution_plan
 
@@ -145,6 +164,39 @@ def test_missing_panda_controller_is_rejected_before_provider_bootstrap(monkeypa
         BaseTaskEnv(config=_config(agent_uids=("panda-v1",)), build_runtime=True)
 
 
+def test_panda_binds_its_controller_and_frame_references_without_engine(monkeypatch):
+    from task_env import controllers
+    from task_env.environment.configuration import resolve_env_config
+    from task_env.robots.panda import PandaAgent
+
+    config = resolve_env_config(
+        task_uid='fixture-v1', scene_uid='tabletop-v1', agent_uids=('panda-v1',),
+        robot={'controller': {'kind': 'absolute_pose', 'reference': 'base'}},
+    )
+    refs = SimpleNamespace(base_body_name='base_link', base_body_id=3,
+                           eef_site_name='tool_site', eef_site_id=7)
+    boundary = object()
+    bound = []
+    gripper = SimpleNamespace(bind_force_limit=lambda value: bound.append(value))
+    monkeypatch.setattr(PandaAgent, 'create_gripper_controller', lambda *_args, **_kwargs: gripper)
+
+    class Adapter:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.action_space = object()
+
+    monkeypatch.setattr(controllers, 'AbsolutePoseActionAdapter', Adapter)
+    runtime, action_spec = PandaAgent().bind_runtime(
+        references=refs, config=config, boundary=boundary,
+    )
+    assert bound == [boundary]
+    assert runtime.uid == 'panda-v1'
+    assert runtime.base.source_name == 'base_link' and runtime.ee.source_name == 'tool_site'
+    assert runtime.controller.action_spec is action_spec
+    assert action_spec.reference_identity == 'body:base_link'
+    assert runtime.controller._adapter.kwargs['gripper'] is gripper
+
+
 def test_failed_environment_construction_rolls_back_the_runtime(monkeypatch):
     import task_env.tasks  # noqa: F401 - load the public component registrations
     import task_env.runtime as runtime_module
@@ -206,3 +258,11 @@ def test_close_has_one_runtime_owner_and_attempts_all_auxiliary_owners():
     assert (ui.close_calls, sensor.close_calls, runtime.close_calls) == (1, 1, 1)
     env.close()
     assert (ui.close_calls, sensor.close_calls, runtime.close_calls) == (1, 1, 1)
+
+
+@pytest.mark.parametrize('value', [False, 0, '', [], 1])
+def test_component_overlay_rejects_non_mapping_even_when_empty(value):
+    from task_env.environment.configuration import overlay_public_env_config
+    from task_env.environment.config import ResolvedEnvConfig
+    with pytest.raises(TypeError, match='overlay must be a mapping'):
+        overlay_public_env_config(ResolvedEnvConfig(), {'runtime': value})

@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from ..robots.panda import PANDA_ASSET_ROOT
 
 
 CUBE_HALF_SIZE = 0.025
@@ -311,12 +310,13 @@ class PickCubeSceneComposer:
     source_label = "task-env-pick-cube"
 
     def __init__(self, *, table_half_size, table_top_z, table_center_xy,
-                 cube_world_pos, cube_world_quat):
+                 cube_world_pos, cube_world_quat, robot_source):
         self.table_half_size = tuple(table_half_size)
         self.table_top_z = float(table_top_z)
         self.table_center_xy = tuple(table_center_xy)
         self.cube_world_pos = tuple(cube_world_pos)
         self.cube_world_quat = tuple(cube_world_quat)
+        self.robot_source = Path(robot_source)
 
     def build_source_description(self):
         from ..assembly.source import TaskSceneSource
@@ -327,6 +327,7 @@ class PickCubeSceneComposer:
             table_center_xy=self.table_center_xy,
             cube_world_pos=self.cube_world_pos,
             cube_world_quat=self.cube_world_quat,
+            robot_source=self.robot_source,
         )
         return TaskSceneSource(xml, base_dir, self.source_label)
 
@@ -342,10 +343,10 @@ class PickCubeSceneComposer:
 
 
 def build_pick_cube_model_xml(*, table_half_size, table_top_z, table_center_xy,
-                              cube_world_pos, cube_world_quat) -> tuple[str, Path]:
+                              cube_world_pos, cube_world_quat, robot_source) -> tuple[str, Path]:
     """Prepare an MJCF source from object assets and task composition values."""
 
-    panda_xml = PANDA_ASSET_ROOT / "panda.xml"
+    panda_xml = Path(robot_source)
     root = _load_xml(panda_xml)
     _ensure_panda_compiler(root, panda_xml)
     _ensure_option(root)

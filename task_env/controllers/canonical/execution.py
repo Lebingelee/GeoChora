@@ -9,6 +9,72 @@ from collections.abc import Mapping
 import math
 import numpy as np
 
+from .gripper_execution import EqualRateGripperServo, NativeRateGripperServo
+
+
+R3_REFERENCE_POSITION_PROFILES = frozenset(('r3_continuous_v1',))
+REFERENCE_POSITION_CONTROLLER_PROFILES = R3_REFERENCE_POSITION_PROFILES | frozenset(('r1', 'r1_split'))
+ARM_HOLD_RAMP_PROFILE = 'r3-hold-ramp-v1'
+
+
+def build_reference_position_controller(artifact, source, *, profile_id, dynamic_profile=None,
+                                        force_limit_N=10.0, gripper_rate_hz=500,
+                                        joint_velocity_limit_rad_s=2.0, execution=None,
+                                        action_config=None, entity_id=None, hand_frame_id=None,
+                                        tcp_profile=None):
+    """Construct the selected Panda position Controller from its bound source."""
+    from ...runtime.sessions.source import UsdRuntimeSourceV1
+
+    if isinstance(source, UsdRuntimeSourceV1):
+        if profile_id not in R3_REFERENCE_POSITION_PROFILES or dynamic_profile is None:
+            raise ValueError('USD Position requires the declared R3 Controller profile')
+        from .position_profile import PandaPositionServoProfileV1
+        return PandaPositionServoProfileV1.from_usd_source(
+            artifact, source, execution=execution, kinematics_source_xml=source.scene_source.xml,
+            config=action_config, pose_target_method='achieved_state_dls_v1',
+            arm_tracking_method='production_r3_continuous_v1', arm_tracking_profile=dynamic_profile,
+            arm_joint_velocity_limit_rad_s=joint_velocity_limit_rad_s,
+            entity_id=entity_id, hand_frame_id=hand_frame_id, tcp_profile=tcp_profile)
+    if profile_id == 'r1':
+        from .production import ProductionCanonicalPandaController
+        return ProductionCanonicalPandaController.from_source(artifact, source)
+    if profile_id == 'r1_split':
+        from .split_panda_position import SplitPandaPositionControllerV1
+        return SplitPandaPositionControllerV1(artifact, source)
+    if profile_id in R3_REFERENCE_POSITION_PROFILES:
+        if dynamic_profile is None:
+            raise ValueError('R3 Controller requires its declared dynamic profile')
+        return ReferenceExecutionController.from_source(
+            artifact, source, profile=dynamic_profile, force_limit_N=force_limit_N,
+            gripper_rate_hz=gripper_rate_hz,
+            joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
+    raise ValueError(f'unsupported reference Position Controller profile: {profile_id!r}')
+
+
+def bind_reference_position_identity(controller, *, profile_id, construction_id):
+    """Bind execution provenance and describe the selected Controller owners."""
+    if profile_id in R3_REFERENCE_POSITION_PROFILES:
+        base_identity = controller.hold.controller.identity
+        execution_profile = controller.identity_profile()
+        controller.bind_identity_provenance({
+            'construction_id': construction_id,
+            'base_controller_identity': base_identity,
+            **execution_profile,
+        })
+        return {
+            'base_controller_identity': base_identity,
+            **execution_profile,
+            'controller_identity': controller.identity,
+            'controller_profile': profile_id,
+            'resolved_controller_profile': controller.rate_profile_mapping(),
+        }
+    if profile_id == 'r1_split':
+        return {'controller_profile': profile_id, 'controller_owners': (
+            {'writer_id': controller.arm.writer_id, 'identity': controller.arm.identity},
+            {'writer_id': controller.hand.writer_id, 'identity': controller.hand.identity},
+        )}
+    return {}
+
 
 @dataclass(frozen=True)
 class ArmTargetExecutionRequestV1:
@@ -19,15 +85,14 @@ class ArmTargetExecutionRequestV1:
     mode: str
 
     def validate(self):
-        if (self.schema_version, self.profile_id) != (
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1",
-        ):
+        if (self.schema_version != "arm-target-execution-request-v1"
+                or self.profile_id != ARM_HOLD_RAMP_PROFILE):
             raise ValueError("unsupported arm target execution request")
         if self.mode not in {"track", "hold_last_applied", "ramp_from_last_applied"}:
             raise ValueError("unsupported arm target execution mode")
 
 class StableArmTargetHold:
-    """Task-local arm hold wrapper; the underlying R3 source is unchanged."""
+    """Own arm hold and ramp state for the R3 Controller."""
     def __init__(self, controller):
         self.controller = controller
         self.locked = False
@@ -35,7 +100,7 @@ class StableArmTargetHold:
         self.last_target = None
         self.last_applied_arm = None
         self._request = ArmTargetExecutionRequestV1(
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1", "track",
+            "arm-target-execution-request-v1", ARM_HOLD_RAMP_PROFILE, "track",
         )
         self._ramp_initial = None
 
@@ -47,7 +112,7 @@ class StableArmTargetHold:
         self.last_applied_arm = None
         self._ramp_initial = None
         self._request = ArmTargetExecutionRequestV1(
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1", "track",
+            "arm-target-execution-request-v1", ARM_HOLD_RAMP_PROFILE, "track",
         )
         return self.controller.reset(state, feedback)
 
@@ -144,6 +209,92 @@ class StableArmTargetHold:
             self.controller.last_arm_diagnostics['experimental_joint_target_hold'] = False
         self.last_target = target
         return canonical, target
+
+
+class ReferenceExecutionController:
+    """Compose the shared R3 arm hold and gripper cadence owners."""
+
+    @classmethod
+    def from_source(cls, artifact, source, *, profile, force_limit_N,
+                    gripper_rate_hz=500, joint_velocity_limit_rad_s=2.0):
+        """Bind the declared source and compose the R3 execution owners."""
+        from .production_r3 import ProductionCanonicalPandaControllerR3
+
+        controller = ProductionCanonicalPandaControllerR3.from_source(
+            artifact, source, profile=profile, joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
+        controller.gripper_config = replace(controller.gripper_config, force_limit_N=force_limit_N)
+        return cls(StableArmTargetHold(controller), artifact.timebase.control_dt,
+                   gripper_rate_hz=gripper_rate_hz)
+
+    def __init__(self, hold, control_dt, *, gripper_rate_hz=500):
+        self.hold = hold
+        if gripper_rate_hz == 500:
+            self.inner = NativeRateGripperServo(hold.controller, 500, control_dt)
+        elif gripper_rate_hz == 100:
+            self.inner = EqualRateGripperServo(hold.controller, 100, control_dt)
+        else:
+            raise ValueError('R3 reference gripper cadence must be 100 or 500 Hz')
+        self.gripper_rate_hz = int(gripper_rate_hz)
+
+    def __getattr__(self, name):
+        return getattr(self.hold, name)
+
+    def identity_profile(self):
+        """Describe the execution owners and cadence included in R3 identity."""
+        import hashlib
+        import inspect
+        from pathlib import Path
+
+        if self.gripper_rate_hz != 500:
+            raise ValueError('R3 reference identity requires the native 500 Hz gripper')
+        def source_hash(owner):
+            return hashlib.sha256(Path(inspect.getsourcefile(owner)).read_bytes()).hexdigest()
+        return {
+            'arm_execution_profile': 'controller-owned-hold-and-linear-native-ramp-v1',
+            'arm_execution_request_profile': ARM_HOLD_RAMP_PROFILE,
+            'gripper_cadence': 'native-gripper-500hz-v1',
+            'gripper_control_hz': 500, 'gripper_feedback_hz': 500,
+            'outer_controller_hz': 100,
+            'execution_support_sha256': {
+                'arm_and_execution_wrapper': source_hash(type(self.hold)),
+                'execution_controller': source_hash(type(self)),
+                'gripper_servo': source_hash(type(self.inner)),
+            },
+        }
+
+    def bind_identity_provenance(self, provenance):
+        """Bind task-provided provenance to this execution's base Controller."""
+        from .contracts import digest
+        base = self.hold.controller
+        if provenance.get('base_controller_identity') != base.identity:
+            raise ValueError('execution provenance differs from its base Controller')
+        base.identity = digest(provenance)
+        return base.identity
+
+    def reset(self, state, feedback):
+        self.inner.reset()
+        return self.hold.reset(state, feedback)
+
+    def compute(self, *args):
+        return self.hold.compute(*args)
+
+    def inner_gripper_step(self, *args):
+        return self.inner.inner_gripper_step(*args)
+
+    def validate_arm_execution_request(self, request):
+        return self.hold.validate_execution_request(request)
+
+    def request_arm_execution(self, request):
+        self.hold.request_execution(request)
+
+    def begin(self, target):
+        self.hold.begin(target)
+
+    def target(self, target, index, count):
+        return self.hold.target(target, index, count)
+
+    def applied(self, acknowledgement):
+        self.hold.applied(acknowledgement)
 
 
 class PoseStabilityWindow:

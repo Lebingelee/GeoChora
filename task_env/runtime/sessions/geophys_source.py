@@ -80,10 +80,21 @@ def validate_canonical_scene_import(scene_definition, imported_scene) -> dict[st
     expected_names = [frame.frame_id for frame in expected_frames]
     if len(set(expected_names)) != len(expected_names):
         raise ValueError('D01a projection requires globally unique native frame names')
-    if set(expected_names) != set(bodies):
-        missing = sorted(set(expected_names) - set(bodies))
-        extra = sorted(set(bodies) - set(expected_names))
+    # MJCF sites are represented as IR frames, while a free-joint parent is
+    # the implicit world and has no imported rigid-body row.
+    site_names = {frame.source_ref.element_path.rsplit('/site[', 1)[1][:-1]
+                  for frame in imported_scene.ir.frames
+                  if '/site[' in frame.source_ref.element_path and frame.source_ref.element_path.endswith(']')}
+    world_names = {joint.parent_frame.frame_id for articulation in scene_definition.articulations or ()
+                   for joint in articulation.joints if joint.kind == 'floating'
+                   and joint.parent_frame.frame_id == 'world'}
+    expected_body_names = set(expected_names) - site_names - world_names
+    if expected_body_names != set(bodies):
+        missing = sorted(expected_body_names - set(bodies))
+        extra = sorted(set(bodies) - expected_body_names)
         raise ValueError(f'canonical Frame mapping mismatch: missing={missing}, extra={extra}')
+    if any(name not in bodies and name not in site_names and name not in world_names for name in expected_names):
+        raise ValueError('canonical runtime Frame has no imported body, site, or free-joint world')
 
     body_names_by_id = {body.body_id: body.name for body in imported_scene.ir.bodies}
     frames_by_id = {frame.node_id: frame for frame in imported_scene.ir.frames}
@@ -112,6 +123,17 @@ def validate_canonical_scene_import(scene_definition, imported_scene) -> dict[st
         imported = joints_by_name[name]
         parent_name = body_names_by_id.get(imported.body_a)
         child_name = body_names_by_id.get(imported.body_b)
+        if definition.kind == 'floating':
+            if (imported.type != 'free' or imported.body_a is not None
+                    or definition.parent_frame.frame_id != 'world'
+                    or child_name != definition.child_frame.frame_id
+                    or not np.allclose(np.asarray(imported.frame_b, dtype=np.float64).reshape(4, 4),
+                                       _pose_matrix(definition.pose_child_from_joint), rtol=0, atol=1e-8)):
+                raise ValueError(f'canonical floating Joint does not match import {name!r}')
+            joint_rows.append({'entity_id': definition.parent_frame.entity_id, 'joint_id': name,
+                'parent_frame_id': 'world', 'child_frame_id': child_name, 'axis': None,
+                'core_disposition': 'CANONICAL_REPRESENTED', 'provider_consumption': 'ImportedScene.ir.joints'})
+            continue
         if (parent_name, child_name) != (
             definition.parent_frame.frame_id,
             definition.child_frame.frame_id,
@@ -176,7 +198,9 @@ def validate_canonical_scene_import(scene_definition, imported_scene) -> dict[st
         'frames': [
             {'entity_id': frame.entity_id, 'frame_id': frame.frame_id,
              'core_disposition': 'CANONICAL_REPRESENTED',
-             'provider_consumption': 'ImportedScene.ir.bodies'}
+             'provider_consumption': ('implicit_world' if frame.frame_id in world_names else
+                                      'ImportedScene.ir.frames' if frame.frame_id in site_names else
+                                      'ImportedScene.ir.bodies')}
             for frame in expected_frames
         ],
         'joints': joint_rows + fixed_rows,

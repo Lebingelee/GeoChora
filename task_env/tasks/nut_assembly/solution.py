@@ -8,6 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
 import hashlib
+import json
 import math
 from numbers import Real
 from pathlib import Path
@@ -17,27 +18,87 @@ import numpy as np
 
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import (
-    ArmTargetExecutionRequestV1, BoundaryWait, PoseStabilityWindow,
+    ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1, BoundaryWait, PoseStabilityWindow,
+    ReferenceExecutionController,
 )
 from ...controllers.canonical.feedback import (
     CanonicalControlFeedback, CanonicalGripperFeedback,
     NativeControlFeedbackSampleV1,
 )
-from ...controllers.canonical.gripper_execution import EqualRateGripperServo
+from ...controllers.canonical.gripper_execution import NativeRateGripperServo
 from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAction
 from ...utils.rotation import (
     normalize_quat_wxyz, quat_angle_wxyz, quat_multiply_wxyz,
     quat_wxyz_to_matrix, rotate_vector_wxyz,
 )
-from ..canonical_solution_lifecycle import (
+from ...planners.completion import (
     CanonicalSolutionLifecycle, SolutionCompletionPolicy,
+    GuardedTransitionEvaluator, TransitionDecision, TransitionGuardSpec,
 )
-from ..guarded_transition import GuardedTransitionEvaluator, TransitionGuardSpec
 from ...objects.nut_assembly import (
     NUT_HALF_HEIGHT, NUT_HANDLE_LOCAL_X, PEG_HALF_HEIGHT,
 )
 
+class NutAssemblySolutionLifecycle(CanonicalSolutionLifecycle):
+    """Apply NutAssembly terminal-stage completion to the shared state."""
+
+    def complete_expert(
+        self,
+        *,
+        terminal_stage_completed: bool,
+        final_task_success: bool,
+        control_step: int,
+        simulation_time_s: float,
+    ) -> bool:
+        """Complete only when the declared expert-stage policy is satisfied."""
+        if self.terminal:
+            raise RuntimeError("cannot complete a terminal solution lifecycle")
+        step, time_s = self._clock(control_step, simulation_time_s)
+        if self.completion_policy is not SolutionCompletionPolicy.ON_EXPERT_TERMINAL_STAGE:
+            self.fail("completion_policy_not_satisfied", control_step=step,
+                      simulation_time_s=time_s)
+            return False
+        if not terminal_stage_completed:
+            self.fail("expert_terminal_stage_incomplete", control_step=step,
+                      simulation_time_s=time_s)
+            return False
+        if not self.task_success_seen:
+            self.fail("task_success_never_observed", control_step=step,
+                      simulation_time_s=time_s)
+            return False
+        if not final_task_success:
+            self.fail("final_task_success_not_valid", control_step=step,
+                      simulation_time_s=time_s)
+            return False
+        self._complete("expert_sequence_completed", step, time_s)
+        return True
+
+
 OUTCOME_POLICY_ID = "nutassembly-outcome-oriented-completion-v1"
+
+
+def _validate_nut_native_force_contract(sample):
+    """Keep the selected Panda actuator and five 2 ms samples strict for Nut."""
+    measurement, feedback = sample.actuator_force_measurement, sample.feedback
+    if measurement.actuator_id != 'actuator8':
+        raise ValueError('selected NutAssembly native Guard requires the Panda actuator8 sample in N')
+    dt = 0.002
+    native_index = measurement.native_step_index
+    sample_time = measurement.native_sample_time_s
+    evaluation_time = feedback.simulation_time
+    if measurement.phase == 'reset_forward':
+        if native_index != 0 or sample_time != 0.0 or abs(evaluation_time) > 1e-10:
+            raise ValueError('reset-forward feedback must identify the exact reset state at t=0')
+    elif measurement.phase == 'native_step_pre_integration':
+        if (native_index < 1
+                or not math.isclose(sample_time, (native_index - 1) * dt, rel_tol=0.0, abs_tol=1e-10)
+                or not math.isclose(evaluation_time, native_index * dt, rel_tol=0.0, abs_tol=1e-10)
+                or not math.isclose(evaluation_time - sample_time, dt, rel_tol=0.0, abs_tol=1e-10)):
+            raise ValueError('native feedback sample phase/time/freshness is not one completed 2 ms step')
+    else:
+        raise ValueError('native Guard does not admit this force sample phase')
+    if measurement.evaluation_control_step != native_index // 5:
+        raise ValueError('native feedback sample outer control step differs from its native index')
 
 
 @dataclass(frozen=True)
@@ -110,6 +171,7 @@ class NutAssemblyNativeFeedbackSampleV1:
         if not isinstance(self.provider_feedback_sample, NativeControlFeedbackSampleV1):
             raise TypeError("native Guard sample requires the RuntimeSession force-sample receipt")
         self.provider_feedback_sample.validate()
+        _validate_nut_native_force_contract(self.provider_feedback_sample)
         measurement = self.provider_feedback_sample.actuator_force_measurement
         mismatches = []
         for name, matches in (
@@ -254,19 +316,10 @@ class NutAssemblyNativeIntervalReceiptV1:
         if self.physics_dt_s != 0.002:
             raise ValueError("NutAssembly Guard requires the accepted 2 ms native clock")
         before, after = self.request_boundary, self.evaluation_boundary
-        if (before.get("control_step", -2) + 1 != after.get("control_step", -1)
-                or before.get("episode_id") != self.episode_id
-                or after.get("episode_id") != self.episode_id
-                or before.get("reset_sample_id") != self.reset_sample_id
-                or after.get("reset_sample_id") != self.reset_sample_id
-                or before.get("provider_materialization_id") != self.provider_materialization_id
-                or after.get("provider_materialization_id") != self.provider_materialization_id
-                or not before.get("identity_hash") or not after.get("identity_hash")):
-            raise ValueError("native interval boundary identity or reset lineage changed")
-        start_time = float(before["simulation_time_s"])
-        end_time = float(after["simulation_time_s"])
-        if abs((end_time - start_time) - 0.01) > 1e-10:
-            raise ValueError("native interval did not complete one 10 ms control interval")
+        from ...controllers.canonical.feedback import validate_native_interval_boundaries
+        start_time, end_time = validate_native_interval_boundaries(
+            before, after, episode_id=self.episode_id, reset_sample_id=self.reset_sample_id,
+            provider_materialization_id=self.provider_materialization_id, interval_s=0.01)
         identities = (self.provider, self.task_artifact_hash, self.source_id,
                       self.source_xml_sha256, self.controller_identity, self.solution_identity,
                       self.provider_materialization_id)
@@ -457,15 +510,16 @@ class NutAssemblyOutcomeSolutionV1:
                 self.provider, self.task_artifact_hash, self.source_id,
                 self.source_xml_sha256, self.base_controller_identity)):
             raise ValueError("native Solution requires actual provider/source/controller identity bindings")
-        self._planner = AbsolutePosePlanner(AbsolutePosePlannerConfig(
-            max_translation_per_step=self.config.translation_speed_m_s * self.control_dt,
-            max_translation_acceleration_per_step=self.config.translation_acceleration_m_s2 * self.control_dt**2,
-            max_rotation_per_step=self.config.rotation_speed_rad_s * self.control_dt,
-            max_rotation_acceleration_per_step=self.config.rotation_acceleration_rad_s2 * self.control_dt**2,
-            settle_steps=self._ticks(self.config.settle_duration_s),
-            max_steps=self._ticks(self.config.max_stage_plan_s),
+        self._planner = AbsolutePosePlanner(AbsolutePosePlannerConfig.from_si_rates(
+            control_dt_s=self.control_dt,
+            translation_speed_m_s=self.config.translation_speed_m_s,
+            translation_acceleration_m_s2=self.config.translation_acceleration_m_s2,
+            rotation_speed_rad_s=self.config.rotation_speed_rad_s,
+            rotation_acceleration_rad_s2=self.config.rotation_acceleration_rad_s2,
+            settle_duration_s=self.config.settle_duration_s,
+            max_plan_duration_s=self.config.max_stage_plan_s,
         ))
-        self._lifecycle = CanonicalSolutionLifecycle(
+        self._lifecycle = NutAssemblySolutionLifecycle(
             SolutionCompletionPolicy.ON_EXPERT_TERMINAL_STAGE)
         description = self.describe(
             config=self.config, control_dt=self.control_dt, physics_dt_s=self.physics_dt_s,
@@ -713,7 +767,11 @@ class NutAssemblyOutcomeSolutionV1:
         return int(step), float(time_s)
 
     def _validate(self, obs, info, reward=0.0, readiness=None, samples=()):
-        if not self._finite((obs, info, reward, samples)):
+        # Gym info can contain the public typed ObservationSchema. Apply the
+        # same value projection used by the Env compatibility path so a
+        # caller-owned Solution can consume reset/step info directly.
+        from ...environment.metadata import task_info_for_solution
+        if not self._finite((obs, task_info_for_solution(info), reward, samples)):
             raise ValueError("nonfinite state or evidence")
         for pose in (self._ee(obs), self._body(obs, "square_nut_v1"),
                      self._body(obs, "square_peg_v1")):
@@ -901,7 +959,7 @@ class NutAssemblyOutcomeSolutionV1:
         else:
             mode = "track"
         control_request = ArmTargetExecutionRequestV1(
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1", mode,
+            "arm-target-execution-request-v1", ARM_HOLD_RAMP_PROFILE, mode,
         )
         control_request.validate()
         if self.require_native_feedback_contract:
@@ -911,6 +969,7 @@ class NutAssemblyOutcomeSolutionV1:
             if (boundary.get("episode_id") != self._episode_id
                     or boundary.get("reset_sample_id") != self._reset_sample_id
                     or boundary.get("controller_identity") != self._controller_identity
+                    or boundary.get("solution_identity") != self.identity
                     or boundary.get("control_step") != self._emitted):
                 raise ValueError("native Solution action boundary is stale or belongs to another episode")
             self._pending_boundary = deepcopy(dict(boundary))
@@ -921,11 +980,16 @@ class NutAssemblyOutcomeSolutionV1:
                 "control_dt": self.control_dt,
                 "completion_policy_id": OUTCOME_POLICY_ID,
                 "readiness_warning_count": len(self._readiness_warnings)},
-            control_request=control_request)
+            control_request=control_request,
+            request_boundary=self._pending_boundary if self.require_native_feedback_contract else None,
+            solution_identity=self.identity if self.require_native_feedback_contract else None)
         if planned: self._index += 1
         else: self._hold_ticks += 1
         self._emitted += 1
-        self._pending_action = {"stage": proposal.stage, "planned": planned}
+        self._pending_action = {"stage": proposal.stage, "planned": planned,
+            "values": tuple(float(value) for value in proposal.action),
+            "control_request": {"schema_version": control_request.schema_version,
+                "profile_id": control_request.profile_id, "mode": control_request.mode}}
         return proposal
 
     def _evaluator(self, start_time_s):
@@ -1196,9 +1260,47 @@ class NutAssemblyOutcomeSolutionV1:
             raise RuntimeError("cannot observe terminal outcome execution")
         if self.require_native_feedback_contract:
             try:
+                if native_interval_receipt is None and native_samples is None:
+                    native_interval_receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(
+                        info["native_interval_receipt_v1"])
+                    native_samples = native_interval_receipt.samples
+                if not isinstance(native_interval_receipt, NutAssemblyNativeIntervalReceiptV1):
+                    raise ValueError("selected NutAssembly step requires a typed native interval receipt")
                 transition_samples = self._validated_native_guard_samples(
                     native_interval_receipt, native_samples,
                 )
+                application = info.get("control_application_v1")
+                pending = self._pending_action
+                if (not isinstance(application, Mapping) or pending is None
+                        or application.get("request_boundary") != self._pending_boundary
+                        or application.get("evaluation_boundary") != native_interval_receipt.evaluation_boundary
+                        or application.get("solution_stage") != pending["stage"]
+                        or application.get("arm_execution_request_v1") != pending["control_request"]
+                        or application.get("requested_action") != {
+                            "mode": "absolute_pose", "reference": "world",
+                            "rotation_representation": "quaternion_wxyz",
+                            "values": list(pending["values"]),
+                        }
+                        or not isinstance(application.get("target_identity_hash"), str)
+                        or not application.get("target_identity_hash")
+                        or application.get("target_identity_hash") != native_interval_receipt.samples[-1].target_hash
+                        or application.get("target_identity_hash") != application.get("applied_target_hash")):
+                    raise ValueError("control application does not match the pending Solution action")
+                evaluation_boundary = info.get("expert_execution_boundary_v1")
+                if (not isinstance(evaluation_boundary, Mapping)
+                        or evaluation_boundary != native_interval_receipt.evaluation_boundary
+                        or evaluation_boundary.get("identity_hash") != digest({
+                            key: value for key, value in evaluation_boundary.items()
+                            if key != "identity_hash"
+                        })):
+                    raise ValueError("native receipt evaluation boundary is stale or mismatched")
+                if readiness is None:
+                    from ...planners.completion import ExpertExecutionInfo
+                    execution_info = ExpertExecutionInfo.from_mapping(info["expert_execution_info_v1"])
+                    execution_info.validate()
+                    if info.get("control_readiness_v1") != execution_info.control_readiness.to_mapping():
+                        raise ValueError("inconsistent public control readiness")
+                    readiness = execution_info.control_readiness
             except (ValueError, KeyError, TypeError):
                 self._task_success = False
                 self._fail("native_feedback_invalid")
@@ -1299,49 +1401,6 @@ class NutAssemblyOutcomeSolutionV1:
 
 
 __all__ = ["NutAssemblyOutcomeSolutionV1", "NutAssemblySolutionConfig", "OUTCOME_POLICY_ID"]
-
-
-class NativeRateGripperServo(EqualRateGripperServo):
-    version = "native-gripper-500hz-v1"
-    def reset(self):
-        self.update_count = 0
-        self._last_control_step = None
-        self._last_target = None
-        self._last_diagnostics = None
-
-    def inner_gripper_step(self, state, feedback):
-        if abs(self.controller.inner_physics_dt_s - 0.002) > 1e-12:
-            raise ValueError("Native-rate gripper requires the accepted 2 ms physics clock")
-        target, diagnostics = self._update(state, feedback)
-        self._last_control_step, self._last_target = state.control_step, target
-        self._last_diagnostics = dict(diagnostics)
-        self.update_count += 1
-        return target, {**diagnostics, "inner_update_performed": True,
-            "inner_update_period_s": 0.002, "configured_inner_rate_hz": 500}
-
-
-class ReferenceExecutionController:
-    """Existing Controller owner for the selected R3 arm and gripper execution."""
-    def __init__(self, hold, control_dt, *, gripper_rate_hz=500):
-        self.hold = hold
-        if gripper_rate_hz == 500:
-            self.inner = NativeRateGripperServo(hold.controller, 500, control_dt)
-        elif gripper_rate_hz == 100:
-            self.inner = EqualRateGripperServo(hold.controller, 100, control_dt)
-        else:
-            raise ValueError('NutAssembly R3 diagnostic gripper cadence must be 100 or 500 Hz')
-        self.gripper_rate_hz = int(gripper_rate_hz)
-    def __getattr__(self, name): return getattr(self.hold, name)
-    def reset(self, state, feedback):
-        self.inner.reset()
-        return self.hold.reset(state, feedback)
-    def compute(self, *args): return self.hold.compute(*args)
-    def inner_gripper_step(self, *args): return self.inner.inner_gripper_step(*args)
-    def validate_arm_execution_request(self, request): return self.hold.validate_execution_request(request)
-    def request_arm_execution(self, request): self.hold.request_execution(request)
-    def begin(self, target): self.hold.begin(target)
-    def target(self, target, index, count): return self.hold.target(target, index, count)
-    def applied(self, acknowledgement): self.hold.applied(acknowledgement)
 
 
 __all__ += ["NativeRateGripperServo", "ReferenceExecutionController",

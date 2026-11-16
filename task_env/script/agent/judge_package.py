@@ -158,7 +158,11 @@ def check_v3_oracle(directory, details, summary, spec_hash, artifact_hash, core_
     require(compiled.get('source_closure_sha256')==profile.get('source_closure_digest')
         and compiled.get('source_sha256',{}).get('f06_delivery_manifest_sha256')
             ==profile.get('delivery_manifest_sha256'),'Oracle source closure/delivery mismatch')
-    from task_env.tasks.pick_cube.isaac import ISAAC_ADMITTED_DELIVERIES_V1
+    if __package__:
+        from .isaac_admission import admitted_isaac_deliveries
+    else:
+        from isaac_admission import admitted_isaac_deliveries
+    ISAAC_ADMITTED_DELIVERIES_V1=admitted_isaac_deliveries()
     require(profile.get('delivery_manifest_sha256') in ISAAC_ADMITTED_DELIVERIES_V1,
         'Oracle recorded delivery differs from Core pin')
     checks=details.get('storage_identity_checks') or {}
@@ -226,7 +230,11 @@ def check_asset_binding(spec, upstream, provider):
     require(len(matches)==1,'candidate object missing or ambiguous in upstream asset binding')
     asset=matches[0]
     if bundle.get('schema_version')=='harness-builtin-source-bundle-v1':
-        from task_env.tasks.pick_cube.isaac import ISAAC_ADMITTED_DELIVERIES_V1
+        if __package__:
+            from .isaac_admission import admitted_isaac_deliveries
+        else:
+            from isaac_admission import admitted_isaac_deliveries
+        ISAAC_ADMITTED_DELIVERIES_V1=admitted_isaac_deliveries()
         from task_env.assembly.usd_delivery import load_usd_asset_delivery
         require(provider=='isaacsim' and asset.get('uid')=='cube-v1'
             and asset.get('source_kind')=='core-builtin-pinned-usd'

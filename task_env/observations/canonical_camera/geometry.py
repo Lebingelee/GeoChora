@@ -33,7 +33,8 @@ def resolve_camera(camera, state):
         if isinstance(state, CanonicalStateViewV1):
             matches = [
                 item.pose_world for item in state.frames
-                if item.frame.frame_id == camera.parent_frame
+                if (item.frame.frame_id == camera.parent_frame
+                    or f'{item.frame.entity_id}/{item.frame.frame_id}' == camera.parent_frame)
             ]
             if len(matches) != 1:
                 raise ValueError(

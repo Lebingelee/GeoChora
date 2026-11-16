@@ -2,16 +2,16 @@
 
 **Import path**：`task_env.robots`、`task_env.controllers`  
 **任务域**：Task Composition  
-**稳定性**：Public API / Extension API  
+**稳定性**：classic 路线扩展接口；selected 控制契约另见 [Controller / Solution](../semantics/task_environment.md)
 **职责**：声明 active agent，并把 public action 转为 `ControlCommand`。  
-**调用者/消费者**：`BaseTaskEnv.step()`、`RuntimeBoundary.apply_control()`。  
+**调用者/消费者**：classic `BaseTaskEnv.step()`、`RuntimeBoundary.apply_control()`；不描述所有 selected 控制路线。
 **源码**：`task_env/robots/`、`controllers/`
 
 ## `task_env.robots.BaseAgent` / `PandaAgent`
 
 **Kind**：class；**Stability**：Extension API / Public API；**Defined in**：`robots/base.py`、`panda.py`
 
-`BaseAgent` 实现 `AgentComponent`；子类必须提供 `asset_manifest()`、`reference_spec()`、`initial_state_spec()`、`supported_action_modes()`。`PandaAgent` 是内置实现，编译后的 ID 位于 `TaskReferences.agents`。`PANDA_ASSET_ROOT` 是资产根路径常量。
+`BaseAgent` 是 `AgentComponent` 的兼容别名；组件须提供 `asset_manifest()`、`reference_spec()`、`initial_state_spec()`、`supported_action_modes()`。`PandaAgent` 是内置实现，编译后的 ID 位于 `TaskReferences.agents`。`PANDA_ASSET_ROOT` 是资产根路径常量。
 
 ## `task_env.environment.ActionAdapter`
 

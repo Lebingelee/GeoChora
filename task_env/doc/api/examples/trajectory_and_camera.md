@@ -9,7 +9,8 @@ PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py \
 ```
 
 The command resets through public `make_env`, starts the canonical recorder at
-the reset boundary, steps only the selected task-owned expert, finalizes H5,
+the reset boundary, drives the selected Solution through caller-owned
+`act → step(action) → observe`, finalizes H5,
 and checks the logical/numeric storage representation and `T`/`T+1` counts.
 It returns nonzero if the task or expert is incomplete or the recording check
 fails. Task outcome, expert lifecycle, and recording validity are reported as
@@ -40,9 +41,9 @@ Artifacts that declare camera observations. UI rendering remains a separate
 `pick-cube-v1` construction and now fail explicitly. The selected manipulation
 routes have no camera acceptance claim.
 
-The bounded native renderer examples cover one scalar Pendulum frame through
+Historical bounded native renderer examples covered one scalar Pendulum frame through
 public `make_env` and one Pendulum batch frame through `merged_scene`, both on
-GeoPhys CPU with the GeoPhys rasterizer. The historical
+GeoPhys CPU with the GeoPhys rasterizer; this maintenance attempt has not rerun those render examples. The historical
 `task_env.script.render_single` CLI fails explicitly and points to the current
 scalar and batch examples. Renderer Registry and Flora contracts remain, but
 these examples do not establish a selected manipulation × Flora intersection

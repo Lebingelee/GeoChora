@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Generic, Iterator, TypeVar
 
 from .environment.protocols import (
-    AgentComponent,
+    RobotComponent,
     SceneBuilderComponent,
     TaskEnvironmentComponent,
     TaskObjectComponent,
@@ -107,7 +107,7 @@ class ComponentRegistry(Generic[T]):
 
 
 ENV_REGISTRY = ComponentRegistry("environment", TaskEnvironmentComponent)
-AGENT_REGISTRY = ComponentRegistry("agent", AgentComponent)
+AGENT_REGISTRY = ComponentRegistry("agent", RobotComponent)
 OBJECT_REGISTRY = ComponentRegistry("object", TaskObjectComponent)
 SCENE_REGISTRY = ComponentRegistry("scene", SceneBuilderComponent)
 
@@ -132,15 +132,36 @@ def make_env(
     *,
     config=None,
     render_mode=None,
+    execution: str | None = None,
     **kwargs,
 ) -> TaskEnvironmentComponent:
-    """Construct a task env from task defaults plus a public config overlay."""
+    """Construct a scalar task; explicit device execution reuses one batch world."""
 
     # Registration modules are loaded at the actual construction boundary so
     # learner-only imports do not initialize Taichi or concrete task assets.
     import importlib
 
     importlib.import_module("task_env.tasks")
+    if execution is not None:
+        if execution != 'device':
+            raise ValueError("scalar execution must be 'device' when explicitly selected")
+        backend = kwargs.pop('backend', 'cuda')
+        worker_directory = kwargs.pop('worker_directory', None)
+        if kwargs:
+            raise TypeError(f'unsupported scalar device environment options: {sorted(kwargs)}')
+        from .vectorization.factory import make_selected_device_spec
+        from .vectorization.homogeneous import HomogeneousVectorTaskEnv
+
+        spec = make_selected_device_spec(uid=uid, num_env=1, env_config=config, backend=backend,
+                                         worker_directory=worker_directory, render_mode=render_mode)
+        try:
+            return HomogeneousVectorTaskEnv(spec, execution_mode='device', scalar_device=True)
+        except BaseException as error:
+            try:
+                spec.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'scalar device construction cleanup also failed: {cleanup_error!r}')
+            raise
     if uid in {"pick-cube-v1", "nut-assembly-square-v1"}:
         raise ValueError(
             "legacy reference task UID retired from active make_env; use "
@@ -154,13 +175,41 @@ def make_env(
         )
     environment_type = ENV_REGISTRY.get(uid)
     from .environment.configuration import resolve_task_env_config
+    task_rgb_camera = kwargs.pop('task_rgb_camera', None)
+    task_renderer = kwargs.pop('task_renderer', None)
+    if (task_rgb_camera is None) != (task_renderer is None):
+        raise ValueError('task RGB camera and fixed renderer must be declared together')
+    if (getattr(environment_type, "uses_selected_public_config", False)
+            or getattr(environment_type, "uses_component_task_config", False)):
+        return environment_type.from_resolved_config(config, render_mode=render_mode,
+            task_rgb_camera=task_rgb_camera, task_renderer=task_renderer, **kwargs)
+    factory_owns_rgb = bool(getattr(environment_type, 'task_rgb_factory_prepares_runtime', False))
+    if task_rgb_camera is not None and factory_owns_rgb:
+        kwargs.update(task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
 
-    if getattr(environment_type, "uses_selected_public_config", False):
-        resolved_config = resolve_task_env_config(environment_type, config)
-        return environment_type.from_resolved_config(resolved_config, render_mode=render_mode, **kwargs)
-    if hasattr(environment_type, 'from_reference_config'):
-        # Other selected candidates retain their bounded compatibility route.
-        return environment_type.from_reference_config(config, render_mode=render_mode, **kwargs)
+    def finish(env):
+        if task_rgb_camera is not None and not factory_owns_rgb:
+            from .environment.reference_env import SelectedReferenceEnv
+            try:
+                if (
+                    not isinstance(env, SelectedReferenceEnv)
+                    or getattr(env, '_uses_component_assembly', False)
+                ):
+                    raise ValueError('task RGB requires an admitted selected-reference environment')
+                env._configure_task_rgb(task_rgb_camera, task_renderer)
+            except BaseException as error:
+                try:
+                    env.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'task RGB factory cleanup also failed: {cleanup_error!r}')
+                raise
+        return env
+
+    reference_config = getattr(environment_type, 'from_reference_config', None)
+    if callable(reference_config):
+        # The factory owns its configuration protocol, including inherited
+        # component and legacy-binding construction.
+        return finish(environment_type.from_reference_config(config, render_mode=render_mode, **kwargs))
     resolved_config = resolve_task_env_config(environment_type, config)
     if resolved_config.runtime.batch_physics_layout != "merged_scene":
         from .environment.types import StageUnavailableError
@@ -169,14 +218,14 @@ def make_env(
             "batch_physics_layout is only valid for make_parallel_env(); "
             "single TaskEnv construction requires merged_scene"
         )
-    return environment_type(
+    return finish(environment_type(
         config=resolved_config,
         render_mode=render_mode,
         **kwargs,
-    )
+    ))
 
 
-def make_agent(uid: str, **kwargs) -> AgentComponent:
+def make_agent(uid: str, **kwargs) -> RobotComponent:
     import importlib
 
     importlib.import_module("task_env.robots")

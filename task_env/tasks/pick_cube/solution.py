@@ -25,17 +25,21 @@ from ...planners.completion import StageCompletionPolicy, ExpertExecutionInfo
 from ...artifacts.contracts import Contract
 from ...artifacts.state import StateBoundaryIdentity, StateSampleClock
 from ...controllers.canonical.contracts import digest
+from ...controllers.canonical.execution import ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1
+from ...controllers.canonical.feedback import boundary_interval_clock_tolerance
 from ...objects.pick_cube import CUBE_HALF_SIZE
 from ...utils.rotation import matrix_to_quat_wxyz, quat_wxyz_to_matrix, rotvec_to_matrix
 
 
 _ABOVE_CLEARANCE = 0.12
-# Keep the approach above the existing hover pose while traversing laterally.
-# The final hover/grasp poses and task geometry remain unchanged.
-_APPROACH_CLEARANCE = 0.10
-# R3 can settle several millimeters below an absolute-pose target.  Give the
-# planned high waypoint extra headroom so the measured clearance interlock is
-# reachable without relaxing its physical threshold.
+# Keep the baseline approach above its existing hover pose during lateral travel.
+_ABOVE_APPROACH_CLEARANCE = 0.10
+# The aligned R3 PickCube route lowers the approach by 40 mm and places its
+# commanded high-clearance waypoint 150 mm below the former R3 waypoint.
+_R3_ABOVE_CLEARANCE = 0.08
+_R3_HIGH_CLEARANCE_COMMAND_ABOVE_CUBE_TOP = 0.09
+# R3 can settle below an absolute-pose target.  Keep the measured gate below the
+# commanded high-clearance pose by this headroom and the existing tolerance.
 _MEASURED_CLEARANCE_COMMAND_HEADROOM = 0.020
 # A small outward wrist pitch avoids the high, fully extended R3 approach
 # singularity. Restore the grasp orientation continuously on the hover path.
@@ -85,8 +89,11 @@ _GRASP_CLEARANCE_ABOVE_CUBE_TOP = 0.020
 _LIFT_DISTANCE = 0.16
 _COLLECTION_LIFT_MARGIN = 0.105
 _POSITION_TOLERANCE = 0.150
-_CLOSE_TRANSITION_MIN_STEPS = 10
 _MIN_CLOSE_TRANSITION_STEPS = 20
+_NUT_R3_CLOSE_TRANSITION_STEPS = 34
+_NUT_R3_CLOSE_SETTLE_STEPS = 50
+_NUT_R3_POSTCLOSE_HOLD_STEPS = 10
+_MAX_CARTESIAN_PLAN_CALLS = 7
 
 
 class SegmentStatus(str, Enum):
@@ -228,6 +235,8 @@ class PickCubeSolutionConfig:
     action_budget: int = 120
     position_tolerance: float = _POSITION_TOLERANCE
     close_transition_steps: int = _MIN_CLOSE_TRANSITION_STEPS
+    close_settle_steps: int = 0
+    postclose_hold_steps: int = 0
     planner: AbsolutePosePlannerConfig = field(
         default_factory=lambda: AbsolutePosePlannerConfig(
             max_translation_per_step=0.012,
@@ -244,9 +253,18 @@ class PickCubeSolutionConfig:
             raise ValueError("action_budget must be at least one")
         if self.position_tolerance <= 0.0:
             raise ValueError("position_tolerance must be positive")
-        if not _CLOSE_TRANSITION_MIN_STEPS <= self.close_transition_steps <= _MIN_CLOSE_TRANSITION_STEPS:
+        if any(type(value) is not int for value in (
+            self.close_transition_steps, self.close_settle_steps,
+            self.postclose_hold_steps,
+        )):
+            raise ValueError("close transition, settle, and postclose hold steps must be integers")
+        if (self.close_transition_steps, self.close_settle_steps, self.postclose_hold_steps) not in {
+            (_MIN_CLOSE_TRANSITION_STEPS, 0, 0),
+            (_NUT_R3_CLOSE_TRANSITION_STEPS, _NUT_R3_CLOSE_SETTLE_STEPS,
+             _NUT_R3_POSTCLOSE_HOLD_STEPS),
+        }:
             raise ValueError(
-                "close_transition_steps must be in the stable-close range [10, 20]"
+                "close profile must be PickCube's 20/0/0 primitive or NutAssembly R3's 34/50/10 primitive"
             )
 
 
@@ -323,8 +341,27 @@ class PickCubeSolution:
             "target_y": float(segment.plan.target_pose[1]),
             "target_z": float(segment.plan.target_pose[2]),
         }
+        control_request = None
+        readiness_config = getattr(self, "readiness_config", None)
+        if (readiness_config is not None
+                and readiness_config.measured_tcp_clearance_gate):
+            mode = "track"
+            if segment.name == "lift":
+                mode = (
+                    "hold_last_applied"
+                    if self._action_index < self.config.postclose_hold_steps
+                    else "ramp_from_last_applied"
+                )
+            control_request = ArmTargetExecutionRequestV1(
+                "arm-target-execution-request-v1",
+                ARM_HOLD_RAMP_PROFILE,
+                mode,
+            )
         self._awaiting_observation = True
-        return ExpertAction(action=action, stage=segment.name, diagnostics=diagnostics)
+        return ExpertAction(
+            action=action, stage=segment.name, diagnostics=diagnostics,
+            control_request=control_request,
+        )
 
     next_action = act
 
@@ -398,9 +435,9 @@ class PickCubeSolution:
         return [
             Segment("move_above_cube", self._plan_move_above, self._accept_position),
             Segment("descend_vertical", self._plan_descend, self._accept_position),
-            # Closing is a fixed 10--20 tick public action primitive.  The
-            # task success contract is the measured 10 cm cube lift, so an
-            # opening-based grasp heuristic must not prevent the lift phase.
+            # PickCube's baseline keeps its 20-step primitive; the selected R3
+            # profile supplies NutAssembly's transition, settle, and postclose
+            # hold schedule through its resolved SolutionConfig.
             Segment("close_gripper", self._plan_close, self._accept_sequence_complete),
             Segment("lift", self._plan_lift, self._accept_task_success),
         ]
@@ -449,8 +486,16 @@ class PickCubeSolution:
         start = self._ee_pose(observation)
         cube = self._cube_position(observation)
         target = start.copy()
+        r3_clearance_profile = bool(getattr(
+            getattr(self, "readiness_config", None),
+            "measured_tcp_clearance_gate",
+            False,
+        ))
+        above_clearance = (
+            _R3_ABOVE_CLEARANCE if r3_clearance_profile else _ABOVE_CLEARANCE
+        )
         target[:3] = cube + np.array(
-            [0.0, 0.0, CUBE_HALF_SIZE + _ABOVE_CLEARANCE], dtype=np.float32
+            [0.0, 0.0, CUBE_HALF_SIZE + above_clearance], dtype=np.float32
         )
         # The face-aligned yaw is composed into the high pitched rotation, so the
         # final descend toward the above pose only removes the wrist pitch.
@@ -462,26 +507,23 @@ class PickCubeSolution:
             yaw = quat_wxyz_to_matrix(target[3:7].astype(np.float64)) @ quat_wxyz_to_matrix(
                 start[3:7].astype(np.float64)).T
         clearance_headroom = (
-            _MEASURED_CLEARANCE_COMMAND_HEADROOM
-            if getattr(
-                getattr(self, "readiness_config", None),
-                "measured_tcp_clearance_gate",
-                False,
-            )
-            else 0.0
+            _MEASURED_CLEARANCE_COMMAND_HEADROOM if r3_clearance_profile else 0.0
         )
         clear = start.copy()
-        clear[2] = max(
-            float(start[2]),
-            float(target[2]) + _APPROACH_CLEARANCE + clearance_headroom,
-        )
+        if r3_clearance_profile:
+            commanded_clearance_z = (
+                float(cube[2]) + CUBE_HALF_SIZE
+                + _R3_HIGH_CLEARANCE_COMMAND_ABOVE_CUBE_TOP
+            )
+        else:
+            commanded_clearance_z = float(target[2]) + _ABOVE_APPROACH_CLEARANCE
+        clear[2] = max(float(start[2]), commanded_clearance_z)
         transit = clear.copy()
         transit[:2] = target[:2]
         vertical_actions = self._planner.plan_translation_only(
             current_pose=start,
             target_position=clear[:3],
             gripper=1.0,
-            settle_steps=0,
         )
         rotation_actions = np.empty((0, 8), dtype=np.float32)
         if clearance_headroom:
@@ -501,17 +543,21 @@ class PickCubeSolution:
             current_pose=pitched,
             target_position=transit[:3],
             gripper=1.0,
-            settle_steps=0,
         )
         descend_actions = self._planner.plan_to_pose(
             current_pose=transit,
             goal_pose=target,
             gripper=1.0,
-            settle_steps=0,
         )
         action_segments = (vertical_actions, rotation_actions, lateral_actions, descend_actions)
         actions = np.concatenate([segment for segment in action_segments if len(segment)], axis=0)
-        minimum_height = _ABOVE_CLEARANCE + _APPROACH_CLEARANCE - _MEASURED_CLEARANCE_TOLERANCE
+        minimum_height = (
+            _R3_HIGH_CLEARANCE_COMMAND_ABOVE_CUBE_TOP
+            - clearance_headroom - _MEASURED_CLEARANCE_TOLERANCE
+            if r3_clearance_profile
+            else _ABOVE_CLEARANCE + _ABOVE_APPROACH_CLEARANCE
+            - _MEASURED_CLEARANCE_TOLERANCE
+        )
         vertical_end = len(vertical_actions)
         lateral_end = vertical_end + len(rotation_actions) + len(lateral_actions)
         return SegmentPlan(
@@ -544,9 +590,11 @@ class PickCubeSolution:
             ],
             dtype=np.float32,
         )
-        gated = getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False)
-        actions = self._planner.plan_translation_only(
-            current_pose=start, target_position=target[:3], gripper=1.0, settle_steps=0
+        return SegmentPlan(
+            actions=self._planner.plan_translation_only(
+                current_pose=start, target_position=target[:3], gripper=1.0
+            ),
+            target_pose=target,
         )
         gates = ()
         if gated:
@@ -576,7 +624,7 @@ class PickCubeSolution:
                 start_gripper=1.0,
                 goal_gripper=-1.0,
                 steps=self.config.close_transition_steps,
-                settle_steps=0,
+                settle_steps=self.config.close_settle_steps,
             ),
             target_pose=target,
         )
@@ -586,15 +634,20 @@ class PickCubeSolution:
         start = self._ee_pose(observation)
         target = start.copy()
         target[2] += _LIFT_DISTANCE
-        remaining_budget = self.config.action_budget - self._actions_emitted
-        return SegmentPlan(
-            actions=self._planner.plan_translation_only(
-                current_pose=start,
-                target_position=target[:3],
-                steps=remaining_budget,
+        actions = self._planner.plan_translation_only(
+            current_pose=start,
+            target_position=target[:3],
+            gripper=-1.0,
+        )
+        if self.config.postclose_hold_steps:
+            hold = self._planner.hold_pose(
+                pose=start,
+                steps=self.config.postclose_hold_steps,
                 gripper=-1.0,
-                settle_steps=0,
-            ),
+            )
+            actions = np.concatenate((hold, actions), axis=0)
+        return SegmentPlan(
+            actions=actions,
             target_pose=target,
         )
 
@@ -634,29 +687,111 @@ class PickCubeReadinessConfig:
     timeout_derivation: str
     version: str = "pick-cube-readiness-v1"
     measured_tcp_clearance_gate: bool = False
+    physics_dt: float | None = None
+    control_substeps: int = 1
 
     def __post_init__(self):
         if self.version != "pick-cube-readiness-v1" or self.control_dt <= 0:
             raise ValueError("invalid readiness configuration")
+        if type(self.control_substeps) is not int or self.control_substeps < 1:
+            raise ValueError("invalid readiness control substeps")
+        if self.physics_dt is not None:
+            import math
+            if (not math.isfinite(self.physics_dt) or self.physics_dt <= 0
+                    or not math.isclose(self.physics_dt * self.control_substeps, self.control_dt,
+                                        rel_tol=1e-12, abs_tol=0.0)):
+                raise ValueError("readiness physics timebase differs from control dt")
         if type(self.measured_tcp_clearance_gate) is not bool:
             raise TypeError("measured_tcp_clearance_gate must be an explicit boolean")
         if len(self.policies) != 4 or tuple(p.kind for p in self.policies) != (
             "pose_ready", "pose_ready", "gripper_ready", "task_outcome"
         ):
             raise ValueError("invalid stage policy order")
-        if self.base.close_transition_steps != 20:
-            raise ValueError("readiness-v1 requires the existing 20-step close primitive")
+        if (self.base.close_transition_steps, self.base.close_settle_steps,
+                self.base.postclose_hold_steps) not in {
+            (20, 0, 0),
+            (_NUT_R3_CLOSE_TRANSITION_STEPS, _NUT_R3_CLOSE_SETTLE_STEPS,
+             _NUT_R3_POSTCLOSE_HOLD_STEPS),
+        }:
+            raise ValueError("readiness config requires a supported close transition/settle profile")
 
     @classmethod
-    def from_source(cls, artifact, source, *, measured_tcp_clearance_gate=False):
+    def from_source(
+        cls,
+        artifact,
+        source,
+        *,
+        measured_tcp_clearance_gate=False,
+        planner=None,
+        close_transition_steps=None,
+        close_settle_steps=0,
+        postclose_hold_steps=0,
+    ):
         if source.task_artifact_hash != artifact.identity_hash:
             raise ValueError("source/Artifact mismatch")
+        return cls.from_resolved_config(
+            artifact, source.config, measured_tcp_clearance_gate=measured_tcp_clearance_gate,
+            planner=planner, close_transition_steps=close_transition_steps,
+            close_settle_steps=close_settle_steps, postclose_hold_steps=postclose_hold_steps,
+        )
+
+    @classmethod
+    def from_resolved_config(
+        cls, artifact, config, *, measured_tcp_clearance_gate=False, planner=None,
+        close_transition_steps=None, close_settle_steps=0, postclose_hold_steps=0,
+    ):
+        """Resolve Task readiness from the declared timebase and control configuration."""
         if type(measured_tcp_clearance_gate) is not bool:
             raise TypeError("measured_tcp_clearance_gate must be an explicit boolean")
-        action, gripper = source.config.action, source.config.robot.gripper
+        action, gripper = config.action, config.robot.gripper
         if gripper.kind != "experimental_rate_limited":
             raise ValueError("readiness-v1 requires resolved experimental gripper profile")
-        base = PickCubeSolutionConfig()
+        if planner is None:
+            base = PickCubeSolutionConfig()
+            action_budget_derivation = {
+                "formula": "legacy PickCube action budget",
+                "action_budget": base.action_budget,
+                "planner_max_steps": base.planner.max_steps,
+                "settle_steps": base.planner.settle_steps,
+            }
+        else:
+            if type(planner) is not AbsolutePosePlannerConfig:
+                raise TypeError("selected PickCube planner must be AbsolutePosePlannerConfig")
+            close_steps = (
+                _MIN_CLOSE_TRANSITION_STEPS
+                if close_transition_steps is None else int(close_transition_steps)
+            )
+            close_settle_steps = int(close_settle_steps)
+            postclose_hold_steps = int(postclose_hold_steps)
+            per_call_bound = planner.max_steps + planner.settle_steps
+            action_budget = (
+                _MAX_CARTESIAN_PLAN_CALLS * per_call_bound
+                + close_steps + close_settle_steps + postclose_hold_steps
+            )
+            base = PickCubeSolutionConfig(
+                action_budget=action_budget,
+                close_transition_steps=close_steps,
+                close_settle_steps=close_settle_steps,
+                postclose_hold_steps=postclose_hold_steps,
+                planner=planner,
+            )
+            action_budget_derivation = {
+                "formula": "max_cartesian_calls * (planner.max_steps + planner.settle_steps) + close_transition_steps + close_settle_steps + postclose_hold_steps",
+                "max_cartesian_calls": _MAX_CARTESIAN_PLAN_CALLS,
+                "route_calls": {
+                    "move_above_vertical_lateral_descent": 3,
+                    "grasp_descent": 1,
+                    "lift": 1,
+                    "additional_plan_reserve": 2,
+                },
+                "planner_max_steps": planner.max_steps,
+                "settle_steps_per_call": planner.settle_steps,
+                "per_call_bound": per_call_bound,
+                "close_transition_steps": close_steps,
+                "close_settle_steps": close_settle_steps,
+                "postclose_hold_steps": postclose_hold_steps,
+                "action_budget": action_budget,
+            }
         dt = Decimal(str(artifact.timebase.control_dt))
         ceil = lambda value: int(value.to_integral_value(rounding=ROUND_CEILING))
         pose = Decimal("1.0") / dt
@@ -667,9 +802,11 @@ class PickCubeReadinessConfig:
         force = ceil(opening / Decimal(str(gripper.force_adjust_step_m)))
         margin = ceil(Decimal("0.2") / dt)
         total_close = max(rate, force) + margin
-        holds = total_close - base.close_transition_steps
-        if holds < 0:
-            raise ValueError("gripper horizon shorter than transition")
+        holds = max(
+            0,
+            total_close - base.close_transition_steps - base.close_settle_steps
+            - base.postclose_hold_steps,
+        )
 
         def policy(kind, ticks, reason):
             return StageCompletionPolicy(
@@ -690,10 +827,14 @@ class PickCubeReadinessConfig:
             "rate_ticks": rate, "force_adjust_ticks": force,
             "common_dynamics_margin_s": .2, "margin_ticks": margin,
             "total_close_ticks": total_close,
-            "transition_ticks": base.close_transition_steps, "pose_timeout_s": 1.,
+            "transition_ticks": base.close_transition_steps,
+            "settle_ticks": base.close_settle_steps,
+            "postclose_hold_ticks": base.postclose_hold_steps,
+            "pose_timeout_s": 1.,
             "formula": "max(ceil(range/opening_step),ceil(range/force_adjust_step))+ceil(margin/control_dt)",
             "measured_tcp_clearance_gate": measured_tcp_clearance_gate,
-            "measured_tcp_clearance_gate_hold_ticks": 4 * int(pose) if measured_tcp_clearance_gate else 0,
+            "measured_tcp_clearance_gate_hold_ticks": 2 * int(pose) if measured_tcp_clearance_gate else 0,
+            "solution_action_budget_derivation": action_budget_derivation,
         }
         return cls(
             base, float(dt),
@@ -703,6 +844,8 @@ class PickCubeReadinessConfig:
              policy("task_outcome", int(pose), "lift_outcome_timeout")),
             digest(profile), json.dumps(derivation, sort_keys=True),
             measured_tcp_clearance_gate=measured_tcp_clearance_gate,
+            physics_dt=float(artifact.timebase.physics_dt),
+            control_substeps=int(artifact.timebase.control_substeps),
         )
 
     @property
@@ -718,6 +861,8 @@ class PickCubeReadinessConfig:
         return digest({
             "version": self.version, "base": asdict(self.base),
             "control_dt": self.control_dt,
+            "physics_dt": self.physics_dt,
+            "control_substeps": self.control_substeps,
             "policies": [policy.to_mapping() for policy in self.policies],
             "profile_identity": self.profile_identity,
             "timeout_derivation": self.timeout_derivation,
@@ -734,7 +879,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
     def __init__(self, *, config: PickCubeReadinessConfig):
         self.readiness_config = config
         self.version = (
-            "pick-cube-p16-readiness-expert-v3-measured-tcp-clearance"
+            "pick-cube-p16-readiness-expert-v4-r3-execution-planner-match"
+            if config.base.postclose_hold_steps == _NUT_R3_POSTCLOSE_HOLD_STEPS
+            else "pick-cube-p16-readiness-expert-v3-measured-tcp-clearance"
             if config.measured_tcp_clearance_gate else type(self).version
         )
         self._measured_tcp_gate_index = 0
@@ -754,7 +901,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
     def identity_for_config(cls, config: PickCubeReadinessConfig):
         """Identify an expert configuration without constructing mutable rollout state."""
         version = (
-            "pick-cube-p16-readiness-expert-v3-measured-tcp-clearance"
+            "pick-cube-p16-readiness-expert-v4-r3-execution-planner-match"
+            if config.base.postclose_hold_steps == _NUT_R3_POSTCLOSE_HOLD_STEPS
+            else "pick-cube-p16-readiness-expert-v3-measured-tcp-clearance"
             if config.measured_tcp_clearance_gate else cls.version
         )
         return digest({
@@ -769,19 +918,40 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if not reset:
             if execution_info.control_step != self._boundary_step + 1:
                 raise ValueError("stale/skipped execution boundary")
-            expected = self._boundary_time + self.readiness_config.control_dt
-            import math
-            if abs(execution_info.simulation_time - expected) > max(
-                math.ulp(expected), math.ulp(execution_info.simulation_time)
-            ):
+            config = self.readiness_config
+            expected = config.control_dt
+            tolerance = boundary_interval_clock_tolerance(
+                self._boundary_time, execution_info.simulation_time, expected,
+                config.physics_dt if config.physics_dt is not None else expected,
+                config.control_substeps,
+            )
+            if abs((execution_info.simulation_time - self._boundary_time) - expected) > tolerance:
                 raise ValueError("stale execution time")
         self._boundary_step = execution_info.control_step
         self._boundary_time = execution_info.simulation_time
 
-    def reset(self, observation, info, metadata, *, execution_info):
-        self._execution(execution_info, reset=True)
+    @staticmethod
+    def _execution_from_info(info, execution_info):
+        if execution_info is not None:
+            return execution_info
+        if not isinstance(info, Mapping):
+            raise TypeError('public execution info is required')
+        position = info.get('pickcube_position_execution_info_v2')
+        if position is not None:
+            return PickCubePositionExecutionInfoV2.from_mapping(position)
+        position = info.get('pickcube_position_execution_info_v1')
+        if position is not None:
+            return PickCubePositionExecutionInfoV1.from_mapping(position)
+        value = info.get('expert_execution_info_v1')
+        if value is None:
+            raise TypeError('public execution info is required')
+        return ExpertExecutionInfo.from_mapping(value)
+
+    def reset(self, observation, info, metadata, *, execution_info=None):
+        self._execution(self._execution_from_info(info, execution_info), reset=True)
         self.planned_actions_emitted = 0
         self.readiness_wait_actions_emitted = 0
+        self._position_close_settled_ticks = 0
         self.total_control_actions_emitted = 0
         self._wait_count = 0
         self.completion_events = []
@@ -855,13 +1025,20 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 "measured_tcp_horizontal_error_m": metrics["horizontal_error_m"],
             })
         self._awaiting_observation = True
-        return ExpertAction(action=action, stage=segment.name, diagnostics=diagnostics)
+        return ExpertAction(
+            action=action, stage=segment.name, diagnostics=diagnostics,
+            request_boundary=((info.get('expert_execution_boundary_v1')
+                               or info.get('state_boundary_identity'))
+                              if isinstance(info, Mapping) else None),
+            solution_identity=self.identity,
+        )
 
     next_action = act
 
-    def observe(self, observation, reward, terminated, truncated, info, *, execution_info):
+    def observe(self, observation, reward, terminated, truncated, info, *, execution_info=None):
         if not self._awaiting_observation:
             raise RuntimeError("observe requires preceding act")
+        execution_info = self._execution_from_info(info, execution_info)
         self._execution(execution_info)
         self._awaiting_observation = False
         self.total_control_actions_emitted += 1
@@ -884,57 +1061,10 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if (policy.kind == "gripper_ready"
                 and isinstance(execution_info, PickCubePositionExecutionInfoV1)):
             ready = execution_info.close_ready
-            if not ready and exhausted:
-                publication = self._position_publication(observation, info, execution_info)
-                fresh = bool(
-                    publication is not None
-                    and self._capture_episode_context is not None
-                    and self._publication_context(publication) == self._capture_episode_context
-                    and publication.state_revision > self._capture_last_revision
-                )
-                if fresh:
-                    self._capture_last_revision = publication.state_revision
-                candidate = self._position_capture_geometry(observation, execution_info) if fresh else None
-                stable = False
-                if candidate is not None and self._capture_previous_pose is not None:
-                    previous_position, previous_rotation = self._capture_previous_pose
-                    anchor_position, anchor_rotation = self._capture_anchor_pose
-                    position, rotation = candidate
-                    from ...utils.rotation import matrix_to_rotvec
-                    dt = self.readiness_config.control_dt
-                    stable = bool(
-                        np.linalg.norm(position - previous_position) <= _CAPTURE_RELATIVE_SPEED_M_S * dt
-                        and np.linalg.norm(matrix_to_rotvec(rotation @ previous_rotation.T))
-                        <= _CAPTURE_RELATIVE_ROTATION_SPEED_RAD_S * dt
-                        and np.linalg.norm(position - anchor_position) <= 0.0002
-                        and np.linalg.norm(matrix_to_rotvec(rotation @ anchor_rotation.T)) <= 0.005
-                    )
-                self._capture_candidate_ticks = self._capture_candidate_ticks + 1 if stable else 0
-                self._capture_previous_pose = candidate
-                if not stable:
-                    self._capture_anchor_pose = candidate
-                    self._capture_first_sample_step = self._boundary_step if candidate is not None else None
-                    self._capture_first_sample_time = self._boundary_time if candidate is not None else None
-                required_ticks = max(
-                    1, int(np.ceil(_CAPTURE_GEOMETRY_DWELL_S / self.readiness_config.control_dt)),
-                )
-                dwell = (
-                    self._boundary_time - self._capture_first_sample_time
-                    if self._capture_first_sample_time is not None else 0.0
-                )
-                ready = bool(
-                    self._capture_candidate_ticks >= required_ticks
-                    and dwell >= _CAPTURE_GEOMETRY_DWELL_S - 1e-12
-                )
-                if ready:
-                    authorization = "stable_opposed_pad_capture_geometry"
-                    capture_evidence = {
-                        "capture_first_sample_step": self._capture_first_sample_step,
-                        "capture_stable_intervals": self._capture_candidate_ticks,
-                        "capture_dwell_s": dwell,
-                    }
-            else:
-                self._clear_capture_candidate()
+            if isinstance(execution_info, PickCubePositionExecutionInfoV2):
+                self._position_close_settled_ticks = (
+                    self._position_close_settled_ticks + 1 if ready else 0)
+                ready = self._position_close_settled_ticks * self.readiness_config.control_dt >= .05
         else:
             ready = policy.evaluate(self._ee_pose(observation), plan.target_pose, info, execution_info)
         if policy.kind == "task_outcome" and ready:
@@ -1188,7 +1318,9 @@ __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
 
 @dataclass(frozen=True)
 class PickCubePositionExecutionInfoV1(Contract):
-    """Force-free gripper readiness from measured joint position and velocity."""
+    """Historical 45 mm readiness contract; retained for explicit v1 inputs."""
+
+    schema_id = "pickcube-position-execution-info-v1"
 
     schema_version: str
     control_step: int
@@ -1198,8 +1330,12 @@ class PickCubePositionExecutionInfoV1(Contract):
     target_opening_m: float
     close_ready: bool
 
+    @staticmethod
+    def closure_is_ready(target, opening, speed):
+        return bool(target <= .045 and opening <= .045 and abs(speed) <= .005)
+
     def validate(self):
-        if self.schema_version != "pickcube-position-execution-info-v1":
+        if self.schema_version != self.schema_id:
             raise ValueError("unsupported PickCube Position execution info")
         values = (self.simulation_time, self.measured_opening_m,
                   self.measured_opening_velocity_m_s, self.target_opening_m)
@@ -1215,13 +1351,26 @@ class PickCubePositionExecutionInfoV1(Contract):
                 f"measured_opening_velocity_m_s={self.measured_opening_velocity_m_s!r}, "
                 f"target_opening_m={self.target_opening_m!r})"
             )
-        expected = bool(
-            self.target_opening_m <= 0.045
-            and self.measured_opening_m <= 0.045
-            and abs(self.measured_opening_velocity_m_s) <= 0.005
-        )
+        expected = self.closure_is_ready(self.target_opening_m, self.measured_opening_m,
+                                         self.measured_opening_velocity_m_s)
         if type(self.close_ready) is not bool or self.close_ready != expected:
             raise ValueError("PickCube close readiness must follow measured position/velocity only")
 
 
-__all__ += ["PickCubePositionExecutionInfoV1"]
+@dataclass(frozen=True)
+class PickCubePositionExecutionInfoV2(PickCubePositionExecutionInfoV1):
+    """A full close request has settled, allowing the Solution to try lifting.
+
+    An object can prevent zero opening. This is neither contact detection nor
+    grasp success: the Solution requires 50 ms of settled readback, and the
+    unchanged Task predicate still requires an actual 100 mm cube lift.
+    """
+
+    schema_id = "pickcube-position-execution-info-v2"
+
+    @staticmethod
+    def closure_is_ready(target, opening, speed):
+        return bool(target == 0. and opening < .08 and abs(speed) <= .005)
+
+
+__all__ += ["PickCubePositionExecutionInfoV1", "PickCubePositionExecutionInfoV2"]

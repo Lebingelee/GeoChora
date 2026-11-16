@@ -203,11 +203,16 @@ class NativeResetWriteReceiptV1:
             'partial': self.partial,
         }
 
-    def validate(self, sample: ResetSample, source: UsdRuntimeSourceV1, target_names: tuple[str, ...]):
+    def validate(self, sample: ResetSample, source: UsdRuntimeSourceV1,
+                 target_names: tuple[str, ...], *, require_zero_velocities: bool = True):
         if self.schema_version != 'native-reset-write-receipt-v1':
             raise ValueError('unsupported native reset write receipt schema')
-        if self.partial or not self.velocities_zeroed:
-            raise ValueError('native reset writes must be complete and zero inherited velocities')
+        if self.partial or (require_zero_velocities and not self.velocities_zeroed):
+            raise ValueError(
+                'native reset writes must be complete and zero inherited velocities'
+                if require_zero_velocities else
+                'native reset writes must be complete'
+            )
         if (self.reset_sample_id, set(self.written_joint_names), set(self.written_free_joint_names),
                 tuple(self.reset_target_names)) != (
                 sample.sample_id, set(source.joints), set(source.free_joints), tuple(target_names)):
@@ -288,13 +293,37 @@ class NativeAdvanceReceiptV1:
             raise ValueError('native advance must acknowledge exactly one expected timed step')
         if self.native_adaptation_application is not None:
             application = self.native_adaptation_application
+            if (isinstance(application, Mapping)
+                    and application.get('schema_version') == 'native-physx-effort-substep-application-v1'):
+                if (application.get('profile_id') != 'isaacsim-6.2-physx-direct-effort-v1'
+                        or application.get('provenance_kind') != 'native_runtime'
+                        or application.get('native_step_index') != expected_index
+                        or application.get('public_effort_api') != 'Articulation.get_dof_efforts'
+                        or type(application.get('native_dof_names')) is not list
+                        or type(application.get('requested_efforts')) is not list
+                        or type(application.get('readback_efforts')) is not list
+                        or len(application['native_dof_names']) != len(application['requested_efforts'])
+                        or len(application['requested_efforts']) != len(application['readback_efforts'])
+                        or any(type(name) is not str or not name.strip()
+                               for name in application['native_dof_names'])
+                        or any(type(value) not in (int, float) or isinstance(value, bool)
+                               or not math.isfinite(float(value))
+                               for values in (application['requested_efforts'], application['readback_efforts'])
+                               for value in values)
+                        or any(not math.isclose(float(actual), float(requested),
+                                                rel_tol=0.0, abs_tol=1e-5)
+                               for actual, requested in zip(
+                                   application['readback_efforts'], application['requested_efforts'], strict=True))):
+                    raise ValueError('native direct-effort substep receipt is incomplete or malformed')
+                return
             # F06 PickCube has a task-scoped PhysX mimic profile: a 5 N
             # leader drive and no DG04 cube/support contact-witness claim.
             # Preserve the stricter F05 DG04 contract while validating F06
             # against the receipt emitted by its own native adapter.
             is_f06_pickcube = (
                 isinstance(application, Mapping)
-                and application.get('profile_id') == 'isaacsim-6.2-pickcube-physx-mimic-5n-v1'
+                and application.get('profile_id') in {'isaacsim-6.1-pickcube-physx-mimic-5n-v1',
+                                                       'isaacsim-6.2-pickcube-physx-mimic-5n-v1'}
             )
             numeric_fields = (
                 'reference_position_m', 'follower_position_m',
@@ -305,11 +334,8 @@ class NativeAdvanceReceiptV1:
             if (not isinstance(application, Mapping)
                     or application.get('schema_version') != 'native-physx-mimic-substep-application-v1'
                     or application.get('native_step_index') != expected_index
-                    or application.get('profile_id') != (
-                        'isaacsim-6.2-pickcube-physx-mimic-5n-v1'
-                        if is_f06_pickcube
-                        else 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
-                    )
+                    or (not is_f06_pickcube and application.get('profile_id') !=
+                        'isaacsim-6.2-physx-native-mimic-leader-drive-v1')
                     or application.get('provenance_kind') not in {'synthetic_fixture', 'native_runtime'}
                     or application.get('reference_joint') != 'finger_joint1'
                     or application.get('follower_joint') != 'finger_joint2'
@@ -466,6 +492,17 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._initialize_values(artifact, source, execution.physics_provider)
         self._execution_spec_v1 = execution
         self._native_io = native_io
+        self._build_layout_facts = getattr(native_io, 'build_layout_facts', None)
+        if self._build_layout_facts is not None:
+            self._build_layout_facts = {**self._build_layout_facts,
+                'materialization_id': self.provider_materialization_id}
+            # Keep the initial native-key set so the public session receipt can
+            # refresh adapter-owned facts after a failed interval without
+            # discarding session-owned additions (for example physical
+            # controller receipts).
+            self._native_build_layout_fact_keys = frozenset(self._build_layout_facts)
+        else:
+            self._native_build_layout_fact_keys = frozenset()
         self._native_io_metadata = native_io.metadata()
         if type(self._native_io_metadata) is not NativeRuntimeIOMetadataV1:
             raise TypeError('native Runtime I/O metadata() must return NativeRuntimeIOMetadataV1')
@@ -484,7 +521,8 @@ class UsdCoreRuntimeSession(_SessionValues):
             )
         if execution_provenance not in {'native_runtime', 'synthetic_fixture'}:
             raise ValueError('native I/O owner reported an unsupported execution provenance')
-        if drive_receipt is None:
+        simple_effort = execution.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
+        if drive_receipt is None and not simple_effort:
             if execution.physics_provider != 'isaacsim':
                 raise ValueError('only the exact admitted Isaac route can defer named-drive receipt compilation')
             drive_receipt = compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
@@ -496,51 +534,141 @@ class UsdCoreRuntimeSession(_SessionValues):
             if execution_provenance == 'synthetic_fixture':
                 from dataclasses import replace
                 drive_receipt = replace(drive_receipt, provenance_kind='synthetic_fixture')
-        if type(drive_receipt) not in (
+        if simple_effort:
+            if drive_receipt is not None:
+                raise ValueError('G05 simple-effort route does not admit a position-drive receipt')
+            receipt_native_names = self._native_io_metadata.native_dof_names
+            receipt_limits = dict(self._native_io_metadata.native_position_limits)
+        elif type(drive_receipt) not in (
                 IsaacNamedPositionDriveReceiptV1,
                 IsaacNativeMimicPositionDriveReceiptV1,
                 GeoPhysUsdPositionDriveReceiptV1,
                 GeoPhysUsdSourceActuationReceiptV2):
             raise TypeError('Core RuntimeSession requires a supported named-drive receipt owner')
-        if ((type(drive_receipt) in (IsaacNamedPositionDriveReceiptV1,
+        if (not simple_effort and ((type(drive_receipt) in (IsaacNamedPositionDriveReceiptV1,
                                      IsaacNativeMimicPositionDriveReceiptV1)
              and execution.physics_provider != 'isaacsim')
                 or (type(drive_receipt) in (GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2)
-                    and execution.physics_provider != 'geophys')):
+                    and execution.physics_provider != 'geophys'))):
             raise ValueError('named-drive receipt provider differs from the declared ExecutionSpec')
-        if drive_receipt.provenance_kind != execution_provenance:
+        if not simple_effort and drive_receipt.provenance_kind != execution_provenance:
             raise ValueError('named-drive receipt provenance does not match the loaded USD source')
-        receipt_native_names = (
-            drive_receipt.native_dof_names
-            if type(drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1
-            else tuple(item.native_dof_name for item in sorted(
-                drive_receipt.drives, key=lambda item: item.native_dof_index,
-            ))
-        )
-        if (self._native_io_metadata.provider_build_identity != drive_receipt.provider_build_identity
+        if not simple_effort:
+            receipt_native_names = (
+                drive_receipt.native_dof_names
+                if type(drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1
+                else tuple(item.native_dof_name for item in sorted(
+                    drive_receipt.drives, key=lambda item: item.native_dof_index,
+                ))
+            )
+        if ((not simple_effort
+             and self._native_io_metadata.provider_build_identity != drive_receipt.provider_build_identity)
                 or self._native_io_metadata.native_dof_names != tuple(receipt_native_names)):
             raise ValueError('native I/O DOF/build metadata differs from the admitted named-drive receipt')
-        receipt_limits = (
-            dict(drive_receipt.native_position_limits)
-            if type(drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1
-            else {item.native_dof_name: (float(item.lower_limit), float(item.upper_limit))
-                  for item in drive_receipt.drives}
-        )
+        if not simple_effort:
+            receipt_limits = (
+                dict(drive_receipt.native_position_limits)
+                if type(drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1
+                else {item.native_dof_name: (float(item.lower_limit), float(item.upper_limit))
+                      for item in drive_receipt.drives}
+            )
         if dict(self._native_io_metadata.native_position_limits) != receipt_limits:
             raise ValueError('native I/O named DOF limits differ from the named-drive receipt')
         self._drive_receipt = drive_receipt
-        self._target_actuators = {
+        self._target_actuators = ({
             f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
             for item in drive_receipt.drives if item.canonical_joint.joint_id.startswith('joint')
-        }
+        } if not simple_effort else {})
         self._open_actuators = ()
         self._native_step_count = 0
+        self._device_pose_generation = 0
         self._reset_write_receipt: NativeResetWriteReceiptV1 | None = None
         self._last_native_position_ack: NativePositionWriteAckV1 | None = None
         self._last_interval_advances: tuple[dict[str, object], ...] = ()
         self._last_interval_advance_attempts = 0
         self._last_readback: NativeRuntimeReadbackV1 | None = None
         self._position_applied_boundary_ids = set()
+
+    def bind_physical_control(self, execution):
+        if getattr(self, '_physical_port', None) is not None or self._reset_done:
+            raise ValueError('physical port must be bound once before reset')
+        from .isaac_physical import IsaacF06PhysicalPort, IsaacSimpleEffortPhysicalPort
+        versions = execution.controller_versions()
+        self._physical_port = (
+            IsaacSimpleEffortPhysicalPort(self, execution)
+            if self._execution_spec_v1.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
+            else IsaacF06PhysicalPort(self, execution)
+        )
+        self._physical_controller_versions = versions
+        self.physical_control_generation = execution.generation
+        self._device_pose_generation = execution.generation
+
+    def assess_physical_control(self, binding):
+        return self._physical_port.assessment(binding)
+
+    def physical_joint_build_receipt(self, binding):
+        return self._physical_port.joints(binding)
+
+    def physical_buffer_policy(self, binding):
+        return self._physical_port.policy(binding)
+
+    def apply_physical_command_batch(self, resolved):
+        return self._physical_port.write(resolved)
+
+    def abort_physical_control(self):
+        port = getattr(self, '_physical_port', None)
+        if port is not None:
+            port.finish_interval()
+
+    def _preflight_physical_reset(self, sample):
+        """Validate the G05 USD reset before the first native write."""
+        if self._execution_spec_v1.physics_profile != 'isaac-gpu-physx-g05-5c-effort-v1':
+            raise RuntimeError('native physical reset preflight is limited to the G05 effort profile')
+        self._validate_sample(sample)
+        if sample.control_policy != 'named_physical_effort_by_source_v1':
+            raise ValueError('physical reset requires the named effort policy')
+        self._assert_native_identity()
+        limits = self._native_io_metadata.native_position_limits
+        for semantic, value in sample.joint_position.items():
+            native_name = self._source.joints.get(semantic)
+            if native_name is None or native_name not in limits:
+                raise ValueError(f'physical reset joint is absent from the admitted USD source: {semantic}')
+            low, high = limits[native_name]
+            if not float(low) <= float(value) <= float(high):
+                raise ValueError(f'physical reset joint position exceeds native limits: {semantic}')
+
+    @property
+    def build_layout_facts(self):
+        """Return the latest native facts plus session-owned receipt additions."""
+        import copy
+        facts = getattr(self, '_build_layout_facts', None)
+        if facts is None:
+            raise RuntimeError('request-specific build layout was not checked')
+        native_facts = getattr(self._native_io, 'build_layout_facts', None)
+        if native_facts is not None:
+            merged = dict(native_facts)
+            merged.update({
+                key: value for key, value in facts.items()
+                if key not in self._native_build_layout_fact_keys
+            })
+            merged['materialization_id'] = self.provider_materialization_id
+            facts = merged
+        return copy.deepcopy(facts)
+
+    @property
+    def native_interval_evidence(self):
+        """Return owned, serializable evidence for the last native interval."""
+        import copy
+        return {
+            'position_ack': (None if self._last_native_position_ack is None
+                             else self._last_native_position_ack.to_mapping()),
+            'advances': copy.deepcopy(list(self._last_interval_advances)),
+            'advance_attempts': self._last_interval_advance_attempts,
+            'provenance_kind': (
+                getattr(self._drive_receipt, 'provenance_kind', None)
+                or getattr(self._native_io, 'execution_provenance_kind', 'unknown')
+            ),
+        }
 
     def _assert_native_identity(self):
         self._source.assert_fresh()
@@ -550,9 +678,25 @@ class UsdCoreRuntimeSession(_SessionValues):
         current.validate_binding(self._artifact, self._execution_spec_v1, self._source)
 
     def reset(self, sample: ResetSample) -> RealizedInitialState:
+        port = getattr(self, '_physical_port', None)
+        if port is not None and port.pending is not None:
+            raise RuntimeError('cannot reset with a pending physical interval')
         self._begin_reset()
         self._validate_sample(sample)
         self._assert_native_identity()
+        if self._execution_spec_v1.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1':
+            targets = ()
+            receipt = self._native_io.write_reset(sample, targets)
+            self._reset_write_receipt = receipt if type(receipt) is NativeResetWriteReceiptV1 else None
+            if type(receipt) is not NativeResetWriteReceiptV1:
+                raise TypeError('G05 native reset must return NativeResetWriteReceiptV1')
+            receipt.validate(sample, self._source, (), require_zero_velocities=False)
+            self._native_step_count = 0
+            self._position_applied_boundary_ids.clear()
+            self._last_native_position_ack = None
+            self._last_interval_advances = ()
+            self._last_interval_advance_attempts = 0
+            return self._realized(sample)
         robot_entity_id = _canonical_panda_entity_id(self._source)
         arm = {f'{robot_entity_id}/joint{index}': sample.joint_position[f'{robot_entity_id}/joint{index}']
                for index in range(1, 8)}
@@ -571,6 +715,17 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._native_step_count = 0
         self._position_applied_boundary_ids.clear()
         self._last_native_position_ack = None
+        if getattr(self, '_physical_port', None) is not None:
+            # Preserve the native F06 position drives at the reset targets;
+            # the independently declared effort is an additional contribution.
+            from ...controllers.canonical.contracts import digest
+            target_id = digest({'schema': 'f06-physical-reset-hold-v1',
+                                'reset_sample_id': sample.sample_id, 'targets': targets})
+            ack = self._native_io.write_position_targets(target_id, targets)
+            if type(ack) is not NativePositionWriteAckV1:
+                raise TypeError('physical reset hold requires a native position acknowledgement')
+            ack.validate(target_id, targets)
+            self._last_native_position_ack = ack
         self._last_interval_advances = ()
         self._last_interval_advance_attempts = 0
         return self._realized(sample)
@@ -600,6 +755,79 @@ class UsdCoreRuntimeSession(_SessionValues):
 
     def snapshot(self) -> CanonicalStateView:
         return self._snapshot_with_native_free_joints()[0]
+
+    def bind_task_camera(self, camera, state):
+        return self._task_camera_operation('bind_task_camera', state, camera)
+
+    def task_camera_binding(self, state):
+        return self._task_camera_operation('task_camera_binding', state)
+
+    def capture_task_camera(self, camera, state):
+        return self._task_camera_operation('capture_task_camera', state, camera)
+
+    def task_camera_completion(self, state):
+        return self._task_camera_operation('task_camera_completion', state)
+
+    def _task_camera_operation(self, operation, state, *args):
+        self._require_reset()
+        self._assert_native_identity()
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('task camera request does not match the current state boundary')
+        method = getattr(self._native_io, operation, None)
+        if not callable(method):
+            raise RuntimeError('native Runtime I/O has no task camera binding')
+        before = self._native_io.read_state()
+        result = method(*args, state)
+        if before != self._native_io.read_state() or state.boundary != self.state_boundary_identity():
+            raise RuntimeError('physics state or boundary changed during task camera operation')
+        return result
+
+    def capture_observer(self, camera, state):
+        """Capture only the currently published boundary through the native owner."""
+        self._require_reset()
+        self._assert_native_identity()
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('observer request does not match the current state boundary')
+        capture = getattr(self._native_io, 'capture_observer', None)
+        if not callable(capture):
+            raise RuntimeError('native Runtime I/O has no admitted observer capture')
+        before = self._native_io.read_state()
+        try:
+            result = capture(camera, state)
+            after = self._native_io.read_state()
+            if state.boundary != self.state_boundary_identity() or before != after:
+                raise RuntimeError('physics state or boundary changed during observer capture')
+        except BaseException as error:
+            invalidate = getattr(self._native_io, 'invalidate_observer', None)
+            if callable(invalidate):
+                try:
+                    invalidate()
+                except BaseException as cleanup_error:
+                    error.add_note(f'observer invalidation also failed: {cleanup_error!r}')
+            raise
+        return result
+
+    def present_observer(self, state):
+        self._require_reset()
+        self._assert_native_identity()
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('observer presentation does not match the current state boundary')
+        present = getattr(self._native_io, 'present_observer', None)
+        if not callable(present):
+            raise RuntimeError('native Runtime I/O has no admitted observer presentation')
+        try:
+            result = present()
+            if state.boundary != self.state_boundary_identity():
+                raise RuntimeError('physics boundary changed during observer presentation')
+        except BaseException as error:
+            invalidate = getattr(self._native_io, 'invalidate_observer', None)
+            if callable(invalidate):
+                try:
+                    invalidate()
+                except BaseException as cleanup_error:
+                    error.add_note(f'observer invalidation also failed: {cleanup_error!r}')
+            raise
+        return result
 
     def read_contact_observation(self) -> dict[str, object]:
         """Read the provider's last DG02 diagnostic contact sample without advancing time."""
@@ -655,6 +883,17 @@ class UsdCoreRuntimeSession(_SessionValues):
         )
 
     def step(self) -> CanonicalStateView:
+        port = getattr(self, '_physical_port', None)
+        if port is None:
+            return self._step_native_interval()
+        if port.pending is None:
+            raise RuntimeError('physical interval requires exactly one fresh batch')
+        try:
+            return self._step_native_interval()
+        finally:
+            port.finish_interval()
+
+    def _step_native_interval(self) -> CanonicalStateView:
         self._require_reset()
         self._assert_native_identity()
         dt = float(self._artifact.timebase.physics_dt)
@@ -675,6 +914,12 @@ class UsdCoreRuntimeSession(_SessionValues):
             if type(self._drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1:
                 application = receipt.native_adaptation_application
                 ack = self._last_native_position_ack
+                if (application is not None and self._execution_spec_v1.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'):
+                    expected_profile = ('isaacsim-' + self._native_io_metadata.provider_build_identity
+                                        .removeprefix('isaacsim-').rsplit('.', 2)[0]
+                                        + '-pickcube-physx-mimic-5n-v1')
+                    if application.get('profile_id') != expected_profile:
+                        raise ValueError('native mimic application version differs from runtime metadata')
                 if (application is None or ack is None
                         or application.get('drive_receipt_identity_sha256') != self._drive_receipt.identity_sha256
                         or application.get('provenance_kind') != self._drive_receipt.provenance_kind
@@ -695,18 +940,48 @@ class UsdCoreRuntimeSession(_SessionValues):
         return self.snapshot()
 
 
+    def device_pose_description(self):
+        """Describe an explicitly supported native device-pose publication."""
+        self._require_reset()
+        publish = getattr(self._native_io, 'device_pose_description', None)
+        if not callable(publish):
+            raise RuntimeError('native provider has no device pose publication')
+        return publish()
+
+    def publish_device_poses(self):
+        """Publish the same reset/step boundary through the native pose owner."""
+        from dataclasses import asdict
+        from ..contracts import DeviceStateIdentity
+
+        self._require_reset()
+        result = self._native_io.publish_device_poses()
+        identity = DeviceStateIdentity(self._source.source_id, self._source.source_closure_digest,
+            self._artifact.identity_hash, self.provider_materialization_id,
+            int(self._device_pose_generation), self.state_revision, result['native_step'],
+            result['native_time_s'], self._artifact.timebase.control_dt)
+        return {'identity': asdict(identity), 'body_names': result['body_names']}
+
     def close(self) -> None:
         if not self._closed:
             try:
-                self._native_io.close()
+                port = getattr(self, '_physical_port', None)
+                if port is not None and port.pending is not None:
+                    port.finish_interval()
             finally:
-                self._closed = True
+                try:
+                    self._native_io.close()
+                finally:
+                    self._closed = True
 
     def close_runtime_owner(self) -> None:
         """Close process-scoped provider resources only when the Env is done."""
         close_owner = getattr(self._native_io, 'close_runtime_owner', None)
         if callable(close_owner):
             close_owner()
+
+    def worker_close_receipt(self):
+        get_receipt = getattr(self._native_io, 'close_receipt', None)
+        return get_receipt() if callable(get_receipt) else None
 
 
 __all__ = [

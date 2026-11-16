@@ -198,3 +198,55 @@ def test_current_camera_admission_stays_legacy_and_same_provider_only():
         admit_render(camera, _execution(), manifest)
     with pytest.raises(TypeError, match="legacy ExecutionSpec"):
         create_camera_session(camera, _execution(), source=_source())
+
+
+def test_layered_execution_codec_is_separate_from_legacy_codecs():
+    from task_env.artifacts import ExecutionSpecV2, RendererSelectionV1, decode_execution_spec
+    value = ExecutionSpecV2(
+        'execution-spec-v2', 'mujoco', 'cpu', 'cpu', 'unknown', None, 'unknown',
+        RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None),
+        'standalone', 'mujoco', 'unknown', 'unknown', 'not_applicable',
+        'scalar', 'in_process', '/python', None,
+    )
+    mapping = value.to_mapping()
+    assert decode_execution_spec(mapping) == value
+    assert decode_execution_spec(mapping).identity_hash == value.identity_hash
+    mapping['unexpected'] = True
+    with pytest.raises(ValueError, match='unknown ExecutionSpecV2 fields'):
+        decode_execution_spec(mapping)
+
+
+def test_frozen_input_codec_mappings_and_hashes_remain_exact():
+    import hashlib
+    import json
+    from pathlib import Path
+    from task_env.artifacts import SceneDefinition, Timebase, decode_task_artifact
+
+    oracle = json.loads(Path(__file__).with_name('v211_g03_3a_legacy_codec_oracle.json').read_text())
+    assert oracle['input_head'] == '40ca5d56153b9e13848b20c2af550c1efe076b98'
+    assert oracle['contracts_source_sha256'] == '93db8c569a457382c507ebe528efe85baee7977cf999d34612c66203334b5fb3'
+    hashes = {
+        'artifact_v0': '9a3fca2d48b0abee7224b5eb96226cb579c13fb085220c412b86edf8e3f003b0',
+        'artifact_v1': '72cf7df2ed9c0c9d924a3f9d85d72f31d8c034820bbce39758de7e10cc4e5f2b',
+        'execution_v0': '8b72e7e1a86505d308608f90656f7a06c4b02cecb119f5dfdcf1c23bdd7f14b9',
+        'execution_v1': '371b6d7c55d557b4843e2e55adbbbc75b55d1ae6b0baff6f19323ebbb336d887',
+        'scene_v1': '492c8d5f0e5f71c8b0eb94c9ff1acbe6003bc408a445d45531529cd21d89f3a9',
+        'scene_v2': '9895694b7b2f7ff75277fe64fe68d1ca23ec6b3cf2582c99ca499661b108c64f',
+        'scene_v3': '76aa9548b5459fb4cb1d7f6a65b288c60fce0144c9a62290bec0fab1e0a26877',
+        'timebase': 'bc74e05e272087f885b5e02702f40dee45014ab5dc0cab7a9ac7c5483f12e7a4',
+    }
+    for name, expected_hash in hashes.items():
+        item = oracle['fixtures'][name]
+        if name.startswith('execution_'):
+            decoded = decode_execution_spec(item['mapping'])
+        elif name.startswith('artifact_'):
+            decoded = decode_task_artifact(item['mapping'])
+        elif name.startswith('scene_'):
+            decoded = SceneDefinition.from_mapping(item['mapping'])
+        else:
+            decoded = Timebase.from_mapping(item['mapping'])
+        assert decoded.to_mapping() == item['mapping']
+        encoded = json.dumps(decoded.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+        assert hashlib.sha256(encoded.encode()).hexdigest() == expected_hash == item['sha256']
+        if 'identity_hash' in item:
+            assert decoded.identity_hash == expected_hash == item['identity_hash']

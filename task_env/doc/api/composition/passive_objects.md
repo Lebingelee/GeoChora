@@ -11,7 +11,7 @@
 
 **Kind**：class；**Stability**：Extension API；**Defined in**：`objects/base.py`
 
-继承 `TaskObjectComponent`。子类实现 `asset_manifest() -> AssetManifest` 和 `reference_spec() -> ReferenceSpec`；不得保存 solver 地址或直接推进物理。
+`BaseTaskObject` 是 `TaskObjectComponent` 的别名。实现者提供 `asset_manifest() -> AssetManifest` 和 `reference_spec() -> ReferenceSpec`；不得保存 solver 地址或直接推进物理。
 
 ## Built-in objects
 

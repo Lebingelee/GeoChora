@@ -9,7 +9,7 @@ import json
 from math import isfinite, pi
 from typing import Any, Literal
 
-from ..artifacts.contracts import RendererSelectionV1
+from ..artifacts.contracts import ExecutionSpecV2, RendererSelectionV1
 
 
 @dataclass(frozen=True)
@@ -352,6 +352,19 @@ class RobotConfig:
 
 
 @dataclass(frozen=True)
+class ControlConfig:
+    """Caller-owned selection for a task-declared physical Controller."""
+
+    profile_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.profile_id is not None:
+            if (type(self.profile_id) is not str or not self.profile_id.strip()
+                    or self.profile_id != self.profile_id.strip()):
+                raise ValueError("control.profile_id must be a nonempty trimmed string")
+
+
+@dataclass(frozen=True)
 class ObservationConfig:
     schema_version: str = "task-env-state-v1"
     include_privileged_state: bool = True
@@ -556,6 +569,7 @@ class ResolvedEnvConfig:
     render: RenderConfig = field(default_factory=RenderConfig)
     task: TaskConfig = field(default_factory=TaskConfig)
     episode: EpisodeConfig = field(default_factory=EpisodeConfig)
+    control: ControlConfig = field(default_factory=ControlConfig)
 
 
 @dataclass(frozen=True)
@@ -568,17 +582,61 @@ class ResolvedSelectedConfig:
 
     environment: ResolvedEnvConfig
     task_uid: str
-    physics_provider: str
-    physics_device: str
-    controller_profile: str | None = None
+    execution_spec_v2: ExecutionSpecV2
     source_delivery_manifest: str | None = None
     task_parameters: tuple[tuple[str, float], ...] = ()
     task_configuration_json: str | None = None
-    render_default: RendererSelectionV1 = field(default_factory=lambda: RendererSelectionV1(
-        "renderer-selection-v1", "none", "cpu", "none", None,
-    ))
+    requested_execution_json: str | None = None
+    gravity_compensation: bool = False
+    reset_profile: str | None = None
+    robot_uid: str | None = None
+    native_drive: str | None = None
+    controller_parameters_json: str = '{}'
+    geophys_contact_mode: Literal['provider_default', 'discrete', 'continuous'] = 'provider_default'
+
+    @property
+    def physics_provider(self) -> str:
+        return self.execution_spec_v2.physics_provider
+
+    @property
+    def physics_device(self) -> str:
+        return self.execution_spec_v2.physics_device
+
+    @property
+    def render_default(self) -> RendererSelectionV1:
+        return self.execution_spec_v2.render_default
+
+    @property
+    def controller_profile(self) -> str | None:
+        """The selected profile is owned by the resolved control configuration."""
+        return self.environment.control.profile_id
 
     def __post_init__(self) -> None:
+        if self.geophys_contact_mode not in ('provider_default', 'discrete', 'continuous'):
+            raise ValueError('unsupported GeoPhys contact mode')
+        if self.geophys_contact_mode != 'provider_default' and self.physics_provider != 'geophys':
+            raise ValueError('explicit GeoPhys contact mode requires the GeoPhys provider')
+        if self.native_drive not in (None, 'position', 'disabled'):
+            raise ValueError('unsupported Robot native drive selection')
+        if (type(self.controller_parameters_json) is not str
+                or not isinstance(json.loads(self.controller_parameters_json), dict)):
+            raise TypeError('Controller parameters must be a JSON object')
+        if self.robot_uid is not None and (type(self.robot_uid) is not str or not self.robot_uid.strip() or self.robot_uid != self.robot_uid.strip()):
+            raise ValueError("selected robot_uid must be a nonempty trimmed string")
+        if self.reset_profile is not None and (
+                type(self.reset_profile) is not str or not self.reset_profile.strip()
+                or self.reset_profile != self.reset_profile.strip()):
+            raise ValueError('reset profile must be a nonempty trimmed string or None')
+        if type(self.gravity_compensation) is not bool:
+            raise TypeError('selected gravity_compensation must be a boolean')
+        if type(self.execution_spec_v2) is not ExecutionSpecV2:
+            raise TypeError("selected execution_spec_v2 must be ExecutionSpecV2")
+        self.execution_spec_v2.validate()
+        if self.environment.runtime.backend != self.execution_spec_v2.physics_backend:
+            raise ValueError("resolved environment and execution backend differ")
+        if self.requested_execution_json is not None:
+            if type(self.requested_execution_json) is not str or not isinstance(json.loads(self.requested_execution_json), dict):
+                raise ValueError("requested execution must be a JSON mapping")
         if type(self.render_default) is not RendererSelectionV1:
             raise TypeError("selected render_default must be a RendererSelectionV1")
         self.render_default.validate()
@@ -615,8 +673,11 @@ class ExecutionPlan:
     resource_owner_identities: tuple[tuple[str, str], ...]
     configuration_identity: str
     state_requirements: Any | None = None
+    execution_spec_v2: ExecutionSpecV2 | None = None
 
     def __post_init__(self) -> None:
+        if self.execution_spec_v2 is not None and type(self.execution_spec_v2) is not ExecutionSpecV2:
+            raise TypeError("execution_spec_v2 must be ExecutionSpecV2 or None")
         if self.schema_version != "execution-plan-v0":
             raise ValueError("unsupported execution plan schema")
         for name, value in (

@@ -3,8 +3,8 @@
 This module owns only the ABI translation between the TaskEnv batch runtime
 contract and one homogeneous ``BatchedRigidSolver`` block.  The solver remains
 the sole owner of mutable physics state, storage, contact workspaces, and
-numerical kernels.  Device state, TaskEnv randomization, and CUDA Graph
-management are intentionally not implemented by this first host-only adapter.
+numerical kernels. Device readback is a separate partial capability;
+device control/reset and a complete CUDA transition are not yet admitted.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 
 from ....environment.types import StageUnavailableError
-from ...contracts import BatchResetResult, BatchState, BatchStepResult
+from ...contracts import BatchResetResult, BatchState, BatchStepResult, DeviceBatchState
 
 
 class GeoPhysRigidBatchRuntime:
@@ -85,6 +85,11 @@ class GeoPhysRigidBatchRuntime:
             "enable_domain_boundary_contact": False,
             "broadphase": str(runtime_config.broadphase),
         }
+        contact_mode = getattr(runtime_config, 'contact_mode', 'provider_default')
+        if contact_mode not in ('provider_default', 'discrete', 'continuous'):
+            raise ValueError('unsupported GeoPhys contact mode')
+        if contact_mode != 'provider_default':
+            options['enable_ccd'] = contact_mode == 'continuous'
         if runtime_config.rigid_solver_backend is not None:
             options["rigid_solver_backend"] = runtime_config.rigid_solver_backend
         if runtime_config.body_contact_solver_iterations is not None:
@@ -110,7 +115,7 @@ class GeoPhysRigidBatchRuntime:
         )
         registry.binding_for(solver)
         registry.freeze()
-        return cls(
+        runtime = cls(
             solver=solver,
             registry=registry,
             num_envs=int(num_envs),
@@ -122,6 +127,9 @@ class GeoPhysRigidBatchRuntime:
                 else str(getattr(runtime_config, "backend", "cpu"))
             ),
         )
+        runtime.contact_mode_resolved = 'continuous' if solver_config.contact.enable_ccd else 'discrete'
+        runtime.solver_iterations_requested = solver_config.contact.body_contact_solver_iterations
+        return runtime
 
     def __init__(
         self,
@@ -275,6 +283,27 @@ class GeoPhysRigidBatchRuntime:
             "act": self._stack(rows, "act_state"),
         }
 
+    def read_device_state(self, names: tuple[str, ...]) -> DeviceBatchState:
+        """Read owned CUDA state through the solver's public device port."""
+        requested = tuple(names)
+        supported = {'qpos', 'qvel', 'body_position', 'body_orientation'}
+        if not requested or len(set(requested)) != len(requested) or set(requested) - supported:
+            raise ValueError('GeoPhys device state requires unique supported field names')
+        arrays = self.solver.read_device_state(device='cuda:0')
+        return DeviceBatchState({name: arrays[name] for name in requested},
+                                'cuda:0', self.num_envs, lifetime='owned_snapshot')
+
+    def write_device_qfrc(self, effort) -> None:
+        """Replace native generalized forces without advancing the block."""
+        self.solver.write_device_qfrc(effort)
+
+    def reset_device_state(self, *, mask, qpos, qvel, body_position, body_orientation,
+                           body_linear_velocity, body_angular_velocity) -> None:
+        """Reset selected native worlds through the solver's device port."""
+        self.solver.reset_device_state(mask=mask, qpos=qpos, qvel=qvel,
+            body_position=body_position, body_orientation=body_orientation,
+            body_linear_velocity=body_linear_velocity, body_angular_velocity=body_angular_velocity)
+
     def refresh(self) -> None:
         """Keep the existing BRS write-state refresh boundary explicit."""
 
@@ -344,7 +373,7 @@ class GeoPhysRigidBatchRuntime:
                     "runtime_method": "step_device",
                     "zero_copy_substeps": False,
                     "field_device": None,
-                    "reason": "GeoPhys BatchedRigidSolver exposes host state exchange only",
+                    "reason": "device state, generalized-force and reset ports exist; source-bound device transition is not implemented",
                 },
                 "capabilities": {
                     "reset": {

@@ -1086,6 +1086,44 @@ class CameraPose:
 
 
 @dataclass(frozen=True)
+class CameraRendererReadbackV1:
+    """Optical values independently read from the camera that rendered a frame."""
+
+    camera_id: str
+    binding_id: str
+    position: tuple[float, float, float]
+    forward: tuple[float, float, float]
+    up: tuple[float, float, float]
+    fov_degrees: float
+    near: float
+    far: float
+    width: int
+    height: int
+
+    def __post_init__(self) -> None:
+        if (type(self.camera_id) is not str or not self.camera_id.strip()
+                or type(self.binding_id) is not str or not self.binding_id.strip()):
+            raise ValueError("renderer camera readback requires camera and binding identities")
+        for name in ("position", "forward", "up"):
+            values = np.asarray(tuple(float(value) for value in getattr(self, name)), dtype=np.float64)
+            if values.shape != (3,) or not np.isfinite(values).all():
+                raise ValueError(f"renderer camera readback {name} must be a finite 3-vector")
+            if name != "position" and float(np.linalg.norm(values)) <= 1.0e-12:
+                raise ValueError(f"renderer camera readback {name} must be nonzero")
+            object.__setattr__(self, name, tuple(float(value) for value in values))
+        if (type(self.width) is not int or type(self.height) is not int
+                or self.width < 1 or self.height < 1):
+            raise ValueError("renderer camera readback resolution must be positive")
+        fov_degrees, near, far = (float(value) for value in (self.fov_degrees, self.near, self.far))
+        if (not np.isfinite((fov_degrees, near, far)).all()
+                or not 0.0 < fov_degrees < 180.0 or not 0.0 < near < far):
+            raise ValueError("renderer camera readback optical interval is invalid")
+        object.__setattr__(self, "fov_degrees", fov_degrees)
+        object.__setattr__(self, "near", near)
+        object.__setattr__(self, "far", far)
+
+
+@dataclass(frozen=True)
 class CameraMetadata:
     """单个相机在 observation / recorder 中共享的稳定元数据。"""
 
@@ -1102,6 +1140,7 @@ class CameraMetadata:
     pose: CameraPose
     intrinsic: np.ndarray
     extrinsic: np.ndarray
+    renderer_readback: CameraRendererReadbackV1 | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -1121,6 +1160,9 @@ class CameraMetadata:
             raise ValueError("camera intrinsic must have shape (3, 3)")
         if self.extrinsic.shape != (4, 4):
             raise ValueError("camera extrinsic must have shape (4, 4)")
+        if self.renderer_readback is not None:
+            if type(self.renderer_readback) is not CameraRendererReadbackV1:
+                raise TypeError("renderer_readback must use CameraRendererReadbackV1")
 
 
 @dataclass(frozen=True)
@@ -1235,19 +1277,32 @@ class ObservationSchema:
         }
         for field in self.fields:
             parts = tuple(part for part in field.name.split(".") if part)
-            if len(parts) < 2:
-                raise ValueError(
-                    f"observation field {field.name} must use group.leaf naming"
-                )
+            if not parts:
+                raise ValueError("observation field name cannot be empty")
             group = parts[0]
             if group not in expected_tree:
                 raise ValueError(
                     f"observation field {field.name} uses unknown group {group}"
                 )
+            if len(parts) == 1:
+                if expected_tree[group]:
+                    raise ValueError(f"top-level observation leaf {group} conflicts with nested fields")
+                expected_tree[group] = field
+                continue
+            if not isinstance(expected_tree[group], OrderedDict):
+                raise ValueError(f"nested observation fields conflict with top-level leaf {group}")
             cursor = expected_tree[group]
             for key in parts[1:-1]:
-                cursor = cursor.setdefault(key, OrderedDict())
-            cursor[parts[-1]] = field
+                child = cursor.get(key)
+                if child is None:
+                    child = cursor[key] = OrderedDict()
+                elif not isinstance(child, OrderedDict):
+                    raise ValueError(f"nested observation field {field.name} conflicts at {key}")
+                cursor = child
+            leaf = parts[-1]
+            if leaf in cursor:
+                raise ValueError(f"observation field {field.name} conflicts with an existing field")
+            cursor[leaf] = field
 
         def _validate_tree(expected: OrderedDict[str, Any], value: Any, path: str) -> None:
             if not isinstance(value, MappingABC):
@@ -1260,7 +1315,8 @@ class ObservationSchema:
 
         for group, expected in expected_tree.items():
             value = observation[group]
-            _validate_tree(expected, value, group)
+            if isinstance(expected, OrderedDict):
+                _validate_tree(expected, value, group)
         for field in self.fields:
             parts = tuple(field.name.split("."))
             value = observation[parts[0]]

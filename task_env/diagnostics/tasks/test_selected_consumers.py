@@ -19,10 +19,102 @@ from task_env.tasks.reference_env import SelectedReferenceEnv
 IDS = ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1')
 
 
+def test_position_runtime_source_resolves_reset_frames_to_unique_scene_joints():
+    from task_env.artifacts import FrameReference
+    from task_env.runtime.sessions.source import position_joint_bindings_from_artifact
+
+    frame = FrameReference('cube', 'root')
+    scalar = SimpleNamespace(joint_id='hinge', kind='revolute', child_frame=None)
+    floating = SimpleNamespace(joint_id='root_joint', kind='floating', child_frame=frame)
+    other = SimpleNamespace(joint_id='other', kind='floating', child_frame=FrameReference('other', 'root'))
+    scene = SimpleNamespace(articulations=(
+        SimpleNamespace(entity_id='cube', joints=(scalar, floating)),
+        SimpleNamespace(entity_id='other', joints=(other,)),
+    ))
+    artifact = SimpleNamespace(legacy_frame_bindings={'cube/root': frame})
+    source = SimpleNamespace(free_joints={'cube/root': 'provider-name-must-not-select-joint'})
+    result = position_joint_bindings_from_artifact(scene, artifact, source)
+    assert result == {'cube/hinge': scalar, 'cube/root': floating}
+
+    with pytest.raises(ValueError, match='lacks an Artifact Frame binding'):
+        position_joint_bindings_from_artifact(scene, SimpleNamespace(legacy_frame_bindings={}), source)
+    empty_scene = SimpleNamespace(articulations=(SimpleNamespace(entity_id='cube', joints=(scalar,)),))
+    with pytest.raises(ValueError, match='exactly one Scene floating Joint'):
+        position_joint_bindings_from_artifact(empty_scene, artifact, source)
+    duplicate_scene = SimpleNamespace(articulations=(
+        SimpleNamespace(entity_id='cube', joints=(scalar, floating, floating)),
+    ))
+    with pytest.raises(ValueError, match='exactly one Scene floating Joint'):
+        position_joint_bindings_from_artifact(duplicate_scene, artifact, source)
+    overlap = SimpleNamespace(joint_id='root', kind='prismatic', child_frame=None)
+    overlap_scene = SimpleNamespace(articulations=(
+        SimpleNamespace(entity_id='cube', joints=(overlap, floating)),
+    ))
+    with pytest.raises(ValueError, match='overlaps a scalar binding'):
+        position_joint_bindings_from_artifact(overlap_scene, artifact, source)
+
+
+@pytest.mark.parametrize(('tamper', 'message'), [
+    ('target_hash', 'computed target'),
+    ('artifact', 'another TaskArtifact'),
+    ('controller', 'another Controller'),
+    ('provider', 'another Provider'),
+    ('boundary', 'exactly one completed boundary'),
+    ('clock', 'control timebase'),
+])
+def test_selected_control_application_rejects_wrong_ack_and_boundary(tamper, message):
+    from task_env.controllers.canonical.feedback import selected_control_application_receipt
+
+    def mapped(**values):
+        return SimpleNamespace(**values, to_mapping=lambda: dict(values))
+
+    artifact = SimpleNamespace(identity_hash='task', timebase=SimpleNamespace(
+        control_dt=0.01, physics_dt=0.002, control_substeps=5))
+    target = mapped(identity_hash='target', task_artifact_hash='task', controller_identity='controller')
+    applied = mapped(target_hash='target', provider_name='mujoco')
+    if tamper == 'target_hash': applied.target_hash = 'other'
+    if tamper == 'artifact': target.task_artifact_hash = 'other'
+    if tamper == 'controller': target.controller_identity = 'other'
+    if tamper == 'provider': applied.provider_name = 'other'
+    before = {'control_step': 0, 'simulation_time_s': 0.0}
+    after = {'control_step': 2 if tamper == 'boundary' else 1,
+             'simulation_time_s': 0.02 if tamper == 'clock' else 0.01}
+    with pytest.raises(ValueError, match=message):
+        selected_control_application_receipt(
+            request=mapped(), canonical=mapped(), target=target, applied=applied,
+            request_boundary=before, read_evaluation_boundary=lambda: (1, after),
+            artifact=artifact, controller_identity='controller', provider='mujoco',
+            source_id='source', reset_sample_id='sample',
+        )
+
+
 class FakeSession(_SessionValues):
     """Frozen physical state, real canonical controller and five native ticks."""
     def __init__(self, artifact, execution, *, source, binding, **_diagnostic_options):
         self._initialize_values(artifact, source, execution.physics_provider)
+        actuator_names = {}
+        for field in ('joint_targets', 'torque_actuators', 'position_actuators'):
+            actuator_names.update(getattr(source, field))
+        checked_objects = {
+            field: {semantic: {'native': native} for semantic, native in getattr(source, field).items()}
+            for field in ('joints', 'free_joints', 'bodies', 'frames')
+        }
+        checked_objects['actuators'] = {
+            semantic: {'native': native} for semantic, native in actuator_names.items()
+        }
+        checked_objects['actuators'].update({
+            'open:' + native: {'native': native} for native in source.open_actuators
+        })
+        self._build_layout_facts = {
+            'helper': ('task_env.runtime.sessions.geophys:check_geophys_named_layout'
+                       if execution.physics_provider == 'geophys' else
+                       'task_env.runtime.sessions.mujoco:check_mujoco_named_layout'),
+            'provider': execution.physics_provider,
+            'source_id': source.scene_source.source_id,
+            'source_closure': source.source_closure_digest,
+            'materialization_id': self.provider_materialization_id,
+            'objects': checked_objects,
+        }
         # This synthetic adapter models the NutAssembly binding's required
         # actuator-force contract so its external lifecycle tests exercise the
         # same native-sample callback gate as the production RuntimeSession.
@@ -78,8 +170,252 @@ class FakeSession(_SessionValues):
 
 @pytest.fixture
 def fake(monkeypatch):
-    monkeypatch.setattr('task_env.tasks.reference_env.materialize_control', FakeSession)
+    monkeypatch.setattr('task_env.environment.reference_env.materialize_control', FakeSession)
     monkeypatch.setattr('task_env.runtime.sessions.provenance.provider_build_identity', lambda provider: {'synthetic_provider':provider})
+
+
+def test_scalar_control_binding_is_supplied_by_task_at_materialization(fake, monkeypatch):
+    from task_env.runtime.sessions.control import ControlBinding
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    declared = ControlBinding('custom-v1/gripper', 0.08)
+    binding = replace(PickCubeReferenceEnv.binding, scalar_control_binding=declared)
+    seen = []
+    def materialize(*args, **kwargs):
+        seen.append(kwargs['binding'])
+        return FakeSession(*args, **kwargs)
+    monkeypatch.setattr('task_env.environment.reference_env.materialize_control', materialize)
+    env = PickCubeReferenceEnv(provider='mujoco', _binding=binding)
+    try:
+        env.reset(seed=19)
+        assert seen == [declared]
+    finally:
+        env.close()
+
+
+def test_scalar_action_contract_is_task_declared_and_drives_step(fake):
+    from gymnasium.spaces import Box
+    from task_env.controllers.canonical.contracts import reference_pose_action
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    base = PickCubeReferenceEnv.binding
+    with pytest.raises(TypeError, match='explicitly declared'):
+        replace(base, action_schema=None)
+    env_ref = []
+    def prepare(action):
+        pose = env_ref[0].state.pose_world['panda-v1/ee']
+        return reference_pose_action((*pose.position, *pose.quaternion_wxyz, float(action[0])))
+    schema = {'schema_version': 'test-one-dimensional-action-v1'}
+    binding = replace(base, action_schema=schema, action_space_factory=lambda: Box(-1, 1, (1,), dtype=np.float32),
+                      prepare_action=prepare)
+    env = PickCubeReferenceEnv(provider='mujoco', _binding=binding)
+    env_ref.append(env)
+    try:
+        env.reset(seed=19)
+        assert env.action_space.shape == (1,)
+        assert env.metadata['action_schema'] == schema
+        env.step(np.zeros(1, dtype=np.float32))
+        assert env.state.control_step == 1
+    finally:
+        env.close()
+
+
+def test_selected_observation_is_declared_by_task_and_survives_step(fake, tmp_path):
+    import hashlib
+    from gymnasium.spaces import Box
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    base = PickCubeReferenceEnv.binding
+    with pytest.raises(TypeError, match='observation space and projection'):
+        replace(base, observation_projection=None)
+    def spaces(_env):
+        return {'measurement': Box(-np.inf, np.inf, (1,), dtype=np.float32)}
+    def project(env, state):
+        evaluation = env.binding.evaluate(state, env.artifact.semantics)
+        obs = {'measurement': np.asarray([state.control_step], dtype=np.float32)}
+        info = {'is_success': bool(evaluation.success), 'task_failure': bool(evaluation.failure),
+                'task_metrics': dict(evaluation.metrics), 'control_step': state.control_step,
+                'simulation_time_s': state.simulation_time}
+        return obs, info, evaluation
+    binding = replace(base, observation_space_factory=spaces, observation_projection=project)
+    env = PickCubeReferenceEnv(provider='mujoco', _binding=binding)
+    try:
+        obs, _ = env.reset(seed=19)
+        assert env.observation_space.contains(obs) and obs['measurement'][0] == 0
+        env.start_recording(tmp_path / 'custom-observation.h5')
+        expected_source = hashlib.sha256(open(__file__, 'rb').read()).hexdigest()
+        provenance = env.recorder.metadata.source_provenance
+        assert provenance['observation_source'] == expected_source
+        assert provenance['observation_space_source'] == expected_source
+        pose = env.state.pose_world['panda-v1/ee']
+        action = np.asarray((*pose.position, *pose.quaternion_wxyz, 0.0), dtype=np.float32)
+        obs, *_ = env.step(action)
+        assert env.observation_space.contains(obs) and obs['measurement'][0] == 1
+        assert env.finish_recording('bounded')['logical_mapping_exact']
+    finally:
+        env.close()
+
+
+def test_untraceable_binding_cannot_start_recording_and_can_retry(fake, tmp_path):
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    env = PickCubeReferenceEnv(provider='mujoco')
+    try:
+        env.reset(seed=19)
+        original = env.binding
+        env.binding = replace(original, prepare_action=len)
+        with pytest.raises(ValueError, match='no traceable source file'):
+            env.start_recording(tmp_path / 'untraceable.h5')
+        assert env.recorder is None and env.recording_path is None
+        assert not (tmp_path / 'untraceable.h5').exists()
+        env.binding = original
+        env.start_recording(tmp_path / 'valid.h5')
+        assert env.recorder is not None
+        assert env.finish_recording('bounded')['logical_mapping_exact']
+    finally:
+        env.close()
+
+
+def test_callable_source_snapshot_rechecks_bytes_without_path_cache(tmp_path, monkeypatch):
+    import hashlib
+    import importlib.util
+    from task_env.recorders import reference_provenance
+
+    path = tmp_path / 'task_callbacks.py'
+    path.write_text('def project(value):\n    return value\n')
+    spec = importlib.util.spec_from_file_location('synthetic_task_callbacks', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    calls = []
+    original = reference_provenance.source_snapshot
+    def counted(source):
+        calls.append(source)
+        return original(source)
+    monkeypatch.setattr(reference_provenance, 'source_snapshot', counted)
+    from functools import partial
+    snapshots = reference_provenance.callable_source_snapshots({
+        'a': module.project, 'b': partial(partial(module.project)),
+    })
+    assert len(calls) == 1 and snapshots['a'] == snapshots['b']
+    first = snapshots['a']
+    assert first == hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text('def project(value):\n    return value + 1\n')
+    second = reference_provenance.callable_source_snapshot(module.project)
+    assert second == hashlib.sha256(path.read_bytes()).hexdigest() and second != first
+    assert len(calls) == 2
+    with pytest.raises(ValueError, match='no traceable source file'):
+        reference_provenance.callable_source_snapshot(partial(len))
+
+
+def test_synthetic_candidate_compiles_and_drives_caller_solution_without_judge_claim(fake, monkeypatch):
+    """Exercise real compiler/binding; the synthetic catalog is never Judge evidence."""
+    from pathlib import Path
+    from task_env.assembly.panda_box import PANDA_BOX_CAPABILITIES
+    from task_env.script.agent import asset_check, catalog_query, harness_compiler
+    from task_env.script.agent.harness_spec_schema import CandidateSpec
+
+    root = Path(__file__).resolve().parents[3]
+    actual_context = catalog_query.core_context(root)
+    catalog = {
+        'schema_version': 'harness-catalog-v0',
+        'core_repo': str(root),
+        'core_commit': actual_context['core_commit'], 'core_dirty': True,
+        'object_uids': ['cube-v1'], 'scene_uids': [], 'external_assets': {},
+    }
+    with pytest.raises(catalog_query.CatalogProvenanceError):
+        catalog_query.validate_catalog(catalog)
+    # The seam admits only this explicitly dirty synthetic catalog to the
+    # compiler test; no production catalog, report or Judge verdict is made.
+    def synthetic_catalog_only(value):
+        assert value is catalog and value['core_dirty'] is True
+        return {'core_repo': value['core_repo'], 'core_commit': value['core_commit'], 'core_dirty': True}
+    monkeypatch.setattr(asset_check, 'validate_catalog', synthetic_catalog_only)
+    monkeypatch.setattr('task_env.runtime.sessions.api.provider_build_identity',
+                        lambda _provider: {'manifest_version': 'synthetic-provider-no-qualification'})
+    spec = CandidateSpec.from_dict({
+        'schema_version': 'harness-candidate-spec-v0', 'task_id': 'synthetic/pick-lift-v1',
+        'template': 'pick-lift-v0',
+        'scene_config': {'table_top_z': 0.4, 'table_center_xy': [0.5, 0.0],
+                         'table_half_size': [0.5, 0.5, 0.05]},
+        'object_config': {'object_uid': 'cube-v1', 'initial_pos_xy': [0.5, 0.0],
+                          'reset_half_extent_m': 0.0, 'reset_z_fixed': True},
+        'success_config': {'lift_height_m': 0.08, 'reach_distance_m': 0.05,
+                           'gripper_closed_opening_m': 0.04},
+        'timebase_config': {'physics_dt': 0.002, 'control_substeps': 5},
+        'required_capabilities': list(PANDA_BOX_CAPABILITIES), 'horizon': 3,
+    })
+    compiled = harness_compiler.compile_candidate(spec, catalog, provider='mujoco')
+    env = compiled.env_class()(provider='mujoco', backend='cpu')
+    try:
+        obs, info = env.reset(seed=0)
+        solution = env.value['solution_factory']()
+        assert solution.identity == env.value['solution_identity']
+        solution.reset(obs, info, env.metadata)
+        action = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(action)
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert env.state.control_step == 1
+        assert env.observation_space.contains(obs)
+        assert env.value['source_revision'] == actual_context['core_commit'] and catalog['core_dirty'] is True
+    finally:
+        env.close()
+
+
+def test_missing_scalar_binding_closes_constructed_source_without_materialization(fake):
+    from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
+
+    base = NutAssemblyReferenceEnv.binding
+    receipts = []
+    def build(*args):
+        value = base.build_native_feedback_profile(*args)
+        receipts.append(value['source'].execution_source_receipt)
+        return value
+    binding = replace(base, scalar_control_binding=None, build_native_feedback_profile=build)
+    with pytest.raises(TypeError, match='declared ControlBinding'):
+        NutAssemblyReferenceEnv(provider='geophys', backend='cpu', _binding=binding,
+                                _native_feedback_request=500)
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
+@pytest.mark.parametrize('failure_stage', ['controller', 'action_space'])
+@pytest.mark.parametrize('source_fails', [False, True])
+def test_selected_construction_failure_cleans_source_and_task_resources(fake, monkeypatch, failure_stage, source_fails):
+    from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
+
+    base = NutAssemblyReferenceEnv.binding
+    receipts = []
+    cleanup_calls = []
+    def build(*args):
+        value = base.build_native_feedback_profile(*args)
+        receipts.append(value['source'].execution_source_receipt)
+        return value
+    def fail(*_args):
+        raise ValueError('selected initialization failed')
+    def cleanup():
+        cleanup_calls.append('task')
+        raise RuntimeError('task cleanup failed')
+    if source_fails:
+        original_close = ExecutionSourceReceiptV1.close
+        def fail_after_source_close(receipt):
+            original_close(receipt)
+            raise RuntimeError('source cleanup failed')
+        monkeypatch.setattr(ExecutionSourceReceiptV1, 'close', fail_after_source_close)
+    if failure_stage == 'controller':
+        monkeypatch.setattr(NutAssemblyReferenceEnv, '_bind_selected_controller', fail)
+    binding = replace(
+        base, build_native_feedback_profile=build, close_task_resources=cleanup,
+        action_space_factory=fail if failure_stage == 'action_space' else base.action_space_factory,
+    )
+    with pytest.raises(ValueError, match='selected initialization failed') as raised:
+        NutAssemblyReferenceEnv(provider='geophys', backend='cpu', _binding=binding,
+                                _native_feedback_request=500)
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+    assert cleanup_calls == ['task']
+    assert any('task cleanup failed' in note for note in raised.value.__notes__)
+    if source_fails:
+        assert any('source cleanup failed' in note for note in raised.value.__notes__)
+    assert raised.value.execution_fault.phase == 'selected_construction'
 
 
 @pytest.mark.parametrize('uid', IDS)
@@ -183,6 +519,311 @@ def test_nutassembly_external_solution_publishes_five_bound_native_samples(fake)
     env.close()
 
 
+def test_nutassembly_feedback_xml_cache_tracks_source_changes(fake, monkeypatch):
+    import hashlib
+    from types import SimpleNamespace
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        action = solution.act(obs, info)
+        source = env.value['source']
+        xml = source.scene_source.xml
+        real_sha256 = hashlib.sha256
+        xml_hashes = []
+
+        def counted_sha256(data=b'', *args, **kwargs):
+            if data == xml.encode():
+                xml_hashes.append(data)
+            return real_sha256(data, *args, **kwargs)
+
+        monkeypatch.setattr(hashlib, 'sha256', counted_sha256)
+        env._boundary_xml_snapshot = None
+        obs, reward, terminated, truncated, info = env.step(action)
+        receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(info['native_interval_receipt_v1'])
+        expected = real_sha256(xml.encode()).hexdigest()
+        assert receipt.source_xml_sha256 == expected
+        assert all(sample.source_xml_sha256 == expected for sample in receipt.samples)
+        assert len(xml_hashes) == 1
+        changed_xml = xml + '\n<!-- source changed -->'
+        env.value['source'] = SimpleNamespace(scene_source=SimpleNamespace(xml=changed_xml))
+        assert env._source_xml_sha256() == real_sha256(changed_xml.encode()).hexdigest()
+        env.value['source'] = source
+        assert env._source_xml_sha256() == expected
+        assert len(xml_hashes) == 2
+        solution.observe(obs, reward, terminated, truncated, info)
+    finally:
+        env.close()
+
+
+def test_nutassembly_caller_drives_solution_without_env_ownership(fake):
+    from dataclasses import replace
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        assert env.solution is None and env._external_solution_owner is None
+        bad_info = {**info, 'expert_execution_boundary_v1': {
+            **info['expert_execution_boundary_v1'], 'solution_identity': 'wrong-solution',
+        }}
+        with pytest.raises(ValueError, match='boundary'):
+            solution.act(obs, bad_info)
+        assert solution._emitted == 0 and env.state.control_step == 0
+        action = solution.act(obs, info)
+        stale = replace(action, request_boundary={**action.request_boundary, 'episode_id': 'stale'})
+        with pytest.raises(ValueError, match='boundary'):
+            env.step(stale)
+        assert env.state.control_step == 0 and env._episode_mode is None
+        with pytest.raises(ValueError, match='control request'):
+            env.step(replace(action, control_request=None))
+        with pytest.raises(ValueError, match='Solution action identity'):
+            env.step(replace(action, solution_identity='wrong-solution'))
+        with pytest.raises(ValueError, match='Solution action identity'):
+            env.step(replace(action, solution_identity=None))
+        assert env.state.control_step == 0 and env._episode_mode is None
+        obs, reward, terminated, truncated, info = env.step(action)
+        receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(info['native_interval_receipt_v1'])
+        assert len(receipt.samples) == 5
+        assert all(s.applied_acknowledgement['target_hash'] == s.target_hash for s in receipt.samples)
+        assert solution._last_observed_step == 0
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert solution._last_observed_step == 1 and not solution.failed
+        with pytest.raises(ValueError, match='boundary'):
+            env.step(action)
+        assert env.state.control_step == 1
+        action = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(action)
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert env.state.control_step == 2 and not solution.failed
+        assert env.solution is None and env._external_solution_owner is None
+    finally:
+        env.close()
+
+
+def test_nutassembly_caller_matches_legacy_interval_and_records(fake, tmp_path, monkeypatch):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.trajectory.canonical.streaming import load_streaming
+    from task_env.environment.lifecycle import EpisodeExecutionState
+
+    intervals, resets = [], []
+    execute_interval = EpisodeExecutionState.execute_interval
+    execute_reset = EpisodeExecutionState.execute_reset
+    def track_interval(**kwargs):
+        intervals.append(1)
+        return execute_interval(**kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_interval', staticmethod(track_interval))
+    def track_reset(state, **kwargs):
+        resets.append(1)
+        return execute_reset(state, **kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_reset', track_reset)
+
+    caller = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
+    legacy = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        legacy_solution = build_outcome_solution(provider='geophys')
+        obs, info = caller.reset(seed=19)
+        solution.reset(obs, info, caller.metadata)
+        legacy.reset_for_solution(legacy_solution, seed=19)
+        assert len(resets) == 2
+        path = tmp_path / 'caller.h5'
+        caller.start_recording(path)
+        for _ in range(2):
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = caller.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+            legacy_obs, legacy_reward, legacy_terminated, legacy_truncated, legacy_info = (
+                legacy.step_with_solution(legacy_solution))
+            assert reward == legacy_reward
+            assert (terminated, truncated) == (legacy_terminated, legacy_truncated)
+            assert info['task_metrics'] == legacy_info['task_metrics']
+            assert solution.stage == legacy_solution.stage
+            assert solution.failed == legacy_solution.failed
+            assert info['control_application_v1']['requested_action'] == (
+                legacy_info['control_application_v1']['requested_action'])
+        result = caller.finish_recording('external_stop')
+        assert len(intervals) == 4
+        assert result['byte_exact']
+        recorded = load_streaming(path)
+        assert len(recorded['transitions']) == 2 and len(recorded['boundaries']) == 3
+    finally:
+        caller.close()
+        legacy.close()
+
+
+@pytest.mark.parametrize('mutation', ['sample', 'missing_target', 'wrong_target', 'evaluation_boundary'])
+def test_nutassembly_caller_rejects_tampered_feedback(fake, mutation):
+    from copy import deepcopy
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        action = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(action)
+        bad = deepcopy(info)
+        if mutation == 'sample':
+            bad['native_interval_receipt_v1']['samples'][0]['reset_sample_id'] = 'wrong'
+        elif mutation == 'missing_target':
+            del bad['control_application_v1']['target_identity_hash']
+            del bad['control_application_v1']['applied_target_hash']
+        elif mutation == 'wrong_target':
+            bad['control_application_v1']['target_identity_hash'] = 'other-target'
+            bad['control_application_v1']['applied_target_hash'] = 'other-target'
+        else:
+            bad['control_application_v1']['evaluation_boundary']['episode_id'] = 'wrong'
+        with pytest.raises(ValueError):
+            solution.observe(obs, reward, terminated, truncated, bad)
+        assert solution.failed
+    finally:
+        env.close()
+
+
+def test_nutassembly_caller_actions_reject_registered_solution_owner(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset_for_solution(solution, seed=19)
+        action = solution.act(obs, info)
+        with pytest.raises(RuntimeError, match='without an Env-owned Solution'):
+            env.step(action)
+        assert env.state.control_step == 0 and env._episode_mode is None
+    finally:
+        env.close()
+
+
+def test_nutassembly_caller_action_cannot_cross_episode(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    first = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    second = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = first.reset(seed=19)
+        solution.reset(obs, info, first.metadata)
+        action = solution.act(obs, info)
+        second.reset(seed=19)
+        with pytest.raises(ValueError, match='boundary'):
+            second.step(action)
+        assert second.state.control_step == 0 and not second.session.calls
+        assert second._episode_mode is None
+    finally:
+        first.close()
+        second.close()
+
+
+def test_nutassembly_caller_binding_cannot_drop_control_request():
+    from dataclasses import replace
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        with pytest.raises(ValueError, match='require the native control request contract'):
+            replace(env.binding, control_request_required=False)
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize('mutation', ['values', 'stage', 'control_mode'])
+def test_nutassembly_solution_rejects_altered_executed_action(fake, mutation):
+    from dataclasses import replace
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        if mutation == 'control_mode':
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+        action = solution.act(obs, info)
+        if mutation == 'values':
+            values = action.action.copy()
+            values[0] += .001
+            action = replace(action, action=values)
+        elif mutation == 'stage':
+            action = replace(action, stage='other_stage')
+        else:
+            action = replace(action, control_request=replace(
+                action.control_request, mode='hold_last_applied'))
+        obs, reward, terminated, truncated, info = env.step(action)
+        with pytest.raises(ValueError, match='pending Solution action'):
+            solution.observe(obs, reward, terminated, truncated, info)
+        assert solution.failed and solution.failure_reason == 'native_feedback_invalid'
+    finally:
+        env.close()
+
+
+def test_nutassembly_revalidates_mutated_typed_receipt(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        obs, reward, terminated, truncated, info = env.step(solution.act(obs, info))
+        receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(info['native_interval_receipt_v1'])
+        object.__setattr__(receipt, 'samples', ())
+        with pytest.raises(ValueError, match='incomplete'):
+            solution.observe(obs, reward, terminated, truncated, info,
+                             native_interval_receipt=receipt, native_samples=())
+        assert solution.failed and solution.failure_reason == 'native_feedback_invalid'
+    finally:
+        env.close()
+
+
+def test_nutassembly_caller_partial_interval_fault_cannot_be_recorded(fake, tmp_path):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        output = tmp_path / 'partial.h5'
+        env.start_recording(output)
+        original_step = env.session._step_physics_once
+        calls = 0
+
+        def fail_second_native_step():
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError('injected partial interval')
+            original_step()
+
+        env.session._step_physics_once = fail_second_native_step
+        _expose_fake_physics_clock(env)
+        action = solution.act(obs, info)
+        with pytest.raises(RuntimeError, match='partial interval'):
+            env.step(action)
+        assert env.execution_fault.phase == 'physics_step'
+        assert env.execution_fault.physical_progress == 'partially_advanced'
+        assert not env.recorder.value['transitions']
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step(action)
+        with pytest.raises(ValueError, match='incomplete effective interval'):
+            env.finish_recording('incomplete')
+        assert not output.exists() and env.solution is None
+    finally:
+        env.close()
+
+
 def test_nutassembly_native_receipt_rejects_stale_or_incomplete_samples(fake):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
     from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
@@ -211,8 +852,10 @@ def test_nutassembly_native_receipt_accepts_100hz_update_then_four_holds(fake):
     )
     from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
 
-    env = NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(
-        backend='cpu', gripper_control_hz=100, horizon=3,
+    from task_env.diagnostics.tasks.c05c_geophys_gripper_cadence import cadence_diagnostic_binding
+    env = NutAssemblyReferenceEnv(
+        provider='geophys', backend='cpu', horizon=3,
+        _binding=cadence_diagnostic_binding(backend='cpu', gripper_control_hz=100),
     )
     solution = build_gripper_cadence_diagnostic_solution(
         backend='cpu', gripper_control_hz=100,
@@ -378,7 +1021,8 @@ def test_controller_owned_arm_hold_and_ramp_use_applied_acknowledgement():
 def test_active_imports_do_not_load_diagnostics_or_native(tmp_path):
     import subprocess, os
     code = "from task_env import make_env; make_env('nut-assembly-outcome-reference-v1').close(); import sys; assert not any(k.startswith(('task_env.diagnostics','mujoco','taichi')) for k in sys.modules)"
-    result = subprocess.run([sys.executable, '-c', code], env={**os.environ,'PYTHONPATH':str(__import__('pathlib').Path.cwd())}, cwd=tmp_path, capture_output=True, text=True)
+    core_root = __import__('pathlib').Path(__file__).resolve().parents[3]
+    result = subprocess.run([sys.executable, '-c', code], env={**os.environ,'PYTHONPATH':str(core_root)}, cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
@@ -386,7 +1030,7 @@ def test_task_bindings_declare_selected_control_and_recording_requirements():
     pickcube = make_env(IDS[0])
     nutassembly = make_env(IDS[1])
     assert (pickcube.binding.interval_mode, pickcube.binding.recorder_mode,
-            pickcube.binding.external_actions) == ('grouped', 'canonical', True)
+            pickcube.binding.external_actions) == ('native', 'canonical', True)
     assert (nutassembly.binding.interval_mode, nutassembly.binding.recorder_mode,
             nutassembly.binding.external_actions, nutassembly.binding.record_native_substeps,
             nutassembly.binding.capture_guard_samples) == ('native', 'execution', False, True, False)
@@ -420,9 +1064,123 @@ def test_current_source_reexecution_uses_selected_factory(uid, fake, tmp_path):
     env.reset(seed=19);env.start_recording(tmp_path/'source.h5')
     while not env._stopped:env.step_expert()
     env.finish_recording('bounded_truncation');env.close()
+    if uid == IDS[1]:
+        with pytest.raises(ValueError, match='legacy Nut expert recording'):
+            reexecute_selected(tmp_path/'source.h5',output=tmp_path/'reexecution.h5')
+        assert not (tmp_path/'reexecution.h5').exists()
+        return
     report=reexecute_selected(tmp_path/'source.h5',output=tmp_path/'reexecution.h5')
     assert report['status']=='PASS' and report['transitions']==3
     assert report['D0']=='NOT_ASSESSED'
+
+
+def test_nutassembly_caller_recording_same_source_reexecution(fake, tmp_path, monkeypatch):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[1], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='mujoco')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        env.start_recording(tmp_path / 'source-caller.h5')
+        for _ in range(3):
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+        env.finish_recording('bounded_truncation')
+    finally:
+        env.close()
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    monkeypatch.setattr(SelectedReferenceEnv, 'step_expert', lambda *args: pytest.fail('legacy expert route used'))
+    report = reexecute_selected(tmp_path / 'source-caller.h5', output=tmp_path / 'reexecution-caller.h5')
+    assert report['status'] == 'PASS' and report['transitions'] == 3
+    assert report['D0'] == 'NOT_ASSESSED'
+
+
+def test_pickcube_caller_recording_same_source_reexecution(fake, tmp_path, monkeypatch):
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        obs, info = env.reset(seed=19)
+        solution = env.value['solution_factory']()
+        solution.reset(obs, info, env.metadata)
+        env.start_recording(tmp_path / 'source-pickcube-caller.h5')
+        for _ in range(3):
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+        env.finish_recording('bounded_truncation')
+    finally:
+        env.close()
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    monkeypatch.setattr(SelectedReferenceEnv, 'step_expert', lambda *args: pytest.fail('legacy expert route used'))
+    report = reexecute_selected(tmp_path / 'source-pickcube-caller.h5',
+                                output=tmp_path / 'reexecution-pickcube-caller.h5')
+    assert report['status'] == 'PASS' and report['transitions'] == 3
+
+
+@pytest.mark.parametrize('attribute,source_name', [
+    ('observation_projection', 'observation_source'),
+    ('observation_space_factory', 'observation_space_source'),
+    ('prepare_action', 'action_source'),
+    ('action_space_factory', 'action_space_source'),
+])
+def test_reexecution_rejects_changed_binding_source(fake, tmp_path, monkeypatch, attribute, source_name):
+    from task_env.recorders import reference_provenance
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 1})
+    obs, info = env.reset(seed=19)
+    solution = env.value['solution_factory']()
+    solution.reset(obs, info, env.metadata)
+    env.start_recording(tmp_path / 'source.h5')
+    action = solution.act(obs, info)
+    obs, reward, terminated, truncated, info = env.step(action)
+    solution.observe(obs, reward, terminated, truncated, info)
+    env.finish_recording('bounded_truncation')
+    callback = getattr(env.binding, attribute)
+    env.close()
+    original = reference_provenance.callable_source_snapshot
+    monkeypatch.setattr(reference_provenance, 'callable_source_snapshot',
+                        lambda current: 'changed' if current is callback else original(current))
+    with pytest.raises(ValueError, match=source_name + ' identity mismatch'):
+        reexecute_selected(tmp_path / 'source.h5', output=tmp_path / 'replay.h5')
+    assert not (tmp_path / 'replay.h5').exists()
+
+
+@pytest.mark.parametrize('change', ['modified', 'missing', 'added'])
+def test_reexecution_rejects_changed_task_source_inventory(fake, tmp_path, monkeypatch, change):
+    import task_env
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 1})
+    obs, info = env.reset(seed=19)
+    solution = env.value['solution_factory']()
+    solution.reset(obs, info, env.metadata)
+    env.start_recording(tmp_path / 'source.h5')
+    action = solution.act(obs, info)
+    obs, reward, terminated, truncated, info = env.step(action)
+    solution.observe(obs, reward, terminated, truncated, info)
+    env.finish_recording('bounded_truncation')
+    env.close()
+
+    original_make_env = task_env.make_env
+    def changed_source(*args, **kwargs):
+        rebuilt = original_make_env(*args, **kwargs)
+        sources = dict(rebuilt.value['source_sha256'])
+        name = 'task_env/runtime/sessions/control.py'
+        assert name in sources
+        if change == 'modified': sources[name] = '0' * 64
+        elif change == 'missing': del sources[name]
+        else: sources['unexpected/new/source.py'] = '0' * 64
+        rebuilt.value['source_sha256'] = sources
+        return rebuilt
+    monkeypatch.setattr(task_env, 'make_env', changed_source)
+    with pytest.raises(ValueError, match='task source inventory identity mismatch'):
+        reexecute_selected(tmp_path / 'source.h5', output=tmp_path / 'replay.h5')
+    assert not (tmp_path / 'replay.h5').exists()
 
 
 def test_pickcube_reexecution_preserves_explicit_profile_and_task_parameter(fake, tmp_path):
@@ -456,6 +1214,144 @@ def test_metadata_ownership_is_per_environment():
     a.metadata['action_schema']['dimension']=999
     assert b.metadata['action_schema']['dimension']==8
     a.close();b.close()
+
+
+def test_reference_binding_owns_action_schema_and_conversion(fake, tmp_path):
+    from gymnasium.spaces import Box
+    from task_env.controllers.canonical.contracts import RequestedAction, digest
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    binding = replace(
+        PickCubeReferenceEnv.binding,
+        action_schema={'schema_id': 'synthetic-scalar-to-pose-v1', 'dimension': 1},
+        action_space_factory=lambda: Box(-1., 1., (1,), dtype=np.float64),
+        prepare_action=lambda action: RequestedAction(
+            'absolute_pose', 'world', 'quaternion_wxyz',
+            (.5, 0., .4, 1., 0., 0., 0., float(action[0])),
+        ),
+    )
+    env = SelectedReferenceEnv(provider='mujoco', horizon=2, _binding=binding)
+    try:
+        env.reset(seed=19)
+        assert env.action_space.shape == (1,)
+        assert env.metadata['action_schema']['schema_id'] == 'synthetic-scalar-to-pose-v1'
+        env.start_recording(tmp_path / 'custom-action.h5')
+        assert env.recorder.metadata.control_contract_identity == digest(
+            {'action_schema': env.metadata['action_schema']})
+        env.step(np.asarray([0.], dtype=np.float64))
+        assert env.state.control_step == 1
+    finally:
+        env.close()
+
+
+def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake, tmp_path):
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        solution = build_readiness_solution()
+        obs, info = env.reset(seed=19)
+        with pytest.raises(TypeError, match='public execution info'):
+            solution.reset(obs, {}, env.metadata)
+        solution.reset(obs, info, env.metadata)
+        reset_info = dict(info)
+        env.start_recording(tmp_path / 'caller-pick.h5')
+        assert env.recorder.metadata.expert_identity == solution.identity
+        proposal = solution.act(obs, info)
+        env.position_profile = True
+        from types import SimpleNamespace
+        env.position_plan = object()
+        env.position_profiles = (SimpleNamespace(identity='position-controller-arm'),
+                                 SimpleNamespace(identity='position-controller-hand'))
+        from task_env.runtime.sessions.control_lifecycle import has_position_control_capability
+        assert has_position_control_capability(env)
+        from task_env.environment.types import StageUnavailableError
+        with pytest.raises(StageUnavailableError, match='unavailable on this Position profile'):
+            env.step(proposal)
+        assert env.state.control_step == 0
+        env.position_profile = False
+        env.position_profiles = ()
+        env.position_plan = None
+        from dataclasses import replace
+        with pytest.raises(ValueError, match='boundary is stale or mismatched'):
+            env.step(replace(proposal, request_boundary={'unexpected': True}))
+        with pytest.raises(ValueError, match='identity differs'):
+            env.step(replace(proposal, solution_identity='wrong-solution'))
+        assert env.state.control_step == 0
+        obs, reward, terminated, truncated, info = env.step(proposal)
+        transition = env.recorder.transitions[-1]
+        assert transition.expert_stage == proposal.stage
+        assert transition.readiness_hold == proposal.diagnostics['readiness_hold']
+        with pytest.raises(ValueError, match='stale/skipped'):
+            solution.observe(obs, reward, terminated, truncated, reset_info)
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert env._episode_mode == 'external'
+        assert env._external_solution_owner is None and env.solution is None
+        assert env.state.control_step == 1 and not solution.failed
+        assert info['control_application_v1']['applied_target_hash'] == (
+            info['control_application_v1']['target_identity_hash'])
+    finally:
+        env.close()
+
+
+def test_pickcube_position_caller_prepares_bound_request_without_solution_callback(fake, monkeypatch):
+    from dataclasses import replace
+    from types import SimpleNamespace as NS
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        obs, info = env.reset(seed=19)
+        solution = build_readiness_solution()
+        solution.reset(obs, info, env.metadata)
+        boundary = {'schema_version': 'synthetic-boundary', 'boundary_id': 'boundary-0'}
+        info = {**info, 'state_boundary_identity': boundary}
+        info.pop('expert_execution_boundary_v1')
+        proposal = solution.act(obs, info)
+        env.info = info
+        env.position_profile = True
+        env.typed_state = NS(view=NS(boundary=NS(to_mapping=lambda: boundary)))
+        env.position_scene = NS(identity_hash='a' * 64)
+        env.position_plan = NS(identity_hash='b' * 64)
+        env.position_profiles = (NS(entity_id='panda-v1', controller_binding=lambda: NS(
+            action_schema=NS(schema_id='pose-v1'))),)
+        captured = {}
+        def prepare(request, **kwargs):
+            captured.update(request=request, **kwargs)
+            return 'prepared'
+        monkeypatch.setattr(env, '_prepare_position_profile', prepare)
+        assert env._prepare_selected_step(proposal) == 'prepared'
+        assert captured['caller_driven'] is True and captured['proposal'] is proposal
+        request = captured['request']
+        assert request.scene_identity_hash == 'a' * 64 and request.binding_identity_hash == 'b' * 64
+        assert tuple(group.group_id for group in request.groups) == ('arm', 'gripper')
+        assert env.state.control_step == 0 and solution._awaiting_observation
+        with pytest.raises(ValueError, match='boundary is stale'):
+            env._prepare_selected_step(replace(proposal, request_boundary={'boundary_id': 'old'}))
+        env.typed_state = NS(view=NS(boundary=NS(to_mapping=lambda: {'boundary_id': 'other'})))
+        with pytest.raises(ValueError, match='boundary is stale'):
+            env._prepare_selected_step(proposal)
+        assert env.state.control_step == 0 and env._episode_mode is None
+        env.typed_state = NS(view=NS(boundary=NS(to_mapping=lambda: boundary)))
+        with pytest.raises(ValueError, match='identity differs'):
+            env._prepare_selected_step(replace(proposal, solution_identity='other'))
+        with pytest.raises(ValueError, match='eight-dimensional'):
+            env._prepare_selected_step(replace(proposal, action=np.zeros(7)))
+    finally:
+        env.position_profile = False
+        env.close()
+
+
+def test_nutassembly_rejects_unguarded_finite_external_action_without_step(fake):
+    env = make_env(IDS[1], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        env.reset(seed=19)
+        with pytest.raises(RuntimeError, match='unguarded external actions are not admitted'):
+            env.step(np.zeros(8, dtype=np.float64))
+        assert env.state.control_step == 0
+        assert env._episode_mode is None and not env.session.calls
+    finally:
+        env.close()
 
 
 def test_c05b_public_solution_lifecycle_and_control_ack_match_internal(fake, tmp_path):
@@ -611,12 +1507,12 @@ def test_c05b_observer_failure_latches_before_recorder_append(fake, tmp_path):
         assert env.execution_fault.phase == 'solution_observation'
         assert env.execution_fault.physical_progress == 'advanced'
         assert env.execution_fault.transition_status == 'incomplete'
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
         assert not env.recorder.transitions and len(env.recorder.boundaries) == 1
         assert not append_calls
         with pytest.raises(RuntimeError, match='faulted'):
             env.step_with_solution(solution)
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
     finally:
         env.close()
 
@@ -642,11 +1538,11 @@ def test_c05b_recorder_append_failure_latches_after_observe_without_valid_transi
         assert env.execution_fault.phase == 'record_interval'
         assert env.execution_fault.physical_progress == 'advanced'
         assert env.execution_fault.transition_status == 'rejected'
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
         assert not env.recorder.transitions and len(env.recorder.boundaries) == 1
         with pytest.raises(RuntimeError, match='faulted'):
             env.step_with_solution(solution)
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
     finally:
         env.close()
 
@@ -687,14 +1583,144 @@ def test_c05b_faulted_canonical_recording_cannot_be_exported(fake, tmp_path, fai
         env.close()
 
 
-def test_failed_reset_closes_old_runtime_and_requires_new_reset(fake):
-    env=make_env(IDS[1]);env.reset(seed=19);old=env.session
-    with pytest.raises(ValueError):env.reset(seed=31)
-    assert old.closed and env.session is None and env._stopped
-    assert env.execution_fault.phase == 'reset_seed'
-    assert env.execution_fault.physical_progress == 'not_advanced'
-    with pytest.raises(RuntimeError):env.step_expert()
-    env.reset(seed=19);env.step_expert();env.close()
+def test_faulted_public_reset_rebuilds_only_after_successful_publication(fake, monkeypatch):
+    from task_env.environment import reference_env as reference_env_module
+
+    env = make_env(IDS[1], config={'provider': 'mujoco'})
+    try:
+        env.reset(seed=19)
+        old_session = env.session
+
+        def fail_physics_step():
+            raise RuntimeError('injected physics-step failure')
+
+        old_session._step_physics_once = fail_physics_step
+        with pytest.raises(RuntimeError, match='injected physics-step failure'):
+            env.step_expert()
+        assert env.execution_fault.phase == 'physics_step'
+        assert env._stopped
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_expert()
+
+        materialize = reference_env_module.materialize_control
+        materialization_count = 0
+        failed_replacements = []
+
+        def fail_first_replacement_reset(*args, **kwargs):
+            nonlocal materialization_count
+            materialization_count += 1
+            session = materialize(*args, **kwargs)
+            if materialization_count == 1:
+                failed_replacements.append(session)
+                def fail_reset(_sample):
+                    raise RuntimeError('injected replacement reset failure')
+                session.reset = fail_reset
+                close_session = session.close
+
+                def fail_replacement_cleanup():
+                    close_session()
+                    raise RuntimeError('injected replacement cleanup failure')
+
+                session.close = fail_replacement_cleanup
+            return session
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', fail_first_replacement_reset)
+        info_before_failed_reset = env.info
+        with pytest.raises(RuntimeError, match='injected replacement reset failure'):
+            env.reset(seed=19)
+        assert old_session.closed and env.session is None and env._stopped
+        assert env.info is info_before_failed_reset
+        assert env.execution_fault.phase == 'runtime_reset'
+        failed_reset = env.reset_failure_receipt
+        assert failed_reset['previous_session_close_completed']
+        assert failed_reset['replacement_materialization_attempted']
+        assert failed_reset['reset_write_attempted']
+        assert failed_reset['reset_write_status'] == 'unknown'
+        assert failed_reset['replacement_session_close_attempted']
+        assert not failed_reset['replacement_session_close_completed']
+        assert failed_reset['prior_execution_fault']['phase'] == 'physics_step'
+        assert failed_reset['failure']['message'] == 'injected replacement reset failure'
+        assert failed_replacements[0].closed
+        assert failed_reset['cleanup_errors'] == [{
+            'operation': 'selected replacement-session cleanup',
+            'exception_type': 'RuntimeError',
+            'message': 'injected replacement cleanup failure',
+        }]
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_expert()
+        assert env.info is info_before_failed_reset
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', materialize)
+        env.reset(seed=19)
+        assert env.session is not old_session
+        assert env.execution_fault is None
+        assert env.reset_failure_receipt is None
+        assert env.state.control_step == 0
+        assert not env._stopped
+    finally:
+        env.close()
+    with pytest.raises(RuntimeError, match='environment is closed'):
+        env.reset(seed=19)
+
+
+def test_observer_fault_reset_for_solution_and_unavailable_owner(fake, monkeypatch):
+    from task_env.environment import reference_env as reference_env_module
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    solution = build_readiness_solution()
+    try:
+        env.reset_for_solution(solution, seed=19)
+        old_session = env.session
+        camera = CameraGeometry(
+            'camera-observation-v0', env.artifact.identity_hash, 'r1-observer', 'world',
+            IDENTITY, IDENTITY, 16, 16, 1.0, .01, 10.0, True, False,
+        )
+
+        def fail_capture():
+            raise RuntimeError('injected observer capture failure')
+
+        monkeypatch.setattr(env, '_capture_selected_observer', fail_capture)
+        env._configure_selected_observer('rgb_array', camera)
+        with pytest.raises(RuntimeError, match='injected observer capture failure'):
+            env.render()
+        assert env.execution_fault.phase == 'observer_render'
+        assert env._ui_render_provider.last_frame_receipt is None
+
+        info_before_failed_rebuild = env.info
+        materialize = reference_env_module.materialize_control
+
+        def unavailable_owner(*_args, **_kwargs):
+            raise RuntimeError('Isaac App owner unavailable; new worker required')
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', unavailable_owner)
+        with pytest.raises(RuntimeError, match='new worker required'):
+            env.reset_for_solution(solution, seed=19)
+        assert old_session.closed and env.session is None and env._stopped
+        assert env.info is info_before_failed_rebuild
+        assert env.execution_fault.phase == 'session_materialization'
+        failed_reset = env.reset_failure_receipt
+        assert failed_reset['previous_session_close_completed']
+        assert failed_reset['replacement_materialization_attempted']
+        assert not failed_reset['reset_write_attempted']
+        assert failed_reset['prior_execution_fault']['phase'] == 'observer_render'
+        assert failed_reset['failure']['message'] == 'Isaac App owner unavailable; new worker required'
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_with_solution(solution)
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', materialize)
+        env.reset_for_solution(solution, seed=19)
+        assert env.session is not old_session
+        assert env.execution_fault is None
+        assert env.reset_failure_receipt is None
+        assert env.state.control_step == 0
+        assert not env._stopped
+    finally:
+        env.close()
+    with pytest.raises(RuntimeError, match='environment is closed'):
+        env.reset_for_solution(solution, seed=19)
 
 
 def test_native_partial_interval_fault_is_recorded_without_a_transition(fake, tmp_path):
@@ -1029,7 +2055,7 @@ def test_nutassembly_public_example_does_not_admit_external_gripper_actions():
     env=make_env(IDS[1])
     try:
         assert env.binding.external_actions is False
-        with pytest.raises(RuntimeError, match='requires step_expert'):
+        with pytest.raises(RuntimeError, match='unguarded external actions are not admitted'):
             env.step(np.zeros(8))
     finally:
         env.close()
@@ -1101,7 +2127,13 @@ def test_recording_example_finalizes_failed_task_h5_and_returns_nonzero(fake, tm
     import task_env
     from examples.recording import record_expert
     monkeypatch.setattr(record_expert, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
-    monkeypatch.setattr(task_env, 'make_env', lambda uid, config=None: make_env(uid, config=config))
+    def make_caller_only(uid, config=None):
+        env = make_env(uid, config=config)
+        def forbidden():
+            raise AssertionError('PickCube recording must not invoke step_expert')
+        env.step_expert = forbidden
+        return env
+    monkeypatch.setattr(task_env, 'make_env', make_caller_only)
     output=tmp_path/'failed-current-route.h5'
     code=record_expert.main(['--env-id', IDS[0], '--provider', 'mujoco', '--horizon', '3',
         '--output', str(output), '--time-limit-s', '10', '--memory-limit-mb', '1024'])
@@ -1110,6 +2142,93 @@ def test_recording_example_finalizes_failed_task_h5_and_returns_nonzero(fake, tm
     assert output.exists() and result['roundtrip']=='PASS'
     assert result['recording']['transitions']==3 and result['recording']['boundaries']==4
     assert result['recording']['t_plus_one_valid'] is True
+
+
+def test_pickcube_task_example_uses_caller_solution(fake, tmp_path, monkeypatch, capsys):
+    from contextlib import nullcontext
+    import task_env
+    from examples.tasks import pick_cube
+
+    monkeypatch.setattr(pick_cube, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
+    def make_caller_only(uid, config):
+        env = make_env(uid, config=config)
+        def forbidden():
+            raise AssertionError('PickCube example must not invoke step_expert')
+        env.step_expert = forbidden
+        return env
+    monkeypatch.setattr(task_env, 'make_env', make_caller_only)
+    output = tmp_path / 'pick-caller.h5'
+    code = pick_cube.main(['--provider', 'mujoco', '--horizon', '3', '--recording', str(output)])
+    result = json.loads(capsys.readouterr().out)
+    assert code == 0 and result['episode']['transitions'] == 3
+    assert result['task_outcome'] == 'TASK_OR_EXPERT_FAILURE_REPORTED'
+    assert output.exists() and result['recording']['t_plus_one_valid']
+
+
+def test_nutassembly_recording_example_drives_caller_solution(fake, tmp_path, monkeypatch, capsys):
+    from contextlib import nullcontext
+    import task_env
+    from examples.recording import record_expert
+    monkeypatch.setattr(record_expert, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
+    monkeypatch.setattr(task_env, 'make_env', lambda uid, config=None: make_env(uid, config=config))
+    output = tmp_path / 'nut-caller.h5'
+    code = record_expert.main(['--env-id', IDS[1], '--provider', 'mujoco', '--horizon', '3',
+        '--output', str(output), '--time-limit-s', '10', '--memory-limit-mb', '1024'])
+    result = json.loads(capsys.readouterr().out)
+    assert code == 1 and result['status'] == 'FAIL'
+    assert result['roundtrip'] == 'PASS' and result['recording']['t_plus_one_valid']
+    assert result['recording']['transitions'] == 3 and result['recording']['boundaries'] == 4
+
+
+def test_nutassembly_task_example_uses_caller_solution(fake, monkeypatch, capsys):
+    from contextlib import nullcontext
+    import task_env
+    from examples.tasks import nut_assembly
+
+    monkeypatch.setattr(nut_assembly, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
+    def make_caller_only(uid, config):
+        env = make_env(uid, config=config)
+        def forbidden():
+            raise AssertionError('NutAssembly example must not invoke step_expert')
+        env.step_expert = forbidden
+        return env
+    monkeypatch.setattr(task_env, 'make_env', make_caller_only)
+    code = nut_assembly.main(['--provider', 'mujoco', '--horizon', '3'])
+    result = json.loads(capsys.readouterr().out)
+    assert code == 1 and result['status'] == 'FAIL'
+    assert result['episode']['transitions'] == 3 and result['episode']['truncated']
+
+
+def test_nutassembly_planning_rollout_uses_caller_solution(fake, monkeypatch):
+    from task_env.script.trajectory.planning._common import rollout_solution
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        def forbidden():
+            raise AssertionError('caller-driven planning must not invoke step_expert')
+        monkeypatch.setattr(env, 'step_expert', forbidden)
+        result = rollout_solution(env, horizon=3, seed=19,
+                                  solution=build_outcome_solution(provider='mujoco'))
+        assert result['transitions'] == 3 and result['truncated']
+        assert env.solution is None and env._external_solution_owner is None
+    finally:
+        env.close()
+
+
+def test_nutassembly_feasibility_probe_uses_caller_solution(fake, monkeypatch):
+    from pathlib import Path
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / 'script' / 'agent'))
+    from feasibility_probe import run_seed
+    from task_env.tasks.nut_assembly.task import NutAssemblyReferenceEnv
+
+    class CallerOnlyNutAssembly(NutAssemblyReferenceEnv):
+        def step_expert(self):
+            raise AssertionError('feasibility probe must drive Nut actions externally')
+
+    row = run_seed(CallerOnlyNutAssembly, 'mujoco', 19, 3)
+    assert row['steps'] == 3 and row['truncated']
+    assert row['classification'] == 'expert_failed' and row['close_succeeded']
 
 
 def test_retired_phase_i_and_grouped_trajectory_commands_fail_explicitly(capsys):
@@ -1131,3 +2250,312 @@ def test_removed_task_plan_and_private_recorder_exports_are_not_active():
     assert recorder.__all__==['main']
     assert not hasattr(trajectory, '_build_plan')
     assert not hasattr(recorder, '_pick_cube_config')
+
+
+@pytest.mark.parametrize('uid', IDS)
+def test_selected_task_source_inventory_includes_runtime_admission(fake, uid):
+    import hashlib
+    from pathlib import Path
+
+    env = make_env(uid, config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        root = Path(__file__).resolve().parents[3]
+        for name in ('task_env/runtime/sessions/api.py', 'task_env/runtime/sessions/control.py'):
+            assert env.value['source_sha256'][name] == hashlib.sha256((root / name).read_bytes()).hexdigest()
+    finally:
+        env.close()
+
+
+def test_marker_public_factory_reset_step_and_source_provenance(fake):
+    # Import registers the example; construction uses the same public factory
+    # as a normal application. This is a synthetic session, not native proof.
+    import examples.tasks.declared_marker  # noqa: F401
+
+    # Match the nested public configuration shown in the task authoring guide.
+    env = make_env('marker-height-example-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'episode': {'horizon': 10},
+    })
+    try:
+        obs, _ = env.reset(seed=31)
+        first = env.state.pose_world['marker-v1']
+        assert env.observation_space.contains(obs)
+        import hashlib
+        from pathlib import Path
+        from task_env.controllers.canonical.contracts import digest
+        hashes = env.value['source_sha256']
+        root = Path(__file__).resolve().parents[3]
+        for name in ('examples/tasks/declared_marker.py', 'task_env/assembly/compiler.py',
+                     'task_env/assembly/panda_box.py', 'task_env/objects/pick_cube.py',
+                     'task_env/robots/panda.py', 'task_env/observations/selected_reference.py',
+                     'task_env/controllers/canonical/contracts.py',
+                     'task_env/runtime/sessions/control.py',
+                     'task_env/environment/reference_binding.py'):
+            assert hashes[name] == hashlib.sha256((root / name).read_bytes()).hexdigest()
+        assert 'task_env/tasks/declarative_reference.py' not in hashes
+        assert env.value['resolved_configuration']['object_id'] == 'marker-v1'
+        assert env.value['recipe_identity'] == digest(env.value['resolved_configuration'])
+        ee = env.state.pose_world['panda-v1/ee']
+        action = np.asarray((*ee.position, *ee.quaternion_wxyz, 0.0), dtype=np.float32)
+        obs, reward, terminated, truncated, _ = env.step(action)
+        assert env.observation_space.contains(obs)
+        assert (reward, terminated, truncated) == (0.0, False, False)
+        assert env.state.control_step == 1
+        env.reset(seed=31)
+        assert env.state.pose_world['marker-v1'] == first
+    finally:
+        env.close()
+
+
+def test_marker_compiler_snapshots_supplied_binding_callback_source(fake, tmp_path):
+    import hashlib
+    import importlib.util
+    from examples.tasks.declared_marker import MarkerHeightEnv
+    from task_env.assembly.compiler import reference_construction_value
+    from task_env.assembly.panda_box import compile_panda_box_task
+    from task_env.controllers.canonical import ProductionCanonicalPandaController
+    from task_env.environment.configuration import resolve_task_env_config
+
+    path = tmp_path / 'custom_observation.py'
+    path.write_text('def project(env, state):\n    return state\n', encoding='utf-8')
+    spec = importlib.util.spec_from_file_location('custom_observation_for_provenance', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    config = resolve_task_env_config(MarkerHeightEnv, {'provider': 'mujoco'})
+    from functools import partial
+    binding = replace(MarkerHeightEnv.selected_binding(config), observation_projection=partial(module.project))
+    compiled = compile_panda_box_task(
+        MarkerHeightEnv.declaration(), config=config.environment,
+        controller_factory=ProductionCanonicalPandaController.from_source,
+    )
+    value = reference_construction_value(compiled, task_id=MarkerHeightEnv.uid,
+                                         construction_schema='test-construction-v1', binding=binding)
+    with pytest.raises(ValueError, match='construction owner has no source file'):
+        reference_construction_value(compiled, task_id=MarkerHeightEnv.uid,
+                                     construction_schema='test-construction-v1',
+                                     binding=replace(binding, observation_projection=partial(len)))
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[3]
+    name = (path.resolve().relative_to(root).as_posix()
+            if path.resolve().is_relative_to(root) else 'external:custom_observation.py')
+    assert value['source_sha256'][name] == hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text('def project(env, state):\n    return env, state\n', encoding='utf-8')
+    changed = reference_construction_value(compiled, task_id=MarkerHeightEnv.uid,
+                                           construction_schema='test-construction-v1', binding=binding)
+    assert changed['source_sha256'][name] != value['source_sha256'][name]
+    assert changed['recipe_identity'] != value['recipe_identity']
+
+
+def test_provider_free_compiler_binding_tracks_compiler_and_current_callbacks(fake, tmp_path):
+    import hashlib
+    import importlib.util
+    from functools import partial
+    from pathlib import Path
+    from examples.tasks.declared_marker import MarkerHeightEnv
+    from task_env.assembly.panda_box import compile_panda_box_task
+    from task_env.controllers.canonical import ProductionCanonicalPandaController
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.environment.reference_binding import ReferenceTaskBinding
+
+    path = tmp_path / 'custom_compiler.py'
+    path.write_text('def compile_task(compiled):\n    return compiled\n')
+    spec = importlib.util.spec_from_file_location('custom_compiler_for_binding', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    config = resolve_task_env_config(MarkerHeightEnv, {'provider': 'mujoco'})
+    original = MarkerHeightEnv.selected_binding(config)
+    compiled = compile_panda_box_task(
+        MarkerHeightEnv.declaration(), config=config.environment,
+        controller_factory=ProductionCanonicalPandaController.from_source,
+    )
+    binding = ReferenceTaskBinding.from_provider_free_compiler(
+        partial(module.compile_task, compiled), task_id=MarkerHeightEnv.uid,
+        construction_schema='test-custom-compiler-v1',
+        reset_sample=original.reset_sample, evaluate=original.evaluate,
+        object_poses=original.object_poses, scalar_control_binding=original.scalar_control_binding,
+        external_actions=True, interval_mode='grouped', recorder_mode='canonical',
+        action_schema=original.action_schema, action_space_factory=original.action_space_factory,
+        prepare_action=original.prepare_action, observation_space_factory=original.observation_space_factory,
+        observation_projection=original.observation_projection,
+    )
+    first = binding.build_for_provider('mujoco')
+    root = Path(__file__).resolve().parents[3]
+    key = (path.resolve().relative_to(root).as_posix()
+           if path.resolve().is_relative_to(root) else 'external:custom_compiler.py')
+    assert first['source_sha256'][key] == hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text('def compile_task(compiled):\n    return compiled  # changed compiler source\n')
+    second = binding.build_for_provider('geophys')
+    assert second['source_sha256'][key] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert first['recipe_identity'] != second['recipe_identity']
+    with pytest.raises(TypeError, match='compiler must be callable'):
+        ReferenceTaskBinding.from_provider_free_compiler(None, task_id='test', construction_schema='test')
+
+
+def test_marker_reset_rebuild_uses_current_binding_source(fake, tmp_path):
+    import hashlib
+    import importlib.util
+    from pathlib import Path
+    import examples.tasks.declared_marker  # noqa: F401
+
+    path = tmp_path / 'current_marker_observation.py'
+    path.write_text(
+        'from task_env.observations.selected_reference import build_selected_observation\n'
+        'def project(env, state):\n    return build_selected_observation(env, state)\n',
+        encoding='utf-8',
+    )
+    spec = importlib.util.spec_from_file_location('current_marker_observation', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    env = make_env('marker-height-example-v1', config={'provider': 'mujoco', 'horizon': 2})
+    try:
+        assert env.binding.build_receives_binding
+        env.binding = replace(env.binding, observation_projection=module.project)
+        obs, _ = env.reset(seed=31)
+        assert env.observation_space.contains(obs)
+        root = Path(__file__).resolve().parents[3]
+        name = (path.resolve().relative_to(root).as_posix()
+                if path.resolve().is_relative_to(root) else 'external:current_marker_observation.py')
+        assert env.value['source_sha256'][name] == hashlib.sha256(path.read_bytes()).hexdigest()
+    finally:
+        env.close()
+
+
+def test_common_selected_construction_rejects_wrong_uid_and_render_before_binding(monkeypatch):
+    from dataclasses import replace
+    from examples.tasks.declared_marker import MarkerHeightEnv
+    from task_env.environment.configuration import resolve_task_env_config
+
+    config = resolve_task_env_config(MarkerHeightEnv, {'provider': 'mujoco'})
+    def unexpected_binding(*_args):
+        raise AssertionError('binding must not be built for invalid construction input')
+    monkeypatch.setattr(MarkerHeightEnv, 'selected_binding', unexpected_binding)
+    with pytest.raises(TypeError, match='own resolved configuration'):
+        MarkerHeightEnv.from_resolved_config(replace(config, task_uid='unrelated'))
+    with pytest.raises(ValueError, match='state-only'):
+        MarkerHeightEnv.from_resolved_config(config, render_mode='rgb_array')
+    with pytest.raises(ValueError, match='state-only'):
+        MarkerHeightEnv.from_resolved_config(config, extra=True)
+
+
+def test_nut_solution_lifecycle_restores_then_requires_final_task_success():
+    from task_env.tasks.nut_assembly.solution import (
+        NutAssemblySolutionLifecycle, SolutionCompletionPolicy,
+    )
+
+    policy = SolutionCompletionPolicy.ON_EXPERT_TERMINAL_STAGE
+    original = NutAssemblySolutionLifecycle(policy)
+    assert not original.observe_task_outcome(task_success=True, control_step=1, simulation_time_s=.01)
+    restored = NutAssemblySolutionLifecycle(policy)
+    restored.restore_state(original.to_mapping())
+    assert not restored.complete_expert(terminal_stage_completed=True, final_task_success=False,
+                                        control_step=2, simulation_time_s=.02)
+    assert restored.expert_failed and restored.failure_reason == 'final_task_success_not_valid'
+    assert original.complete_expert(terminal_stage_completed=True, final_task_success=True,
+                                    control_step=2, simulation_time_s=.02)
+    assert original.expert_complete and not original.expert_failed
+
+
+def test_selected_episode_state_survives_horizon_reset_and_close(fake):
+    from task_env.environment.lifecycle import EpisodeExecutionState
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 2})
+    assert isinstance(env._episode_state, EpisodeExecutionState)
+    state = env._episode_state
+    try:
+        env.reset(seed=31)
+        assert env._episode_state is state and not state.stopped and state.fault is None
+        assert state.episode_id == env._selected_episode_id and state.episode_id
+        ee = env.state.pose_world['panda-v1/ee']
+        action = np.asarray((*ee.position, *ee.quaternion_wxyz, 0.0), dtype=np.float32)
+        env.step(action)
+        _, _, _, truncated, _ = env.step(action)
+        assert truncated and state.stopped
+        with pytest.raises(RuntimeError):
+            env.step(action)
+        env.reset(seed=31)
+        assert env._episode_state is state and not state.stopped and state.fault is None
+    finally:
+        env.close()
+    assert state.closed
+
+
+@pytest.mark.parametrize('mixed', [False, True])
+def test_selected_exposes_one_episode_end_for_the_active_route(mixed):
+    env = object.__new__(SelectedReferenceEnv)
+    env._mixed_control_candidate = mixed
+    end = object()
+    if mixed:
+        env._mixed_episode_end = end
+        assert env._position_episode_end is None
+    else:
+        env._position_episode_end = end
+        assert env._mixed_episode_end is None
+    assert env._episode_state.episode_end is end
+    if mixed:
+        env._mixed_episode_end = None
+    else:
+        env._position_episode_end = None
+    assert env._episode_state.episode_end is None
+
+
+def test_selected_position_stop_stores_one_published_outcome_without_stepping():
+    env = object.__new__(SelectedReferenceEnv)
+    env._mixed_control_candidate = False
+    env.mixed_control_profile = False
+    env.position_profile = True
+    env.leaf_position_profile = False
+    env.dual_entity_position = False
+    env._closed = False
+    env._stopped = False
+    env._execution_fault = None
+    env._position_episode_end = None
+    env._position_controller_switch_fault_receipt = None
+    env._pending_position_switch = None
+    env.recorder = None
+    env.session = object()
+    env._published_position_state = SimpleNamespace(control_step=2, simulation_time=.02)
+    boundary = SimpleNamespace(boundary_id='published-boundary', episode_id='selected-episode')
+    env._published_position_typed_state = SimpleNamespace(view=SimpleNamespace(boundary=boundary))
+    env._published_position_evaluation = SimpleNamespace(success=False)
+    env.value = {'source': SimpleNamespace(source_closure_digest='a' * 64)}
+    env.controller = SimpleNamespace(identity='b' * 64, profile_id='position-test')
+    first = env.stop('operator_request')
+    assert env.stop('repeated_request') is first
+    assert env._episode_state.episode_end is first and env._episode_state.stopped
+    assert first.outcome.end_reason == 'external_stop'
+    assert first.outcome.final_boundary == 2
+
+
+@pytest.mark.parametrize(('reason', 'solution', 'end_reason', 'flags'), [
+    ('operator_request', None, 'external_stop', (False, True, True)),
+    ('horizon_reached', None, 'horizon_reached', (False, True, True)),
+    ('solution_completed', SimpleNamespace(done=True, failed=False),
+     'solution_completed', (False, False, True)),
+    ('solution_failed', SimpleNamespace(done=False, failed=True),
+     'solution_failed', (True, False, False)),
+])
+def test_selected_mixed_stop_stores_one_published_outcome_without_stepping(
+        reason, solution, end_reason, flags):
+    env = object.__new__(SelectedReferenceEnv)
+    env._mixed_control_candidate = True
+    env.mixed_control_profile = True
+    env._closed = False
+    env._stopped = False
+    env._execution_fault = None
+    env._mixed_episode_end = None
+    env._external_solution_owner = solution
+    env.recorder = None
+    env.session = SimpleNamespace(episode_id='mixed-episode')
+    env.state = SimpleNamespace(control_step=3, simulation_time=.03)
+    env.sample = SimpleNamespace(sample_id='sample')
+    env.value = {'source': SimpleNamespace(scene_source=SimpleNamespace(source_id='scene'),
+                                           source_closure_digest='a' * 64)}
+    env.controller = SimpleNamespace(identity='b' * 64)
+    env.evaluation = SimpleNamespace(success=False)
+    first = env.stop(reason)
+    assert env.stop('repeated_request') is first
+    assert env._episode_state.episode_end is first and env._episode_state.stopped
+    assert first.outcome.end_reason == end_reason
+    assert (first.outcome.terminated, first.outcome.truncated,
+            first.outcome.bootstrap_allowed) == flags
+    assert first.outcome.final_boundary == 3

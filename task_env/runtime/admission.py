@@ -144,7 +144,10 @@ def admit_runtime_port(
     if transition_reason is not None:
         device_reasons.append(str(transition_reason))
     execution_value = str(execution).strip().lower()
-    if execution_value != "local":
+    device_worker = (execution_value == 'device_worker' and isinstance(resolved_summary, Mapping)
+                     and isinstance(resolved_summary.get('device_transition'), Mapping)
+                     and resolved_summary['device_transition'].get('transport') == 'cuda_ipc')
+    if execution_value != "local" and not device_worker:
         device_available = False
         device_reasons.append(
             f"device transition requires local execution, got {execution_value}"

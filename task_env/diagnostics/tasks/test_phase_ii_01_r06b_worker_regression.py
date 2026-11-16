@@ -90,6 +90,15 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
     from task_env.runtime.sessions import api, control
 
     root = worker.ROOT
+    real_check_output = subprocess.check_output
+
+    def synthetic_clean_tree_check(args, *call_args, **call_kwargs):
+        if list(args[:2]) == ['git', 'status']:
+            return ''
+        return real_check_output(args, *call_args, **call_kwargs)
+
+    # Synthetic model IO does not claim the native worker's clean-tree gate.
+    monkeypatch.setattr(subprocess, 'check_output', synthetic_clean_tree_check)
     cases = [
         _build_synthetic_case('E1', False),
         _build_synthetic_case('E2', True),
@@ -145,12 +154,13 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
     monkeypatch.setattr(worker_probe_module, '_native_identity', lambda _mj, _static: runtime_identity)
     originals = {
         'control_materialize': control.materialize_control,
-        'reference_materialize': sys.modules['task_env.tasks.reference_env'].materialize_control,
+        'reference_materialize': sys.modules['task_env.environment.reference_env'].materialize_control,
         'step': engine.mj_step, 'forward': engine.mj_forward,
     }
     materialization_count = {'value': 0}
 
-    def materialize(artifact, execution, source):
+    def materialize(artifact, execution, source, *, mixed_actuator_plan):
+        assert mixed_actuator_plan is source.mixed_actuator_plan
         materialization_count['value'] += 1
         current_io['materializations'] += 1
         order_variant = source.fixed_attachment_plan.parent_asset_version.endswith('r06b-order-v1')
@@ -258,7 +268,7 @@ def test_real_run_worker_two_cases_with_synthetic_model_io_and_restored_hooks(mo
     assert engine.mj_step is originals['step']
     assert engine.mj_forward is originals['forward']
     assert sys.modules['task_env.runtime.sessions.control'].materialize_control is originals['control_materialize']
-    assert sys.modules['task_env.tasks.reference_env'].materialize_control is originals['reference_materialize']
+    assert sys.modules['task_env.environment.reference_env'].materialize_control is originals['reference_materialize']
     trace = [json.loads(line) for line in (output / 'native/native_step_trace.jsonl').read_text().splitlines()]
     assert len(trace) == 640
     assert {row['episode_id'] for row in trace} == {'E1', 'E2'}
@@ -310,7 +320,7 @@ def test_real_run_worker_failure_finalizes_and_restores_hooks(monkeypatch, tmp_p
     assert engine.mj_step is originals['step']
     assert engine.mj_forward is originals['forward']
     assert sys.modules['task_env.runtime.sessions.control'].materialize_control is originals['control_materialize']
-    assert sys.modules['task_env.tasks.reference_env'].materialize_control is originals['reference_materialize']
+    assert sys.modules['task_env.environment.reference_env'].materialize_control is originals['reference_materialize']
     assert not (output / 'native/native_result.json').exists()
     if failure == 'e2_materialize_before':
         assert failure_receipt['counters']['materialization_attempts'] == 2
@@ -453,7 +463,7 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
             monkeypatch.setattr(supervisor, '_terminate_group', lambda _pgid, proc: {
                 'term_sent': True, 'kill_sent': False, 'term_wait_seconds': 0.0,
             })
-        receipt = supervisor.run_supervisor(contract_path)
+        receipt = supervisor._run_historical_test_logic(contract_path, fake_popen=popen, fake_run=FakeRun())
         assert receipt['rss_sample_count'] in (0, 1)
         assert receipt['process_group_exit_confirmed_before_unlock'] is True
         assert receipt['reader_completed_before_unlock'] is True

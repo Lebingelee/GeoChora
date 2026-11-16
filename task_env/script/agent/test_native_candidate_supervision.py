@@ -84,7 +84,11 @@ def test_builtin_launch_refuses_unconfirmed_native_retirement(tmp_path, monkeypa
         'harness-example-working-tree-scope-v1', (),
     ).to_dict()))
     lock_path = tmp_path / 'native.lock'
+    lock_path.touch()
     validation.native_cleanup_blocker_path(lock_path).write_text('{}')
+    # develop's built-in supervisor opens Core's canonical LOCK directly.
+    monkeypatch.setattr(validation, 'LOCK', lock_path)
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', tmp_path / 'absent' / 'legacy.lock')
     monkeypatch.setattr(validation, 'native_lock_path', lambda: lock_path)
     monkeypatch.setattr(validation, 'core_python', lambda: Path(sys.executable))
     monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 12 * 1024**3)

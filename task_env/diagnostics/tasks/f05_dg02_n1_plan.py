@@ -36,6 +36,7 @@ def tracked_input(path: Path) -> dict[str, str]:
 
 
 def build() -> Path:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     if RUN_DIR.exists():
         raise FileExistsError(f"probe output already exists: {RUN_DIR}")
     previous = json.loads(PREVIOUS.read_text())
@@ -46,7 +47,7 @@ def build() -> Path:
     if git("-C", str(PROVIDER), "rev-parse", "HEAD") != "41f8b517c5f92cd6e59907394dc42714b78702a7" or git("-C", str(PROVIDER), "branch", "--show-current") != "codex/phase-ii-01-f05-geophys":
         raise RuntimeError("provider branch/HEAD differs from the frozen DG02 input")
 
-    lock_stream = LOCK.open("a+")
+    lock_stream = LOCK.open("r+")
     try:
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

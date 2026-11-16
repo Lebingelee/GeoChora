@@ -96,7 +96,7 @@ def _branch(path: Path) -> str:
 
 def _assert_lock_free(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+") as lock:
+    with path.open("r+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
@@ -281,6 +281,7 @@ def build_plan(*, output_root: Path, progress_path: Path,
                candidate_plan_path: Path, candidate_sidecar_path: Path,
                candidate_receipt_path: Path, candidate_worker_path: Path,
                candidate_supervisor_path: Path) -> tuple[dict, dict]:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     output_root = output_root.resolve()
     progress_path = progress_path.resolve(strict=True)
     attempt_index = 1

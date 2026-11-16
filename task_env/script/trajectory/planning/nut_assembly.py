@@ -1,4 +1,4 @@
-"""Run the guarded selected NutAssembly solution through ``step_expert()``."""
+"""Run the guarded selected NutAssembly Solution through public actions."""
 
 from __future__ import annotations
 

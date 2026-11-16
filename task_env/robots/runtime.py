@@ -76,15 +76,69 @@ class RobotRuntime:
     """Single robot runtime view exposed as ``env.robot``."""
 
     uid: str
-    references: AgentReferences
-    controller: RobotControllerHandle
-    gripper: PandaGripperController
-    base: RobotFrameReference
-    ee: RobotFrameReference
-    world: RobotFrameReference
+    references: AgentReferences | None = None
+    controller: object | None = None
+    gripper: PandaGripperController | None = None
+    base: object | None = None
+    ee: RobotFrameReference | None = None
+    world: RobotFrameReference | None = None
+    subjects: tuple = ()
+    controllers: tuple = ()
+    declaration: object | None = None
+
+    @classmethod
+    def from_selected(cls, value, selected, *, robot=None, physical_selection=None):
+        """Expose the admitted subjects and their actual Controller owners.
+
+        No native resource, state copy, or Controller is created by this view.
+        Component-only Panda conveniences remain optional capabilities.
+        """
+        source = value['source']
+        physical = selected.physical_execution or value.get('physical_execution')
+        controller = selected.controller
+        if physical_selection is not None:
+            committed = physical_selection.committed
+            physical = (physical_selection.declaration if committed is None else committed.execution)
+            controller = None if committed is None else committed.execution.controllers[0]
+        if physical is not None:
+            if physical_selection is None:
+                controller = physical.controllers[0]
+            subjects = physical.subjects
+            controllers = (() if physical_selection is not None and physical_selection.committed is None
+                           else physical.controllers)
+        else:
+            binding = getattr(source, 'position_subject_plan', None)
+            subjects = () if binding is None else binding.subjects
+            declare = getattr(selected.controller, 'position_binding_requirements', None)
+            controllers = (tuple(row[0] for row in declare()) if callable(declare)
+                           else (selected.controller,))
+        if not subjects:
+            return None
+        roots = tuple(subject for subject in subjects if subject.parent_subject_id is None)
+        request = getattr(source, 'source_composition_request', None)
+        built_robot = value.get('robot')
+        if robot is not None and built_robot is not None and built_robot is not robot:
+            raise ValueError('built Task source differs from the selected Robot declaration')
+        declaration = robot if robot is not None else built_robot
+        if declaration is not None:
+            uid = declaration.uid
+            if request is not None and request.robot_uid != uid:
+                raise ValueError('Robot source composition differs from the selected declaration')
+        else:
+            uid = request.robot_uid if request is not None else subjects[0].entity_id
+        return cls(uid=uid, declaration=declaration, controller=controller, subjects=subjects,
+                   controllers=controllers, base=roots[0].root_frame if len(roots) == 1 else None,
+                   world=RobotFrameReference('world', 'world', None, 'world'))
+
+    @property
+    def root_frames(self):
+        """Source-owned root Frames, retaining nested subject identities."""
+        return tuple(subject.root_frame for subject in self.subjects)
 
     @property
     def arm_joint_order(self) -> tuple[str, ...]:
+        if self.references is None:
+            raise AttributeError('this Robot does not declare a legacy arm joint projection')
         return self.references.arm_joint_names
 
 

@@ -108,8 +108,15 @@ def isaac_route_record(delivery_manifest=None):
     1000-tick horizon. The Harness records that pin and whether the local
     manifest bytes match; it never relaxes the pin or claims runtime admission.
     """
-    from task_env.tasks.pick_cube.isaac import (ISAAC_ADMITTED_DELIVERIES_V1,
-        ISAAC_DELIVERY_MANIFEST_SHA256_V1, ISAAC_PROFILE_V1)
+    if __package__:
+        from .isaac_admission import (admitted_isaac_deliveries, isaac_physics_profile,
+            pinned_isaac_delivery_sha256)
+    else:
+        from isaac_admission import (admitted_isaac_deliveries, isaac_physics_profile,
+            pinned_isaac_delivery_sha256)
+    ISAAC_ADMITTED_DELIVERIES_V1=admitted_isaac_deliveries()
+    ISAAC_DELIVERY_MANIFEST_SHA256_V1=pinned_isaac_delivery_sha256()
+    ISAAC_PROFILE_V1=isaac_physics_profile()
     from task_env.tasks.pick_cube.specialization import REFERENCE_ENV_ID
     record={'schema_version':'harness-isaac-route-v1','provider':'isaacsim','backend':'cuda','device':'cuda:0',
         'physics_profile':ISAAC_PROFILE_V1,'controller_profile':'r3_continuous_v1','horizon_max_control_ticks':1000,

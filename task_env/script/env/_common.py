@@ -14,7 +14,6 @@ from .._bootstrap import (
     get_logger,
     json_compatible,
     load_yaml_mapping,
-    pick_cube_config,
     resolved_config_summary,
     stage14_output,
     with_backend_fallback,
@@ -45,9 +44,22 @@ def _observation_leaf_shapes(value: Any, path: str = "") -> dict[str, dict[str, 
     }
 
 
+_FORMAL_TASKS = frozenset(('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+                           'pendulum-v1', 'two-wheel-balance-v1'))
+
+
+def _example_action(env, observation):
+    from task_env.runtime.sessions.control_lifecycle import has_position_control_capability
+
+    if has_position_control_capability(env) and len(env.position_profiles) == 1:
+        return np.array([*observation['state']['ee_pose'], 1.], dtype=np.float64)
+    return env.action_space.sample()
+
+
 def inline_config(env_id: str, backend: str, horizon: int) -> dict[str, Any]:
-    if env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}:
-        return {'provider': 'geophys', 'backend': backend, 'horizon': horizon}
+    if env_id in _FORMAL_TASKS:
+        return {'execution': {'physics_provider': 'geophys', 'physics_backend': backend},
+                'episode': {'horizon': horizon}}
     return {
         "runtime": {"backend": backend, "broadphase": "n2", "prewarm": False},
         "episode": {"horizon": horizon},
@@ -63,8 +75,8 @@ def public_config(
     """Resolve inline example defaults followed by the user YAML mapping."""
 
     values = deep_merge(inline_config(env_id, backend, horizon), load_yaml_mapping(config_path))
-    if env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}:
-        values['backend'] = backend
+    if env_id in _FORMAL_TASKS:
+        values['execution'] = dict(values.get('execution', {}), physics_backend=backend)
         return values
     runtime = dict(values.get("runtime", {}))
     runtime["backend"] = backend
@@ -86,8 +98,8 @@ def run_single(
     logger = get_logger(f"task-env-stage14-{summary_name}")
 
     def create(backend: str):
-        selected = env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}
-        values = dict(config, backend=backend) if selected else deep_merge(config, {'runtime': {'backend': backend}})
+        values = deep_merge(config, {'execution': {'physics_backend': backend}} if env_id in _FORMAL_TASKS
+                            else {'runtime': {'backend': backend}})
         return make_env(env_id, config=values)
 
     backend, env = with_backend_fallback(
@@ -100,16 +112,24 @@ def run_single(
     try:
         observation, info = env.reset(seed=seed)
         check_observation(observation, env.observation_space)
+        solution = None
+        if env_id == 'nut-assembly-outcome-reference-v1':
+            from task_env.tasks.nut_assembly.task import build_outcome_solution
+            solution = build_outcome_solution(provider=env.provider)
+            solution.reset(observation, info, env.metadata)
         for step_index in range(steps):
             # Stage 13 exposes structured action spaces (for example,
             # ``{"torque": Box(...)}``) on the public boundary.  Keep the
             # sampled tree intact instead of assuming every space is a Box.
-            action = (np.array([*observation['state']['ee_pose'], 1.], dtype=np.float64)
-                      if hasattr(env, 'step_expert') else env.action_space.sample())
-            if not env.action_space.contains(action):
+            action = (solution.act(observation, info) if solution is not None
+                      else _example_action(env, observation))
+            if not env.action_space.contains(action.action if solution is not None else action):
                 raise ValueError("sampled action is outside the advertised action_space")
-            observation, reward, terminated, truncated, info = (
-                env.step(action) if env.binding.external_actions else env.step_expert())
+            if solution is not None:
+                observation, reward, terminated, truncated, info = env.step(action)
+                solution.observe(observation, reward, terminated, truncated, info)
+            else:
+                observation, reward, terminated, truncated, info = env.step(action)
             check_observation(observation, env.observation_space)
             if not np.isfinite(float(reward)):
                 raise ValueError("TaskEnv reward is not finite")
@@ -121,7 +141,8 @@ def run_single(
                     "truncated": bool(truncated),
                 }
             )
-            if terminated or truncated or getattr(env, '_stopped', False):
+            if (terminated or truncated or getattr(env, '_stopped', False)
+                    or solution is not None and (solution.done or solution.failed)):
                 break
         summary = {
             "env_id": env_id,
@@ -130,7 +151,8 @@ def run_single(
             "steps_requested": steps,
             "steps_completed": len(rows),
             "rows": rows,
-            "resolved": (env.value['resolved_configuration'] if hasattr(env, 'step_expert') else resolved_config_summary(env)),
+            "resolved": (env.value['resolved_configuration'] if hasattr(env, 'value')
+                         and 'resolved_configuration' in env.value else resolved_config_summary(env)),
             "final_info": json_compatible(info),
         }
         output = stage14_output("env", summary_name, "summary.json")

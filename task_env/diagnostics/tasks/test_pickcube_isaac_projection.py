@@ -2,7 +2,7 @@
 
 import pytest
 
-from task_env.tasks.pick_cube.isaac import compile_pickcube_isaac_task_artifact
+from task_env.tasks.pick_cube.specialization import compile_pickcube_isaac_task_artifact
 from task_env.tasks.pick_cube.task import _configuration, build_artifact
 
 
@@ -10,10 +10,14 @@ def test_session_admission_dispatch_uses_exact_pickcube_runtime_input_type():
     from types import SimpleNamespace
 
     from task_env.runtime.sessions.api import _session_admission_input_route
-    from task_env.tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
+    from task_env.runtime.sessions.source import UsdRuntimeInputV1
 
-    runtime_input = object.__new__(PickCubeIsaacRuntimeInputV1)
+    runtime_input = object.__new__(UsdRuntimeInputV1)
+    object.__setattr__(runtime_input, 'schema_version', 'pick-cube-isaac-runtime-input-v1')
     assert _session_admission_input_route(runtime_input) == 'f06_pickcube'
+    object.__setattr__(runtime_input, 'schema_version', 'unrelated-usd-runtime-input-v1')
+    with pytest.raises(TypeError, match='exact supported task runtime input'):
+        _session_admission_input_route(runtime_input)
     with pytest.raises(TypeError, match='exact supported task runtime input'):
         _session_admission_input_route(SimpleNamespace())
 
@@ -74,6 +78,31 @@ def test_pickcube_isaac_projection_preserves_task_semantics_and_binds_runtime_fr
     artifact.validate_scene(scene)
 
 
+def test_task_owned_f06_bindings_match_trusted_policy_without_native_import():
+    from types import SimpleNamespace as NS
+    from task_env.controllers.canonical.contracts import digest
+    from task_env.runtime.sessions.api import _F06_TASK_POLICY_SHA256_V1
+    from task_env.tasks.pick_cube.specialization import _source_bindings
+
+    names = [*(f'joint{i}' for i in range(1, 8)), 'finger_joint1', 'finger_joint2']
+    scene = NS(articulations=[NS(entity_id='panda-v1', joints=[
+        NS(joint_id=name, kind='prismatic' if name.startswith('finger') else 'revolute')
+        for name in names
+    ])])
+    artifact = NS(legacy_joint_bindings={f'panda-v1/{name}': None for name in names},
+                  legacy_frame_bindings={key: None for key in
+                      ('panda-v1/base', 'cube-v1', 'panda-v1/ee', 'tabletop-v1/top')},
+                  initialization=NS(poses_world={'cube-v1': None}))
+    joints, bodies, frames, free_joints = _source_bindings(scene, artifact)
+    policy = {
+        'schema_version': 'usd-task-admission-policy-v1',
+        'bindings': {'joints': joints, 'joint_targets': dict(joints), 'bodies': bodies,
+                     'frames': frames, 'free_joints': free_joints},
+        'controller_profile': 'r3_continuous_v1', 'horizon_min': 1, 'horizon_max': 1000,
+    }
+    assert digest(policy) == _F06_TASK_POLICY_SHA256_V1
+
+
 def test_f06_pickcube_tcp_is_the_task_ee_site_offset():
     from task_env.controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
 
@@ -86,7 +115,8 @@ def test_f06_pickcube_tcp_is_the_task_ee_site_offset():
     }
 
 
-def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity():
+@pytest.mark.parametrize('sdk_version', ['6.1.0.0', '6.2.0.0'])
+def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity(sdk_version):
     from task_env.artifacts import JointReference
     from task_env.runtime.sessions.leaf_control import (
         IsaacNamedPositionDriveV1,
@@ -114,7 +144,7 @@ def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity():
     )
     receipt = IsaacNativeMimicPositionDriveReceiptV1(
         'isaac-native-mimic-position-drive-receipt-v1', 'synthetic_fixture',
-        'a' * 64, 'b' * 64, 'c' * 64, 'isaacsim-6.2.0.0',
+        'a' * 64, 'b' * 64, 'c' * 64, 'isaacsim-' + sdk_version,
         'isaac-gpu-physx-pickcube-f06-v1', 'cuda', 'cuda:0', 'best_effort',
         0.002, 5, f'{entity_id}/position-servo-v1', native_names, limits, drives,
         gripper_drive_stiffness_N_m=5000.0,
@@ -180,6 +210,9 @@ def test_f06_external_binding_constructs_only_the_solution_free_source_once():
         controller_profile='r3_continuous_v1',
         source_delivery_manifest=manifest,
     )
+    assert binding.position_control_binding({}).gripper_semantic_id == 'panda-main/gripper'
+    assert binding.position_control_binding({'f06_pickcube_isaac_input': object()}).gripper_semantic_id == 'panda-v1/gripper'
+    assert binding.position_control_binding({}).opening_range_m == 0.08
     with patch('task_env.tasks.pick_cube.specialization.build_isaac_reference',
                return_value={'construction': 'external'}) as build:
         result = binding.build_external('isaacsim')
@@ -215,13 +248,32 @@ def test_position_reset_uses_artifact_frame_alias_for_single_segment_semantics()
     }
 
 
-def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
+def test_versioned_reset_rejects_distinct_or_changed_artifact():
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+    from task_env.environment.reference_env import _artifact_for_reset
+
+    @dataclass(frozen=True)
+    class Artifact:
+        identity_hash: str
+
+    current, rebuilt = Artifact('same'), Artifact('same')
+    assert _artifact_for_reset(current, {'artifact': rebuilt}) is current
+    assert _artifact_for_reset(current, {'artifact': rebuilt}, SimpleNamespace(artifact=rebuilt)) is rebuilt
+    with pytest.raises(ValueError, match='not identical'):
+        _artifact_for_reset(current, {'artifact': rebuilt}, SimpleNamespace(artifact=current))
+    with pytest.raises(ValueError, match='changed'):
+        _artifact_for_reset(current, {'artifact': Artifact('different')})
+
+
+@pytest.mark.parametrize('binding_kind', ['valid', 'missing', 'wrong_type'])
+def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact(binding_kind):
     from dataclasses import dataclass
     from types import SimpleNamespace
     from unittest.mock import patch
 
     from task_env.artifacts import ExecutionSpecV1, RendererSelectionV1
-    from task_env.runtime.sessions.control import ControlBindingPlanV1
+    from task_env.runtime.sessions.control import ControlBinding, ControlBindingPlanV1
     from task_env.runtime.sessions.api import F06_PICKCUBE_ISAAC_PROFILE
     from task_env.tasks.reference_env import SelectedReferenceEnv
 
@@ -234,7 +286,21 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
     assert rebuilt_artifact == initial_artifact
     assert rebuilt_artifact is not initial_artifact
 
-    reset_plan = SimpleNamespace(reset_sample=SimpleNamespace(task_seed=31))
+    from task_env.artifacts.execution import ResetPlanV1, ResetSampleV1
+    reset_sample = ResetSampleV1.create(
+        schema_version='reset-sample-v1', task_artifact_hash='a' * 64,
+        source_id='source-a', source_closure_digest='b' * 64,
+        sampler_id='test', sampler_version='v1', task_seed=31,
+        init_row_index=0, init_row_sha256='c' * 64,
+        joint_position={'arm/drive': 1.0}, joint_velocity={'arm/drive': 0.0},
+        sampled_poses_world={}, poses_world={}, free_joint_velocity={},
+        free_joint_velocity_frame='mujoco_world_linear_local_angular_v1',
+        fixture_pose_world={}, simulation_time_s=0.0,
+        velocity_policy='named_qvel_and_free_joint_qvel_v1',
+        control_policy='named_physical_effort_by_source_v1', initialization_order=(
+            'sample_source_properties', 'native_preprocess', 'sample_task_placements',
+            'restore_source_bound_state', 'forward_derived_state'), settle_steps=0)
+    reset_plan = ResetPlanV1('reset-plan-v1', reset_sample, 'task_episode')
     execution = ExecutionSpecV1(
         schema_version='execution-spec-v1',
         physics_provider='isaacsim',
@@ -271,15 +337,33 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
     env.position_profile = True
     env.leaf_position_profile = False
     env.fixed_attachment_leaf_position_profile = False
-    env.position_profiles = (object(),)
+    # The Position preparation seam validates the profile/plan before it
+    # reaches the materializer; the old plain object lacked that protocol.
+    env.position_profiles = (SimpleNamespace(_validate_plan=lambda _plan: None),)
+    from task_env.runtime.sessions.control import SelectedPositionCapabilityV1
+    env._selected_controller_binding = SimpleNamespace(
+        leaf_plan=None,
+        position_capabilities=(SelectedPositionCapabilityV1(env.position_profiles[0]),),
+        requires_reset_plan=True,
+    )
     env.position_plan = plan
     env.provider, env.backend, env.horizon = 'isaacsim', 'cuda', 1000
     env.artifact = initial_artifact
     env.value = {'artifact': initial_artifact, 'reset_plan': reset_plan}
     env.binding = SimpleNamespace(
+        physical_control_profile=None,
         reset_seed=lambda seed: seed,
         build_seeded=lambda *_args: rebuilt_value,
+        reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
+        position_control_binding=(
+            None if binding_kind == 'missing' else
+            lambda value: (ControlBinding('panda-v1/gripper', 0.08)
+                           if binding_kind == 'valid' else 'panda-v1/gripper')
+        ),
     )
+    from task_env.environment.reference_binding import ReferenceTaskBinding
+    env._reset_reconstruction = ReferenceTaskBinding.reset_reconstruction_strategy(
+        env.binding, env.provider, env.backend, env.horizon)
     env._diagnostic_profile = None
     env._native_feedback_profile = None
     env._mixed_control_candidate = False
@@ -298,18 +382,24 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
 
     def capture_materialization(artifact, *_args, **_kwargs):
         observed['artifact'] = artifact
+        observed['gripper'] = _kwargs['binding'].gripper_semantic_id
         raise StopAtMaterialization
 
-    with patch('task_env.tasks.reference_env.materialize_control', capture_materialization):
-        try:
-            env.reset(seed=31)
-        except StopAtMaterialization:
-            pass
+    with patch('task_env.environment.reference_env.materialize_control', capture_materialization):
+        if binding_kind == 'valid':
+            with pytest.raises(StopAtMaterialization):
+                env.reset(seed=31)
         else:
-            raise AssertionError('the reset did not reach the materialization boundary')
+            with pytest.raises(TypeError, match='Position control'):
+                env.reset(seed=31)
+
+    if binding_kind != 'valid':
+        assert observed == {}
+        return
 
     assert observed['artifact'] is rebuilt_artifact
     assert observed['artifact'] is runtime_input.artifact
+    assert observed['gripper'] == 'panda-v1/gripper'
 
 
 def test_f06_gripper_readback_failure_reports_exact_boundary_values():
@@ -337,6 +427,8 @@ def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue(
     def env_for_opening(opening_m):
         env = object.__new__(SelectedReferenceEnv)
         env.position_profile = True
+        from task_env.tasks.pick_cube.specialization import make_reference_binding
+        env.binding = make_reference_binding()
         env.value = {'f06_pickcube_isaac_input': object()}
         env.state = SimpleNamespace(
             control_step=52,
@@ -354,21 +446,30 @@ def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue(
         env.last_position_transition = (None, SimpleNamespace(target=target), None)
         return env
 
-    info = env_for_opening(-5.300285010889638e-7).expert_execution_info()
+    env = env_for_opening(-5.300285010889638e-7)
+    info = env.expert_execution_info()
     assert info.measured_opening_m == 0.0
     assert info.target_opening_m == 0.08
     assert not info.close_ready
+    output = {}
+    env._publish_task_position_execution_info(output)
+    assert output['pickcube_position_execution_info_v1'] == info.to_mapping()
+    env.value = {}
+    output = {}
+    env._publish_task_position_execution_info(output)
+    assert output == {}
 
     with pytest.raises(ValueError, match='measured_opening_m=-1.000001e-06'):
         env_for_opening(-1.000001e-6).expert_execution_info()
 
 
-def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
+@pytest.mark.parametrize('sdk_minor', ['6.1', '6.2'])
+def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract(sdk_minor):
     from task_env.runtime.sessions.native_io import NativeAdvanceReceiptV1
 
     application = {
         'schema_version': 'native-physx-mimic-substep-application-v1',
-        'profile_id': 'isaacsim-6.2-pickcube-physx-mimic-5n-v1',
+        'profile_id': f'isaacsim-{sdk_minor}-pickcube-physx-mimic-5n-v1',
         'provenance_kind': 'native_runtime',
         'drive_receipt_identity_sha256': 'a' * 64,
         'target_identity_sha256': 'b' * 64,
@@ -446,3 +547,73 @@ def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
             'native-advance-receipt-v1', 1, 1, 0.002,
             native_adaptation_application=non_finite_projection,
         ).validate(1, 0.002)
+
+
+def test_f06_runtime_admission_keeps_exact_delivery_and_task_bindings(monkeypatch):
+    """Exercise F06-specific rejection independently of native/USD loading."""
+    from types import SimpleNamespace as NS
+    from task_env.runtime.sessions import api
+    from task_env.runtime.sessions.source import UsdRuntimeInputV1
+
+    monkeypatch.setattr(api, '_validate_exact_admission_binding', lambda *args: None)
+    joints = {**{f'panda-v1/joint{i}': f'joint{i}' for i in range(1, 8)},
+              'panda-v1/finger_joint1': 'finger_joint1', 'panda-v1/finger_joint2': 'finger_joint2'}
+    delivery = NS(manifest_bytes_sha256=api._F06_DELIVERY_MANIFEST_SHA256_V1,
+                  delivery=NS(representation_id=api._F06_REPRESENTATION_V1),
+                  locally_validated=True, source_verified=False)
+    representation = NS(provider='isaacsim', provider_build_identity='isaacsim-6.2.0.0',
+                        representation_format='usd', runtime_admitted=False, source_verified=False)
+    scene = NS(loaded_delivery=delivery, representation=representation,
+               locally_validated=True, source_verified=False)
+    source = NS(scene_source=scene, joints=joints, joint_targets=joints,
+                bodies={'panda-v1/base': '/F06Scene/panda/Geometry/link0', 'cube-v1': '/F06Scene/cube_v1'},
+                frames={'panda-v1/ee': '/F06Scene/panda/Geometry/link0/link1/link2/link3/link4/link5/link6/link7/hand/ee',
+                        'tabletop-v1/top': '/F06Scene/tabletop_v1/top'},
+                free_joints={'cube-v1': '/F06Scene/cube_v1'})
+    execution = NS(physics_provider='isaacsim', physics_backend='cuda', physics_device='cuda:0',
+                   physics_profile=api.F06_PICKCUBE_ISAAC_PROFILE, provider_seed=31,
+                   determinism_mode='best_effort', render_default=NS(provider='none'), camera_overrides=())
+    policy = {
+        'schema_version': 'usd-task-admission-policy-v1',
+        'bindings': {name: dict(getattr(source, name)) for name in
+                     ('joints', 'joint_targets', 'bodies', 'frames', 'free_joints')},
+        'controller_profile': 'r3_continuous_v1', 'horizon_min': 1, 'horizon_max': 1000,
+    }
+    value = object.__new__(UsdRuntimeInputV1)
+    for name, item in dict(schema_version='pick-cube-isaac-runtime-input-v1', runtime_source=source,
+                           execution=execution, reset_plan=NS(reset_sample=NS(task_seed=31)),
+                           controller_profile='r3_continuous_v1', horizon=1000,
+                           admission_policy=policy,
+                           delivery_manifest_sha256=delivery.manifest_bytes_sha256).items():
+        object.__setattr__(value, name, item)
+    api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    object.__setattr__(value, 'horizon', 1001)
+    with pytest.raises(ValueError, match='frozen controller'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    object.__setattr__(value, 'horizon', 1000)
+    delivery.manifest_bytes_sha256 = '0' * 64
+    with pytest.raises(ValueError, match='exact locally validated'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    delivery.manifest_bytes_sha256 = value.delivery_manifest_sha256
+    source.bodies['cube-v1'] = '/wrong'
+    with pytest.raises(ValueError, match='binding map'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    # A caller cannot bypass the binding check by changing the declaration too.
+    policy['bindings']['bodies']['cube-v1'] = '/wrong'
+    with pytest.raises(ValueError, match='trusted policy identity'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    policy['bindings']['bodies']['cube-v1'] = '/F06Scene/cube_v1'
+    source.bodies['cube-v1'] = '/F06Scene/cube_v1'
+    policy['horizon_max'] = 1001
+    with pytest.raises(ValueError, match='trusted policy identity'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    policy['horizon_max'] = 1000
+    for name in ('joints', 'joint_targets', 'frames', 'free_joints'):
+        # Copy because the fixture's joint maps initially share a dictionary.
+        original = getattr(source, name)
+        altered = dict(original)
+        altered[next(iter(altered))] = '/wrong'
+        setattr(source, name, altered)
+        with pytest.raises(ValueError, match='binding map'):
+            api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+        setattr(source, name, original)

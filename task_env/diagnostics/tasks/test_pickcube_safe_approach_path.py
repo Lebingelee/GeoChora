@@ -5,7 +5,7 @@ import numpy as np
 from task_env.objects.pick_cube import CUBE_HALF_SIZE
 from task_env.tasks.pick_cube.solution import (
     _ABOVE_CLEARANCE,
-    _APPROACH_CLEARANCE,
+    _ABOVE_APPROACH_CLEARANCE,
     _MEASURED_CLEARANCE_COMMAND_HEADROOM,
     PickCubePositionExecutionInfoV1,
     PickCubeReadinessConfig,
@@ -32,7 +32,7 @@ def test_move_above_cube_clears_vertically_before_lateral_transit():
     target = cube + np.asarray(
         [0.0, 0.0, CUBE_HALF_SIZE + _ABOVE_CLEARANCE], dtype=np.float32,
     )
-    clear_z = float(target[2]) + _APPROACH_CLEARANCE
+    clear_z = float(target[2]) + _ABOVE_APPROACH_CLEARANCE
     deltas = np.diff(np.vstack((start[:3], positions)), axis=0)
     lateral = np.flatnonzero(np.linalg.norm(deltas[:, :2], axis=1) > 1e-7)
 

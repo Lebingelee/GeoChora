@@ -159,6 +159,36 @@ def expand_snapshot(snapshot, blobs):
     return result
 
 
+def validate_pending_native_interval(pending, *, control_step, physics_dt, control_substeps):
+    """Reject incomplete or misaligned native receipts before recording a transition."""
+    count = control_substeps
+    recorded = pending.get('substeps') if isinstance(pending, dict) else None
+    required = {
+        'index', 'native_step_index', 'native_start_time', 'state',
+        'feedback', 'target', 'applied', 'updated',
+    }
+    if (
+        not isinstance(pending, dict)
+        or type(pending.get('control_step')) is not int
+        or pending.get('control_step') != control_step
+        or pending.get('physics_dt') != physics_dt
+        or type(pending.get('control_substeps')) is not int
+        or pending.get('control_substeps') != count
+        or type(pending.get('native_step_count')) is not int
+        or pending.get('native_step_count') != count
+        or not isinstance(recorded, list)
+        or len(recorded) != count
+        or any(not isinstance(item, dict) or not required.issubset(item)
+               for item in recorded)
+        or any(type(item['index']) is not int or type(item['native_step_index']) is not int
+               for item in recorded)
+        or [item['index'] for item in recorded] != list(range(count))
+        or [item['native_step_index'] for item in recorded]
+           != [control_step * count + index + 1 for index in range(count)]
+    ):
+        raise ValueError('incomplete native Recorder application receipts')
+
+
 class ExecutionRecorder:
     """Own the opt-in episode data; receive actual completed application events."""
     def __init__(self, metadata, recipe, *, content_fields=None, owner_content_fields=None, schema=SCHEMA):
@@ -242,6 +272,11 @@ class ExecutionRecorder:
         transition_entry={'record':transition.to_mapping(),'interval':copy.deepcopy(self.pending),'native_audit':copy.deepcopy(audit)}
         structured_entry=(structured_control.to_mapping() if self.value['schema']==STRUCTURED_SCHEMA else None)
         boundary_entry, blobs = self._prepare_boundary(boundary,owners,stage,task_metrics,native_time)
+        timebase = self.value['metadata']['timebase']
+        validate_pending_native_interval(
+            self.pending, control_step=boundary_entry['record']['control_step'] - 1,
+            physics_dt=timebase['physics_dt'], control_substeps=timebase['control_substeps'],
+        )
         transitions=self.value.get('transitions')
         boundaries=self.value.get('boundaries')
         stored_blobs=self.value.get('blobs')

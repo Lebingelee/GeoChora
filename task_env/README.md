@@ -1,6 +1,10 @@
 # TaskEnv Core
 
+3b attempt001 三路线短程运行的结果、失败门与待复审边界见[执行摘要](../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_3b_attempt001_execution.md)。
+
 当前模块使用与能力治理入口：[TaskEnv canonical docs](../docs/module/task_env/README.md)。符号级细节继续在 API reference 维护。
+
+开发中 v2.1.1 的[安装与启动指南](../docs/module/task_env/v2.1.1/guides/installation-and-start.md)说明新克隆、复用已有路径与轻量入口；[自定义任务指南](doc/自定义任务构建指南.md)对应可运行示例和 Solution 接口，并标明尚未验证的组合。[阶段3前限定核心收尾](../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_pre_stage3_closeout_120min_sol_review.md)已有限接收，更广整理仍有边界；统一Env的并行适配待阶段6，本次Pendulum以单环境迁移和验证为范围。旧batch入口及历史证据不代表新路线已完成适配。
 
 `task_env/` owns GeoChora's public task/environment lifecycle, task-owned
 reference implementations, controller and observation contracts, generic
@@ -20,19 +24,13 @@ PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py \
 
 The current selected manipulation UIDs are
 `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`.
-Construct them through `from task_env import make_env`; NutAssembly advances
-through its guarded `step_expert()` route by default. The separate advanced
-R05b profile below uses the existing task-owned external Solution route.
+Construct them through `from task_env import make_env`. The NutAssembly and
+PickCube examples use a caller-owned Solution and `act → step(action) → observe`.
 Task success and Expert lifecycle completion remain separate.
 
-An advanced bounded GeoPhys native-feedback profile is available through
-`NutAssemblyReferenceEnv.for_native_feedback_profile(backend="cpu"|"cuda",
-gripper_control_hz=100|500)`; it uses the selected NutAssembly source and
-normal Core admission with a versioned source-closure receipt. R05b attempt001
-completed focused provider-free S1 plus two-outer CPU and CUDA native S2 with
-independent H5 readback, pending Sol review. This does not qualify the full
-100/500 Hz campaign, task/Expert completion, other sources or Providers, or
-Formal Qualification. See the [R05 execution record](../docs/module/task_env/v2.1.0/history/phase_ii_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29) and [public API contract](../docs/module/task_env/v2.1.0/api/public-api.md).
+The historical R05b-specific construction entry has been retired. Its
+[execution record](../docs/module/task_env/v2.1.0/history/phase_ii_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29)
+remains historical evidence; use the formal task configuration for current execution.
 
 ## Current developer workflows
 
