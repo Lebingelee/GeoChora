@@ -2,13 +2,13 @@
   "schema_version": "geochora-v211-auxiliary-use-case-plan-v1",
   "use_case_id": "V211_UC_ASSEMBLED_PANDA",
   "title": "装配Panda、空载跟踪与Solution复用",
-  "status": "PLANNED_NOT_RUN",
+  "status": "PARTIAL_IMPLEMENTED_PENDING_7A",
   "requirements_authority": "Maintainer five-point correction: new Panda class under robots; task-feasible unloaded gripper-center TCP tracking; existing controller/gripper reuse; per-task original Solution; no integrated-Panda physical equivalence.",
   "scheduling_status": "MAINTAINER_CONFIRMED_PLANNING",
   "planning_ref": "planning/stage4-assembled-panda.md",
   "scope_level": "v2.1.1 auxiliary integration use case, separate from original G04 exit gates",
   "original_g04_required_gate": false,
-  "implementation_started": false,
+  "implementation_started": true,
   "new_substage_or_attempt_series": false,
   "proposed_first_native_route": "MuJoCo CPU / fixed base / one assembled Panda",
   "proposed_full_closeout": "7a",
@@ -20,7 +20,8 @@
       "implementation_owner": "task_env/robots and existing task selected bindings/source construction",
       "proposed_schedule": "4b auxiliary work when packaged; complete by 7a",
       "expected": "New Panda class is actually consumed by normal task configuration; shared controller/gripper algorithms, source and TCP bindings reused. Registration alone cannot pass.",
-      "status": "NOT_RUN"
+      "status": "PARTIAL_G05_SHORT_ROUTE",
+      "current_evidence": "Existing assembled class and PickCube MuJoCo short route; two-task full configuration/profile closure remains 7a."
     },
     {
       "id": "AP-C2",
@@ -47,11 +48,38 @@
         "NutAssembly / assembled Panda"
       ],
       "expected": "Per-task same Solution algorithm/strategy and success predicates, actual task success, independent same-run record readback and close in each covered intersection. Four coverage cells do not require four fresh native runs when existing evidence still matches.",
-      "status": "NOT_RUN"
+      "status": "PARTIAL_ORIGINAL_REFERENCES_AVAILABLE",
+      "current_evidence_ref": "../maintenance/reviews/20261113_e11_e16_u4_joint_completion.md",
+      "coverage_status": {
+        "PickCube / original Panda": "BOUNDED_SUCCESS_REFERENCE_REUSE_PENDING_INPUT_MATCH",
+        "NutAssembly / original Panda": "BOUNDED_SUCCESS_REFERENCE_REUSE_PENDING_INPUT_MATCH",
+        "PickCube / assembled Panda": "SHORT_ROUTE_ONLY_FULL_SOLUTION_NOT_VERIFIED",
+        "NutAssembly / assembled Panda": "FULL_ROUTE_AND_SOLUTION_NOT_VERIFIED"
+      }
     }
   ],
   "acceptance_policy": "Separate auxiliary-case decision. Original G04 commands, three-provider 7+2 effort, BodyWrench, input-spec reset and PickCube success gates remain unchanged. Shared-capability defects affect their original gate; case-specific adaptation or incomplete evidence remains explicit through proposed 7a closeout. Do not silently discard the case or claim full version completion from a G04 pass.",
-  "implementation_and_validation_authority": "Future complete package manually dispatched by maintainer; this document does not start execution.",
+  "implementation_and_validation_authority": "Existing Robot and bounded G05 short native evidence are retained. Completing the auxiliary case requires a separately frozen 7a execution package; this handoff starts no execution.",
   "qualified_capability": false,
-  "scheduling_authority": "2026-11-06 maintainer accepted the clarified version-level use-case arrangement and requested G03 closeout/G04 Sol handoff."
+  "scheduling_authority": "2026-11-06 maintainer accepted the clarified version-level use-case arrangement and requested G03 closeout/G04 Sol handoff.",
+  "historical_initial_planning": {
+    "status": "PLANNED_NOT_RUN",
+    "implementation_started": false,
+    "checkpoint_statuses": {
+      "AP-C1": "NOT_RUN",
+      "AP-C2": "NOT_RUN",
+      "AP-C3": "NOT_RUN",
+      "AP-C4": "NOT_RUN"
+    },
+    "note": "Initial 2026-11-06 planning snapshot; later G05 partial implementation is reconciled below, without asserting full case acceptance."
+  },
+  "handoff_reconciliation": {
+    "date": "2026-11-16",
+    "handoff_ref": "../maintenance/20261116_g07_agent_handoff.md",
+    "robot_uid": "panda-arm-hand-v1",
+    "implementation_ref": "task_env/robots/assembled_panda.py::AssembledPandaAgent",
+    "short_route_evidence_ref": "../maintenance/20261113_e05_e10_u7_delivery.md",
+    "full_case_accepted": false,
+    "note": "Class/recipes and PickCube short public construction exist; no full assembled-robot Solution success is inferred. Nut currently restricts original Panda/profile and requires 7a wiring."
+  }
 }

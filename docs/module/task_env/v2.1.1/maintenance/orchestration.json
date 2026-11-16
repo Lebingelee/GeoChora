@@ -20,7 +20,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Canonical G06 closeout completed at maintainer request; R3/backend list and G07 require separate packages. No automatic execution, merge or push.",
+  "next_action": "G07 handoff prepared at maintainer request. Prepare one complete 7a package using current implementation and assembled-case partial evidence; no Goal/native dispatch and all G07 attempt counts remain zero.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2400,5 +2400,14 @@
     "closeout_cpu_tests_passed": 23,
     "remaining_required_items": [],
     "optional_and_deferred_ref": "g06/implementation-summary.md#6-尚未完成的可选暂缓与不支持项"
+  },
+  "g07_handoff": {
+    "status": "PREPARED_NOT_EXECUTING",
+    "date": "2026-11-16",
+    "document": "20261116_g07_agent_handoff.md",
+    "sha256": "4a2e256a373964cb4075207a7fd4a2d3846dbb412a1213661e102c1fa901936c",
+    "input_head": "0c4fb5ded6fc2bf0e79eae246269096545d4ec8d",
+    "first_substage": "7a",
+    "implementation_started": false
   }
 }

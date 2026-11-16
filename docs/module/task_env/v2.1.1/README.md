@@ -14,6 +14,8 @@
 
 ## 阅读入口
 
+进入G07先读[交接文档](maintenance/20261116_g07_agent_handoff.md)，从已存在装配Robot和成功参考接续；本交接不等于启动7a或最终九格。
+
 - [范围与七阶段路线](planning/roadmap.md)：7 个阶段、22 个 a/b/c/d 子阶段及延期事项。
 - [执行顺序与验收](planning/execution-and-acceptance.md)：依赖、阶段出口、工作包、证据及分支约束。
 - [阶段3前维护方案](planning/pre-stage3-environment-refactor.md)：生命周期R1与限定的核心代码／开发文档收尾已获[Sol有限接收](maintenance/reviews/20261105_pre_stage3_closeout_120min_sol_review.md)，该前置核心窗口结束；更广整理和未验证能力保留边界。Pendulum并行适配留阶段6。
