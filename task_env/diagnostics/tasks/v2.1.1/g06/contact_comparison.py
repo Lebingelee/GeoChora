@@ -163,25 +163,12 @@ def replay_scalar(worker_python, action_file, *, iterations, contact_mode, sourc
     if contact_mode != 'provider_default':
         config['execution']['geophys_contact_mode'] = contact_mode
     env = make_env('pick-cube-p16-reference-v1', config=config)
-    trace = None
     result = {'configuration': config, 'action_file': str(path),
               'action_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
               'seed': seed, 'source_row': source_row, 'cases': {}, 'contact_mode_requested': contact_mode}
     try:
         for name, sequence in actions.items():
-            if trace is not None:
-                trace.close()
-                trace = None
             observation, _ = env.reset(seed=seed)
-            if os.environ.get('G06B_SCALAR_TRACE_OUTPUT'):
-                import importlib.util
-                trace_file = (Path(__file__).resolve().parents[5] / 'GeoPhys/test/development/rigid'
-                              / 'g06b_scalar_contact_trace.py')
-                spec = importlib.util.spec_from_file_location('g06b_scalar_contact_trace', trace_file)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                trace = module.ScalarContactTrace(
-                    env.session, Path(os.environ['G06B_SCALAR_TRACE_OUTPUT']) / name)
             if 'effective_model' not in result:
                 facts = env.session.build_layout_facts
                 Path('scalar-build-layout-facts.json').write_text(json.dumps(facts, indent=2) + '\n')
@@ -219,9 +206,5 @@ def replay_scalar(worker_python, action_file, *, iterations, contact_mode, sourc
             np.savez_compressed(output, **{key: np.asarray(value)[:, None] for key, value in arrays.items()})
             result['cases'][name] = {'steps': len(sequence), 'trajectory': output}
     finally:
-        try:
-            if trace is not None:
-                trace.close()
-        finally:
-            env.close()
+        env.close()
     return result

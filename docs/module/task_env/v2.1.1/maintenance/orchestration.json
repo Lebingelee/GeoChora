@@ -1805,7 +1805,7 @@
             "6a"
           ],
           "status": "PARTIAL_NOT_ACCEPTED",
-          "attempt_count": 2,
+          "attempt_count": 3,
           "attempts": [
             {
               "attempt": 1,
@@ -1821,22 +1821,38 @@
               "output_head": "f8c43d61163e6774b3869875842337b427781fe4",
               "geophys_pin": "dd393187983798abac0e8d99c2426d64d4a8aa5e",
               "review_ref": "reviews/20261116_g06b_attempt002_scope_reassessment.md"
+            },
+            {
+              "attempt": 3,
+              "status": "PARTIAL_NOT_ACCEPTED",
+              "input_head": "120281a1ed787bcb351840bf9f5f6622ec89152c",
+              "output_head": null,
+              "geophys_pin": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
+              "report_ref": "../../../../../workspace/maintenance/v211_g06b_attempt003/report.md",
+              "output_head_note": "See local commit containing this execution record and the ignored report closeout."
             }
           ],
           "assigned_agent": null,
-          "package_path": "work-packages/20261116_g06b_attempt002_goal.md",
-          "package_sha256": "3438b9fc1a4466beaee39c6bf455d991ea49ea8daba495b2176087550c7852a5",
-          "input_head": null,
-          "output_head": "f8c43d61163e6774b3869875842337b427781fe4",
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": "Supplement reviewed; B1/B3 recorded fields exact. Full Task/clock/reset and affected rendering remain. Attempt003 prepared, not dispatched. Maintainer approved only three Isaac PickCube B16 rendered resource exceptions.",
+          "package_path": "work-packages/20261116_g06b_attempt003_goal.md",
+          "package_sha256": "1fd893c5340a1aadd1e1a061405243f5e353ecee37e437bd1505ce9a3dac0ac0",
+          "input_head": "120281a1ed787bcb351840bf9f5f6622ec89152c",
+          "output_head": null,
+          "expected_duration_minutes": [
+            180,
+            300
+          ],
+          "execution_budget": {
+            "wall_minutes_max": 360,
+            "supervised_native_minutes_max": 120
+          },
+          "last_observation": "Attempt003 partial: GeoPhys B1 lifecycle/scalar smooth comparison, cleanup, renderer/record and seven affected performance samples done. Isaac Pendulum B16 window remains resource limited without an approved exception; no new final-renderer Isaac PickCube B3 native run. Direct initial pytest included unsupervised CUDA and is recorded in the execution report.",
           "evidence_refs": [
             "reviews/20261116_g06b_attempt001_review.md",
             "../../../../../workspace/maintenance/v211_g06b_attempt001/report.md",
             "reviews/20261116_g06b_attempt002_scope_reassessment.md",
             "../../../../../workspace/maintenance/v211_g06b_attempt002/brief-for-sol.md",
-            "reviews/20261116_g06b_attempt002_supplement_review.md"
+            "reviews/20261116_g06b_attempt002_supplement_review.md",
+            "../../../../../workspace/maintenance/v211_g06b_attempt003/report.md"
           ],
           "commits": [],
           "review_decision": {
@@ -1846,7 +1862,7 @@
             "scope": "original G06b gate reassessment, source/diff review and offline evidence verification; implementation remains paused"
           },
           "blockers": [
-            "B1 complete lifecycle/Task evidence, bounded scalar comparison, diagnostic cleanup and final affected render/record/performance closure remain."
+            "Isaac Pendulum B16 window affected measurement needs safe resources; historical and targeted evidence for Isaac PickCube B3 final renderer must be assessed without claiming a new native run."
           ],
           "supplement": {
             "attempt": 2,

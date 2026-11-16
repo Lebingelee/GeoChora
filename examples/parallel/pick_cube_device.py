@@ -2,6 +2,11 @@
 
 GeoPhys requires explicitly selecting discrete contact for this source. Its
 verified scope and loaded-contact limitations are described in the current API.
+
+For the verified GeoPhys configuration, from the repository root run::
+
+    PYTHONPATH="$PWD:$PWD/GeoPhys/src" python examples/parallel/pick_cube_device.py --provider geophys \
+        --geophys-contact-mode discrete --geophys-contact-iterations 32
 """
 from __future__ import annotations
 

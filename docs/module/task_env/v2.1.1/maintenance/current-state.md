@@ -14,9 +14,9 @@
 
 2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。[G06 Agent handoff](20261115_g06_agent_handoff.md)保留派发前时点；后续 attempt001 已开始实施，main／远端未同步、未发布。
 
-G06b attempt002 在 Core `f8c43d61`／GeoPhys `dd393187` 经[范围重估主审](reviews/20261116_g06b_attempt002_scope_reassessment.md)保持 **PARTIAL_NOT_ACCEPTED**；执行 attempt 计数为2，维护者已要求暂停，attempt003未派发。真实六格主链、GeoPhys显式discrete／32次预算的有界接触及reset、MJWarp B16双传感器与窗口800步已有证据。Sol此前将单次受控轨迹2mm界限扩大为通用门，现重估为不应沿用；scalar mixed缺陷和跨引擎接触力差异不自动阻断batch出口。待收口项是受影响渲染／记录、正确配置性能索引及Isaac B16资源处置；尚不表示六格完整接收。窗口外观仍由维护者人工验收，AOT等既定暂缓事项保持。
+G06b attempt002 在 Core `f8c43d61`／GeoPhys `dd393187` 经[范围重估主审](reviews/20261116_g06b_attempt002_scope_reassessment.md)保持 **PARTIAL_NOT_ACCEPTED**。真实六格主链、GeoPhys显式discrete／32次预算的有界接触及reset、MJWarp B16双传感器与窗口800步已有证据。Sol此前将单次受控轨迹2mm界限扩大为通用门，现重估为不应沿用；scalar mixed缺陷和跨引擎接触力差异不自动阻断batch出口。窗口外观仍由维护者人工验收，AOT等既定暂缓事项保持。
 
-2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)：B1/B3 已保存字段逐值一致，完整 Task/clock/reset 仍待补齐；无效探索清理也列入收口。维护者已批准仅 Isaac PickCube 三个 B16 渲染组合的资源例外，B3 正确性不豁免。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已准备、未派发，执行计数仍为2。
+2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已执行，普通 attempt 计数为3；执行证据见[交接报告](../../../../../workspace/maintenance/v211_g06b_attempt003/report.md)。GeoPhys B1/B3 指定完整状态、Task及reset时钟对照、同源 Pendulum 无接触 scalar/B1 对照、诊断清理，以及 GeoPhys/MJWarp 七项受影响性能补测已完成。维护者已批准仅 Isaac PickCube 三个 B16 渲染组合的资源例外，B3 正确性不豁免；本次安全内存复核不足以启动 Isaac，Pendulum B16 窗口补测及最终 renderer 下 Isaac PickCube B3 的直接运行未闭合。G06b 仍为 **PARTIAL_NOT_ACCEPTED**，等待独立主审；没有宣布维护者接收。
 
 ## 启动输入与工作归属
 

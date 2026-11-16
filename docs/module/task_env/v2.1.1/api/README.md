@@ -18,6 +18,15 @@ GeoPhys 标量和设备批量入口的碰撞模式可在既有 `execution.geophy
 
 普通设备批量示例见 [Pendulum](../../../../../examples/parallel/pendulum_device.py) 和 [PickCube](../../../../../examples/parallel/pick_cube_device.py)，默认关闭可选相机与窗口。传感器采集和窗口彼此独立；Recorder 是显式操作。MJWarp 可在 info 提供每行原生 world time；Isaac 提供共享模拟管理器时钟，GeoPhys 提供直接 solver step 计数，不能将后二者当作逐 world 原生时钟。
 
+GeoPhys PickCube 已验证配置可在仓库根目录运行：
+
+```sh
+PYTHONPATH="$PWD:$PWD/GeoPhys/src" python examples/parallel/pick_cube_device.py \
+  --provider geophys --geophys-contact-mode discrete --geophys-contact-iterations 32
+```
+
+输出中的 `contact_mode_requested`／`contact_mode_resolved` 和 `solver_iterations_requested`／`solver_iterations_resolved` 可用于核对实际模式及接触、耦合约束预算。这个显式配置不改变 provider 的默认值。
+
 <a id="pendulum-device-batch"></a>
 
 ## Pendulum device batch（G06a 有界接收）
