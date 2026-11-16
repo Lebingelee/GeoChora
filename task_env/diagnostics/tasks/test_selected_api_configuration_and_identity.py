@@ -199,6 +199,21 @@ def test_selected_execution_is_strict_and_rejects_inherited_device_conflicts():
         resolve_task_env_config(target, {"execution": {"physics_backend": "cuda"}})
 
 
+def test_selected_scalar_accepts_render_configuration_and_roundtrips_it():
+    config = {
+        "render": {
+            "backend": "mujoco_reference",
+            "width": 96,
+            "height": 72,
+        },
+    }
+    from task_env.tasks.pendulum import PendulumEnv
+    resolved = resolve_task_env_config(PendulumEnv, config)
+    assert resolved.environment.render.backend == "mujoco_reference"
+    assert (resolved.environment.render.width, resolved.environment.render.height) == (96, 72)
+    assert resolve_task_env_config(PendulumEnv, resolved) == resolved
+
+
 def test_state_only_renderer_is_resolved_recorded_and_roundtrips():
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
 

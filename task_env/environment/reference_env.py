@@ -884,6 +884,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if not selected and type(config) is not ResolvedEnvConfig:
             raise TypeError('environment construction requires resolved configuration')
         from ..render.base.contracts import validate_camera_declarations, normalize_render_mode
+        # Scalar callers may keep the camera declaration in the public
+        # ``config.render`` section.  Reuse that declaration for the existing
+        # observer ``env.render()`` route instead of requiring the same camera
+        # to be passed again through a constructor-only keyword.
+        if (selected and render_mode is not None and observer_camera is None
+                and len(config.environment.render.cameras) == 1):
+            observer_camera = config.environment.render.cameras[0]
         # Legacy component render_mode still means its existing display route;
         # explicit observer declarations belong to the selected source contract.
         if selected or observer_camera is not None or task_camera is not None:

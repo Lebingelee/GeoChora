@@ -30,6 +30,13 @@ GeoPhys 标量和设备批量入口的碰撞模式可在既有 `execution.geophy
 
 `render_mode='rgb_array'` 显式创建共享 GeoPhys Rasterizer，`env.render()` 返回 owned CUDA uint8 `[480, 640, 3]`；`render_mode='human'` 使用窗口，`close_render()` 关闭窗口／renderer，物理仍可继续。默认不创建可选 renderer 或相机传感器。B=3、非默认 CUDA stream、重复 capture 和真实 Xorg 窗口已作短程验证。device batch 可在 `render` 配置中声明 RGB-only、HWC、uint8 的 `CameraSpec`，返回 `obs["cameras"][name]["rgb"]`，形状为 CUDA `[B,H,W,3]`；有限 near/far 使用 compute mesh／analytic 路径，粒子、native graphics、TAA 和 overlay 的有限裁剪仍不准入。一次 B=3 Pendulum 诊断用显式测试相机核对了 reset／step 采集；默认 Pendulum 不创建传感器。启用相机时 `close_render()` 只关闭窗口，保留相机共享 renderer。代表性诊断将真实 Isaac scalar session 的公开设备 body pose 接入同一 Rasterizer，验证了真实 PickCube base／hand 相机与 Xorg 窗口的开关组合；三格仅复制一个 scalar 物理状态供渲染，不表示 Isaac parallel Task 获得资格。
 
+Scalar selected construction now accepts the public `render` section as well as
+the existing `execution`、`episode`、`task`、`controller` and `robot` sections.
+The resolved `render` value is passed into the single-environment owner. When a
+scalar caller supplies one `render.cameras` entry together with
+`render_mode='rgb_array'` or `'human'`, that declaration is reused by the public
+observer `env.render()` route. Observer capability admission remains unchanged.
+
 MJWarp session 还按 source 声明发布环境局部坐标的具名 frame pose；合成 Scene 的具名 site 已在 B=3、seed 73 和共享 Rasterizer 路径中核对运动学、masked reset 与保留快照。该 fixture 不代表注册任务已配置传感器。
 
 现有 `VectorTransitionRecorder` 可显式包装 device 五元组并选行、选 observation 字段，开启记录时导出 owned 数据至既有 H5，关闭记录时不执行记录数据复制。设备记录在 transition 已发生后失败时会锁存原异常，拒绝继续 reset／step；`end_record()` 或 `close()` 会尝试结束各行，失败行保留供重试。已用 B=3 Pendulum 的显式测试相机记录两个环境的错开 episode，并独立逐像素核对 H5 中的终止帧、新首帧及状态；Pendulum 默认仍无传感器。Isaac PickCube 的双挂载图像来自真实 scalar 设备位姿；其中 hand 帧还通过受控 episode fixture 做了 H5 独立像素与时钟读回，不能当作 PickCube 并行任务或真实终止／reset 全链的接收证据。这些结果只支持上述 G06a 有界接收，不代表 G06 整体或其他任务／provider 的接收。

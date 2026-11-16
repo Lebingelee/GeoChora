@@ -13,9 +13,35 @@ Later values override earlier values only for known fields. Unknown keys, duplic
 
 ## Sections and fields
 
-New selected configuration uses `execution`, `episode`, and `task` sections. `execution` accepts `physics_provider`, `physics_backend`, `physics_device`, `source_delivery_manifest`, and `render_default`. `episode` accepts `horizon`. `task` accepts only the selected task's declared parameters and controller profile.
+New selected configuration uses `execution`, `episode`, `task`, and `render` sections. `execution` accepts `physics_provider`, `physics_backend`, `physics_device`, `source_delivery_manifest`, and `render_default`. Scalar construction also accepts the public `render` section, which is applied to the existing single-environment renderer. `episode` accepts `horizon`. `task` accepts only the selected task's declared parameters and controller profile.
 
 The selected task YAML files explicitly declare the current defaults: GeoPhys / CPU / CPU device, with state-only rendering. PickCube defaults to controller profile `r3_continuous_v1`; use `r1` only when the caller explicitly requests it. NutAssembly defaults and its source/reset profile remain task-owned.
+
+For a scalar render request, keep the renderer declaration in `config.render` and
+keep the UI mode in the factory call. A single configured camera is reused by the
+observer `env.render()` route, so callers do not need to repeat it as a separate
+constructor keyword.
+
+```python
+env = make_env(
+    "pick-cube-p16-reference-v1",
+    config={
+        "execution": {"physics_provider": "mujoco", "physics_backend": "cpu"},
+        "render": {
+            "camera_obs": True,
+            "backend": "mujoco_reference",
+            "width": 320,
+            "height": 240,
+            "cameras": [{"name": "observer", "width": 320, "height": 240}],
+        },
+    },
+    render_mode="rgb_array",
+)
+```
+
+The selected task and controller still need an admitted observer route. The
+configuration change only makes the scalar render fields pass through the same
+public resolver and preserves them in the resolved configuration.
 
 ```yaml
 execution:
