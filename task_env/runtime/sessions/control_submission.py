@@ -271,13 +271,18 @@ def prepare_position_scene_interval(*, session, plan, command, source_id,
         None, None, None, dt, count, tuple(contributions))
 
 
+def _bound_physical_execution(session):
+    """Local native binding or a declaration verified by the remote session."""
+    declared = getattr(session, 'physical_control_execution', None)
+    return declared if declared is not None else getattr(getattr(session, '_physical_port', None), 'execution', None)
+
+
 def prepare_physical_scene_interval(*, session, execution, resolved):
     """Bind a preflighted physical batch to its live execution and typed effects."""
     from .physical_control import PhysicalControlExecutionV1, ResolvedPhysicalBatchV1
     if type(execution) is not PhysicalControlExecutionV1 or type(resolved) is not ResolvedPhysicalBatchV1:
         raise TypeError('scene physical interval requires its typed execution and resolved batch')
-    port = getattr(session, '_physical_port', None)
-    if port is None or getattr(port, 'execution', None) is not execution:
+    if _bound_physical_execution(session) is not execution:
         raise ValueError('scene physical execution is not the materialized session binding')
     binding = execution.compiled.binding
     batch, context = resolved.input_batch, resolved.input_batch.context
@@ -992,9 +997,9 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
             source_id=source_id, source_closure_sha256=source_closure_sha256,
             artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
             resource_owners=payload['resource_owners'])
-    elif command_kind == 'physical-effort-batch' and getattr(session, '_physical_port', None) is not None:
+    elif command_kind == 'physical-effort-batch' and _bound_physical_execution(session) is not None:
         scene_interval = prepare_physical_scene_interval(session=session,
-            execution=session._physical_port.execution, resolved=command)
+            execution=_bound_physical_execution(session), resolved=command)
     elif command_kind == 'physical-effort-sequence' and getattr(session, '_physical_port', None) is not None:
         parts = tuple((start, end, prepare_physical_scene_interval(session=session,
             execution=session._physical_port.execution, resolved=resolved))

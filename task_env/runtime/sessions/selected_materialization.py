@@ -28,6 +28,58 @@ def _contact_mode_options(env, key):
     return {} if mode == 'provider_default' else {key: mode}
 
 
+def prepare_selected_position(value, binding, selected):
+    """Compile the selected Position ports identically for either deployment."""
+    from .control import prepare_position_control_materialization
+    return prepare_position_control_materialization(
+        source=value['source'], artifact=value['artifact'], profiles=selected.position_profiles,
+        plan=value.get('controller_binding_plan'), select_binding=binding.position_control_binding,
+        value=value, capabilities=selected.position_capabilities)
+
+
+def materialize_selected_session(artifact, execution, *, value, binding, selected,
+                                 position=None, observer_render_request=None,
+                                 task_render_requested=False, geophys_contact_mode='provider_default',
+                                 legacy_observer_requested=False, legacy_camera_observations=False,
+                                 materialize=None, materialize_control=None):
+    """Create one native session; callers keep their own Env/worker lifecycle."""
+    if materialize is None:
+        from .api import materialize
+    if materialize_control is None:
+        from .control import materialize_control
+    source = value['source']
+    options = dict(observer_render_request=observer_render_request,
+                   task_render_requested=task_render_requested,
+                   geophys_contact_mode=geophys_contact_mode)
+    if position is not None:
+        return materialize_control(artifact, execution, source=source, binding=position[3],
+            controller_binding_plan=position[0], controller_profile=selected.position_profiles,
+            session_admission_input=value.get('session_admission_input'), **options)
+    if value.get('physical_execution') is not None:
+        return materialize(artifact, execution, source=source,
+            _observer_render_request=observer_render_request,
+            _task_render_requested=task_render_requested,
+            _session_admission_input=value.get('session_admission_input'),
+            _geophys_contact_mode=geophys_contact_mode,
+            _legacy_observer_requested=legacy_observer_requested,
+            _legacy_camera_observations=legacy_camera_observations)
+    return materialize_control(artifact, execution, source=source,
+        binding=binding.scalar_control_binding,
+        selected_controller=selected.controller if binding.interval_mode == 'native' else None,
+        **options)
+
+
+def physical_execution_facts(execution):
+    """Immutable build-boundary values; no Controller/SDK objects cross IPC."""
+    return dict(binding=execution.compiled.binding.to_mapping(),
+        controller_versions=execution.controller_versions(), generation=execution.generation,
+        joint_bindings={key: value.to_mapping() for key, value in execution.joint_bindings.items()},
+        frame_bindings={key: value.to_mapping() for key, value in execution.frame_bindings.items()},
+        requirements=execution.requirements.to_mapping(),
+        subjects=tuple(subject.identity_hash for subject in execution.subjects),
+        selection_profile_id=execution.selection_profile_id)
+
+
 @dataclass(frozen=True)
 class PhysicalRuntimeBuilder:
     execution: object
@@ -71,16 +123,14 @@ class PhysicalRuntimeBuilder:
         if _worker(selection):
             env.session = start_worker()
         else:
-            options = {'_observer_render_request': getattr(env, '_observer_render_request', None),
-                       '_session_admission_input': env.value.get('session_admission_input'),
-                       '_task_render_requested': bool(getattr(env, '_task_rgb_config', None) is not None
-                                                      or getattr(env, '_component_task_rgb', None) is not None)}
-            options.update(_contact_mode_options(env, '_geophys_contact_mode'))
-            if getattr(env, '_legacy_observer_requested', False):
-                options['_legacy_observer_requested'] = True
-            if getattr(env, '_legacy_camera_observations', False):
-                options['_legacy_camera_observations'] = True
-            env.session = materialize(env.artifact, env.execution, source=env.value['source'], **options)
+            env.session = materialize_selected_session(env.artifact, env.execution,
+                value=env.value, binding=env.binding, selected=env._selected_controller_binding,
+                observer_render_request=getattr(env, '_observer_render_request', None),
+                task_render_requested=bool(getattr(env, '_task_rgb_config', None) is not None
+                                          or getattr(env, '_component_task_rgb', None) is not None),
+                legacy_observer_requested=getattr(env, '_legacy_observer_requested', False),
+                legacy_camera_observations=getattr(env, '_legacy_camera_observations', False),
+                materialize=materialize, **_contact_mode_options(env, 'geophys_contact_mode'))
         return RuntimeBuildResult()
 
 
@@ -96,15 +146,12 @@ class PositionRuntimeBuilder:
         return self.capabilities[0]
 
     def create(self, env, selection, start_worker, _materialize, materialize_control):
-        from .control import prepare_position_control_materialization
         source = env.value['source']
         env.position_scene = source.scene_definition
         selector = env.binding.position_control_binding
         profiles = tuple(item.owner for item in self.capabilities)
-        plan, joints, frames, position_binding = prepare_position_control_materialization(
-            source=source, artifact=env.artifact, profiles=profiles,
-            plan=env.value.get('controller_binding_plan'),
-            select_binding=selector, value=env.value, capabilities=self.capabilities)
+        position = prepare_selected_position(env.value, env.binding, env._selected_controller_binding)
+        plan, joints, frames, position_binding = position
         if self.selection_match_required:
             if len(self.selection_matches) != 1:
                 raise ValueError('Position materialization requires its common Controller match result')
@@ -131,14 +178,13 @@ class PositionRuntimeBuilder:
         if _worker(selection):
             env.session = start_worker()
         else:
-            env.session = materialize_control(env.artifact, env.execution, source=source,
-                binding=position_binding, controller_binding_plan=plan, controller_profile=profiles,
-                session_admission_input=env.value.get('session_admission_input'),
-                observer_render_request=getattr(env, '_observer_render_request', None),
-                task_render_requested=bool(
-                    getattr(env, '_component_task_rgb', None) is not None
-                    or getattr(env, '_task_rgb_config', None) is not None
-                ), **_contact_mode_options(env, 'geophys_contact_mode'))
+            env.session = materialize_selected_session(env.artifact, env.execution,
+                value=env.value, binding=env.binding, selected=env._selected_controller_binding,
+                position=position, observer_render_request=getattr(env, '_observer_render_request', None),
+                task_render_requested=bool(getattr(env, '_component_task_rgb', None) is not None
+                                          or getattr(env, '_task_rgb_config', None) is not None),
+                materialize_control=materialize_control,
+                **_contact_mode_options(env, 'geophys_contact_mode'))
         env._materialized_position_control_binding = position_binding
         env._materialized_position_control_selector = selector
         initial = PositionInitialState(plan, env.position_scene, joints, frames,
@@ -162,11 +208,10 @@ class ScalarRuntimeBuilder:
             raise TypeError('selected scalar control requires its declared ControlBinding')
         if _worker(selection):
             env.session = start_worker()
-            env.session._source, env.session._artifact = env.value['source'], env.artifact
             return RuntimeBuildResult(skip_gravity=env._physical_execution() is None)
-        env.session = materialize_control(env.artifact, env.execution, source=env.value['source'],
-            binding=self.binding,
-            selected_controller=(env._selected_controller if env.binding.interval_mode == 'native' else None),
+        env.session = materialize_selected_session(env.artifact, env.execution,
+            value=env.value, binding=env.binding, selected=env._selected_controller_binding,
+            materialize_control=materialize_control,
             **_contact_mode_options(env, 'geophys_contact_mode'))
         return RuntimeBuildResult()
 
@@ -196,6 +241,8 @@ def build_selected_runtime(env, selected, selection, start_worker, materialize, 
     if len(builders) != 1:
         raise ValueError('selected runtime has conflicting construction capabilities')
     result = builders[0].create(env, selection, start_worker, materialize, materialize_control)
+    if _worker(selection):
+        env.session._source, env.session._artifact = env.value['source'], env.artifact
     capabilities = list(result.initial_capabilities)
     execution = env._physical_execution()
     if execution is not None:

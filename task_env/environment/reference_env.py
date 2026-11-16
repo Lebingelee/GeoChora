@@ -2005,6 +2005,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     'observer_render_request': (asdict(self._observer_render_request)
                         if getattr(self, '_observer_render_request', None) is not None else None),
                     'task_render_requested': getattr(self, '_task_rgb_config', None) is not None,
+                    'physical_reset_selection': (None if physical_candidate is None else
+                        physical_candidate.reconstruction_request()),
                 }
                 # Native startup and the first control interval can compile
                 # provider kernels; keep a finite operation deadline for both.

@@ -26,6 +26,16 @@ class PhysicalResetCapability:
             initial_kind=self.initial_kind, allowed_kinds=self.allowed_kinds,
             space_policy=self.space_policy, declaration=value['physical_execution'])
 
+    def reconstruct(self, value, request):
+        """Rebuild this declared choice without a second Controller lifecycle."""
+        generation = request['generation']
+        if type(generation) is not int or generation < 1:
+            raise ValueError('reconstructed Controller generation must be positive')
+        prepared = self.bind(value).prepare({'kind': request['kind'],
+                                            'parameters': request['parameters']})
+        return replace(prepared, execution=replace(
+            prepared.execution, generation=generation)).bind_value(value)
+
 
 @dataclass(frozen=True)
 class PreparedPhysicalSelection:
@@ -36,6 +46,11 @@ class PreparedPhysicalSelection:
     parameters: tuple[tuple[str, float], ...]
     execution: PhysicalControlExecutionV1
     spec_id: str
+
+    def reconstruction_request(self):
+        """Value-only declaration consumed by the same binding in another process."""
+        return {'kind': self.kind, 'parameters': dict(self.parameters),
+                'generation': self.execution.generation}
 
     def bind_value(self, value):
         """Use the same prepared Controller for preflight and reconstruction."""

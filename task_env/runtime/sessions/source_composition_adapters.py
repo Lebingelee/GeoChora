@@ -41,8 +41,8 @@ def validate_effort_source_route(*, provider, backend, deployment, source_delive
     if device_effort:
         if drive != 'disabled' or kind != 'direct' or reset_selection:
             raise ValueError('device batch effort requires direct control with isolated native drives')
-    elif deployment != 'in_process':
-        raise ValueError('physical profile currently requires explicit in_process execution')
+    elif deployment not in {'in_process', 'isolated_worker'}:
+        raise ValueError('physical profile requires a supported session deployment')
     if not device_effort and (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
         raise ValueError('physical control requires an admitted CPU or Isaac CUDA route')
     if provider == 'isaacsim':

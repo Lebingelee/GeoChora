@@ -31,15 +31,23 @@ _METHODS = frozenset({
     'device_pose_description', 'publish_device_poses',
     'capture_observer', 'bind_task_camera', 'capture_task_camera',
     'task_camera_binding', 'task_camera_completion',
+    'physical_control_build_facts', 'assess_physical_control', 'physical_joint_build_receipt',
+    'physical_buffer_policy', 'apply_physical_command_batch', 'abort_physical_control',
+    'bind_physical_source_dynamics', 'evaluate_physical_source_dynamics',
 })
 _PROPERTIES = frozenset({
     'provider_materialization_id', 'episode_id', 'state_revision',
+    'physical_control_generation', '_physical_controller_versions',
     'runtime_progress_receipt', 'reset_readback_v1', 'compiled_layout_receipt',
     'reset_plan_evidence', 'close_receipt', 'build_layout_facts', 'native_interval_evidence',
 })
 
 
 def _types():
+    from ...controllers.canonical.physical_commands import (
+        PhysicalControlBindingV1, PhysicalCommandBatchV1, PhysicalControlReceiptV1,
+        PhysicalJointBuildReceiptV1, PhysicalBufferPolicyV1)
+    from ...artifacts.contracts import CapabilityAssessmentV1
     from ...observations.canonical_camera import CameraGeometry, ResolvedCameraMetadata
     from ...render.camera.source import CameraCaptureIdentityV1
     from ...artifacts import (CanonicalStateView, CanonicalStateViewV1,
@@ -61,7 +69,9 @@ def _types():
         AppliedCanonicalControl, GripperControlTarget, MixedActuatorCommandV1,
         AppliedMixedActuatorCommandV1, PositionControlTargetV1, CanonicalControlFeedback,
         NativeControlFeedbackSampleV1, CameraGeometry, ResolvedCameraMetadata,
-        CameraCaptureIdentityV1)
+        CameraCaptureIdentityV1, PhysicalControlBindingV1, PhysicalCommandBatchV1,
+        PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1, PhysicalBufferPolicyV1,
+        CapabilityAssessmentV1)
     return {item.__name__: item for item in values}
 
 
@@ -88,6 +98,16 @@ def _encode(value):
         converted = value.item()
         if type(converted) in (bool, int, float, str):
             return _encode(converted)
+    from .physical_control import ResolvedPhysicalBatchV1
+    if type(value) is ResolvedPhysicalBatchV1:
+        from dataclasses import asdict
+        if value.body_wrenches or value.extensions:
+            raise ValueError('physical worker transport admits joint effort only')
+        return {'$type': 'ResolvedPhysicalBatchV1', 'value': {
+            'input_batch': _encode(value.input_batch), 'binding_sha256': value.binding_sha256,
+            'joints': _encode(tuple(asdict(joint) for joint in value.joints)),
+            'accepted_receipt': _encode(value.accepted_receipt),
+            'mapping_provenance': _encode(value.mapping_provenance)}}
     known = _types()
     if type(value).__name__ in known and type(value) is known[type(value).__name__]:
         return {'$type': type(value).__name__, 'value': value.to_mapping()}
@@ -111,6 +131,15 @@ def _decode(value):
                 raise ValueError('invalid transport tuple')
             return tuple(_decode(item) for item in value['$tuple'])
         if '$type' in value:
+            if value['$type'] == 'ResolvedPhysicalBatchV1':
+                from .physical_control import ResolvedPhysicalBatchV1, ResolvedJointEffortV1
+                fields = {'input_batch', 'binding_sha256', 'joints', 'accepted_receipt', 'mapping_provenance'}
+                if set(value) != {'$type', 'value'} or set(value['value']) != fields:
+                    raise ValueError('invalid physical batch transport fields')
+                payload = _decode(value['value'])
+                return ResolvedPhysicalBatchV1(payload['input_batch'], payload['binding_sha256'],
+                    tuple(ResolvedJointEffortV1(**joint) for joint in payload['joints']), (), (),
+                    payload['accepted_receipt'], payload['mapping_provenance'])
             if value['$type'] == 'CanonicalCameraObservation':
                 return _decode_camera_frame(value)
             if set(value) != {'$type', 'value'} or value['$type'] not in _types():
@@ -237,7 +266,9 @@ def serve_session(sock, session, request_identity, *, handlers=None, close_owned
     """Forward one session until close; check operation and episode identity."""
     materialization = session.provider_materialization_id
     handlers = {} if handlers is None else dict(handlers)
-    if set(handlers) - {'position_preflight', 'position_apply', 'apply_control', 'step_control_interval'}:
+    if set(handlers) - {'position_preflight', 'position_apply', 'apply_control', 'step_control_interval',
+                        'physical_control_build_facts', 'bind_physical_source_dynamics',
+                        'evaluate_physical_source_dynamics'}:
         raise ValueError('unknown worker control handler')
     methods = sorted(name for name in _METHODS if name in handlers or callable(getattr(session, name, None)))
     properties = sorted(name for name in _PROPERTIES
@@ -310,6 +341,28 @@ def serve_session(sock, session, request_identity, *, handlers=None, close_owned
                 return response['error'] is None
     finally:
         cleanup()
+
+
+class _RemoteSourceDynamics:
+    """Value-only proxy for the source model owned by one remote episode."""
+    def __init__(self, session, metadata):
+        self._session = session
+        self.source_closure_sha256 = metadata['source_closure_sha256']
+        boundary = metadata['boundary']
+        binding = session.physical_control_execution.compiled.binding
+        if (self.source_closure_sha256 != binding.source_closure_sha256
+                or boundary.provider_materialization_id != session.provider_materialization_id
+                or boundary.episode_id != session.episode_id):
+            raise ValueError('remote source dynamics differs from the bound episode/source')
+
+    def evaluate(self, q, qd, boundary):
+        import numpy as np
+        result = self._session._call('evaluate_physical_source_dynamics',
+            np.asarray(q, dtype=np.float64).tolist(), np.asarray(qd, dtype=np.float64).tolist(), boundary)
+        if result['boundary'] != boundary or result['physics_steps'] != 0:
+            raise ValueError('remote source dynamics returned stale or advancing results')
+        return {**result, 'mass_matrix': np.asarray(result['mass_matrix'], dtype=np.float64),
+                'bias': np.asarray(result['bias'], dtype=np.float64)}
 
 
 class RemoteSession:
@@ -432,6 +485,25 @@ class RemoteSession:
     @property
     def state_revision(self):
         return self._call('state_revision')
+
+    @property
+    def physical_control_execution(self):
+        """Local declaration confirmed against the child's actual native binding."""
+        return getattr(self, '_bound_physical_execution', None)
+
+    def physical_source_dynamics_model(self):
+        """Bind the admitted no-step source model without exporting its SDK data."""
+        return _RemoteSourceDynamics(self, self._call('bind_physical_source_dynamics'))
+
+    def bind_physical_control(self, execution):
+        """Confirm the native-bound child declaration, without exporting execution."""
+        from .selected_materialization import physical_execution_facts
+        if self.physical_control_execution is not None:
+            raise ValueError('physical port must be bound once before reset')
+        actual = self._call('physical_control_build_facts')
+        if actual != physical_execution_facts(execution):
+            raise ValueError('remote physical binding differs from selected execution')
+        self._bound_physical_execution = execution
 
     def step_control_interval(self, target, servo, *, interval_observer=None, arm_schedule=None):
         callbacks = {'servo': servo}

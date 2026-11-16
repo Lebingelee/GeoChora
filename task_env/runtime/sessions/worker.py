@@ -40,8 +40,7 @@ def _materialize_selected(payload):
     from ...artifacts import ExecutionSpec, ExecutionSpecV1, ExecutionSpecV2, decode_execution_spec
     from ...environment.configuration import resolve_task_env_config
     from ...registry import ENV_REGISTRY
-    from .control import (bind_selected_controller, materialize_control,
-                          prepare_position_control_materialization,
+    from .control import (bind_selected_controller,
                           _validate_position_source_boundary, apply_position_control_target)
 
     importlib.import_module('task_env.tasks')
@@ -77,6 +76,9 @@ def _materialize_selected(payload):
     try:
         value = binding.reset_reconstruction_strategy(provider, backend, horizon).initial(seed=seed)
         source = value['source']
+        choice = payload.get('physical_reset_selection')
+        if choice is not None:
+            value = binding.physical_reset_capability.reconstruct(value, choice)
         artifact = value['artifact']
         execution = decode_execution_spec(payload['execution'])
         if type(execution) not in (ExecutionSpec, ExecutionSpecV1):
@@ -125,18 +127,37 @@ def _materialize_selected(payload):
         handlers = {}
         if len(selected.position_profiles) > 1:
             raise ValueError('worker route does not implement multi-writer profiles')
-        if selected.position:
-            plan, joints, frames, control_binding = prepare_position_control_materialization(
-                source=source, artifact=artifact, profiles=selected.position_profiles,
-                plan=value.get('controller_binding_plan'),
-                select_binding=binding.position_control_binding, value=value,
-            )
-            session = materialize_control(
-                artifact, execution, source=source, binding=control_binding,
-                controller_binding_plan=plan, controller_profile=selected.position_profiles,
-                session_admission_input=value.get('session_admission_input'),
-                **render_options,
-            )
+        from .selected_materialization import (
+            materialize_selected_session, prepare_selected_position, physical_execution_facts)
+        position = prepare_selected_position(value, binding, selected) if selected.position else None
+        session = materialize_selected_session(artifact, execution, value=value, binding=binding,
+            selected=selected, position=position, **render_options)
+        physical = value.get('physical_execution')
+        if physical is not None:
+            # The child binds native ports, but never initializes/computes physical Controllers.
+            session.bind_physical_control(physical)
+            def physical_build_facts():
+                return {**physical_execution_facts(physical),
+                    'generation': session.physical_control_generation,
+                    'controller_versions': session._physical_controller_versions}
+            handlers['physical_control_build_facts'] = physical_build_facts
+            if physical.requires_source_dynamics:
+                model = None
+                def bind_source_dynamics():
+                    nonlocal model
+                    model = session.physical_source_dynamics_model()
+                    return {'source_closure_sha256': model.source_closure_sha256,
+                            'boundary': session.state_boundary_identity()}
+                def evaluate_source_dynamics(q, qd, boundary):
+                    if model is None:
+                        raise ValueError('source dynamics model is unbound')
+                    result = model.evaluate(q, qd, boundary)
+                    return {**result, 'mass_matrix': result['mass_matrix'].tolist(),
+                            'bias': result['bias'].tolist()}
+                handlers['bind_physical_source_dynamics'] = bind_source_dynamics
+                handlers['evaluate_physical_source_dynamics'] = evaluate_source_dynamics
+        if position is not None:
+            plan, joints, frames, _ = position
             profile = selected.position_profiles[0]
             scene = source.scene_definition
             handlers['position_preflight'] = lambda publication: _validate_position_source_boundary(
@@ -144,12 +165,7 @@ def _materialize_selected(payload):
             handlers['position_apply'] = lambda target, publication: apply_position_control_target(
                 session, target, controller_profile=profile, plan=plan, publication=publication,
                 scene=scene, joint_bindings=joints, frame_bindings=frames)
-        else:
-            session = materialize_control(artifact, execution, source=source,
-                                          binding=binding.scalar_control_binding,
-                                          selected_controller=(selected.controller
-                                              if binding.interval_mode == 'native' else None),
-                                          **render_options)
+        elif physical is None:
             from contextlib import nullcontext
             from .control import position_subject_interval
 

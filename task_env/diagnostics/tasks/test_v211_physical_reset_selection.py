@@ -72,7 +72,7 @@ def test_live_physical_controller_switch_rejected_before_session_effect():
     effects = []
     env.binding = SimpleNamespace(physical_control_profile=lambda _: effects.append('profile'))
     env.session = SimpleNamespace(step=lambda: effects.append('step'), close=lambda: effects.append('close'))
-    with pytest.raises(StageUnavailableError, match='only change at reset'):
+    with pytest.raises(StageUnavailableError, match='only supported at reset'):
         env.switch_position_controller(object())
     assert effects == []
 
@@ -89,3 +89,19 @@ def test_fixed_semantic_cached_space_accepts_new_generation_and_validator_reject
     assert np.array_equal(selection.validate_action(new), np.zeros(8))
     with pytest.raises(ValueError, match='stale or foreign'):
         selection.validate_action(old)
+
+
+def test_controller_capability_restores_the_same_declared_choice_without_commit():
+    from task_env.controllers.canonical.reset_selection import PhysicalResetCapability
+    initial = _factory('A')
+    value = {'physical_execution': initial, '_physical_controller_factory': _factory}
+    capability = PhysicalResetCapability('A', ('A','B'), 'dynamic', lambda _: {})
+    selection = capability.bind(value)
+    first = selection.prepare('B'); selection.commit(first)
+    second = selection.prepare({'kind':'A','parameters':{'kp':100.}})
+    restored = capability.reconstruct(value, second.reconstruction_request())
+    assert restored['physical_execution'].generation == 2
+    assert restored['controller'].identity == second.execution.controllers[0].identity
+    assert selection.committed is first
+    with pytest.raises(ValueError, match='generation must be positive'):
+        capability.reconstruct(value, {**second.reconstruction_request(), 'generation':0})

@@ -774,7 +774,11 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                         and not any(selected.controller is item for item in physical.controllers))):
                 raise ValueError('physical Controller is not bound to the selected execution')
             if selection.deployment == 'isolated_worker':
-                raise ValueError('direct physical execution is not admitted in an isolated worker')
+                if (physical.requires_source_dynamics
+                        and (selection.physics_provider, selection.physics_backend) != ('mujoco', 'cpu')):
+                    raise ValueError('physical worker source dynamics requires MuJoCo CPU')
+                if physical.compiled.binding.bodies:
+                    raise ValueError('physical worker currently admits joint effort only')
             physical.validate_source(
                 scene=source.scene_definition, artifact_sha256=artifact.identity_hash,
                 source_id=source.source_id, source_closure_sha256=source.source_closure_digest,

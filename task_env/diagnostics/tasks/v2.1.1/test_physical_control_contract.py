@@ -204,7 +204,8 @@ def test_mujoco_physical_build_mapping_checks_axis_gear_and_drive():
     execution = PhysicalControlExecutionV1(plan, (controller,), plan.scene, {'arm/drive': object()}, {},
         StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
     source = SimpleNamespace(scene_definition=plan.scene, source_id='source-a',
-        source_closure_digest='b'*64, joints={'arm/drive': 'native-joint'}, free_joints={}, bodies={}, frames={})
+        source_closure_digest='b'*64, joints={'arm/drive': 'native-joint'}, free_joints={}, bodies={}, frames={},
+        joint_targets={}, open_actuators=())
     model = SimpleNamespace(joint=lambda name: SimpleNamespace(id=0), actuator=lambda name: SimpleNamespace(id=0),
         jnt_type=np.array([3]), jnt_axis=np.array([[0., 0., 1.]]), jnt_dofadr=np.array([0]),
         actuator_forcelimited=np.array([1]), actuator_forcerange=np.array([[-5., 5.]]),
@@ -216,7 +217,7 @@ def test_mujoco_physical_build_mapping_checks_axis_gear_and_drive():
         mjtBias=SimpleNamespace(mjBIAS_AFFINE=1), mjtGain=SimpleNamespace(mjGAIN_FIXED=0),
         mjtDyn=SimpleNamespace(mjDYN_NONE=0), mjtTrn=SimpleNamespace(mjTRN_JOINT=0, mjTRN_TENDON=3))
     session = SimpleNamespace(_source=source, _artifact=SimpleNamespace(identity_hash='a'*64),
-        _provider='mujoco', _mixed_actuator_plan=None, _model=model, _mj=mj)
+        _provider='mujoco', _mixed_actuator_plan=None, _model=model, _mj=mj, _build_layout_facts={})
     assert MuJoCoPhysicalPort(session, execution).dofs[binding.channels[0].target_key] == 0
     model.jnt_axis[0] = (0., 1., 0.)
     with pytest.raises(ValueError, match='joint axis'):

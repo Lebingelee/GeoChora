@@ -526,7 +526,7 @@ def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path, monkey
         _, info = env.reset_for_solution(solution, seed=31)
         assert isinstance(env.typed_state, CanonicalStatePublicationV2)
         assert not env.position_profile
-        assert 'pickcube_position_execution_info_v1' in info
+        assert 'pickcube_position_execution_info_v2' in info
         env.start_recording(tmp_path / 'solution.h5')
         before = env.state.control_step
         original_scope = env._selected_com_wrench_scope
