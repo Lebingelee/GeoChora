@@ -264,36 +264,42 @@ def make_framework_parallel_spec(
 
 def _cleanup_failed_device_build(adapter, render_source, runtime, built, binding, error,
                                  controller=None, definition=None):
+    """Attempt acquired owners and return only the closes that need retrying."""
     from ..runtime.sessions.source import close_source_and_task_resources
 
+    operations = []
     if adapter is not None:
         if render_source is not None and adapter.parallel_render_provider is None:
-            try:
-                render_source.close()
-            except BaseException as cleanup_error:
-                error.add_note(f'device render source cleanup also failed: {cleanup_error!r}')
-        try:
-            adapter.close()
-        except BaseException as cleanup_error:
-            error.add_note(f'device adapter cleanup also failed: {cleanup_error!r}')
+            operations.append(('device render source', render_source.close))
+        operations.append(('device adapter', adapter.close))
     else:
         if runtime is not None:
-            try:
-                runtime.close()
-            except BaseException as cleanup_error:
-                error.add_note(f'device runtime cleanup also failed: {cleanup_error!r}')
+            operations.append(('device runtime', runtime.close))
         for owner in (controller, definition):
             close_device = getattr(owner, 'close_device', None)
             if callable(close_device):
-                try:
-                    close_device()
-                except BaseException as cleanup_error:
-                    error.add_note(f'device owner cleanup also failed: {cleanup_error!r}')
-        close_source_and_task_resources(None if built is None else built.get('source'), binding, error=error)
+                operations.append(('device owner', close_device))
+
+        def close_source():
+            failure = close_source_and_task_resources(
+                None if built is None else built.get('source'), binding, error=None)
+            if failure is not None:
+                raise failure
+
+        operations.append(('device source', close_source))
+    failed = []
+    for label, close in operations:
+        try:
+            close()
+        except BaseException as cleanup_error:
+            error.add_note(f'{label} cleanup also failed: {cleanup_error!r}')
+            failed.append(close)
+    return failed
 
 
 def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_directory=None,
-                              render_mode=None, resolved_config=None, generation=None):
+                              render_mode=None, resolved_config=None, generation=None,
+                              pending_cleanup=None):
     """Use the selected task's shared source and Controller to construct a device batch.
 
     ``resolved_config`` allows a preflighted whole-batch reconfiguration to
@@ -449,8 +455,11 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
         )
         return adapter
     except BaseException as error:
-        _cleanup_failed_device_build(adapter, render_source, runtime, built, binding, error,
-                                     controller=controller, definition=definition)
+        failed = _cleanup_failed_device_build(
+            adapter, render_source, runtime, built, binding, error,
+            controller=controller, definition=definition)
+        if pending_cleanup is not None:
+            pending_cleanup.extend(failed)
         raise
 
 

@@ -471,3 +471,76 @@ def test_teardown_failure_faults_without_constructing_a_target(monkeypatch):
         env.read_device_state(('qpos',))
     env.close()
     env.close()
+
+
+@pytest.mark.parametrize('adapter_created', [False, True])
+def test_failed_construction_retains_only_failed_closes_for_retry(monkeypatch, adapter_created):
+    from task_env.vectorization.factory import _cleanup_failed_device_build
+
+    env, old, _ = _fake_env()
+    calls = []
+
+    class Owner:
+        parallel_render_provider = None
+
+        def close(self):
+            calls.append('target')
+            if calls.count('target') < 3:
+                raise RuntimeError('target close temporarily failed')
+
+    owner = Owner()
+    controller = SimpleNamespace(close_device=lambda: calls.append('controller'))
+    monkeypatch.setattr('task_env.runtime.sessions.source.close_source_and_task_resources',
+                        lambda source, binding, error=None: None)
+
+    def factory(**kwargs):
+        failure = RuntimeError('target construction failed')
+        failed = _cleanup_failed_device_build(
+            owner if adapter_created else None, None,
+            None if adapter_created else owner, None, None, failure,
+            None if adapter_created else controller)
+        kwargs['pending_cleanup'].extend(failed)
+        raise failure
+
+    monkeypatch.setattr('task_env.vectorization.factory.make_selected_device_spec', factory)
+    _patch_preparation(monkeypatch)
+    with pytest.raises(RuntimeError, match='target construction failed') as caught:
+        env.reset(options={'execution': {'physics_provider': 'isaacsim'}})
+    assert old.closed and env._task_spec is None
+    assert len(caught.value.__notes__) == 1
+    with pytest.raises(RuntimeError, match='faulted'):
+        env.step({})
+    with pytest.raises(RuntimeError, match='target close temporarily failed'):
+        env.close()
+    assert not env._close_complete and len(env._pending_device_cleanup) == 1
+    env.close()
+    env.close()
+    assert env._close_complete and not env._pending_device_cleanup
+    assert calls.count('target') == 3
+    assert calls.count('controller') == (0 if adapter_created else 1)
+
+
+def test_adapter_keeps_failed_source_cleanup_owner_until_success(monkeypatch):
+    from task_env.vectorization.task_definition import BatchTaskLifecycleAdapter
+
+    adapter = object.__new__(BatchTaskLifecycleAdapter)
+    adapter.parallel_render_provider = None
+    adapter.runtime = SimpleNamespace(close=lambda: None)
+    adapter.metadata = {}
+    resources = (object(), object())
+    adapter._source_resources = resources
+    calls = []
+
+    def close_resources(source, binding):
+        assert (source, binding) == resources
+        calls.append('source')
+        return RuntimeError('source close failed') if len(calls) == 1 else None
+
+    monkeypatch.setattr('task_env.runtime.sessions.source.close_source_and_task_resources',
+                        close_resources)
+    with pytest.raises(RuntimeError, match='source close failed'):
+        adapter.close()
+    assert adapter._source_resources is resources
+    adapter.close()
+    adapter.close()
+    assert adapter._source_resources is None and calls == ['source', 'source']

@@ -1258,8 +1258,13 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         if self._source_resources is not None:
             from ..runtime.sessions.source import close_source_and_task_resources
             source, binding = self._source_resources
-            self._source_resources = None
-            error = close_source_and_task_resources(source, binding, error=error)
+            source_error = close_source_and_task_resources(source, binding)
+            if source_error is None:
+                self._source_resources = None
+            elif error is None:
+                error = source_error
+            else:
+                error.add_note(f'source cleanup also failed: {source_error!r}')
         if error is not None:
             raise error
 

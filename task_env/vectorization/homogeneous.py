@@ -110,6 +110,7 @@ class HomogeneousVectorTaskEnv:
                           else np.zeros(self.num_envs, dtype=np.bool_))
         self._has_reset = False
         self._device_fault = None
+        self._pending_device_cleanup = []
 
     @property
     def task_uid(self) -> str:
@@ -333,6 +334,7 @@ class HomogeneousVectorTaskEnv:
                 render_mode=build_input.render_mode,
                 resolved_config=prepared.target_config,
                 generation=prepared.generation,
+                pending_cleanup=self._pending_device_cleanup,
             )
         except BaseException as error:
             self._device_fault = error
@@ -633,10 +635,27 @@ class HomogeneousVectorTaskEnv:
             if self._close_complete:
                 return
             self._closed = True
+            error = None
             spec = self._task_spec
             if spec is not None:
-                spec.close()
-            self._task_spec = None
+                try:
+                    spec.close()
+                except BaseException as caught:
+                    error = caught
+                else:
+                    self._task_spec = None
+            pending, self._pending_device_cleanup = self._pending_device_cleanup, []
+            for close in pending:
+                try:
+                    close()
+                except BaseException as caught:
+                    self._pending_device_cleanup.append(close)
+                    if error is None:
+                        error = caught
+                    else:
+                        error.add_note(f'device cleanup also failed: {caught!r}')
+            if error is not None:
+                raise error
             self._parallel_render_provider = None
             self._close_complete = True
             return
