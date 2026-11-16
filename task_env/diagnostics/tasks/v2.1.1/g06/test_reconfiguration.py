@@ -20,7 +20,6 @@ from task_env.vectorization.reconfiguration import (
     _assert_fixed_contract,
     parse_switch_options,
     prepare_reconfiguration,
-    render_config_signature,
 )
 
 
@@ -63,7 +62,6 @@ def _build_input(config=None, *, provider="mujoco_warp"):
         resolved_config=config,
         provider=provider,
         generation=0,
-        render_signature=render_config_signature(config.environment.render),
     )
 
 
@@ -133,9 +131,7 @@ def _patch_preparation(monkeypatch, *, generation=1):
     def prepare(build_input, execution, *, generation):
         return PreparedReconfiguration(
             target_config=object(),
-            target_provider=str(execution.get("physics_provider", "isaacsim")),
             generation=generation,
-            execution=dict(execution),
         )
 
     monkeypatch.setattr(
@@ -168,7 +164,7 @@ def test_prepare_reconfiguration_rejects_an_unadmitted_edge_before_touch():
     prepared = prepare_reconfiguration(
         build_input, {"physics_provider": "mujoco_warp"}, generation=1
     )
-    assert prepared.target_provider == "mujoco_warp"
+    assert prepared.target_config.physics_provider == "mujoco_warp"
     assert prepared.generation == 1
 
 

@@ -432,7 +432,7 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                 adapter.metadata['observation_schema'] = asdict(replace(
                     schema, fields=(*schema.fields, *camera_fields),
                     groups=(*schema.groups, 'cameras')))
-        from .reconfiguration import DeviceBatchBuildInput, render_config_signature
+        from .reconfiguration import DeviceBatchBuildInput
 
         adapter.resolved_config.update({
             'physics_provider': str(config.physics_provider),
@@ -440,7 +440,6 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
             'physics_device': str(config.physics_device),
             'device_generation': actual_generation,
         })
-        adapter.device_generation = actual_generation
         adapter.device_build_input = DeviceBatchBuildInput(
             uid=str(uid),
             num_env=int(num_env),
@@ -451,7 +450,6 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
             resolved_config=config,
             provider=str(config.physics_provider),
             generation=actual_generation,
-            render_signature=render_config_signature(config.environment.render),
         )
         return adapter
     except BaseException as error:

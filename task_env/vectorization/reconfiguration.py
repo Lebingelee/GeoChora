@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -83,7 +83,6 @@ class DeviceBatchBuildInput:
     resolved_config: Any
     provider: str
     generation: int
-    render_signature: tuple
 
     def __post_init__(self) -> None:
         if type(self.uid) is not str or not self.uid:
@@ -101,27 +100,8 @@ class PreparedReconfiguration:
     """A preflighted target that can safely replace the old batch."""
 
     target_config: Any
-    target_provider: str
     generation: int
-    execution: Mapping[str, Any]
     target_request: Mapping[str, Any] | None = None
-
-
-def _render_signature(render_config: Any) -> tuple:
-    """Freeze renderer implementation, camera layout and resolution."""
-
-    return tuple(
-        sorted(
-            (name, repr(value))
-            for name, value in asdict(render_config).items()
-        )
-    )
-
-
-def render_config_signature(render_config: Any) -> tuple:
-    """Public helper used when the factory records its build input."""
-
-    return _render_signature(render_config)
 
 
 def parse_switch_options(options: Mapping[str, Any] | None, *, num_envs: int) -> dict[str, Any] | None:
@@ -307,12 +287,9 @@ def prepare_reconfiguration(
         environment_type, request, execution_scope="device_batch"
     )
     _assert_fixed_contract(build_input.resolved_config, target_config)
-    target_provider = str(target_config.physics_provider)
     return PreparedReconfiguration(
         target_config=target_config,
-        target_provider=target_provider,
         generation=int(generation),
-        execution=dict(merged),
         target_request=request,
     )
 
@@ -322,5 +299,4 @@ __all__ = [
     "PreparedReconfiguration",
     "parse_switch_options",
     "prepare_reconfiguration",
-    "render_config_signature",
 ]
