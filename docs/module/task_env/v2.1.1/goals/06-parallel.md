@@ -1,6 +1,6 @@
 # G06：并行执行、部分 reset 与整批切换
 
-当前进度（2026-11-16）：G06a/b及[6c attempt001](../maintenance/reviews/20261116_g06c_attempt001_acceptance.md)已有界独立主审接收；维护者最终接收待确认，R3/G07另包。后文旧派发状态保留历史时点。
+当前进度（2026-11-16）：G06abc canonical范围已依独立主审及维护者收尾指令有界结案，详见[实施总结](../maintenance/g06/implementation-summary.md)及其证据索引。基本要求无未闭合项；可选/暂缓项逐项列示，R3/G07另包。后文原派发与设计记录保留历史时点。
 
 规划标识：`V211_G06_PARALLEL`。3 个子阶段；复用既有 batch runtime、vector 调用、parallel render 和 Recorder。由[数据协议](../contracts/lifecycle-and-data.md)规定身份与时序，不为 batch 新建第二套任务生命周期。
 

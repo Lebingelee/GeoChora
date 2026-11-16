@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-16",
-  "status": "G06ABC_SOL_ACCEPTED_BOUNDED",
+  "status": "G06_CANONICAL_CLOSED_BOUNDED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -16,11 +16,11 @@
     "stage": "6",
     "reuse_existing_checkout": true,
     "actual_stage_branch": "codex/v211-stage6-parallel",
-    "reason": "Existing G06 implementation branch; review and documentation closeout only."
+    "reason": "Reuse the committed G06 stage checkout for bounded canonical closeout; no branch synchronization or publication performed."
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "G06abc canonical bounded independent review complete. Await maintainer disposition; R3 and G07 require separate packages. No new execution dispatched.",
+  "next_action": "Canonical G06 closeout completed at maintainer request; R3/backend list and G07 require separate packages. No automatic execution, merge or push.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1789,7 +1789,8 @@
             "review_ref": "reviews/20261115_g06a_attempt002_acceptance.md",
             "qualification": false
           },
-          "blockers": []
+          "blockers": [],
+          "closeout_status": "CLOSED_BOUNDED_CANONICAL_G06"
         },
         {
           "id": "6b",
@@ -1884,7 +1885,8 @@
             "result_status": "RESOURCE_LIMIT",
             "b3_correctness_waived": false,
             "used": false
-          }
+          },
+          "closeout_status": "CLOSED_BOUNDED_CANONICAL_G06"
         },
         {
           "id": "6c",
@@ -1942,7 +1944,8 @@
             "review_ref": "reviews/20261116_g06c_attempt001_acceptance.md",
             "scope": "B3 partial reset across three providers and both tasks; fixed Rasterizer Isaac-MJWarp-Isaac for both tasks; failed construction cleanup retry fixed and CPU-tested; maintainer acceptance not asserted."
           },
-          "blockers": []
+          "blockers": [],
+          "closeout_status": "CLOSED_BOUNDED_CANONICAL_G06"
         }
       ]
     },
@@ -2384,5 +2387,18 @@
       "output_head": "3bc9e2a70daea2dda1004352c54ba1d1ada46b54",
       "sol_review_ref": "reviews/20261115_g06a_attempt002_acceptance.md"
     }
-  ]
+  ],
+  "g06_closeout": {
+    "status": "CLOSED_BOUNDED_CANONICAL_G06",
+    "date": "2026-11-16",
+    "authority": "Maintainer requested stage closeout after independent abc reviews.",
+    "code_commit": "4332844f0ede0c8f56f75a27c773bd2cf7bd67f5",
+    "summary_ref": "g06/implementation-summary.md",
+    "evidence_index_ref": "g06/evidence-index.json",
+    "primary_evidence_files": 461,
+    "new_native_runs": 0,
+    "closeout_cpu_tests_passed": 23,
+    "remaining_required_items": [],
+    "optional_and_deferred_ref": "g06/implementation-summary.md#6-尚未完成的可选暂缓与不支持项"
+  }
 }

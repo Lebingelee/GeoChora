@@ -1,6 +1,6 @@
 # v2.1.1 恢复入口
 
-更新时间：2026-11-11。当前处于 **G01～G05 有界接收、5c 单元 1～9 收口后的代码与项目优化**。G06／G07 尚未开始。准确当前结论、输入与下一交付统一在[当前摘要](current-state.md)，工作包在[编排索引](orchestration.json)，优化步骤见[执行安排](../planning/post-5c-optimization-execution.md)。
+更新时间：2026-11-16。G01～G06 canonical范围有界结案，G07/版本收口待实施，R3另包。先读[唯一当前摘要](current-state.md)、[G06实施总结](g06/implementation-summary.md)和[编排索引](orchestration.json)恢复代码、submodule、受测范围与下一停门；下文保留历史窗口，不能据旧“未开始”重开已接收工作。
 
 以下是各历史窗口的恢复记录，保留当时的待审、失败、授权及暂停状态；其中的“当前”“尚未开始”只指该记录时点，不覆盖上方唯一当前摘要。最新综合主审见[单元 9](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)。
 

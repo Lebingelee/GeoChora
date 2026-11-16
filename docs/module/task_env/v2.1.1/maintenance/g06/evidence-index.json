@@ -1,0 +1,3221 @@
+{
+  "schema": "geochora-g06-closeout-evidence-index-v1",
+  "date": "2026-11-16",
+  "scope": "Canonical G06abc bounded closeout; original evidence stays in place. No native execution during closeout.",
+  "code_head": "4332844f0ede0c8f56f75a27c773bd2cf7bd67f5",
+  "reviewed_input_head": "9c13febe7e5edaed994483d71307c14f048e89d9",
+  "source_baseline": "41a09c87a7599f13adce9fb50501eb6378c2a17e",
+  "geophys_initial": "c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7",
+  "geophys_final": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
+  "menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+  "locks": [
+    {
+      "path": "task_env/dependencies/mujoco-warp-4.0.1-python312.txt",
+      "sha256": "deb694a387b695fd7280840462b5dde1a380dccfc40bafde9ce2badf2138fe3b"
+    },
+    {
+      "path": "docs/module/task_env/v2.1.1/maintenance/work-packages/20261116_g06c_attempt001_goal.md",
+      "sha256": "a8a283dfdac876db7e50cefa7893fc598bcf86c98bc971347332f9aa8fc533e0"
+    }
+  ],
+  "raw_run_roots": [
+    "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001",
+    "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002",
+    "workspace/maintenance/v211_g06a_attempt002/isaac-sensor-001",
+    "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-no-window-001",
+    "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-window-001",
+    "workspace/maintenance/v211_g06a_attempt002/scalar-device-scalar-camera-schema-003",
+    "workspace/maintenance/v211_g06a_attempt002_review",
+    "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b16-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b256-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b4096-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-formal-003",
+    "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001",
+    "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-window-001",
+    "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b16-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b256-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-formal-003",
+    "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001",
+    "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-window-001",
+    "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b16-off-003",
+    "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-motion-003",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-off-002",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-window-002",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b256-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b3",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b4096-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b16-off-final-001",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b256-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b4096-off-001",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001",
+    "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-motion-003",
+    "workspace/maintenance/v211_g06b_attempt001/reset-control-geophys-pendulum-001",
+    "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pendulum-001",
+    "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pickcube-002",
+    "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pendulum-001",
+    "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pickcube-001",
+    "workspace/maintenance/v211_g06b_attempt002/contact-b3-trace-current-pin-32-full-001",
+    "workspace/maintenance/v211_g06b_attempt002/performance-geophys-b256-off-32-001",
+    "workspace/maintenance/v211_g06b_attempt002/performance-geophys-off-32-001",
+    "workspace/maintenance/v211_g06b_attempt002/performance-mjwarp-sensor-window-scoped-b16-001",
+    "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row0-32-001",
+    "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row1-32-002",
+    "workspace/maintenance/v211_g06b_attempt003/performance-geophys-window-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-isaac-window-retry-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pendulum-window-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-window-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-window-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-retry-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-window-retry-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-window-retry-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-sensor-001",
+    "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-window-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-geophys-camera-explained-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-isaac-camera-explained-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-explained-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-geophys-final-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-isaac-final-001",
+    "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-mjwarp-final-001",
+    "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001",
+    "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001",
+    "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001",
+    "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001",
+    "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001",
+    "workspace/maintenance/v211_g06c_attempt001/c4-fault-ipc-final-001",
+    "workspace/maintenance/v211_g06c_attempt001/example-existing-pendulum-001",
+    "workspace/maintenance/v211_g06c_attempt001/example-existing-pickcube-001",
+    "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pendulum-001",
+    "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pickcube-001",
+    "workspace/maintenance/v211_g06c_attempt001/regression-current-final-001",
+    "workspace/maintenance/v211_g06c_attempt001/regression-final-001",
+    "workspace/maintenance/v211_g06c_attempt001/regression-scalar-effort-001",
+    "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pendulum-001",
+    "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pickcube-001",
+    "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pendulum-001",
+    "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pickcube-001",
+    "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pendulum-001",
+    "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pickcube-001"
+  ],
+  "retention_note": "Original accepted run roots remain unchanged. A verified copy of the primary files is retained under primary_evidence_copy_root using the same repository-relative paths. Generated delivery/models/SDK caches stay at the original run roots and pinned Git sources. This is an audit evidence packet, not a portable native replay environment; future cleanup must preserve or explicitly migrate referenced inputs/readers.",
+  "evidence_files": [
+    {
+      "path": "docs/module/task_env/v2.1.1/maintenance/reviews/20261115_g06a_attempt002_acceptance.md",
+      "bytes": 6101,
+      "sha256": "5867f405ef8b8f75d08dd4a8b0f5c9f694b6623f3930cd30ad337a66364d0e2f"
+    },
+    {
+      "path": "docs/module/task_env/v2.1.1/maintenance/reviews/20261116_g06b_attempt003_acceptance.md",
+      "bytes": 3738,
+      "sha256": "d1a70e43704671fa87471b79e2597471a19e75d90d37d200943357aa856efa57"
+    },
+    {
+      "path": "docs/module/task_env/v2.1.1/maintenance/reviews/20261116_g06c_attempt001_acceptance.md",
+      "bytes": 7112,
+      "sha256": "a3831ed13a671945c6a0cff81c00bf4e85946d785dd2029f0ecb0fd4639e8942"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt001/gates.json",
+      "bytes": 721,
+      "sha256": "22c9a505d5a1f183a1c0727df92eb2990c3e264c25e8b9a66a835a7e27b806d6"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt001/report.md",
+      "bytes": 17245,
+      "sha256": "2bea51ca2caf48c7d2ef02246102044cd1e3a17815a5451d6cf603ac196a41f7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-framebuffer-device-001/stdout.log",
+      "bytes": 689,
+      "sha256": "8ba195d804769dea56e5adc5c52b86fbc06ebe2b467f060bbe56704e19799340"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001/camera_mount_values.npz",
+      "bytes": 5242,
+      "sha256": "e2af5889066355d4c524ccf794a6a470c4a37643d950560051ba343d67d3b4b3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001/isaac_device_frames.npz",
+      "bytes": 7701,
+      "sha256": "f62f378a719395fe697eb56b84317aad9ecea7e14f90beb19df1e710dd6ca53a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001/isaac_pose_values.npz",
+      "bytes": 2330,
+      "sha256": "6f64a939b8b78285f48e31c351049aa4ef4370f6dfc61f7ffdea9969d687eaa9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001/isaac_sensor_frames.npz",
+      "bytes": 57551,
+      "sha256": "2779b82911d2a567e5e212026ab819795e799e144d3aca2dfa81e4cb38913484"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001/stderr.log",
+      "bytes": 475,
+      "sha256": "fc51d91f8c179c6254cebef741cc3094371bbcc7ef3e7b471e837067c3f13c3b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001/stdout.log",
+      "bytes": 45389,
+      "sha256": "514706ae5b4735e47d669713d7cea85774c03273c0f9308a03093f8e5ae415a3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-isaac-sensor-window-001/supervisor.json",
+      "bytes": 110,
+      "sha256": "5834fa2996639c47406d0fd83696e8d176944612d3338f8602493cafdabd475d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/expected_record_values.npz",
+      "bytes": 397334,
+      "sha256": "5ca2718051c119e20d2b53279b148725d4d1f490e921c524b46c602fc8dcc77c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/public_record_contexts.json",
+      "bytes": 31948,
+      "sha256": "0e87192d52bbb7e20ab12c1c6ebd94982ea8521a2dc30f1970ea5753c43f16fd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/public_record_traces.npz",
+      "bytes": 107571,
+      "sha256": "262d2031eac88097c4ac960d4d123c000cc837b19ea1936705d8493ee3b0653a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/stderr.log",
+      "bytes": 4513,
+      "sha256": "fc814a262437a0589d8a8d4ddcacf0ab8dbbdd1cbfb13c0c04767c7c09dbd97d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/stdout.log",
+      "bytes": 704,
+      "sha256": "d62bf503922993651f80529f5ce544dfda4bafb60867b5d54a0d7da131ee5c73"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/supervisor.json",
+      "bytes": 109,
+      "sha256": "e13eb7795350040749b67c842073a60b1cde31243abef184f988935570ff879c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/trajectory_slot_000_episode_000000.h5",
+      "bytes": 96250,
+      "sha256": "adbb3db529bbb0682be59ce6d182a0742ec22d6cf07b654522e162f9f170e586"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/trajectory_slot_000_episode_000001.h5",
+      "bytes": 39241,
+      "sha256": "176f6b2e16df09f5991c5b7176af747b6820ea5a25bc32fe69ee8d82f86fb688"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/trajectory_slot_001_episode_000000.h5",
+      "bytes": 66225,
+      "sha256": "d54474ecaee2630beaa93df9b7014b70923eaf80ccd5aa324436cb0175f2d11b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/forge070-record-camera-002/trajectory_slot_001_episode_000001.h5",
+      "bytes": 80039,
+      "sha256": "3635040e86de37612b7f136ef18f2e1e448a38716079018f50db23b16cb8b421"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/gates.json",
+      "bytes": 5754,
+      "sha256": "57d29a6de247610687ad68e095a569c6c7b75b18e66a92fe93ed147abfd800a7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/geophys-main-merge-status.md",
+      "bytes": 5294,
+      "sha256": "6357870c852eed9b64cdeb971a9a4094134013511350d06b0cafb18f684ba636"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/isaac-sensor-001/camera_mount_values.npz",
+      "bytes": 5242,
+      "sha256": "e2af5889066355d4c524ccf794a6a470c4a37643d950560051ba343d67d3b4b3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/isaac-sensor-001/isaac_pose_values.npz",
+      "bytes": 2330,
+      "sha256": "6f64a939b8b78285f48e31c351049aa4ef4370f6dfc61f7ffdea9969d687eaa9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/isaac-sensor-001/isaac_sensor_frames.npz",
+      "bytes": 57547,
+      "sha256": "d6dfd0a65137fef853423c56fb180a4fff185ae99af153c67f63461193081a50"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/isaac-sensor-001/stderr.log",
+      "bytes": 475,
+      "sha256": "9e71a5af39af696e9688493d005dd1302323ab330f451bc5756dbe194724b57e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/isaac-sensor-001/stdout.log",
+      "bytes": 40924,
+      "sha256": "ccb4221cc7bc2f1dca7be9a39a4d63ad59730bac30917c1234166a5438acb19d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/isaac-sensor-001/supervisor.json",
+      "bytes": 110,
+      "sha256": "9aade4db3050c35864e9426083bc7bc42ee9ffc45731210fde71edfdc3737c55"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-no-window-001/isaac_pose_values.npz",
+      "bytes": 2330,
+      "sha256": "6f64a939b8b78285f48e31c351049aa4ef4370f6dfc61f7ffdea9969d687eaa9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-no-window-001/stderr.log",
+      "bytes": 475,
+      "sha256": "ec5fab7c80a3e45e50b6d6e21b0eb751f66aa31459e821a5c775d2fa1f68682b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-no-window-001/stdout.log",
+      "bytes": 39191,
+      "sha256": "98e2afe12ae0542acf994f85832f80b39a2c36b802948228cc9bd8bc64b39f35"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-no-window-001/supervisor.json",
+      "bytes": 110,
+      "sha256": "f51b5494efe649cf909024699447b78966dddd1c3bae75bbe9cde9e3d4daa7a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-window-001/isaac_device_frames.npz",
+      "bytes": 13676,
+      "sha256": "17a3e5ac5de3ab0b8fe6326897e5945bf6bc766443319d9236f9b8b7e7cfc061"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-window-001/isaac_pose_values.npz",
+      "bytes": 2330,
+      "sha256": "6f64a939b8b78285f48e31c351049aa4ef4370f6dfc61f7ffdea9969d687eaa9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-window-001/stderr.log",
+      "bytes": 475,
+      "sha256": "017185f2fe759ef55d1f489cac7b02af796a48035e0c828f325cc8d67f39b4bf"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-window-001/stdout.log",
+      "bytes": 39643,
+      "sha256": "76db65b3611a7e3cf0c58216d879f0004c1aa5a94e1e8ae45e1b682a7adb139e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/postmerge-isaac-window-001/supervisor.json",
+      "bytes": 110,
+      "sha256": "f9df92bfa4035f042b87b51d4aa044ad409719c36277df1d4d542b8317fbbdec"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/record-state-readback-004.json",
+      "bytes": 140,
+      "sha256": "3b006af32975d19c0aee4b5ea0e72a619055fbac2a9821eb35f53eb50cd2c804"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/report.md",
+      "bytes": 18307,
+      "sha256": "d113af6622cdd3880a68308f7f210c88624e66a66f380016efb67569f317ef68"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/scalar-device-scalar-camera-schema-003/scalar_camera_frames.npz",
+      "bytes": 9782,
+      "sha256": "3138ee034492b390dba3516b7be1480686e5782e0a56e2bebc0e28eb17f56ddb"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/scalar-device-scalar-camera-schema-003/stderr.log",
+      "bytes": 4513,
+      "sha256": "5cb5dfae7c5f79b0f406d091312eca31062605d7f086c46018b9a332283126ea"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/scalar-device-scalar-camera-schema-003/stdout.log",
+      "bytes": 561,
+      "sha256": "fe2f6ec6305aacada3fb60beeb7440800886359059e64b635364a1cb761a5be3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002/scalar-device-scalar-camera-schema-003/supervisor.json",
+      "bytes": 110,
+      "sha256": "a865d5c9941db2a1df8fbda6a1a56dbe6cb2de9295ca9edc33fa20a6d3d8018d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/doc-validation.txt",
+      "bytes": 18808,
+      "sha256": "1581b3e873259eab9cda50ef5a4dbc0fe68b973fa622f277bd56980ec337cafa"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/forge070-isaac-sensor-window-001-readback.json",
+      "bytes": 307,
+      "sha256": "56c848663ecb2738ec0d6b49054d5fab09346a847fe1ba0217d69085ea8c0c10"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/forge070-record-camera-002-readback.json",
+      "bytes": 178,
+      "sha256": "2f900090f7b3aab8c6ea5abbaa2d9179783e4f09a896020074bfcdf53b74f211"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/isaac-sensor-001-readback.json",
+      "bytes": 308,
+      "sha256": "0b0cf619b9f378e54d2156f8578e8a932a0974e6ea10b13fbcaedf9e88db571c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/postmerge-isaac-no-window-001-readback.json",
+      "bytes": 219,
+      "sha256": "8fea85d6dff11e2cb37582f4b5f824a5fc755fcf781099499e9b2861ce787ed0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/postmerge-isaac-window-001-readback.json",
+      "bytes": 279,
+      "sha256": "adeef5d83a6f75072fdc048f6cf90550c24845c35e643742202d0fc56c422e5e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/readbacks.json",
+      "bytes": 2116,
+      "sha256": "1a42689b0ef929700248c6b2d14bdeb0ab498a7ec7318dcaf9a8d8edaa218a86"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/review-summary.json",
+      "bytes": 389,
+      "sha256": "473b60f2d61f7c0ca844f2b6902270dff08a8b9ec61246f1063cb33702452031"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06a_attempt002_review/scalar-device-scalar-camera-schema-003-readback.json",
+      "bytes": 169,
+      "sha256": "4cad50c5e0fb552fa992dcaea19cc90d1ae6a9e718e6784001ba79aa4afd163e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/gates.json",
+      "bytes": 2024,
+      "sha256": "4bf6895385938fdc063dbf6baba4b0e45d82fe4f4d0e6003d165605b3e1c7462"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-framebuffer-height-after-001/supervisor.json",
+      "bytes": 276,
+      "sha256": "3057e4c06c017425c1a618b15f46591b0ab1faf7ad624877adce03235a6f69f5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-framebuffer-height-before-001/supervisor.json",
+      "bytes": 276,
+      "sha256": "a197123e0a8fabd46ba8a0437269b7cd8f77a80e55912fb6f60b491e38203ac8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-mesh-contact-cuda-final-001/stdout.log",
+      "bytes": 1753,
+      "sha256": "b04d7469cb6f2834134476f0e03fd799ed15fc3b73a75eb1e38febed63ac0fb2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b16-off-001/stderr.log",
+      "bytes": 598,
+      "sha256": "2f8c08a53da07f8ccf40f7f1dd8c5e2688797c05e420f3f6040acdda9a9b8e4d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b16-off-001/stdout.log",
+      "bytes": 516,
+      "sha256": "fd0ac57dc538fe33a1cf960539e4f2aa849413370784efeece24a2991396c991"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b16-off-001/supervisor.json",
+      "bytes": 208,
+      "sha256": "c4d05e0cd2b92c73dec280ee82a6c6748f6fee7b93142bfd5d025fa86a99db43"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b256-off-001/stderr.log",
+      "bytes": 598,
+      "sha256": "be4825ef4eff88a2687c3e448b2cba07a758254d398cf467a65ae2afe2f9d9d4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b256-off-001/stdout.log",
+      "bytes": 714,
+      "sha256": "074a2028284d286a0843077522a3f9bd899b2a53a77bd0fdf24c3c2809b6d644"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b256-off-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "bbac0d4e44ae12846aed597cf0f9811c8fc4899123aee0f1a7d99b1da0b4db64"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b4096-off-001/stderr.log",
+      "bytes": 598,
+      "sha256": "61246e735ffe7b07ec34e29b2506c0c72f86baac1da1ed9027aa22bbf43a9917"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b4096-off-001/stdout.log",
+      "bytes": 716,
+      "sha256": "dbb4a76bce1759212140d503592809e309e2a32a0ca8725c0aa11fc388fa586f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b4096-off-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "2ccb9342e7d8a7aeb53608d4a9b0e61d108f2a4a219aadccd789f82d35b133bf"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-formal-003/formal_terminal_oracle.json",
+      "bytes": 601,
+      "sha256": "3b65cccd6abc7f6f5f42343cb4120698658e64d943d2dd62adb5d1f1d66d19e8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-formal-003/stderr.log",
+      "bytes": 598,
+      "sha256": "532025571c8ffd67913481a624d283b83028e8e27835fe7ce326e08d886e481e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-formal-003/stdout.log",
+      "bytes": 1766,
+      "sha256": "2941ae4b86f4e6257837f81ab3c0be6c21cd2e2212fb5bb0afaf9de98fc1a1c3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-formal-003/supervisor.json",
+      "bytes": 110,
+      "sha256": "47ce9624faae7cf36cbaba70288a89a05b8d19fb221d49204cabb6dd3789fad5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/expected_record_values.npz",
+      "bytes": 1828,
+      "sha256": "a013b2b51aa9e64e0821ee43e5dba9460993889f19b3fa90f0bfb48288625d38"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/independent-readback.json",
+      "bytes": 181,
+      "sha256": "74ba409217f2c3a7fe0ae854246e94ceae88c63930dfe51e6e5734097ce8cc2a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/public_record_contexts.json",
+      "bytes": 30613,
+      "sha256": "9b76dfdb6893131e656354fdc385e779ddde1bd8a37e4bdaebec23db5e8a0495"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/public_record_traces.npz",
+      "bytes": 1605,
+      "sha256": "f7cf329fbebe5eb50ab1e7859c5ca6dce13b5c57622013cca157258f6150c208"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/stderr.log",
+      "bytes": 598,
+      "sha256": "471f007b0199a733ed11239da9b134f6b21bc244f7f26c91875154b2e7deb258"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/stdout.log",
+      "bytes": 367,
+      "sha256": "c43d8037af7bd3d338a73e57dde3309230cbca79a3e928b9bc03ae48954a9a5f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/supervisor.json",
+      "bytes": 109,
+      "sha256": "2c72b4f6f963c7ceb51457fcdfcce5c3b7c8705c1e0acbcc00c37faa385f0868"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/trajectory_slot_000_episode_000000.h5",
+      "bytes": 35456,
+      "sha256": "6ae7e23965223994707b80a0a7d0fca148537af9173c42d6d239b29970fe5d7d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/trajectory_slot_001_episode_000000.h5",
+      "bytes": 28376,
+      "sha256": "b2ea8d41be4c8688051695a8235d1f8563c369f96b5e75b2dd1ec70ca10af716"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-record-001/trajectory_slot_001_episode_000001.h5",
+      "bytes": 32752,
+      "sha256": "28a613003944579a312bb3370352330e1f44f03de9b027e79e36abb1a08e75a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-window-001/stderr.log",
+      "bytes": 598,
+      "sha256": "1fff5548f2feaf11f0465547d569913d2a19e54c8ac90a551c3ec7d2d5933761"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-window-001/stdout.log",
+      "bytes": 526,
+      "sha256": "dcf4aad4c6c98ddf2a5cae8d6021e67a4ee5deccb33fe8088c546b47ba2e8188"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-window-001/supervisor.json",
+      "bytes": 110,
+      "sha256": "28fd1e9898ca55ddf53a43d148e62eadd2e7470134e83b564f7d8d3ab762d56c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b16-off-001/stderr.log",
+      "bytes": 39042,
+      "sha256": "77ce4b742713a656b3041f3301d63f27e2a0ed86607af78055a15acca0ddcc25"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b16-off-001/stdout.log",
+      "bytes": 516,
+      "sha256": "bb27bb51119fcdf4fce1b57b4f4ba2d8dab72fd2f3fafaaed8f4bf32a67f4a31"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b16-off-001/supervisor.json",
+      "bytes": 209,
+      "sha256": "0ecf820733ce047738a8bfced2075dbb87a9c7df24e990595c307899f050baa1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b256-off-001/stderr.log",
+      "bytes": 39091,
+      "sha256": "9b179cc685119c0d99dd861576928e86b8aae424d7cbca7c877384eac20b696d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b256-off-001/stdout.log",
+      "bytes": 714,
+      "sha256": "95fe75b49e4cbb4e32f94239a92f31b04cae2df2bb24bff523938e76c7a8de08"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b256-off-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "3ddb5ba9427085858486f08caa8511777fd5a977e9d2077d6d09293b71d314ab"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-formal-003/formal_terminal_oracle.json",
+      "bytes": 605,
+      "sha256": "4cc1d14c9884d81a5352852b99d8c274cd5c8ad0444026e8f363718b053f87a4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-formal-003/stderr.log",
+      "bytes": 39046,
+      "sha256": "787e78a59e0c39e7928c44391e79c5204b47b4e4e90fa118dd95a017576fb7a2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-formal-003/stdout.log",
+      "bytes": 1770,
+      "sha256": "3cec8d28b59941be3bfe1dc9bb4bfcacaf657165639d7010427e29e8ed6d8fcb"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-formal-003/supervisor.json",
+      "bytes": 109,
+      "sha256": "89466e64e89f1c155af3d99b6a70698988f60c4bcb397a934429a206fd0cfc6b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/expected_record_values.npz",
+      "bytes": 1828,
+      "sha256": "8f818e6ac232cad8d3083b2149a70c126c82193b85741d0876652eeece78a6d4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/independent-readback.json",
+      "bytes": 181,
+      "sha256": "74ba409217f2c3a7fe0ae854246e94ceae88c63930dfe51e6e5734097ce8cc2a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/public_record_contexts.json",
+      "bytes": 39325,
+      "sha256": "3797bea467a907985000dfe1f88fc6aac6d67d5b2328227282cccad48c64103c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/public_record_traces.npz",
+      "bytes": 1604,
+      "sha256": "9812349bc738672d22888dab45c24b2ccfae77c40812df4642e8c783ddbb6032"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/stderr.log",
+      "bytes": 39046,
+      "sha256": "8ecf52e8d074cb8bc9611af271c29fc83412ff16cddbc5fc37b4a9c386e64e43"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/stdout.log",
+      "bytes": 367,
+      "sha256": "c43d8037af7bd3d338a73e57dde3309230cbca79a3e928b9bc03ae48954a9a5f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/supervisor.json",
+      "bytes": 109,
+      "sha256": "3f667172d06055695b75f4a3b2bc4007843db846f1e27b859060cd927c73a82c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/trajectory_slot_000_episode_000000.h5",
+      "bytes": 39616,
+      "sha256": "37f4be8c350faff752dc76b4663270e578c53d8793a70439700970e051045a26"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/trajectory_slot_001_episode_000000.h5",
+      "bytes": 28472,
+      "sha256": "7e710be5a0a3f64781687e88d0c86834031de0e8d1e8f5993c4993c0223b42dd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-record-001/trajectory_slot_001_episode_000001.h5",
+      "bytes": 35920,
+      "sha256": "554e4b3418cfd3671cabe63e68249dcd594b36e26975da72fed2e0d2891d429e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-window-001/stderr.log",
+      "bytes": 39044,
+      "sha256": "feedc11f39caa77d61994fc5b65fbe7357eff72169ed2ce6c406dd443d164ffa"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-window-001/stdout.log",
+      "bytes": 526,
+      "sha256": "58c047b8c139c52ff7126aa8b3b11c4e2fb17ebef479149d6e3579e9c19c86ce"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-window-001/supervisor.json",
+      "bytes": 110,
+      "sha256": "536f0d6cee848104e7d321271b9fff37ff6733ce8563edfa5187e53f48734d6b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b16-off-003/stderr.log",
+      "bytes": 39098,
+      "sha256": "5b99898f2993741279b371feac9999e9ee3465cf8f02f13ff566fdd4c8c89151"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b16-off-003/stdout.log",
+      "bytes": 1179,
+      "sha256": "95b739ddda290d530bb8b6bd5c4aecd2c2c4fd0afe6d0037470ff320ef0d6756"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b16-off-003/supervisor.json",
+      "bytes": 279,
+      "sha256": "07b0a5bd053ec9e932841d40d2c44e77d4739c5d01a7b297c899d80f8d0ebd77"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b256-resource-estimate.md",
+      "bytes": 1659,
+      "sha256": "b56b8b254c14d6ea396add83f73c436585cd78bbf5944aaafe8f3e79e6a6d259"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-motion-003/independent-fk.json",
+      "bytes": 790,
+      "sha256": "1343d050cebd91e539ab128a0edaca053f4e2815927f2a6d37f4df6ea8d09e71"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-motion-003/stderr.log",
+      "bytes": 39046,
+      "sha256": "a474ea0c42330f7654732feb2828edd9be95442299d907e4ce3b0f7be9a3161d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-motion-003/stdout.log",
+      "bytes": 3403,
+      "sha256": "af0af3a9a73d684c50ca3804754fc47135670539944d392408a5b2c9d8795638"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-motion-003/supervisor.json",
+      "bytes": 208,
+      "sha256": "d53d1fe2c7231e75afe48c16d1a8ef55e630430fa48cd20e3a9f28cac2957483"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-off-002/stderr.log",
+      "bytes": 4513,
+      "sha256": "ce7cf90cec974fba4bb2c3e95afa9dc188154c6eb6453f3076ca7144548c573e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-off-002/stdout.log",
+      "bytes": 520,
+      "sha256": "c5fe14a8fd996751d6c8a7690dd73a544459584ca0d9c04a29b743a4547087fe"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-off-002/supervisor.json",
+      "bytes": 208,
+      "sha256": "4b9e23771dcd0f7a92c897b98e4e0f29211da92dcd470da9165adaa113bac02d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-window-002/observer-warmup.png",
+      "bytes": 4341,
+      "sha256": "b056715fec80ffd364eddb6de50f927b23f6dc9262deb0a114dff0e4059864c5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-window-002/stderr.log",
+      "bytes": 4513,
+      "sha256": "3354555cbd4f3338e9d4fc07d8492af9f3b4ded187d6f5f430e0d4e3642b6f09"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-window-002/stdout.log",
+      "bytes": 976,
+      "sha256": "827e8c82f2ff730975b5d4e95019c51e51a94f9572037bc475a210ceab6932e0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-window-002/supervisor.json",
+      "bytes": 278,
+      "sha256": "0458f5ec67aa5cc8315290354be67e2581837c25d5baccb46fe55025fcd69143"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b256-off-001/stderr.log",
+      "bytes": 4513,
+      "sha256": "9b0ffb107aebb1c74dffeb03d86cc675694ffa6926b765da0b0c949fb6e32ec9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b256-off-001/stdout.log",
+      "bytes": 648,
+      "sha256": "c4ec807ea896ac23bf9fafe43f55136ef1e808b330a0a4b6a4c1c299322af394"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b256-off-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "1a66b71a814e60504d89ae7b5e733cd44829d13db1fa70d05b92abd7ca0c3e0b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b3/stderr.log",
+      "bytes": 4513,
+      "sha256": "e67b6612c52971b0a903c88d6aa6c23ff3fad8c68e7039e59bf1f8b48a9acc4a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b3/stdout.log",
+      "bytes": 1613,
+      "sha256": "73a4afa328e3d4038091c0a8225ef4ba3832df3f8c3cc495abe559a672edb011"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b3/supervisor.json",
+      "bytes": 108,
+      "sha256": "a7a4713273b960a40b12d68c187677cf0bdb8cfa2db612647d84c26d3cf938b6"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b4096-off-001/stderr.log",
+      "bytes": 4513,
+      "sha256": "23235ba690bc37e5d82c72f3d6b84de21b70fb7cfaf99561eb1bc8d1b5117ff0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b4096-off-001/stdout.log",
+      "bytes": 647,
+      "sha256": "c39d7b0d08540f3e2623aa34e3eb655a728895d35c116ad5d60182b73b9171e6"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b4096-off-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "a17bf4fdfc2231b725cc326b89d612f511635c138a39a9e0fe5afa1789c09c80"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b16-off-final-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "3a393c2f26c6f3251fa603b78a20fd909b6e03c9d7f242d58bbc12ebfc025b85"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b16-off-final-001/stdout.log",
+      "bytes": 1183,
+      "sha256": "675ff2b8fbb5e40fe1da5f6ec70ef452c555a50e34a2477d55d2ca0f849ba4d1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b16-off-final-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "88bbe8ea085f2577e456affc7acc58193022946bb37a9c2ea28561d6673695ac"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b256-off-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "eb20a502a2a2fe054672e0fe3465da872acdf6d49fa76d8c3dc1f72297f89977"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b256-off-001/stdout.log",
+      "bytes": 1183,
+      "sha256": "90bf10067840f9ee8424ea0888a4c5b94bfff8cc4153a03a403c380102a86b46"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b256-off-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "0e1d2832f838001b8d4c1990aec2e6d52622179aa1142ae7592178a5a91e45c0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b4096-off-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "3a4654c6991149938adb451794753b2f99c1cbbf00cc48b200a1f91e4cc49ea7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b4096-off-001/stdout.log",
+      "bytes": 1184,
+      "sha256": "dfa6c348b7a5398b267d604c6b33976c4a8331f5e4116b0e27070aa34d18076e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b4096-off-001/supervisor.json",
+      "bytes": 279,
+      "sha256": "97fa8586b377acf57adf440f8d804311759a8595a6ee90b836a8718748883093"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/independent-readback.json",
+      "bytes": 217,
+      "sha256": "fb763007ffc5947163fe88b910757387a934c607549cf1d592752dec0a3fe879"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/pickcube_public_contexts.json",
+      "bytes": 9604,
+      "sha256": "33b9768bf499004bf193f63327cb0faa5e63867b5606cb6b7ec361f6ea5b26f6"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/pickcube_public_traces.npz",
+      "bytes": 135451,
+      "sha256": "2a56669d37d8127466ad579a5622490354e71cb3abe3dfce58cd4c133e2e9407"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "8d174a63374448bab8d5cc5f9ebb634925d54cdb5b2b01d77accf4c8f5b791f1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/stdout.log",
+      "bytes": 1820,
+      "sha256": "1d90274acb0096bfaab23a9c28a08508fb82230fa61ac4debfd1e336786f0107"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "6517a6f549f535ce1fed578340f8ca83bf7e5cd3f548ec3bc24d64d371be4e8e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/trajectory_slot_000_episode_000000.h5",
+      "bytes": 133963,
+      "sha256": "af8a76fbf56cbe535d7dae2cca3a7b7b6ef07ae2bb8a94ecd7f63551c0bc7e52"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/trajectory_slot_000_episode_000001.h5",
+      "bytes": 91963,
+      "sha256": "af754adb555a9b1c4564537290d39f55ae482b2950998bc99bde904ce628571e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/trajectory_slot_001_episode_000000.h5",
+      "bytes": 106152,
+      "sha256": "a9813a423f84ec98c041379e0f19136b927c84b9b0e4da6f23148bce9ec8e95d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-camera-clock-record-001/trajectory_slot_001_episode_000001.h5",
+      "bytes": 119865,
+      "sha256": "dc26c9b683b20aecfc79301994f2e9615ae8b8554cda172aa9a724db71d3a54d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-motion-003/stderr.log",
+      "bytes": 6010,
+      "sha256": "5054fc66193f008bc1450fdb1708b91a6d6b7b1762825d258cdd95315e144535"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-motion-003/stdout.log",
+      "bytes": 1090,
+      "sha256": "9c4990043f92b632451c5d1ad707468701e9f1fa9062391a373a82b041abd02a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-motion-003/supervisor.json",
+      "bytes": 109,
+      "sha256": "197063c71f8366dc047129f200907d6b5b241bd8fca3de1ed9c2f723761daead"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/package-index.json",
+      "bytes": 91787,
+      "sha256": "5722108562bdfc26c3ed3f59e7007d6887e99d5d2fb6cb5bb75be9658be47a4a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/performance-b16-corrected.json",
+      "bytes": 10929,
+      "sha256": "e978ede7e645d61df5f93a792b8cc2ef5ff22d51711c15a3533b5e41c78e8a5a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/report.md",
+      "bytes": 20306,
+      "sha256": "df9cfa2bfec79d93d3d4567edbf6228b9752cb6dd3bc7b4bac38d664dc1637b9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-geophys-pendulum-001/independent-readback.json",
+      "bytes": 252,
+      "sha256": "bb577b6f90f96cb52ed7dc14f8b1d171d456f738e1473073aec52a757b051bd1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-geophys-pendulum-001/masked_reset_step_states.npz",
+      "bytes": 3047,
+      "sha256": "9acba5ae2fe98103a39b058a4ec240e722cacace918d5fd48d663ca630c2218f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-geophys-pendulum-001/stderr.log",
+      "bytes": 598,
+      "sha256": "1d6e2bf0e7891a9fa648edbcd122bf6511bce62b2c7d23def4c7ebcc667a2965"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-geophys-pendulum-001/stdout.log",
+      "bytes": 368,
+      "sha256": "fb17ccb47698d19b4f3225f83fbfa4380fdec60bb2795ce8f2b9164eb3c3524c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-geophys-pendulum-001/supervisor.json",
+      "bytes": 277,
+      "sha256": "834bfce60feeef952c45213a4268405d1b30b14685b05ea29ab98be0339ada2f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pendulum-001/independent-readback.json",
+      "bytes": 290,
+      "sha256": "9be554dd2a8b0d10c6a702d4f4121a42f1a76b5f3573579aab9411540dd16d2e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pendulum-001/masked_reset_step_states.npz",
+      "bytes": 3047,
+      "sha256": "bb8a4f980aa259b425a63961862d6570d4ce4249b57ccaf7580539c066760552"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pendulum-001/stderr.log",
+      "bytes": 39042,
+      "sha256": "0b64b4c47e15b14b511af68df6a0d3929fbcfc82738e613b24c1d5993b0aa270"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pendulum-001/stdout.log",
+      "bytes": 406,
+      "sha256": "b8b234904b7f0fd3b73ae8e6930bc462458a1cd3d17dbf8cfa86d05f11487006"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pendulum-001/supervisor.json",
+      "bytes": 278,
+      "sha256": "9a3855491b8e8e93c71b81cba281e35365d960d5517562d747e3abdc96af262d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pickcube-002/independent-readback.json",
+      "bytes": 306,
+      "sha256": "98d541dcfde62cbf62a48fd8fe3da5d154c808565f918fb60bb47f08284b3206"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pickcube-002/masked_reset_step_states.npz",
+      "bytes": 6298,
+      "sha256": "1185cd8a51c9807058681a4466fdce51d0509e78258fd58f1fc03b20cc5ae2f5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pickcube-002/stderr.log",
+      "bytes": 39046,
+      "sha256": "688527045d281e73730ac57df5ca10832c0ee81f030ab3d9a44915e9ab2ef329"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pickcube-002/stdout.log",
+      "bytes": 949,
+      "sha256": "0474ba4bf0957083b3d155990fd967273c5a82391e74be09fe358b24a0f67b9e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-isaac-pickcube-002/supervisor.json",
+      "bytes": 279,
+      "sha256": "4117923c660c1bfcc00582a6db7c26a7d9ebe9a823d922f898ad4e05b566d25f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pendulum-001/independent-readback.json",
+      "bytes": 256,
+      "sha256": "8461229ce0bbfe55d37f0b76959352e39c355bdffda62b46c07e2851b70afedd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pendulum-001/masked_reset_step_states.npz",
+      "bytes": 3047,
+      "sha256": "05405bdb99eaf701eba161183090487314f68aa2303b86d9aef7f3ebf5ed266f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pendulum-001/stderr.log",
+      "bytes": 4513,
+      "sha256": "3efb62212682f08cd1dde939e937a2e58fbf4d450970415bd0e8cc43aed44b85"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pendulum-001/stdout.log",
+      "bytes": 372,
+      "sha256": "428120badcfb943e38f3c5ca74379744c1a9c455aaad9f692c2a8b9556ee17be"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pendulum-001/supervisor.json",
+      "bytes": 277,
+      "sha256": "ff4161a76005da6c51ee3e8e41d75610f9b962c0f95aa42f752556597496f756"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pickcube-001/independent-readback-v1-again.json",
+      "bytes": 272,
+      "sha256": "d2f722392cb7dc31895675793c3389ecfc6dba6333bcb86ec4bb6ca1e863bd58"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pickcube-001/independent-readback.json",
+      "bytes": 272,
+      "sha256": "d2f722392cb7dc31895675793c3389ecfc6dba6333bcb86ec4bb6ca1e863bd58"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pickcube-001/masked_reset_step_states.npz",
+      "bytes": 4690,
+      "sha256": "d6af9071eb87fdb0d46568d6ab54f5be474fdd3b9360857e1dbf9fccb5428b6e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pickcube-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "a95bd4ac9d3a1b5dbf49d6ec6e0822cc7855f1c274a6195a48e2fa4f463d07b9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pickcube-001/stdout.log",
+      "bytes": 793,
+      "sha256": "286975ca8fe1c0ce25c135f231c8e9420449789e20d79e8ff2d3648ea58d0cf2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt001/reset-control-mjwarp-pickcube-001/supervisor.json",
+      "bytes": 277,
+      "sha256": "64783f02517d195e00e6165402c46b32e0dab837bf1b2614de4b7567ed64d1f5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/contact-b3-trace-current-pin-32-full-001/descent-trajectory.npz",
+      "bytes": 21682,
+      "sha256": "26d966d971f3d0d9ce6368810d7c5d46d520cba9e0a22ce2d320b0c5a7075309"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/contact-b3-trace-current-pin-32-full-001/hold-trajectory.npz",
+      "bytes": 10325,
+      "sha256": "31fb1b7bac818803175883c65abe9f1e9b2308f6d4a66198b767ef0e23d5a465"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/contact-b3-trace-current-pin-32-full-001/stderr.log",
+      "bytes": 1118,
+      "sha256": "deab03d2a49e6e86018c4de2f005d7ca8855f15656977478d8505614bd2a5d07"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/contact-b3-trace-current-pin-32-full-001/stdout.log",
+      "bytes": 4133,
+      "sha256": "e1169596b75588b1ae05c162c136e0da8c72fa719a7047e345c8a6e60097aaec"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/contact-b3-trace-current-pin-32-full-001/supervisor.json",
+      "bytes": 1197,
+      "sha256": "2d3096e9edde77bb65e86e9fa0297c8b51be067d11cc81c7e9cebdf42eece8ff"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/contact-b3-trace-current-pin-32-full-001/zero-trajectory.npz",
+      "bytes": 10525,
+      "sha256": "d77ead6093f78b2f6bd1fab6ef90eeeef332421b7eae8acd2aec04d4e6b91b1b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/framebuffer-dlpack-postcommit-001/supervisor.json",
+      "bytes": 875,
+      "sha256": "f8b209d0d5907d0a7c8d508eafc5fb00ea99e48fce43f638d74849d0300754f0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/freejoint-armature-committed-core-cpu-001/stdout.log",
+      "bytes": 685,
+      "sha256": "ea2dfcb11af17711d60027adc89791f8170d92479f79abfb4d4062afb8b0eacc"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/freejoint-armature-discrete-core-cuda-graph-003/stdout.log",
+      "bytes": 673,
+      "sha256": "971a995d2569484aa5f4f260aefc363cbd034bc4d0b3027b34a7fdcd3297c818"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/frozen-action-first-control.npz",
+      "bytes": 627,
+      "sha256": "d764547e4947f4e447695d6378ac16a12b02cfe2ebb3346074f4305066fff546"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/frozen-actions.npz",
+      "bytes": 5296,
+      "sha256": "9547370dfabcb16c008c1a3bfb2155675b86a7850d894c39001bddb44d13a30e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/geophys-batch-solve-fingers-readback-001/solve-stage-fingers-readback.json",
+      "bytes": 4644,
+      "sha256": "a665d6223c38a316ed73020a3cb9d31596e31b8eea591f5dbe42b8f85caa2894"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/geophys-graph-sort-specialized-postcommit-001/stdout.log",
+      "bytes": 713,
+      "sha256": "1346fa092a6fd5933b58499f7059acfe4d4f82ac52ecabc4de479d08d7502c9b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/geophys-iteration-budget-postcommit-001/stdout.log",
+      "bytes": 1301,
+      "sha256": "e7a374b2033bc2fde23d088ee339c7b7b78dd3b49e71782ce7cbec2a043ca563"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/geophys-native-constraint-energy.npz",
+      "bytes": 36000,
+      "sha256": "a04af72f77cb7457148f9db6da84a637541ed2dfb014bf3753acf1f8a033ccba"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-b256-off-32-001/stderr.log",
+      "bytes": 1419,
+      "sha256": "eaf10e139ab62d5096d187a8507a9e10fbcffb689a863ad2dce995a341c9eca8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-b256-off-32-001/stdout.log",
+      "bytes": 3013,
+      "sha256": "5a6ff9b62a24a0e2bed8a7f4763d923cc4e3009e2239b31dbc59f080c32bb9c6"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-b256-off-32-001/supervisor.json",
+      "bytes": 1062,
+      "sha256": "8eb305ac5044c8a6d9470fa403331d6d53596a1fdff2664550fe5cfd3bfbd919"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-off-32-001/stderr.log",
+      "bytes": 1419,
+      "sha256": "46d16651a4e6369c76746092d1d35595b858331aebfc3de37268bd6c4287e638"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-off-32-001/stdout.log",
+      "bytes": 3062,
+      "sha256": "b65c8446e31fc15a0ce3b76d9f82f362f4fef6cb521a4efed9a6b7d698232a67"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-off-32-001/supervisor.json",
+      "bytes": 1056,
+      "sha256": "964ff259d35e92574c3b1fd953ce8912d2130b82c43093ae08e442a270aedb5e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-mjwarp-sensor-window-scoped-b16-001/observer-warmup.png",
+      "bytes": 6971,
+      "sha256": "0fdd52571ddb6be81793be6e250f38d6df6518800fa0ed0522599fa559fc72ff"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-mjwarp-sensor-window-scoped-b16-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "6ae9f44e30701a98065208d031636cf0460aababc94bfffa836b0e8b6cf1a418"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-mjwarp-sensor-window-scoped-b16-001/stdout.log",
+      "bytes": 4395,
+      "sha256": "3ec13ca4f3c2ad774aa1a349bfcfb2164ac1bdf58c3435ffc1938f9e00ea382c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/performance-mjwarp-sensor-window-scoped-b16-001/supervisor.json",
+      "bytes": 1160,
+      "sha256": "1edafd1a43448d42d4bf8165fbeee23c7406a7a8822ccf7305f27ee99331c6a2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/report.md",
+      "bytes": 68502,
+      "sha256": "3c4d86f3f860242292a7122a9f5d5112e399ea90a9cd38bf862d28dc75cd6795"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/reset-geophys-b3-32-current-pin-001/independent-reset-current-pin.json",
+      "bytes": 757,
+      "sha256": "71996cd571b089c17ad0f46ee2a7893510ede0160000d12a74964ff72322ac12"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row0-32-001/descent-trajectory.npz",
+      "bytes": 10659,
+      "sha256": "0679fee73859f16e867634e137a634755191df4b8733f52a4b6496626b0d8cd0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row0-32-001/hold-trajectory.npz",
+      "bytes": 4539,
+      "sha256": "a4bfbea6a3b46c1feb6a7fe056cddf1c44b0a65dc98a16a61c7854c6d852582c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row0-32-001/stderr.log",
+      "bytes": 1421,
+      "sha256": "22eac1beb34e69c8a32bd7348b292226d432eaaa24a558db96b6816fb61a90e5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row0-32-001/stdout.log",
+      "bytes": 4068,
+      "sha256": "ec2dcb8f5ffacdc56dc86461f6ca0c4447303f4aab4021c445f539c7183dd008"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row0-32-001/supervisor.json",
+      "bytes": 1136,
+      "sha256": "9a6411332a6708cab642f485f5b2dbed408a229492950f2a17301019c2378782"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row0-32-001/zero-trajectory.npz",
+      "bytes": 4579,
+      "sha256": "1b781632b8cb2d22dba14e1caab0288dfbe729f0975fe907a0f876a49b32faff"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row1-32-002/descent-trajectory.npz",
+      "bytes": 10221,
+      "sha256": "c0524e9f4d35effa7601f56da01d5027e23985110f8c6a0ab10436b62c9970ed"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row1-32-002/hold-trajectory.npz",
+      "bytes": 4478,
+      "sha256": "ba8a3d1e6cab0b348d87e250aa885520e7ab4cebe3420c886633d029616ed251"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row1-32-002/stderr.log",
+      "bytes": 1421,
+      "sha256": "cfe7a0fe6bec22a85a747a934fb551d6c9ffcdbb2adbed55faa89e26d88f868f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row1-32-002/stdout.log",
+      "bytes": 4066,
+      "sha256": "9f8f45c7f566691bb7d0159b3341f2fbb23a18f57030c5ad81f6476bb5e6679b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row1-32-002/supervisor.json",
+      "bytes": 1135,
+      "sha256": "cc7f1e4bd4ebfa6dda0dedf9ff312a07eea381a9406a95ecc0a567ce49c62f15"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/b1-row1-32-002/zero-trajectory.npz",
+      "bytes": 4561,
+      "sha256": "fa8ddd4afcca7b312c43e4e29bd76358b49755c400ba282f9d27d63bc915c22f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/compare.py",
+      "bytes": 5657,
+      "sha256": "3f12a4005b3e26d8480d5f1f7d766c96473da7a5923fd89241489d7930b03214"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/comparison.json",
+      "bytes": 50139,
+      "sha256": "ad5f7d5ad4fdf5652b1beebf18c716fc321fa8092a2cece28bc011ff2ad5899c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/index.json",
+      "bytes": 14368,
+      "sha256": "0d81e7ad79f5d5f7c8cf5d15b6ff0ffca82c3ba16a8b51410534c07308243bcf"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt002/supplement001/report.md",
+      "bytes": 22821,
+      "sha256": "a16e26620c1d5865dbf12f9b168948a52c2cc0624a318ef4f8ec114878742e74"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/b1-comparison.json",
+      "bytes": 7899,
+      "sha256": "f4eb4e5d7ccf95fb112f4f43bc5b4bdb1b22359fdb79b2276ddad3ab3e169841"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/cleanup.md",
+      "bytes": 2651,
+      "sha256": "88ca99b8db26963528fad914cf4fe26464f3dcbf1e8633e58effad1a9dd05100"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/closeout-final.json",
+      "bytes": 794,
+      "sha256": "6ecf59578a7e4c3bbb0d7ed406187a9600a4b10ac4f4d946e8263c86b8f5385c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/closeout.json",
+      "bytes": 709,
+      "sha256": "fe4248943ae5da4041fdc526c79a07c14294df996e16d274e0ef4422fd5e86e8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/compare_lifecycle.py",
+      "bytes": 6817,
+      "sha256": "6753e6a67b3b94e11c0ba09fa9f2a8ab885dbab0a80720713a624058c30d322d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/comparison-protocol.md",
+      "bytes": 1770,
+      "sha256": "dcf6e120b565785fe3ceb7c70eebceebf248f37dc9833a25bbd5bb296e03f9e4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/completion-audit.json",
+      "bytes": 834,
+      "sha256": "6f8ceb8268dcee19f84f64c72eea65decd3e386765a3882e162b53747c1f1aa5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/framebuffer-device-001/stdout.log",
+      "bytes": 689,
+      "sha256": "ab10f3c412fb59995f205a7d4b6fd15dfbdca004901147b9b230c269d0a90c3c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/gates.json",
+      "bytes": 10730,
+      "sha256": "04e041db6af3cb728f1648b6157ae5b41f59e6911e870fbc3b9783f76f363004"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/geophys-pickcube-sensor-window-001/supervisor.json",
+      "bytes": 993,
+      "sha256": "2ae1450b3bf8d1147ac1a0f7e5d5cc33e7b7455ebf213b74a4f9219cc77eb3cc"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/geophys-record-varied-actions-001/independent-configuration.json",
+      "bytes": 3694,
+      "sha256": "251663b03b1dbaa53f2e22f836f0605b1883596370e659ba2ef1e133c6eaccd5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/geophys-record-varied-actions-001/independent-readback.json",
+      "bytes": 217,
+      "sha256": "fb763007ffc5947163fe88b910757387a934c607549cf1d592752dec0a3fe879"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/isaac-pickcube-camera-record-retry-001/independent-readback.json",
+      "bytes": 217,
+      "sha256": "fb763007ffc5947163fe88b910757387a934c607549cf1d592752dec0a3fe879"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/isaac-pickcube-camera-record-retry-001/supervisor.json",
+      "bytes": 999,
+      "sha256": "27f6987970a4e2cf97e94508ebbf86be8814d57e5b937940ac22e274fb5e671f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/isaac-pickcube-sensor-window-retry-001/supervisor.json",
+      "bytes": 999,
+      "sha256": "a188c6f5edee24d80f98df0f9773eb21047a631bd1de4b3b1fad13ae14d27687"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/lifecycle_worker.py",
+      "bytes": 4484,
+      "sha256": "29f4db4ae67b103e8cce66a4a33c6cad69307bfd8907bc16d543203048d475f1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/pendulum-comparison.json",
+      "bytes": 2579,
+      "sha256": "dad57e24040c9deeed37254f3eb9e70158d67209aa12ce7dde986d881bb45596"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-geophys-window-001/observer-warmup.png",
+      "bytes": 4374,
+      "sha256": "6c73d2782d3465e8f55b8c2f7456ec01841423c20419ae5b09036928953fd9af"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-geophys-window-001/stderr.log",
+      "bytes": 600,
+      "sha256": "22b9eedb9e0d1b410eea86dd0141823d21eacfcc3ffa9dc86ba935de2fc66233"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-geophys-window-001/stdout.log",
+      "bytes": 1036,
+      "sha256": "7f99eb6d6ad62bf6c7e5fb2d77128f42dd84a82ff33dc1d6b9e8d82f23d4d3e3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-geophys-window-001/supervisor.json",
+      "bytes": 981,
+      "sha256": "08def898a53f64035eaf0afc03526c0e3f85ae00d22754fbaba8bc0e8d96f794"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-index.json",
+      "bytes": 28746,
+      "sha256": "48fdd429eddc57f7719c3838ca1e5ac3ded415171e2164302a07f8c1567530eb"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-isaac-window-retry-001/observer-warmup.png",
+      "bytes": 4111,
+      "sha256": "c73a5488f02203dedb9d2e901e7f90b93acb05a25b2b233d0f5fedc2683a809e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-isaac-window-retry-001/stderr.log",
+      "bytes": 39683,
+      "sha256": "c359993642754a1fe38a77437199c59fc724db663995e27aa0c50f3c52e148af"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-isaac-window-retry-001/stdout.log",
+      "bytes": 1040,
+      "sha256": "184fac9bb817904dd9b2985ebcc89eb1cfc3a4ddf2ba8da9a309f38c1c1bdee0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-isaac-window-retry-001/supervisor.json",
+      "bytes": 1017,
+      "sha256": "8b327f82132714bc55d59590a60a3213fc85bd93f622c2978023b52fc9797472"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pendulum-window-001/observer-warmup.png",
+      "bytes": 4341,
+      "sha256": "b056715fec80ffd364eddb6de50f927b23f6dc9262deb0a114dff0e4059864c5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pendulum-window-001/stderr.log",
+      "bytes": 4513,
+      "sha256": "8b7d6afdadc6fcb3a8bb6f1b2dfd8fcfde660837c628db979ac156d105408a02"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pendulum-window-001/stdout.log",
+      "bytes": 1045,
+      "sha256": "1c01d9319b14f3f5949dd5fa7935597b924b4748f445eb0e8211836e7444d17c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pendulum-window-001/supervisor.json",
+      "bytes": 1026,
+      "sha256": "9dc6de480d185727b5ba4970200cc0f95d2048531dd9bef53f4f006bf0ee1382"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-001/stderr.log",
+      "bytes": 1421,
+      "sha256": "3701fc963c89653f1f73326b93bc4b3322d6149a41e63495494eb0ce70a4dd87"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-001/stdout.log",
+      "bytes": 4578,
+      "sha256": "9cc9a6503a97e8c674838580cdb0c37824695dc420f18726c627ac498ecb5eff"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-001/supervisor.json",
+      "bytes": 1096,
+      "sha256": "ef957c33fc2d8189e826e56ed1c2005ef95d25d4ac96e5b37cc056e4ee467265"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-window-001/observer-warmup.png",
+      "bytes": 7059,
+      "sha256": "52aebaa3d30ed0cab6ac72fb5d2e01171275fd02268706570c60aa1d05956529"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-window-001/stderr.log",
+      "bytes": 3903,
+      "sha256": "9d36d417db42762219de459b43b65db714c4a7a742cfa45aeb9363a2c298cfe3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-window-001/stdout.log",
+      "bytes": 4614,
+      "sha256": "fdcc2e744be263d35b935c5f12311b22d771419e6db363b65ba5b2cc20900da0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-window-001/supervisor.json",
+      "bytes": 1139,
+      "sha256": "354106b77c56fa565cedaca0f985a616b7d2ef76e5564596d661b012b4c8c6a5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-window-001/observer-warmup.png",
+      "bytes": 7059,
+      "sha256": "52aebaa3d30ed0cab6ac72fb5d2e01171275fd02268706570c60aa1d05956529"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-window-001/stderr.log",
+      "bytes": 1421,
+      "sha256": "45ed2a2c43fd103a469b6ebd42242684d2a54c5710b6a18b9d313ffbcc250a25"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-window-001/stdout.log",
+      "bytes": 4006,
+      "sha256": "8cd339f36043264da85981d5cf9964c9e33ae815551a899e89603bbb9866551c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-window-001/supervisor.json",
+      "bytes": 1096,
+      "sha256": "ad16760f3a7eec1985dfe1b68a2842ccd4244c4449b0eba1b0b18c1b9ae5f836"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-retry-001/stderr.log",
+      "bytes": 43381,
+      "sha256": "776172ffb93e86d012728b9974464234b18c1f36f2e88bc06ef8e72b253fabf9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-retry-001/stdout.log",
+      "bytes": 10290,
+      "sha256": "3fdc6ab7c65af2a7e4a2e782889ea04e0900f5d693bf9aa5b9e39fba07effa12"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-retry-001/supervisor.json",
+      "bytes": 1111,
+      "sha256": "ff97d67d84cf5866c10c6986eef729fe1c9ee45147c95771a41ab18f8c6acd9f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-window-retry-001/observer-warmup.png",
+      "bytes": 6815,
+      "sha256": "10effcfb98ade77f55f3449c81c36cbb6c6b3a9273678be608bb821638c751c7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-window-retry-001/stderr.log",
+      "bytes": 43222,
+      "sha256": "7984a4c336cb96db6483f87eeb736e7e3795f25f4b4311dde509076eafd07fe2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-window-retry-001/stdout.log",
+      "bytes": 10327,
+      "sha256": "b5152237bce75568d02a92cc3057e6c36dcfaeb78027ce74b27e54295048d0bd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-window-retry-001/supervisor.json",
+      "bytes": 1153,
+      "sha256": "5ee01b448d545e96a558d654fa3dcdd284611a5cd43962896efe09dbae415f04"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-window-retry-001/observer-warmup.png",
+      "bytes": 6815,
+      "sha256": "10effcfb98ade77f55f3449c81c36cbb6c6b3a9273678be608bb821638c751c7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-window-retry-001/stderr.log",
+      "bytes": 42417,
+      "sha256": "c249f6b1807a12e5d9680bd974870bea4ab8182dcf1dffff51139d8c2d9ce5aa"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-window-retry-001/stdout.log",
+      "bytes": 10254,
+      "sha256": "ac50f18e8bf38d21167aa89bcf9da6ab2e87dd0135e83ff972b8f529eb06b688"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-window-retry-001/supervisor.json",
+      "bytes": 1110,
+      "sha256": "d03c208434c6c76a976e5e5664248704ca2e411a3dd2197a1c3949ef328ce227"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-sensor-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "3ce692b63884be3f44db7b097eb85cb074786f21f0a13a0a92e7853762ae7237"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-sensor-001/stdout.log",
+      "bytes": 4362,
+      "sha256": "4f33b47f70a0f9b6aab23bb9485c16dc9ed4a8d0f598175551df18922be0174b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-sensor-001/supervisor.json",
+      "bytes": 1122,
+      "sha256": "416b3d97d2c41384b422b91d53c332ae52fece360d45f266095a4bb0c7525bf9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-window-001/observer-warmup.png",
+      "bytes": 6971,
+      "sha256": "0fdd52571ddb6be81793be6e250f38d6df6518800fa0ed0522599fa559fc72ff"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-window-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "89ea346139583296d0377643e7b72eacbc690ddb1f1c30edf73ecc8cf669ab4b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-window-001/stdout.log",
+      "bytes": 4459,
+      "sha256": "466372245deb54c642c29abd0d0e60144b76f93c07a2507d0fe9a495ab1c1fba"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-window-001/supervisor.json",
+      "bytes": 1121,
+      "sha256": "c531d8ca80963133ba9b30f58ff7ac3f4459a11cbeaba88ffbc52d5ecd99f771"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/replay-short.npz",
+      "bytes": 707,
+      "sha256": "566063944426820d4344d28db46dfd8e020c1277c19d1d4153a75f6bcf384073"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/report.md",
+      "bytes": 13763,
+      "sha256": "1a676dcca0d7df1303fc9c6e5fbccf15771695fd5e6f63516befb4e5c1f2cefd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06b_attempt003/scalar-batch-model-comparison.json",
+      "bytes": 1721,
+      "sha256": "cde92c03ce41b60d649d5da7e6f99b360f6fc140482b01a8409c12e56ce43f2a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-geophys-camera-explained-001/camera-non-adjacent-base-row1.npz",
+      "bytes": 7342,
+      "sha256": "f1d15b84a9427c8b06ee0d35f33e93edb15661f07fb32a85d253b0db7a8c3195"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-geophys-camera-explained-001/camera-single-base-row0.npz",
+      "bytes": 7338,
+      "sha256": "f2ce21f61f02c41e6e285da799a8aeda8ca59c2753c44729cc6b5011c2b441df"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-geophys-camera-explained-001/partial.json",
+      "bytes": 11472,
+      "sha256": "f2d67a7d0cb32e09293541814a675312942c104e70e2ef113debc239aea82791"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-geophys-camera-explained-001/stderr.log",
+      "bytes": 6381,
+      "sha256": "f6c2956b2c896dd3ac2a8d9a8c1c0e680c3a0d26e93133e3e26d7cb9216f1543"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-geophys-camera-explained-001/stdout.log",
+      "bytes": 13897,
+      "sha256": "bb145d0433e1f2707bfe231f2d0f78e9a70d67f411a80c1049e5c90c044e447a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-geophys-camera-explained-001/supervisor.json",
+      "bytes": 1216,
+      "sha256": "c1d09a4167fced22e690ae4f3ce1a132d5e4885044356a97b1595fcadcfeca74"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-isaac-camera-explained-001/camera-non-adjacent-base-row1.npz",
+      "bytes": 6736,
+      "sha256": "f291a829f0a681a17c30f97acc18cdc641d780756d42cbc0b564ad7141a16b36"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-isaac-camera-explained-001/camera-single-base-row0.npz",
+      "bytes": 6726,
+      "sha256": "c2ae84efba59dc70bc1aa491568a5e0d0312c0b96c4e548cbba3f86c3873725d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-isaac-camera-explained-001/partial.json",
+      "bytes": 11437,
+      "sha256": "603b50105fdc93b7979cef728523c3c0c1c33de76b961e79d4690393e5dcd395"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-isaac-camera-explained-001/stderr.log",
+      "bytes": 195221,
+      "sha256": "d7e18f8f7d598a61e768bb854fa315e39f00919bbecb23360abe6ac055d1cfd5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-isaac-camera-explained-001/stdout.log",
+      "bytes": 11034,
+      "sha256": "daba1a8a4620fc374a0968aa2327d061150b98a1e14b5ff0ab9e6ed02da18f4e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-isaac-camera-explained-001/supervisor.json",
+      "bytes": 1248,
+      "sha256": "d1010f774bddb97988d6d17c996195cab68ff4cc1849c71961251415bcda2826"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/camera-non-adjacent-base-row1.npz",
+      "bytes": 7349,
+      "sha256": "de34eb8437d16b19fdfa086a5610091e001679eb51d2b144446f9628794e7cdd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/camera-row2-only-base-row0.npz",
+      "bytes": 7334,
+      "sha256": "c2eb419dab8e6da3dcd0e2fc16830d27d2927a0e392fd1ad481e35c6afb5e4fc"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/camera-row2-only-base-row1.npz",
+      "bytes": 7349,
+      "sha256": "de34eb8437d16b19fdfa086a5610091e001679eb51d2b144446f9628794e7cdd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/camera-single-base-row0.npz",
+      "bytes": 7336,
+      "sha256": "cbb530e2b174ad393b021105daae2ba138c5a48cb81fb8b6503f5fbf62acaa9a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/partial.json",
+      "bytes": 19795,
+      "sha256": "4c13bf3aac22b1f6c5b00ebbbf65a6ca5fdff211d96b05c628a2e2b9d8ad65d1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/stderr.log",
+      "bytes": 42042,
+      "sha256": "880367987d88f40dc5f3c60784d634cb7a0179e13a82a9474d263b1f37bdfc29"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/stdout.log",
+      "bytes": 19468,
+      "sha256": "898ed3f6a7c8ab81a0554837155eec81287a6f8c4ef6143cf8b46bd45838fb37"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-attribution-001/supervisor.json",
+      "bytes": 1267,
+      "sha256": "9dd86cec316ea72a1a4317438c37ae79ac66a2625f07e7d9942b3947fc2e826b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-explained-001/camera-non-adjacent-base-row1.npz",
+      "bytes": 7349,
+      "sha256": "de34eb8437d16b19fdfa086a5610091e001679eb51d2b144446f9628794e7cdd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-explained-001/camera-single-base-row0.npz",
+      "bytes": 7336,
+      "sha256": "cbb530e2b174ad393b021105daae2ba138c5a48cb81fb8b6503f5fbf62acaa9a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-explained-001/partial.json",
+      "bytes": 11476,
+      "sha256": "64de26f826a8ba9fb0752ebfe3315dce4f6ccc83da7c70d17c9516bc2a57e822"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-explained-001/stderr.log",
+      "bytes": 30030,
+      "sha256": "38368194f8a3db394d0ca8917814c425b4e9cc43ab443cc6a37458a9d0ce4bcb"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-explained-001/stdout.log",
+      "bytes": 13901,
+      "sha256": "07e3d44815fe85c08d9a624a6122d279ff28db38106172f3ae7a3b9c4ad98440"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-explained-001/supervisor.json",
+      "bytes": 1262,
+      "sha256": "02d7bda7d067945bbead073e5a1dc5a0d8527ad6fd2401520703068716026461"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/camera-non-adjacent-base-row1.npz",
+      "bytes": 7349,
+      "sha256": "de34eb8437d16b19fdfa086a5610091e001679eb51d2b144446f9628794e7cdd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/camera-row2-only-base-row0.npz",
+      "bytes": 7334,
+      "sha256": "c2eb419dab8e6da3dcd0e2fc16830d27d2927a0e392fd1ad481e35c6afb5e4fc"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/camera-row2-only-base-row1.npz",
+      "bytes": 7349,
+      "sha256": "de34eb8437d16b19fdfa086a5610091e001679eb51d2b144446f9628794e7cdd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/camera-single-base-row0.npz",
+      "bytes": 7336,
+      "sha256": "cbb530e2b174ad393b021105daae2ba138c5a48cb81fb8b6503f5fbf62acaa9a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/partial.json",
+      "bytes": 20253,
+      "sha256": "b9866493baee99f02f5b52fe0ce671d0f1800c82518a1416bee31af5732093b1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/stderr.log",
+      "bytes": 42042,
+      "sha256": "197f04d8d71e7b25cb1ca1ebd7998d8fd9eb3597ae1df28bd6fc7730fe78d25d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/stdout.log",
+      "bytes": 20447,
+      "sha256": "05edfb3a09a3cd4232636725210d221bd635fa4b620b670a1f26ed4bff7a2f17"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-mjwarp-camera-isolation-001/supervisor.json",
+      "bytes": 1261,
+      "sha256": "b875c58f8f9469c172f6b2a7d915758a1dcbb13f3bac254ccbd1dbd733da0260"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-geophys-final-001/partial.json",
+      "bytes": 1931,
+      "sha256": "f7eda2f557b81a0c77cd3c7a9ec0e7c3ca066f1cbe6cc59de5f5e5dd6ed9be9f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-geophys-final-001/stderr.log",
+      "bytes": 3000,
+      "sha256": "815ba174259e5fbedccc48ed8089322184e45cb70349b5c981c1d516a6a3165c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-geophys-final-001/stdout.log",
+      "bytes": 1467,
+      "sha256": "06713c27e0f682341f6ee4ffd8dc111a16514e8ca169ee89e3573441362d4dfa"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-geophys-final-001/supervisor.json",
+      "bytes": 1182,
+      "sha256": "232d0bd8f8de1986c944ca6fca0d5639634d5803be5ab9e8ae9112ffa04a0789"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-isaac-final-001/partial.json",
+      "bytes": 1932,
+      "sha256": "39487b357349f869e6a30bade00e627a835df531a0865dd0ca83adbe01fd02bd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-isaac-final-001/stderr.log",
+      "bytes": 195204,
+      "sha256": "0dae305520da3263810ad9f0fedb3b742afb56f5717dc901c344dd44e2fae2c9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-isaac-final-001/stdout.log",
+      "bytes": 1468,
+      "sha256": "845c1860bdcbb1546b0d90bf883e324c8af53360afa1002c50d0da775b3d511a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-isaac-final-001/supervisor.json",
+      "bytes": 1213,
+      "sha256": "51440e1df6f782ecba92fb76a18fed94fdd3f6e3d1507955be30e9f10bc29436"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-mjwarp-final-001/partial.json",
+      "bytes": 1935,
+      "sha256": "71b54d987d8adf5cf2042012faa19a3b8602cea08a43bee743185cbce7b61c7b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-mjwarp-final-001/stderr.log",
+      "bytes": 22565,
+      "sha256": "619e5ebe78951bb68a6f0bba2f1822390d17b292282bfdf98023a62c735321dc"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-mjwarp-final-001/stdout.log",
+      "bytes": 1471,
+      "sha256": "46d4e8f7a70fd7cdccb0a2dde0bbac79ea502ceb391f9fefd80e121db8f4ec95"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c1-pendulum-mjwarp-final-001/supervisor.json",
+      "bytes": 1225,
+      "sha256": "2c06dadf5f25b2d5e01a2a741863951ec6da3e26c20125920f1b4e7af6d7c5b3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/independent-readback.json",
+      "bytes": 218,
+      "sha256": "1a5c7e0641eae1756651f6f9b12e24112a533ca0ddc6f6abc3edde1895d748e8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/pickcube_public_contexts.json",
+      "bytes": 17529,
+      "sha256": "b3d7b684a9ad3d849673303dae7f4f6adadcdc303fe677a8b48dcd5e452fa4d5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/pickcube_public_traces.npz",
+      "bytes": 259586,
+      "sha256": "042e28598cc024de577fbcbbe6af5631c3483ee19a5515cf48da9e02563e54d7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/staggered.json",
+      "bytes": 9590,
+      "sha256": "559c6f420a13006509442bfe36e6418569542f42abbf6d16075df831d71bab8a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/stderr.log",
+      "bytes": 1421,
+      "sha256": "ac2bb49d75d9ab8deef9ba7f1d22b7560383bac8fc183cb1ea414056949da38c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/stdout.log",
+      "bytes": 8637,
+      "sha256": "0612732e4063f52df91f5da2169325c8cfacf3d566fa1cc878418611bb25a86b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/supervisor.json",
+      "bytes": 1130,
+      "sha256": "cc624916e449b67fa7c163ea151144df69bd2dbf0748e3e17272c6bacb94a65b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/trajectory_slot_000_episode_000000.h5",
+      "bytes": 91650,
+      "sha256": "a4359944e118793416b92374a61a1b155dac12fdb11933fceec19d5c985181a4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/trajectory_slot_000_episode_000001.h5",
+      "bytes": 133063,
+      "sha256": "e11b247d6efeada3b1769f790d74db22502512d877e949f5e4393e567abb2830"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/trajectory_slot_000_episode_000002.h5",
+      "bytes": 132509,
+      "sha256": "22a02eb568725883e5f8f867dc32db3336770fc64dfd3fc5c971bde95d92728c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/trajectory_slot_000_episode_000003.h5",
+      "bytes": 91602,
+      "sha256": "f892618ea08c7347b2c0a167d6fd0d19c7db3aa1a2672d718f0bd18baaa3d51c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/trajectory_slot_001_episode_000000.h5",
+      "bytes": 119689,
+      "sha256": "739ef0e66c8e3447fdc7af3063382cec96acd44560058d8eafdf70579c7d7353"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/trajectory_slot_001_episode_000001.h5",
+      "bytes": 133270,
+      "sha256": "0149b14ccdda8def3c315e71505fb8fc3060c9b40b082f86c692fa639257e8b8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-geophys-record-001/trajectory_slot_001_episode_000002.h5",
+      "bytes": 119789,
+      "sha256": "267bfb516b0e740500743596437464a87314a7f6209b678fa0d74c41397a685f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/independent-readback.json",
+      "bytes": 218,
+      "sha256": "1a5c7e0641eae1756651f6f9b12e24112a533ca0ddc6f6abc3edde1895d748e8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/pickcube_public_contexts.json",
+      "bytes": 22632,
+      "sha256": "e607a476416c40d9696399903984a393967f29cf34d8e014af4c8d1d1c822520"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/pickcube_public_traces.npz",
+      "bytes": 234287,
+      "sha256": "52e44d093a7951e15f29f7c53354efb5907f4b05ec43af69d59896c8052fec63"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/staggered.json",
+      "bytes": 9591,
+      "sha256": "4ea2b4e2886fd2bea8dd762173285593cb89db79c013f01719ee54225577f841"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/stderr.log",
+      "bytes": 39042,
+      "sha256": "9668c5efe139220c4adb89fb8c9abbd245c640bd7d2b0f3f69b84b1262daab7b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/stdout.log",
+      "bytes": 8234,
+      "sha256": "318805584d353e2981a03d22978497a55ae23050a14e4ab0a41466a33084ea68"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/supervisor.json",
+      "bytes": 1163,
+      "sha256": "7191548185747a4d4498d844e90db5625cbd5b9ae2cf84537afe3a936dafb39f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/trajectory_slot_000_episode_000000.h5",
+      "bytes": 90881,
+      "sha256": "5b06ef5e4f8969c03b4a462bd136087dc1d1938a59ccd3eb3db9baaec79d7264"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/trajectory_slot_000_episode_000001.h5",
+      "bytes": 132797,
+      "sha256": "f51c7b85821d4332a5cfab853db1f95574384cb4f0b7c8755ce70e74777a61c6"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/trajectory_slot_000_episode_000002.h5",
+      "bytes": 132099,
+      "sha256": "cb46c856e251f13b36a1e3612a50fec1fa7acaa7dc8000141bf08e5289ba90ce"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/trajectory_slot_000_episode_000003.h5",
+      "bytes": 90798,
+      "sha256": "5e1fad6bef5cc192db5da8623d9c5f8155bf542cdc17bb99f30b36a354e783a0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/trajectory_slot_001_episode_000000.h5",
+      "bytes": 116007,
+      "sha256": "661e792283907de4971816de488632e82cf058cc80bdbae3dfaf2ada185291e0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/trajectory_slot_001_episode_000001.h5",
+      "bytes": 133067,
+      "sha256": "0d833646432db31fbe7692a263c2490e7bc29150a8a6756271a8acad29d071a2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-isaac-record-001/trajectory_slot_001_episode_000002.h5",
+      "bytes": 115723,
+      "sha256": "cd319b1f9926ac7c67d43ea3ec8e28f877a639b76e99d2521ffbf93fdc7bbe22"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/independent-readback.json",
+      "bytes": 218,
+      "sha256": "1a5c7e0641eae1756651f6f9b12e24112a533ca0ddc6f6abc3edde1895d748e8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/pickcube_public_contexts.json",
+      "bytes": 18514,
+      "sha256": "c1347cefe88e592a90ffb3c6aae4c114c482602418900f717a305e23b7999dba"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/pickcube_public_traces.npz",
+      "bytes": 259840,
+      "sha256": "d518a596e1a2eb64174de980c20af87b7a14f2381b3974dc70a6e884fb593046"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/staggered.json",
+      "bytes": 9594,
+      "sha256": "d96de49a91b3aa2196b844b033ebf1fecebec92319b47dbfdad190420abca3a0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/stderr.log",
+      "bytes": 6006,
+      "sha256": "ed281c454d09ab83a6b950b7ac990b438d9d9bef3bb5093bbc936b5c697567b3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/stdout.log",
+      "bytes": 8641,
+      "sha256": "63a19a98baf5efd0a59f554fa8fa7ce3947f45bffb6dbd7973ec6e6468e203f4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/supervisor.json",
+      "bytes": 1175,
+      "sha256": "3ae6ca267b5abe2e76dbe3716dd8eb77b5f76dd9582422f98fd336aa682a5319"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/trajectory_slot_000_episode_000000.h5",
+      "bytes": 92474,
+      "sha256": "87f33a2154f9735dcc47876f7dc6a31075b86b7f847ad6a7c2f92789204d8041"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/trajectory_slot_000_episode_000001.h5",
+      "bytes": 133910,
+      "sha256": "a06eccfc7c459d7286e9f09f3f4a5c3dd2488db5078ce631a72758bc03fb7e02"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/trajectory_slot_000_episode_000002.h5",
+      "bytes": 133531,
+      "sha256": "73d80baa83cec0c802b949d17a80e9c01949fd808dc1243fd3e37c11eb620bf3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/trajectory_slot_000_episode_000003.h5",
+      "bytes": 92411,
+      "sha256": "76dcdbebd465171f1d2a34099e582dc3aafe848e47c6c70bf58bd15c3b03fffe"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/trajectory_slot_001_episode_000000.h5",
+      "bytes": 120502,
+      "sha256": "71f5d78f2c18e7766017e1b08d38650291fe1cc6daf711cd4955621f2c1faab9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/trajectory_slot_001_episode_000001.h5",
+      "bytes": 134143,
+      "sha256": "edaebfec4a84685455ed1e37af992dfd84f43bb3b016a054422da1feb2bdf0bc"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c2-mjwarp-record-001/trajectory_slot_001_episode_000002.h5",
+      "bytes": 120678,
+      "sha256": "47bb4fc0f6e49f8cdc611530ae131a90a3ba713b074e2bbd857c2c1447385179"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_000_episode_000000.h5",
+      "bytes": 115876,
+      "sha256": "cb846ecfe05d00765e5a67865f90af2e02e5d9041676554d09f649efc106cf1a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_000_episode_000001.h5",
+      "bytes": 119806,
+      "sha256": "fe4721a299e3e1e25176c1bd446d1d3106881d1669fd60f60749644bbc4206f7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_000_episode_000002.h5",
+      "bytes": 115209,
+      "sha256": "83705c4615e1614c37f17a38ecf132102243cc856b2aac65c6da72e35f2edb58"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_001_episode_000000.h5",
+      "bytes": 116007,
+      "sha256": "6d2dec93bf925a7689a946c337c26c289258943fe6ae15e3a673c2d52674f8a2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_001_episode_000001.h5",
+      "bytes": 119941,
+      "sha256": "029d17a906a947e2c1e11035ed127ab9dde60dba8d681737616fd00d58b31e03"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_001_episode_000002.h5",
+      "bytes": 115740,
+      "sha256": "77ef411d82fb9ec5c1a379ed0ba104cb922e6cb52f9c8034fd0d13711ad2dddc"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_002_episode_000000.h5",
+      "bytes": 115111,
+      "sha256": "785b774d55cefebdcb1cc517a7a4a74d2b371f811f40bb9997b4cb9abd6cf681"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_002_episode_000001.h5",
+      "bytes": 119511,
+      "sha256": "ad06bdf325ffa15f475d80e5e9a471875f3f9e627e6a55e09434ca83514021d3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/pick_cube_switch_slot_002_episode_000002.h5",
+      "bytes": 115180,
+      "sha256": "42133f793ea38ed9bed3d0d890acd914683fe597ac5d902521366105eb397044"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/stderr.log",
+      "bytes": 84266,
+      "sha256": "952e6d0ee5d04baef8d2d96737f55e0de1865e5b1f47a7421080452b21f562b1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/stdout.log",
+      "bytes": 6602,
+      "sha256": "6467652bf16304eae5f709ec58463698452f549a1bb107084e8f59feed500be5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/supervisor.json",
+      "bytes": 1187,
+      "sha256": "04d4c84fb0f1d00501d6f291a4ede5f7e8587aeb69271271d855c3997791465c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/switch-independent-readback.json",
+      "bytes": 3491,
+      "sha256": "d590f06f701ed875f056604d38d50b2f5569afe1a75de2d6676b4cd4ec20e047"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/switch-public-witness.npz",
+      "bytes": 302529,
+      "sha256": "a878c747c8749608251d589f68f70827ed1245864dc3625e7fbc432b47eb3772"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-pickcube-current-final-001/switch.json",
+      "bytes": 5657,
+      "sha256": "9c74278525139c7af10a00733195394b87fae19f8e787a4bfa09d91ed1322c3e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_000_episode_000000.h5",
+      "bytes": 28376,
+      "sha256": "0a3efb81e1da65bb5c1f672de7a323c562ce45b22ed2e07c29dafa81be08215b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_000_episode_000001.h5",
+      "bytes": 28376,
+      "sha256": "dea973f1c7e88f3044856a884f32f3b5d161aa64b3baf3eaec90281b7fa30c21"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_000_episode_000002.h5",
+      "bytes": 28376,
+      "sha256": "61a3405930123f9b465615a69df92322ddf5367232353e4e2078cf4632af78d3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_001_episode_000000.h5",
+      "bytes": 28376,
+      "sha256": "66dbd6f5538d47495e6a9c086a008700ba49c90b7675100ca13b6f15fc535fa5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_001_episode_000001.h5",
+      "bytes": 28376,
+      "sha256": "0a1da0a78f4bb1074c97662d03f484c8791f71501dcffbf8879eb4259ca509c7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_001_episode_000002.h5",
+      "bytes": 28376,
+      "sha256": "48a76cebfb25b53b5c0cb8d68a88c93d0c9f7cc2866cb9b84a108af8305837a7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_002_episode_000000.h5",
+      "bytes": 28376,
+      "sha256": "47d8247e60603f57e8ef063b99bb26b8eb7f997ecab7254d25989b896b84f518"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_002_episode_000001.h5",
+      "bytes": 28376,
+      "sha256": "992a26231fc76f9441c7df161ae328ca478fb2a7fa98fd92822b668c1333e1ac"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/pendulum_switch_slot_002_episode_000002.h5",
+      "bytes": 28376,
+      "sha256": "023affa38898926d06cfeeae915b46cb517c60c7f7121adb4b05e53881fe2bc8"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/stderr.log",
+      "bytes": 82605,
+      "sha256": "cb83bcc957c8a5142bd6bf0640ef55adf31e8e08401a8232224174b78655e533"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/stdout.log",
+      "bytes": 3608,
+      "sha256": "fa86876015672724171b33736540cfc36f8731cec7d5fa7c5410cecd028bd473"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/supervisor.json",
+      "bytes": 1182,
+      "sha256": "270b42086724fcd20a0b57e174ba82de46d96dbe2e4ff9653c2b05ff8e265c7b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/switch-independent-readback.json",
+      "bytes": 2096,
+      "sha256": "bc9aeeb52b224b3eb7cd511151e18615d713a6d20d09f31c03536a7fb8ad7452"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/switch-public-witness.npz",
+      "bytes": 3788,
+      "sha256": "18435d2599e3d5633db08da4d4abe60598cd0ce99e8065ea3569c9d61102339e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c3-switch-pendulum-retry-001/switch.json",
+      "bytes": 4371,
+      "sha256": "1605ae2e4d69ea71789c38678fd95406f49c17ecf8b255b51440340bd1c1befb"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c4-fault-ipc-final-001/fault.json",
+      "bytes": 1608,
+      "sha256": "77d632b45573a36b2c860b052c86797e1b82aa482e38cace3dc89bcc5b4778e3"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c4-fault-ipc-final-001/stderr.log",
+      "bytes": 82483,
+      "sha256": "c69db1f4c9a3f2ad0d496016950daf8ecea020abd08d2fe7fff636b84f9d07f1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c4-fault-ipc-final-001/stdout.log",
+      "bytes": 1160,
+      "sha256": "074e7b1995fa102be6c7550385ac78c88a00e5f03f571ca7274e52a832c5c23d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/c4-fault-ipc-final-001/supervisor.json",
+      "bytes": 1163,
+      "sha256": "81461f14e92946f1aba642d75ff1e5cda3b1ecd62dc2880114518f517da1b519"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/command-index.json",
+      "bytes": 73852,
+      "sha256": "0f05ad02b537df6932ceeae58e779f2675da917cf2fbb00c68f4ec97baa3a0bf"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-existing-pendulum-001/stderr.log",
+      "bytes": 4519,
+      "sha256": "fcea833d1f04c56340e4d04d4c8f8a3cdaa4b859907778792755ca6b47afc444"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-existing-pendulum-001/stdout.log",
+      "bytes": 412,
+      "sha256": "43312e5ac86faa8208812c482d4decb6833f406fd0dc3b1b2eb2b3ae784b1a1e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-existing-pendulum-001/supervisor.json",
+      "bytes": 994,
+      "sha256": "3a524b9e97bc43f6eb62a69f241335a897beeee0b4d50d4a1e2dc6c15eb34a93"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-existing-pickcube-001/stderr.log",
+      "bytes": 6009,
+      "sha256": "3b5a9567d1ed9aed84312ed2751cc456be0ca3149895842aaa2ddc6541a21b9e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-existing-pickcube-001/stdout.log",
+      "bytes": 1823,
+      "sha256": "e4de0eb3bd6e0f6ee56bab42e8839a353dcae06c710bd55b4a8f880c8f6b8335"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-existing-pickcube-001/supervisor.json",
+      "bytes": 1010,
+      "sha256": "e38c959462947bf50d048c335f1cba0e7058b8d5c82f80e0bb3a690f846a8765"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pendulum-001/stderr.log",
+      "bytes": 82580,
+      "sha256": "4f87d27c2f282e28cdca547a90ef92b85a1f0f89fa276161b42d46d54335b136"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pendulum-001/stdout.log",
+      "bytes": 171,
+      "sha256": "2d5e7c5e4245ddbfb499b77c4fc4d67b9f392f691b9917ff9d1b6be3a3b908fe"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pendulum-001/supervisor.json",
+      "bytes": 1133,
+      "sha256": "38054ec36922c73ea0b0b1bf230f1000563e0ece0d31c66a4351339972b93bec"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pickcube-001/stderr.log",
+      "bytes": 84094,
+      "sha256": "35f17a9bee122866e13aa956d96a9ffcfc5235dfcffef1a1ee2a8ec2982c91d1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pickcube-001/stdout.log",
+      "bytes": 2932,
+      "sha256": "e8096ef12ec75faa75788ea6ea63c8415de9a439be3b9b1c1f91751c2e21c0a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/example-reconfigure-pickcube-001/supervisor.json",
+      "bytes": 1134,
+      "sha256": "e6ade6c89dfb7fe9ecfa826803c954c43e211e0ffde3bd4a503f6130f046762e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/gates.json",
+      "bytes": 1844,
+      "sha256": "5f4acb9ec6005cf8ba99af703f026f283f49ecbb4de292f7f00d3540166b164a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/readback_switch.py",
+      "bytes": 4030,
+      "sha256": "5ec81a05de3bf31bc7f8f73f06a7a7dbf82c6c9576ffc81d3a341e47243e2c38"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-current-final-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-current-final-001/stdout.log",
+      "bytes": 179,
+      "sha256": "084f2468b88505a699e14739a97aedeb51e13b853334ba05403ec5727a8292d7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-current-final-001/supervisor.json",
+      "bytes": 1112,
+      "sha256": "8dd8c35f255f333c7ccce8d4fc583343e1c57d071dc5416f6355a926e072b11f"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-final-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-final-001/stdout.log",
+      "bytes": 192,
+      "sha256": "703a357349a6011207b6caf5abadf6e7d63f6ffcaf12f6460c3b07fb11a34e96"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-final-001/supervisor.json",
+      "bytes": 1519,
+      "sha256": "035f87dc243624f3b5dba0158ed6e5f31e0b4bae71ad296a36ad8c9f7bc94992"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-scalar-effort-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-scalar-effort-001/stdout.log",
+      "bytes": 98,
+      "sha256": "31640b69fb11fb26cdd527775103644fff25df8e7ead56faba2d6011818edfe2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/regression-scalar-effort-001/supervisor.json",
+      "bytes": 1112,
+      "sha256": "7eb4b2155dde34bee57ccc2ff89975db9a4322173007290409c06a8e66da1acd"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/report.md",
+      "bytes": 8139,
+      "sha256": "3bcdfd6638d6ce75e9e48825058f7f678a086a258a9b9735a4ae6c7517719cf5"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pendulum-001/rng-sequence.json",
+      "bytes": 335,
+      "sha256": "87e1603655124386545853fd60cf3474bcaf852eb7ccc7b6fb5681ebd3af18d0"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pendulum-001/stderr.log",
+      "bytes": 1200,
+      "sha256": "6b2c4942bb3a38ef82aef3e8a96c0ab5304992f560ed45d4da91c7cc26dcf0b4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pendulum-001/stdout.log",
+      "bytes": 257,
+      "sha256": "e1c3770523cd89be92c00118bbc38b1c74cadb031a1780c6129bb057fec95c50"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pendulum-001/supervisor.json",
+      "bytes": 1162,
+      "sha256": "6a056329c31ad78546120d2b0ce1f64f8e0737675f3f29435b464c4692b58ea4"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pickcube-001/rng-sequence.json",
+      "bytes": 336,
+      "sha256": "df5eb5e1e314e8c2002e8f7fe92b0df89661729b4f305de5e95a3c72dc186533"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pickcube-001/stderr.log",
+      "bytes": 2842,
+      "sha256": "aa7ee8079e70501ca640a22f367c3f9d8a2ccb631f46b61854664d5f1e35363e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pickcube-001/stdout.log",
+      "bytes": 1072,
+      "sha256": "3a32a1ae4c078d1eddef3e0145903d654125bccba3a9c59ec0d7e396c87c9c1c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-geophys-pickcube-001/supervisor.json",
+      "bytes": 1164,
+      "sha256": "45717633aaf08b34c5821b68b948aa3f01087024abbb3a62d46c1a12c2409f4e"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pendulum-001/rng-sequence.json",
+      "bytes": 336,
+      "sha256": "a054f6daabc21ccc27384e693100638f2791ef8cbfe34d8a2c862b0eba030fcb"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pendulum-001/stderr.log",
+      "bytes": 78079,
+      "sha256": "480a5e99685750a72418e96616e9b073026998316e5ed7ab6311c4a7ba119ef9"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pendulum-001/stdout.log",
+      "bytes": 258,
+      "sha256": "c210daeb30e375e8ba6e07fd0fe4f65a753e6494e4a32854c75f6c81fb56b45b"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pendulum-001/supervisor.json",
+      "bytes": 1194,
+      "sha256": "95aa42906593518d8ec37736dc6fbef9f72d185c168e524cba1290edd8f28def"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pickcube-001/rng-sequence.json",
+      "bytes": 337,
+      "sha256": "aacd84d537883421582d3a573f58719438bf0042305343214aa342b1bb526cee"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pickcube-001/stderr.log",
+      "bytes": 78079,
+      "sha256": "0cf90c72b01435fc0f27712e0b0aaab1dfd6fa9c76f3947502c73982c635b106"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pickcube-001/stdout.log",
+      "bytes": 1073,
+      "sha256": "8c49ea9618c8976f73a4d357739f1a1977d29b00ac2bc59feb01054c52db192a"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-isaac-pickcube-001/supervisor.json",
+      "bytes": 1196,
+      "sha256": "c477ae0e6b6aa157d2f166baad6362f45b36d675b964166071bb5bb1934d2fd6"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pendulum-001/rng-sequence.json",
+      "bytes": 339,
+      "sha256": "dc027003dcbde6c59089c3009a0e339b804a7891e0ee5569bad688bfcd1a6e66"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pendulum-001/stderr.log",
+      "bytes": 9026,
+      "sha256": "d60ff2b92fb6b4cea8185c9ee437b818ca6539a3bc7d09019f8749577141763d"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pendulum-001/stdout.log",
+      "bytes": 261,
+      "sha256": "333445550604f24b1914cba23f389fdcbb322c3c7f1bc38d618dab55eec19ce2"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pendulum-001/supervisor.json",
+      "bytes": 1206,
+      "sha256": "086b8cfbd13707c57bd2e32b63a6a3e836cda20ea194973521c426f1a69acc93"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pickcube-001/rng-sequence.json",
+      "bytes": 340,
+      "sha256": "d4d6929977f802d3571cfbb870d2a15a557a759b5308c36b8ae6a493754ecc14"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pickcube-001/stderr.log",
+      "bytes": 12012,
+      "sha256": "d323a2265bab117539de59b7e2435f481d758b580f0605c00753a452dd6e572c"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pickcube-001/stdout.log",
+      "bytes": 1076,
+      "sha256": "601f3a235dea6b3e9eabbc175749bb92d18a2ae78142031d753650a5a81ed6b1"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/rng-mjwarp-pickcube-001/supervisor.json",
+      "bytes": 1208,
+      "sha256": "d8ae8da9ebdb5e0fbdbea08927e66875cd0b18cf0277758f26798230ba4c0ac7"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/supervise_probe.py",
+      "bytes": 6324,
+      "sha256": "40479bc0dd83e0637ae406465c57db94d24451693973e05c37690a0042a35089"
+    },
+    {
+      "path": "workspace/maintenance/v211_g06c_attempt001/temporal-evidence-audit.json",
+      "bytes": 791,
+      "sha256": "11cb6b30f8da60a4b557e53e6cd1d7bbf29eef7efa5353c7db4b6cff56d26bd9"
+    }
+  ],
+  "b16_performance": [
+    {
+      "task": "MJWarp Pendulum",
+      "mode": "off",
+      "status": "REUSE_HISTORICAL",
+      "control_hz_including_present": 11.907660896873502,
+      "public_step_hz": null,
+      "env_transitions_per_second": 190.52257434997603,
+      "sensor_hz": null,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 1632112640,
+      "peak_process_gpu_mib": 296,
+      "peak_card_gpu_mib": null,
+      "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-off-002",
+      "historical_source_identity": "attempt001 input Core f43db73d / GeoPhys a2c85b7f; output Core 1ad14dd8 / GeoPhys 9ef7768b; exact in-window run pin not independently recorded"
+    },
+    {
+      "task": "MJWarp Pendulum",
+      "mode": "window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 12.209188506446074,
+      "public_step_hz": 12.71564886383982,
+      "env_transitions_per_second": 195.34701610313718,
+      "sensor_hz": null,
+      "window_fps": 12.209188506446074,
+      "peak_process_tree_rss_bytes": 2403598336,
+      "peak_process_gpu_mib": 506,
+      "peak_card_gpu_mib": 1753,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pendulum-window-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "GeoPhys Pendulum",
+      "mode": "off",
+      "status": "REUSE_HISTORICAL",
+      "control_hz_including_present": 121.22497860138182,
+      "public_step_hz": null,
+      "env_transitions_per_second": 1939.5996576221091,
+      "sensor_hz": null,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 2477367296,
+      "peak_process_gpu_mib": 332,
+      "peak_card_gpu_mib": null,
+      "evidence": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b16-off-001",
+      "historical_source_identity": "attempt001 input Core f43db73d / GeoPhys a2c85b7f; output Core 1ad14dd8 / GeoPhys 9ef7768b; exact in-window run pin not independently recorded"
+    },
+    {
+      "task": "GeoPhys Pendulum",
+      "mode": "window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 91.5980863414548,
+      "public_step_hz": 126.12047640945627,
+      "env_transitions_per_second": 1465.5693814632768,
+      "sensor_hz": null,
+      "window_fps": 91.5980863414548,
+      "peak_process_tree_rss_bytes": 3232956416,
+      "peak_process_gpu_mib": 544,
+      "peak_card_gpu_mib": 1793,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-geophys-window-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "Isaac Pendulum",
+      "mode": "off",
+      "status": "REUSE_HISTORICAL",
+      "control_hz_including_present": 14.50473133496976,
+      "public_step_hz": null,
+      "env_transitions_per_second": 232.07570135951616,
+      "sensor_hz": null,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 7314747392,
+      "peak_process_gpu_mib": 1707,
+      "peak_card_gpu_mib": null,
+      "evidence": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b16-off-001",
+      "historical_source_identity": "attempt001 input Core f43db73d / GeoPhys a2c85b7f; output Core 1ad14dd8 / GeoPhys 9ef7768b; exact in-window run pin not independently recorded"
+    },
+    {
+      "task": "Isaac Pendulum",
+      "mode": "window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 18.329666266075716,
+      "public_step_hz": 19.46384164659559,
+      "env_transitions_per_second": 293.27466025721145,
+      "sensor_hz": null,
+      "window_fps": 18.329666266075716,
+      "peak_process_tree_rss_bytes": 7291707392,
+      "peak_process_gpu_mib": 1797,
+      "peak_card_gpu_mib": 2653,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-isaac-window-retry-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "MJWarp PickCube",
+      "mode": "off",
+      "status": "REUSE_HISTORICAL",
+      "control_hz_including_present": 26.185366185095475,
+      "public_step_hz": 26.186640442829976,
+      "env_transitions_per_second": 418.9658589615276,
+      "sensor_hz": null,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 2115452928,
+      "peak_process_gpu_mib": 360,
+      "peak_card_gpu_mib": 1579,
+      "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b16-off-final-001",
+      "historical_source_identity": "attempt001 input Core f43db73d / GeoPhys a2c85b7f; output Core 1ad14dd8 / GeoPhys 9ef7768b; exact in-window run pin not independently recorded"
+    },
+    {
+      "task": "MJWarp PickCube",
+      "mode": "sensor",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 8.541245395667628,
+      "public_step_hz": 8.541530220105829,
+      "env_transitions_per_second": 136.65992633068205,
+      "sensor_hz": 8.541245395667628,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 2732101632,
+      "peak_process_gpu_mib": 1068,
+      "peak_card_gpu_mib": 2192,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-sensor-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "MJWarp PickCube",
+      "mode": "window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 24.95452263827552,
+      "public_step_hz": 27.792393870541854,
+      "env_transitions_per_second": 399.2723622124083,
+      "sensor_hz": null,
+      "window_fps": 24.95452263827552,
+      "peak_process_tree_rss_bytes": 3091714048,
+      "peak_process_gpu_mib": 1210,
+      "peak_card_gpu_mib": 2453,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-mujoco_warp-window-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "MJWarp PickCube",
+      "mode": "sensor+window",
+      "status": "REUSE_HISTORICAL",
+      "control_hz_including_present": 8.382005043766831,
+      "public_step_hz": 8.771730309917178,
+      "env_transitions_per_second": 134.1120807002693,
+      "sensor_hz": 8.382005043766831,
+      "window_fps": 8.382005043766831,
+      "peak_process_tree_rss_bytes": 3051143168,
+      "peak_process_gpu_mib": 1216,
+      "peak_card_gpu_mib": 2643,
+      "evidence": "workspace/maintenance/v211_g06b_attempt002/performance-mjwarp-sensor-window-scoped-b16-001",
+      "historical_source_identity": "attempt002 prior to final Core f8c43d61 / GeoPhys dd393187; exact run pin and in-flight diff not independently recorded"
+    },
+    {
+      "task": "GeoPhys PickCube",
+      "mode": "off",
+      "status": "REUSE_HISTORICAL",
+      "control_hz_including_present": 10.893276023542029,
+      "public_step_hz": 10.893819898564548,
+      "env_transitions_per_second": 174.29241637667246,
+      "sensor_hz": null,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 3075502080,
+      "peak_process_gpu_mib": 534,
+      "peak_card_gpu_mib": 1768,
+      "evidence": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-off-32-001",
+      "historical_source_identity": "attempt002 prior to final Core f8c43d61 / GeoPhys dd393187; exact run pin and in-flight diff not independently recorded"
+    },
+    {
+      "task": "GeoPhys PickCube",
+      "mode": "sensor",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 5.763235068313676,
+      "public_step_hz": 5.763379932461565,
+      "env_transitions_per_second": 92.21176109301882,
+      "sensor_hz": 5.763235068313676,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 3511414784,
+      "peak_process_gpu_mib": 1242,
+      "peak_card_gpu_mib": 2387,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "GeoPhys PickCube",
+      "mode": "window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 10.429076253479726,
+      "public_step_hz": 10.958096180072333,
+      "env_transitions_per_second": 166.86522005567562,
+      "sensor_hz": null,
+      "window_fps": 10.429076253479726,
+      "peak_process_tree_rss_bytes": 3813986304,
+      "peak_process_gpu_mib": 1384,
+      "peak_card_gpu_mib": 2599,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-window-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "GeoPhys PickCube",
+      "mode": "sensor+window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 5.550607631030496,
+      "public_step_hz": 5.733091595868371,
+      "env_transitions_per_second": 88.80972209648793,
+      "sensor_hz": 5.550607631030496,
+      "window_fps": 5.550607631030496,
+      "peak_process_tree_rss_bytes": 3892019200,
+      "peak_process_gpu_mib": 1390,
+      "peak_card_gpu_mib": 2605,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-geophys-sensor-window-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "Isaac PickCube",
+      "mode": "off",
+      "status": "REUSE_HISTORICAL",
+      "control_hz_including_present": 18.259298593726076,
+      "public_step_hz": 18.260161275977673,
+      "env_transitions_per_second": 292.1487774996172,
+      "sensor_hz": null,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 8020328448,
+      "peak_process_gpu_mib": 1753,
+      "peak_card_gpu_mib": 2983,
+      "evidence": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b16-off-003",
+      "historical_source_identity": "attempt001 input Core f43db73d / GeoPhys a2c85b7f; output Core 1ad14dd8 / GeoPhys 9ef7768b; exact in-window run pin not independently recorded"
+    },
+    {
+      "task": "Isaac PickCube",
+      "mode": "sensor",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 7.828410061279897,
+      "public_step_hz": 7.828678539988813,
+      "env_transitions_per_second": 125.25456098047835,
+      "sensor_hz": 7.828410061279897,
+      "window_fps": null,
+      "peak_process_tree_rss_bytes": 8567320576,
+      "peak_process_gpu_mib": 2461,
+      "peak_card_gpu_mib": 3457,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-retry-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "Isaac PickCube",
+      "mode": "window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 22.19332486905248,
+      "public_step_hz": 24.368730686907004,
+      "env_transitions_per_second": 355.09319790483966,
+      "sensor_hz": null,
+      "window_fps": 22.19332486905248,
+      "peak_process_tree_rss_bytes": 9055805440,
+      "peak_process_gpu_mib": 2603,
+      "peak_card_gpu_mib": 3756,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-window-retry-001",
+      "historical_source_identity": null
+    },
+    {
+      "task": "Isaac PickCube",
+      "mode": "sensor+window",
+      "status": "PASS_MEASURED",
+      "control_hz_including_present": 7.160021697131116,
+      "public_step_hz": 7.431564331115396,
+      "env_transitions_per_second": 114.56034715409785,
+      "sensor_hz": 7.160021697131116,
+      "window_fps": 7.160021697131116,
+      "peak_process_tree_rss_bytes": 8477749248,
+      "peak_process_gpu_mib": 2609,
+      "peak_card_gpu_mib": 3744,
+      "evidence": "workspace/maintenance/v211_g06b_attempt003/performance-pickcube-isaacsim-sensor-window-retry-001",
+      "historical_source_identity": null
+    }
+  ],
+  "state_only_scaling": [
+    {
+      "task": "MJWarp Pendulum",
+      "configuration": "accepted canonical state-only configuration",
+      "stages": [
+        {
+          "B": 16,
+          "status": "REUSE_HISTORICAL",
+          "control_hz_including_present": 11.907660896873502,
+          "public_step_hz": null,
+          "env_transitions_per_second": 190.52257434997603,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b16-off-002"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 256,
+          "control_hz_including_present": 11.530276334811367,
+          "public_step_hz": 11.530518306861431,
+          "env_transitions_per_second": 2951.75074171171,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b256-off-001"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 4096,
+          "control_hz_including_present": 11.397374178375415,
+          "public_step_hz": 11.397611740182601,
+          "env_transitions_per_second": 46683.6446346257,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pendulum-b4096-off-001"
+        }
+      ]
+    },
+    {
+      "task": "GeoPhys Pendulum",
+      "configuration": "accepted canonical state-only configuration",
+      "stages": [
+        {
+          "B": 16,
+          "status": "REUSE_HISTORICAL",
+          "control_hz_including_present": 121.22497860138182,
+          "public_step_hz": null,
+          "env_transitions_per_second": 1939.5996576221091,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b16-off-001"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 256,
+          "control_hz_including_present": 119.11576854680811,
+          "public_step_hz": 119.14335127140025,
+          "env_transitions_per_second": 30493.636747982877,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b256-off-001"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 4096,
+          "control_hz_including_present": 115.54243816714525,
+          "public_step_hz": 115.56721264597687,
+          "env_transitions_per_second": 473261.82673262694,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/geophys-pendulum-b4096-off-001"
+        }
+      ]
+    },
+    {
+      "task": "Isaac Pendulum",
+      "configuration": "accepted canonical state-only configuration",
+      "stages": [
+        {
+          "B": 16,
+          "status": "REUSE_HISTORICAL",
+          "control_hz_including_present": 14.50473133496976,
+          "public_step_hz": null,
+          "env_transitions_per_second": 232.07570135951616,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b16-off-001"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 256,
+          "control_hz_including_present": 7.797589182535378,
+          "public_step_hz": 7.797689241756112,
+          "env_transitions_per_second": 1996.1828307290568,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/isaac-pendulum-b256-off-001"
+        },
+        {
+          "B": 4096,
+          "status": "CONDITION_NOT_MET",
+          "reason": "B256 measured below10Hz",
+          "additional_resource_note": null
+        }
+      ]
+    },
+    {
+      "task": "MJWarp PickCube",
+      "configuration": "accepted canonical state-only configuration",
+      "stages": [
+        {
+          "B": 16,
+          "status": "REUSE_HISTORICAL",
+          "control_hz_including_present": 26.185366185095475,
+          "public_step_hz": 26.186640442829976,
+          "env_transitions_per_second": 418.9658589615276,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b16-off-final-001"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 256,
+          "control_hz_including_present": 21.39916656238141,
+          "public_step_hz": 21.400017043661396,
+          "env_transitions_per_second": 5478.186639969641,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b256-off-001"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 4096,
+          "control_hz_including_present": 7.027594366605774,
+          "public_step_hz": 7.027666242364045,
+          "env_transitions_per_second": 28785.02652561725,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/mjwarp-pickcube-b4096-off-001"
+        }
+      ]
+    },
+    {
+      "task": "GeoPhys PickCube",
+      "configuration": "GeoPhys PickCube explicit discrete/contact32/coupled32",
+      "stages": [
+        {
+          "B": 16,
+          "status": "REUSE_HISTORICAL",
+          "control_hz_including_present": 10.893276023542029,
+          "public_step_hz": 10.893819898564548,
+          "env_transitions_per_second": 174.29241637667246,
+          "evidence": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-off-32-001"
+        },
+        {
+          "status": "PASS_MEASURED",
+          "B": 256,
+          "control_hz_including_present": 6.696319289429563,
+          "public_step_hz": 6.69652413809785,
+          "env_transitions_per_second": 1714.257738093968,
+          "evidence": "workspace/maintenance/v211_g06b_attempt002/performance-geophys-b256-off-32-001"
+        },
+        {
+          "B": 4096,
+          "status": "CONDITION_NOT_MET",
+          "reason": "B256 measured below10Hz",
+          "additional_resource_note": "GeoPhys planner logical payload at B4096 is 40369889464 bytes (~37.6GiB); no allocation attempted"
+        }
+      ]
+    },
+    {
+      "task": "Isaac PickCube",
+      "configuration": "accepted canonical state-only configuration",
+      "stages": [
+        {
+          "B": 16,
+          "status": "REUSE_HISTORICAL",
+          "control_hz_including_present": 18.259298593726076,
+          "public_step_hz": 18.260161275977673,
+          "env_transitions_per_second": 292.1487774996172,
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b16-off-003"
+        },
+        {
+          "B": 256,
+          "status": "RESOURCE_LIMIT",
+          "reason": "live host RAM resource floor prevented start; estimated, not native allocation",
+          "evidence": "workspace/maintenance/v211_g06b_attempt001/isaac-pickcube-b256-resource-estimate.md"
+        },
+        {
+          "B": 4096,
+          "status": "CONDITION_NOT_MET",
+          "reason": "B256 not admitted by resource estimate; sequential expansion prerequisite missing",
+          "additional_resource_note": null
+        }
+      ]
+    }
+  ],
+  "test_counts_do_not_sum": {
+    "6a": {
+      "review_targeted_checks": 58,
+      "breakdown": "29 device semantics +29 transport/recording/render-fault checks",
+      "offline_readbacks": 6,
+      "note": "earlier65 and29 lifecycle reports overlap; do not accumulate"
+    },
+    "6b": {
+      "attempt003_targeted_checks": 67,
+      "scope": "budget/lifecycle/Task/source preflight/DLPack",
+      "additional_device_checks": "framebuffer and supervised pose-transfer separate fixtures, do not sum unknown counts",
+      "B1_B3_compared_field_groups": 35,
+      "task_reward_max_abs_error": 5.090247926636815e-08,
+      "performance_entries": 18,
+      "new_performance_entries": 11,
+      "reused_performance_entries": 7
+    },
+    "6c": {
+      "final_targeted_checks": 87,
+      "broader_checks_passed": 105,
+      "broader_checks_skipped": 8,
+      "scalar_targeted_checks": 2,
+      "review_reconfiguration_file_checks": 23,
+      "new_review_cases_included_in_23": 3,
+      "note": "overlapping suites; present by scope, never total",
+      "C2_H5_files": 21,
+      "C2_boundaries": 81,
+      "C2_camera_frames": 162,
+      "C3_H5_files": 18,
+      "C3_pickcube_camera_frames": 72,
+      "supervised_runs": 63,
+      "supervised_native_minutes": 114.98958399861779
+    }
+  },
+  "submodule_gitlink_transitions": [
+    {
+      "core_commit": "3bc9e2a70daea2dda1004352c54ba1d1ada46b54",
+      "subject": "Integrate device task cameras and vector recording",
+      "old_geophys": "c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7",
+      "new_geophys": "a2c85b7fb87e821b1e3b211c97ed2b695db8b3c1"
+    },
+    {
+      "core_commit": "b039fa5d4d1ea02223dfcf5f8441e08f3add9442",
+      "subject": "Connect source-bound device batches across providers",
+      "old_geophys": "a2c85b7fb87e821b1e3b211c97ed2b695db8b3c1",
+      "new_geophys": "81d87f8bb112058ebac540cca1ccc4b97f9d4814"
+    },
+    {
+      "core_commit": "1ad14dd82812ef69587e5ca6aabdb1a4e6cdc818",
+      "subject": "Correct device framebuffer resize and qualify render measurements",
+      "old_geophys": "81d87f8bb112058ebac540cca1ccc4b97f9d4814",
+      "new_geophys": "9ef7768b4bd6c2b105c16f3d5fd75d2136b3ab2a"
+    },
+    {
+      "core_commit": "ae96d52ec059125f6e0fc624bc9a42d5a99a19c5",
+      "subject": "fix(task-env): propagate GeoPhys contact solver budget",
+      "old_geophys": "9ef7768b4bd6c2b105c16f3d5fd75d2136b3ab2a",
+      "new_geophys": "ce594de87d0bdfe39bf4d0546c13846265eb190e"
+    },
+    {
+      "core_commit": "229a8a67e76ac73f7e4f40f77dfde45a1acfd74d",
+      "subject": "test(task-env): supervise mixed contact regression",
+      "old_geophys": "ce594de87d0bdfe39bf4d0546c13846265eb190e",
+      "new_geophys": "335da22fc893ba5cc950f042251fd1c887d4f0e8"
+    },
+    {
+      "core_commit": "119c91d97653844386871c626a603799f0dfc690",
+      "subject": "test(task-env): pin mixed contact diagnostic probe",
+      "old_geophys": "335da22fc893ba5cc950f042251fd1c887d4f0e8",
+      "new_geophys": "cbd9ca86fd59d3478da24461ad7e879369b78930"
+    },
+    {
+      "core_commit": "af9ca8e8c9110575f19255dbf7ceca9f84ba3117",
+      "subject": "fix(task-env): scope device pose DLPack leases",
+      "old_geophys": "cbd9ca86fd59d3478da24461ad7e879369b78930",
+      "new_geophys": "f47c0cd49779086745edd9a611179d1640a86bf2"
+    },
+    {
+      "core_commit": "38c40c28cef004e05cce01ec2fb6fd980d08b6ec",
+      "subject": "test: pin free armature contact diagnostic",
+      "old_geophys": "f47c0cd49779086745edd9a611179d1640a86bf2",
+      "new_geophys": "9548b12bf21a9f62637d99ba2c91bcfcb1f87242"
+    },
+    {
+      "core_commit": "cba44cfd159d668ce4ba3aedef531bdd9a86fdbc",
+      "subject": "test: pin offset center armature witness",
+      "old_geophys": "9548b12bf21a9f62637d99ba2c91bcfcb1f87242",
+      "new_geophys": "6606865c7d34f937e466fed37d25fa37c6d4960e"
+    },
+    {
+      "core_commit": "100c2959749716681834acb17d8b3e7c19494527",
+      "subject": "test: pin ownership-aware contact witnesses",
+      "old_geophys": "6606865c7d34f937e466fed37d25fa37c6d4960e",
+      "new_geophys": "64c506fc34a61d49b200933cbb415bdc849b99d0"
+    },
+    {
+      "core_commit": "a4e7738972d1f9784c2e4f84dd47ac45ba32a2cc",
+      "subject": "fix: pin rigid graph sort compatibility",
+      "old_geophys": "64c506fc34a61d49b200933cbb415bdc849b99d0",
+      "new_geophys": "d5b33f0e6ea71cae66738407fccf69af519d978d"
+    },
+    {
+      "core_commit": "a15f87aea47e28e28325604caf4af69ab18d3dbc",
+      "subject": "test: pin free body momentum witness",
+      "old_geophys": "d5b33f0e6ea71cae66738407fccf69af519d978d",
+      "new_geophys": "a436f2a9feba82a2a65c409e5deb0b67482607e2"
+    },
+    {
+      "core_commit": "f8c43d61163e6774b3869875842337b427781fe4",
+      "subject": "fix(task-env): pin free joint armature correction",
+      "old_geophys": "a436f2a9feba82a2a65c409e5deb0b67482607e2",
+      "new_geophys": "dd393187983798abac0e8d99c2426d64d4a8aa5e"
+    },
+    {
+      "core_commit": "eae80abb437f47eb5dbac965962d7734391b9e06",
+      "subject": "test(task-env): close bounded G06b comparisons and cleanup",
+      "old_geophys": "dd393187983798abac0e8d99c2426d64d4a8aa5e",
+      "new_geophys": "198d30ac64ce873a1467f55d2adfc471db18fbc5"
+    }
+  ],
+  "submodule_local_commits": {
+    "count": 24,
+    "diff": "56 files changed, 3499 insertions(+), 137 deletions(-)",
+    "commits": [
+      {
+        "hash": "05f2e2d36c5187786e3557cff030dae7f5f808ff",
+        "subject": "Support bounded CUDA task camera frames"
+      },
+      {
+        "hash": "a2c85b7fb87e821b1e3b211c97ed2b695db8b3c1",
+        "subject": "Register rendering smoke diagnostics"
+      },
+      {
+        "hash": "ef5c8de8e1b25e0819b68ee9e5338849edd5c56d",
+        "subject": "feat(rigid): publish owned CUDA batch state snapshots"
+      },
+      {
+        "hash": "570f4b2fff0146b70a290db5c44cc11f85063ce8",
+        "subject": "feat(rigid): accept CUDA batch generalized forces"
+      },
+      {
+        "hash": "fe8ebb901877aac5b84be9bad4c13bdc002d6770",
+        "subject": "feat(rigid): reset selected worlds from CUDA state"
+      },
+      {
+        "hash": "9793a8b5c986beb36a7b6ce228bb446e5da24fa2",
+        "subject": "Expose direct batch step clock"
+      },
+      {
+        "hash": "d267fad611ee5c72ba9ab2880e9500369f7d14fb",
+        "subject": "Preserve and apply free-joint passive damping"
+      },
+      {
+        "hash": "ed3bb32bda86bd979dc9ef7e8c1f8c9481257cf5",
+        "subject": "Exclude proven fixed-root contact pairs from batch slots"
+      },
+      {
+        "hash": "7a10d5e86ad0d692b0bd0cfa112cd7b98974c7c2",
+        "subject": "Support bounded torsional contact rows in rigid batch"
+      },
+      {
+        "hash": "3e5991cac22e386e83d822f10459c491fcb76fda",
+        "subject": "Retain all source contact candidates during batch planning"
+      },
+      {
+        "hash": "42c30c6b256f2517c004001cbaf432d1e9919dd0",
+        "subject": "Isolate native batch actuators from applied effort"
+      },
+      {
+        "hash": "81d87f8bb112058ebac540cca1ccc4b97f9d4814",
+        "subject": "Support bounded convex mesh contact in rigid batches"
+      },
+      {
+        "hash": "9ef7768b4bd6c2b105c16f3d5fd75d2136b3ab2a",
+        "subject": "Use active framebuffer height for device RGB export"
+      },
+      {
+        "hash": "ce594de87d0bdfe39bf4d0546c13846265eb190e",
+        "subject": "diagnostics(rigid): expose batch iteration budgets and contact traces"
+      },
+      {
+        "hash": "335da22fc893ba5cc950f042251fd1c887d4f0e8",
+        "subject": "test(rigid): capture mixed contact residual regression"
+      },
+      {
+        "hash": "cbd9ca86fd59d3478da24461ad7e879369b78930",
+        "subject": "test(rigid): probe mixed contact row recoupling"
+      },
+      {
+        "hash": "f47c0cd49779086745edd9a611179d1640a86bf2",
+        "subject": "fix(render): retire CUDA DLPack views after use"
+      },
+      {
+        "hash": "9548b12bf21a9f62637d99ba2c91bcfcb1f87242",
+        "subject": "test(rigid): capture free armature contact momentum mismatch"
+      },
+      {
+        "hash": "6606865c7d34f937e466fed37d25fa37c6d4960e",
+        "subject": "test(rigid): cover offset center in armature witness"
+      },
+      {
+        "hash": "64c506fc34a61d49b200933cbb415bdc849b99d0",
+        "subject": "test(rigid): make contact witnesses ownership aware"
+      },
+      {
+        "hash": "d5b33f0e6ea71cae66738407fccf69af519d978d",
+        "subject": "fix(rigid): specialize graph sort passes without private scalars"
+      },
+      {
+        "hash": "a436f2a9feba82a2a65c409e5deb0b67482607e2",
+        "subject": "test(rigid): add free body armature momentum witness"
+      },
+      {
+        "hash": "dd393187983798abac0e8d99c2426d64d4a8aa5e",
+        "subject": "fix(rigid): honor discrete free joint armature"
+      },
+      {
+        "hash": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
+        "subject": "test(rigid): retire mixed contact experiment switch"
+      }
+    ]
+  },
+  "submodule_modules": [
+    {
+      "module": "G06前已有基础",
+      "source": "c1ea3cc9 and upstream 2110d359",
+      "change": "homogeneous free/articulated rigid batch；Row/EFC有限路线；sphere/box/mixed contact；joint/tendon；host/K-shaped部分reset；selected-world raster。G06复用并接到TaskEnv，不应表述为新造native batch。"
+    },
+    {
+      "module": "上游同步",
+      "commits": [
+        "e38c6bad"
+      ],
+      "change": "将2110d359合入旧pin c1ea3cc9；1129个上游提交，1939文件+379721/-41995。与24个G06本地提交分计。"
+    },
+    {
+      "module": "设备渲染接口",
+      "commits": [
+        "05f2e2d3",
+        "a2c85b7f",
+        "9ef7768b",
+        "f47c0cd4"
+      ],
+      "change": "具名多task-camera、CUDA pose、caller-owned RGB8、observer设备frame/present、公开RenderScene source；compute finite clipping准入；active framebuffer height；DLPack scoped lifetime。JIT CUDA有界，AOT未通过。"
+    },
+    {
+      "module": "Rigid batch设备端口",
+      "commits": [
+        "ef5c8de8",
+        "570f4b2f",
+        "fe8ebb90",
+        "9793a8b5",
+        "d267fad6",
+        "42c30c6b"
+      ],
+      "change": "owned CUDA world-major qpos/qvel/body pose；CUDA applied generalized effort；masked CUDA reset；direct step clock；FREE passive damping；native actuator disable isolation。沿用BatchedRigidSolver owner。"
+    },
+    {
+      "module": "contact planning与有限几何",
+      "commits": [
+        "ed3bb32b",
+        "7a10d5e8",
+        "3e5991ca",
+        "81d87f8b"
+      ],
+      "change": "仅排除已证明fixed-root pair；保留全部源contact candidates；condim4扭转row；bounded full convex hull geometry/owned scratch/fault latch。mesh CCD/boundary/sphere/softEFC/Graph不在资格范围。"
+    },
+    {
+      "module": "预算与诊断",
+      "commits": [
+        "ce594de8",
+        "335da22f",
+        "cbd9ca86",
+        "9548b12b",
+        "6606865c",
+        "64c506fc",
+        "a436f2a9",
+        "198d30ac"
+      ],
+      "change": "实际contact/coupled预算public readback及development trace/independent witnesses；Core ae96d52e透传既有runtime预算。最终198d仅删development interleave实验switch21行，未改src，默认预算异常不记修复。"
+    },
+    {
+      "module": "Forge Graph兼容",
+      "commits": [
+        "d5b33f0e"
+      ],
+      "change": "当builder缺private_scalar时用template-specialized sort pass；保留已有API路径。"
+    },
+    {
+      "module": "FREE armature修复",
+      "commits": [
+        "dd393187"
+      ],
+      "change": "显式discrete/CCD-off纯FREE joint armature保留generalized质量响应，并用完整质量响应对角项。限已测CPU direct/CUDA Graph；default/continuous、未准入TGS、mixed任务并非全面修复。"
+    },
+    {
+      "module": "Menagerie",
+      "commits": [],
+      "change": "b846dd12始终未变；detached HEAD且干净。"
+    }
+  ],
+  "retained_backup_stash": "stash@{0} 51bc6d46a16f6148dda04a22b8526fb951a1d3d2 On codex/v211-stage6-render-device: codex-g06a-pre-main-merge-20261115",
+  "deferred_and_optional": [
+    {
+      "item": "R3/model/gravity compensation",
+      "status": "SEPARATE_FUTURE_PACKAGE",
+      "note": "provider list not frozen for that package; not canonical G06 blocker"
+    },
+    {
+      "item": "GeoPhys upstream main merge/AOT/previous governance",
+      "status": "DEFERRED_BY_MAINTAINER",
+      "note": "not PASS"
+    },
+    {
+      "item": "window visual appearance",
+      "status": "MANUAL_MAINTAINER_ACCEPTANCE",
+      "note": "technical window/state/camera tests passed; no new visual styling development"
+    },
+    {
+      "item": "GeoPhys PickCube",
+      "status": "BOUNDED",
+      "note": "explicit discrete/contact32/coupled32 verified configuration; continuous mesh+constraint combination unsupported, default budget old penetration not repaired"
+    },
+    {
+      "item": "GeoPhys cross-provider whole-batch switching",
+      "status": "NOT_ADMITTED",
+      "note": "6c representative tested edge Isaac↔MJWarp for both tasks; three-backend allpairs not required"
+    },
+    {
+      "item": "shared-scene camera visual isolation",
+      "status": "NOT_PROMISED",
+      "note": "other-row geometry visible; C1 same-state binding and physical/RNG isolation passed, exact isolated-row renders unchanged"
+    },
+    {
+      "item": "MJWarp renderer/RayTracer/Flora alternatives",
+      "status": "NOT_IN_CANONICAL_MATRIX",
+      "note": "Rasterizer selected; backup need not be built when chosen route succeeds"
+    },
+    {
+      "item": "full successful grasp Solution/multiGPU/heterogeneous assets/per-slot backend switch/allautoreset modes",
+      "status": "OUT_OF_SCOPE"
+    },
+    {
+      "item": "legacy scalar per-stepSHA migration",
+      "status": "SEPARATE_PUBLIC_RECEIPT_MIGRATION",
+      "note": "canonical device has no hot pathSHA"
+    }
+  ],
+  "primary_evidence_copy_root": "workspace/maintenance/v211_stage_closeout/stage06/evidence",
+  "closeout_cpu_check": {
+    "result": "23 passed",
+    "seconds": 1.97,
+    "native_starts": 0,
+    "log": "workspace/maintenance/v211_stage_closeout/stage06/closeout-pure-tests.log",
+    "sha256": "4dd367d243cf0e8dfb01f3d1ffc17e52bf618a3aa00d6dd7d4b08e93ee99ec56"
+  },
+  "upstream_merge": {
+    "commit": "e38c6bad8fbf66c3d5322851c0ea2981e55d6a25",
+    "parents": [
+      "c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7",
+      "2110d359a90f3fbcea89d35d7756a523ebd91cde"
+    ],
+    "upstream_import_count": 1129,
+    "diff_vs_old_pin": "1939 files changed, 379721 insertions(+), 41995 deletions(-)"
+  }
+}

@@ -1,6 +1,6 @@
 # G06a～c CUDA 并行环境实施方案（维护者审批稿）
 
-日期：2026-11-15。状态：`DRAFT_FOR_MAINTAINER_REVIEW`。本轮讨论修订输入 HEAD：`5bb547f2099f9936d50c36b2553bdb2f4e356ea7`，阶段分支：`codex/v211-stage6-parallel`。本次只交付方案；尚未安装依赖、改变 pin、运行 native 仿真或实施生产代码。方案批准后，由维护者转交实施 agent。
+日期：2026-11-15（原设计），结案状态更新：2026-11-16。状态：`HISTORICAL_DESIGN_IMPLEMENTED_BOUNDED`。本文保留审批时的目标/版本表及设计推导；现行成果、精确受测profile、未覆盖项及证据以[G06实施总结](../maintenance/g06/implementation-summary.md)、[API](../api/README.md)和[dependencies](../../../../../task_env/dependencies/README.md)为准。旧“待验证/拟定”不再表示当前未实施。
 
 本文细化[现行 G06 Goal](../goals/06-parallel.md)，承接[项目／上游调研](20261115_g06_parallel_research.md)、[G06 交接](../maintenance/20261115_g06_agent_handoff.md)和[原始优化总账](post-5c-code-project-optimization-diagnostic-ledger.md)。总账的历史待办以[G05 逐项结案](../maintenance/reviews/20261114_e14_current_state_alignment_closeout.md)为准；下文引用其职责原则，不重开已经接收的 G05。
 
@@ -251,13 +251,15 @@ physics worker 采用 headless／physics 所需的最小 SDK 配置，不启动�
 
 ### 8.2 网格场景的坐标与隔离
 
+2026-11-16结案澄清：物理与相机绑定身份隔离已经验证，当前共享scene可见其他行几何，6c通过单行隔离对照解释了像素变化。下方“FOV不含邻居”是原视觉隔离设计建议，未作为已接收canonical的必达门；需视觉隔离的使用场景另行限制visibility/FOV/布局，不能冒称现已支持。
+
 构建一次 logical env template，每 env 的 render root 使用固定网格平移 `T_grid[i]`。列数建议 `ceil(sqrt(B))`；spacing 根据该任务冻结 workspace、运动包络和相机 near／far／FOV 明确计算／设置，6a 记录最终值，不写一个对所有任务通用的任意常数。
 
 共同 renderer 可物化为 **一个 render world 中 B 组 visual 实例**；observer 可看全场景或配置的 K 个展示实例，每 env task cameras 对应自己的实例。MJWarp physics 的 B 个 native worlds 仍是独立 world；Isaac physics 可在一个 stage 复制 env namespaces 并使用 collision filtering。两者都向 public state 发布无 grid offset 的 env-local pose。
 
 `T_visual_world = T_grid[i] @ T_env_local`；若 Isaac native 场景已经包含自身 env origin，adapter 先还原 env-local，再由 renderer 应用 presentation grid，不能叠加两次。固定附件和 hand camera 的 mount 链按同样原则处理。
 
-网格距离不能代替物理接触隔离：Isaac 验证 collision filtering／共享地面归属；MJWarp 验证 world-local 状态与接触。也不能仅靠间距声称相机看不到邻居：优先使用 renderer 公开可见性能力；若没有逐相机隔离功能，应为冻结运动包络证明 FOV／far／spacing 不包含邻居，必要时调整 renderer scene 组织并回报 D4，不伪造图像裁剪隔离。
+网格距离不能代替物理接触隔离：Isaac 验证 collision filtering／共享地面归属；MJWarp 验证 world-local 状态与接触。也不能仅靠间距声称相机看不到邻居：当前canonical共享scene未承诺视觉隔离。若后续任务需要该能力，优先使用renderer公开可见性接口，或为冻结运动包络验证FOV／far／spacing；不得以图像裁剪伪造隔离。
 
 ### 8.3 observer、base、hand 的配置
 
@@ -393,7 +395,7 @@ renderer 实现／选择在创建时固定到 close；允许其为新 source／g
 | 动作行与状态行 | 同初态，行 0 正 effort、行 1 零、行 2 负 effort；必要时分开重置重放 | 按关节轴／重力模型检查初始加速度和响应方向；零 effort 允许自由运动，不能当 hold oracle；行映射不能错位 |
 | native batch 证明 | native layout／world_count、单批提交与一次场景推进、真实进程归属 | 不以 device 字符串、worker 数或一次 Python 方法调用替代原生批量实现证据 |
 | Pendulum 物理 | actual q／qd、joint frame、显式 dt／substep、已知 effort | 限幅和单位符合原任务；kinematics 对齐；相同 backend 受控反事实可判断动作作用；不要求三家轨迹逐位相同 |
-| PickCube 物理 | Panda／finger／cube／table 的公开状态、effort／contact、base／hand 图像 | joint／actuator／tendon 传动正确，cube 受重力／接触，不能穿桌或悬空假运动；R3 小幅目标运动与实际末端一致。G06 物理有效与完整抓取成功分列 |
+| PickCube 物理 | Panda／finger／cube／table 的公开状态、effort／contact、base／hand 图像 | joint／actuator／tendon 传动正确，cube 受重力／接触，无已接受配置下的明显物理异常；R3末端运动及完整抓取属于后续包，不作canonical门。具体几何回归仅按冻结轨迹/配置判断，不设跨后端统一2mm门 |
 | 相机真同步 | 公开 frame 和冻结 intrinsics 预测可见地标；同次 RGB、frame ID、physics boundary | 相机／物体运动与投影一致；非零 step 带来对应变化；不用“任意像素变了”证明正确；重复 render 显式子步增量 0 |
 | 环境物理隔离 | 固定初态／seed，改变一行 action 或 reset，其余行做同 backend 对照 | native contact／constraint 无跨 env 耦合；未选行数据不改变。warmstart／浮点容差提前按同 provider 精度冻结，不能见结果后放宽 |
 | 同步终止与自动 reset | 短 horizon 测试配置，先错开一行 reset，再走到真实 horizon；另做 TaskDefinition 级自然 terminated 合同用例 | 最终 obs／全部配置图像先保存，done 原值和奖励保留，returned done 行新 episode，未 done 行仍是本步；不改 Task 成功阈值制造 native PASS |

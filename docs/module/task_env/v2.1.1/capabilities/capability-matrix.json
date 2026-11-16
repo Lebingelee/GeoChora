@@ -2,7 +2,7 @@
   "schema_version": "geochora-v211-capability-plan-v1",
   "version": "2.1.1",
   "status": "CURRENT_BOUNDED_WITH_HISTORICAL_PLAN",
-  "updated_date": "2026-11-13",
+  "updated_date": "2026-11-16",
   "baseline": {
     "core_commit": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
     "geophys_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
@@ -516,10 +516,10 @@
   "publication_claim": false,
   "current_state_ref": "../maintenance/current-state.md",
   "evidence_reconciliation": {
-    "status": "U4_CODE_ACCEPTED_U5_PENDING",
-    "date": "2026-11-13",
+    "status": "G06_CANONICAL_CLOSED_BOUNDED",
+    "date": "2026-11-16",
     "planning_snapshot_date": "2026-11-03",
-    "execution_ref": "../planning/post-5c-e11-e16-remaining-ledger.md",
+    "execution_ref": "../maintenance/g06/implementation-summary.md",
     "policy": "current_support is limited to named evidence; historical targets/cells retain their original planning semantics; no qualification or publication claim."
   },
   "historical_planning_fields": {
@@ -798,6 +798,26 @@
         "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim; v3 Outcome completion absent; review open"
       }
     ],
-    "frame_mounted_camera_evidence": "../maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md"
+    "frame_mounted_camera_evidence": "../maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md",
+    "g06_closeout": {
+      "status": "CLOSED_BOUNDED_CANONICAL_G06",
+      "code_commit": "4332844f0ede0c8f56f75a27c773bd2cf7bd67f5",
+      "review_refs": [
+        "../maintenance/reviews/20261115_g06a_attempt002_acceptance.md",
+        "../maintenance/reviews/20261116_g06b_attempt003_acceptance.md",
+        "../maintenance/reviews/20261116_g06c_attempt001_acceptance.md"
+      ],
+      "summary_ref": "../maintenance/g06/implementation-summary.md",
+      "evidence_index_ref": "../maintenance/g06/evidence-index.json",
+      "canonical_cells": 6,
+      "fixed_renderer": "GeoPhys Rasterizer",
+      "switch_edge": [
+        "isaacsim",
+        "mujoco_warp"
+      ],
+      "geophys_mode": "explicit discrete contact32/coupled32 tested configuration",
+      "R3_status": "SEPARATE_FUTURE_PACKAGE",
+      "g07_status": "NOT_RUN"
+    }
   }
 }

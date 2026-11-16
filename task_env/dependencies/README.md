@@ -6,13 +6,13 @@ index's Linux x86-64 Python 3.12 wheels, with MuJoCo and MJWarp 4.0.1 and Warp
 1.18.0. It is a worker environment, not a replacement for the main interpreter;
 it does not include Torch. The tested learner interpreter used Torch
 2.14.0+cu130 and CUDA Python bindings. The cross-interpreter CUDA IPC and
-MJWarp/renderer checks are bounded diagnostics; the implemented device batch
-route remains unaccepted and does not establish compatibility on other systems.
+MJWarp/renderer checks are bounded diagnostics; the canonical device batch routes now have bounded G06 acceptance; exact
+source/physics/render intersections remain limited to the tested system.
 `pip check` passed in the isolated worker. Select the worker interpreter through
 the explicit runtime configuration; no machine-specific path is embedded here.
 
 G06b also uses a separate Isaac Sim 6.2 Python 3.12 worker with the same main
-learner interpreter. Its measured native-batch routes remain unreviewed and
+learner interpreter. Its measured native-batch routes have bounded G06 acceptance and remain
 limited to the source and physics intersections documented in the current API.
 
 For the merged GeoPhys main integration, the learner interpreter uses
@@ -34,3 +34,10 @@ claim those checks pass or qualify the wider GeoPhys API.
 Create a separate Python 3.12 environment and install with
 `python -m pip install -r task_env/dependencies/mujoco-warp-4.0.1-python312.txt`;
 run the repository with its usual `PYTHONPATH` and do not mix site-packages.
+
+G06 closes at GeoPhys `198d30ac64ce873a1467f55d2adfc471db18fbc5`; Menagerie
+remains `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`. The upstream-to-stage
+merge above was completed; merging the stage changes back to upstream main is
+still deferred. See the [G06 implementation summary](../../docs/module/task_env/v2.1.1/maintenance/g06/implementation-summary.md)
+for native/device evidence, full gitlink provenance and the explicit discrete/32
+GeoPhys PickCube scope. No environment was upgraded during closeout.

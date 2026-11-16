@@ -28,7 +28,7 @@ The v2.1 integration records a bounded intersection across the merged F/R implem
 
 ## v2.1.1 current boundary
 
-G01–G05 have bounded acceptance in their exact reviewed intersections: shared controlled subjects and scene intervals, provider execution/reset, native and cross-render RGB. The maintainer has entered [post-5c code and project optimization](../module/task_env/v2.1.1/planning/post-5c-optimization-execution.md) before G06. Read the [current state](../module/task_env/v2.1.1/maintenance/current-state.md) for evidence, source restrictions and remaining formal-entry migration. G06 batch and G07 final integration remain unfinished; protocol approval and bounded route acceptance do not imply arbitrary composition. Task semantics remain task-owned and shared native resources retain a single owner.
+G01–G05 have bounded acceptance in their exact reviewed intersections: shared controlled subjects and scene intervals, provider execution/reset, native and cross-render RGB. The maintainer completed [post-5c code and project optimization](../module/task_env/v2.1.1/planning/post-5c-optimization-execution.md), followed by bounded canonical G06 closeout. Read the [current state](../module/task_env/v2.1.1/maintenance/current-state.md) for evidence, source restrictions and remaining formal-entry migration. G06 batch/reset/rebuild is supported in its [reviewed scope](../module/task_env/v2.1.1/maintenance/g06/implementation-summary.md); G07 final integration remains pending; protocol approval and bounded route acceptance do not imply arbitrary composition. Task semantics remain task-owned and shared native resources retain a single owner.
 
 ## Evidence and task state
 

@@ -4,23 +4,13 @@
 
 ## 当前停门
 
-G06abc canonical目标已有界独立主审接收。G06c [attempt001主审](reviews/20261116_g06c_attempt001_acceptance.md)为 **SOL_ACCEPTED_BOUNDED_6C**：执行Core `a824b7df`，主审清理重试小修`a4d9eb26`，GeoPhys `198d30ac`。三后端六格部分reset/错开终止、两个任务固定Rasterizer的Isaac→MJWarp→Isaac及故障资源清理成立；主审另有23项纯测试通过，未新增native。两项事前记录/API补写时序偏差保留，不补造历史、不阻断技术结案，无需6c attempt002。维护者最终接收待确认，R3与G07另包。
+**G01～G06 canonical范围有界结案，G07与版本收口待实施。** 维护者在6c主审后要求收尾G06；[开发实施总结](g06/implementation-summary.md)与[证据索引](g06/evidence-index.json)统一记录基本要求、abc成果、测试/性能、submodule和未覆盖项。生产代码结案`4332844f`；GeoPhys pin`198d30ac`，Menagerie`b846dd12`。本次后继提交仅文档/索引，无native重跑，不自动启动R3/G07。
 
-2026-11-16：G06b attempt003 已[独立主审有界接收](reviews/20261116_g06b_attempt003_acceptance.md)（SOL_ACCEPTED_BOUNDED_6B），Core `8d0fd756`／GeoPhys `198d30ac`。18项性能为11项新测、7项复用，Isaac资源例外未使用；GeoPhys限显式discrete／32已验证配置。首次未监督CUDA执行偏差保留。维护者接收待确认，R3 未启动；下述早期未接收文字保留其时点。
+6a、6b、6c独立主审分别为[6a](reviews/20261115_g06a_attempt002_acceptance.md)、[6b](reviews/20261116_g06b_attempt003_acceptance.md)、[6c](reviews/20261116_g06c_attempt001_acceptance.md)，普通attempt计数2/3/1。三后端×两任务CUDA native batch、canonical action、设备Task/state、相机/窗口独立、same-step终止帧、部分reset及两个任务固定Rasterizer的Isaac→MJWarp→Isaac已成立。GeoPhys限显式discrete/contact32/coupled32配置，跨provider未准入；shared scene不承诺视觉隔离。R3、旧scalar SHA迁移、AOT/上游反向合并等后续或暂缓边界不记通过。
 
-2026-11-15的6a接收时点记录（后续状态以上文为准）：**G01～G05 与优化账本保持原有接收；G06a attempt002 已经[独立主审](reviews/20261115_g06a_attempt002_acceptance.md)有界接收（SOL_ACCEPTED_BOUNDED_6A）。Core 为 `3bc9e2a7`，GeoPhys pin 为 `a2c85b7f`；无需 attempt003。G06b／6c、完整 canonical 六格、R3 和 G07 尚未接收，v2.1.1 尚未完成。** GeoPhys 主分支合并与 AOT 按维护者决定暂缓，不记通过、不阻断本次接收。G06a 的 Isaac 第二来源证据是 scalar 物理；G06b 新增的 native batch 有界证据及限制见[API](../api/README.md)，仍待独立主审。下方早期启动表及历史记录保留其时点。
+结构复核保留真实provider/IPC差异和必要identity检查，清除无消费者重复状态；相关23项CPU纯测试通过。本次保全461份主要证据副本，原运行目录不改不删。6b未监督CUDA及6c两项时序偏差继续记录，不补造历史。窗口外观人工验收、COM/N08原失败和R05c NOT_REQUALIFIED保持原范围。文档校验仍仅有既知保护日志基准问题，实际SHA不变。
 
-[单元 9 综合主审](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)的 `SOL_ACCEPTED_BOUNDED_5C` 已由维护者在本次启动对话确认；原主审中的“维护者待确认”描述保留其审查时点。优化实施安排见[执行计划](../planning/post-5c-optimization-execution.md)。顺序为：G05 功能接收 → 代码优化、定向复验及人工接收 → 项目证据和 refs／worktree 整理及接收 → 决定进入 G06。G07 继续承担 G06 新增调用者及最终版本收口，7b 三 provider × 三 seed 门保留。
-
-2026-11-14 总账复审及收尾：`d0902adc` 的[逐项复审](reviews/20261114_e00_e16_total_ledger_reaudit_0847a5da.md)确认57项满足有界出口，GOV-04／DOC-01／DOC-02留有编排和Skill同步欠账；后续已按维护者授权完成[E14资料收尾和60项现行结案表](reviews/20261114_e14_current_state_alignment_closeout.md)。60项及V01～V10均按既定有界范围结案，原复审保留其时点；不改变原运行身份、批准例外或G06/G07未开始状态。
-
-维护者另行提出的[Env／provider／renderer精简计划](../planning/post-optimization-env-provider-render-slimming-plan.md)已完成 C1～C5 的有界实施和[集中复验](reviews/20261114_post_optimization_c5_final.md)，其限制及独立复核见交付记录；不是未关闭的原账目。基于 `7f8796b4` 的[G05→G06复核](reviews/20261114_g05_pre_g06_readiness_7f8796b4.md)未发现须重开G05的功能阻断项，已同步当前说明；可以准备G06的范围和执行包，本次不自动启动G06。
-
-2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。[G06 Agent handoff](20261115_g06_agent_handoff.md)保留派发前时点；后续 attempt001 已开始实施，main／远端未同步、未发布。
-
-G06b attempt002 在 Core `f8c43d61`／GeoPhys `dd393187` 经[范围重估主审](reviews/20261116_g06b_attempt002_scope_reassessment.md)保持 **PARTIAL_NOT_ACCEPTED**。真实六格主链、GeoPhys显式discrete／32次预算的有界接触及reset、MJWarp B16双传感器与窗口800步已有证据。Sol此前将单次受控轨迹2mm界限扩大为通用门，现重估为不应沿用；scalar mixed缺陷和跨引擎接触力差异不自动阻断batch出口。窗口外观仍由维护者人工验收，AOT等既定暂缓事项保持。
-
-2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已执行，普通 attempt 计数为3；执行证据见[交接报告](../../../../../workspace/maintenance/v211_g06b_attempt003/report.md)。GeoPhys B1/B3 指定完整状态、Task及reset时钟对照、同源 Pendulum 无接触 scalar/B1 对照和诊断清理已完成。维护者调整内存后，同一 attempt 续跑完成 Isaac Pendulum B16 窗口、Isaac PickCube B3 最终 renderer 记录与关窗、以及此前三个受资源限制的 B16 渲染模式；18项性能中11项本轮实测、7项历史复用，没有使用资源例外。该段记录执行者返包时点；其后已按上文独立主审有界接收，维护者接收待确认。先前直接 pytest 中一次未监督 CUDA 执行及其后监督复验均在交接报告中保留。
+G05及E00～E16优化的原有接收见[项目接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)；本次不重开。Core此前已同步并push develop至`120281a1`，最终6c与收尾仍在阶段分支，本次不合并/推送。下列G05启动输入和旧进展均为历史记录，不覆盖上方当前结论。
 
 ## 启动输入与工作归属
 

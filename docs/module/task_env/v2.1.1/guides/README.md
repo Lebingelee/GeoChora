@@ -1,5 +1,7 @@
 # v2.1.1 指南交付要求
 
+G06 canonical CUDA并行已结案：普通调用、具名相机、部分reset及整批切换见[API](../api/README.md)与[并行示例](../../../../../examples/parallel/reconfigure_device.py)；开发、测试和能力边界见[G06实施总结](../maintenance/g06/implementation-summary.md)。R3并行支持另包，不能沿用单环境重力补偿指南推断其已支持。
+
 3b 的运行范围与未通过项见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)；不把10步执行等同于方向或整体验收通过。Isaac 解释器可用显式 `--isaac-python` 或 `ISAAC_SIM_PYTHON` 选择，前者优先，Core 解释器默认当前 Python。
 
 [安装与启动指南](installation-and-start.md)提供已有安装路径、轻量入口与新克隆的依赖边界；已有受限CPU启动与任务回归记录见[当前状态](../maintenance/reviews/20261105_pre_stage3_current_status.md)，不证明完整新安装组合或selected RGB。仓库当前无root packaging metadata，不使用`pip install -e .`。
