@@ -78,12 +78,13 @@ def validate_physical_joint_mapping(model, mj, binding, definitions, *, source_j
     worker. The supplied layout facts receive the exact public model overrides.
     """
     drive_mode = uniform_native_drive_mode(binding)
-    direct_motor = (bool(torque_actuators) and not position_actuators
+    direct_motor = (bool(torque_actuators)
                     and all(c.native_drive == 'disabled' for c in binding.channels))
     if direct_motor:
         if ({f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in binding.channels}
-                != dict(torque_actuators) or joint_targets or open_actuators):
-            raise ValueError('physical motor bindings must exactly cover the source actuators')
+                != dict(torque_actuators) or dict(joint_targets) != dict(position_actuators)
+                or open_actuators):
+            raise ValueError('physical motor bindings must exactly cover their source actuators')
         for frame_id in fixed_roots:
             root_id = int(model.body(frame_id).id)
             if root_id <= 0 or int(model.body_parentid[root_id]) != 0 or int(model.body_jntnum[root_id]) != 0:
@@ -96,6 +97,38 @@ def validate_physical_joint_mapping(model, mj, binding, definitions, *, source_j
             raise ValueError('physical channels alias one native DOF')
         dofs[channel.target_key] = dof
         groups.setdefault((channel.entity_id, channel.transmission_id), []).append((channel, joint_id))
+    if direct_motor:
+        # Separate source-owned position holds may coexist, but cannot claim a
+        # motor, joint, or DOF controlled by the physical effort writer.
+        position_ids, position_dofs = set(), set()
+        for semantic, native_actuator in position_actuators.items():
+            native_joint = source_joints.get(semantic)
+            if native_joint is None:
+                raise ValueError('independent position hold lacks a named source joint')
+            joint = int(model.joint(native_joint).id)
+            actuator = int(model.actuator(native_actuator).id)
+            dof = int(model.jnt_dofadr[joint])
+            if (actuator in position_ids or dof in position_dofs or dof in dofs.values()
+                    or native_actuator in torque_actuators.values()
+                    or int(model.jnt_type[joint]) != int(mj.mjtJoint.mjJNT_SLIDE)
+                    or not bool(model.actuator_ctrllimited[actuator])
+                    or not all(math.isfinite(float(v)) for v in model.actuator_ctrlrange[actuator])
+                    or float(model.actuator_ctrlrange[actuator, 0]) >= float(model.actuator_ctrlrange[actuator, 1])
+                    or int(model.actuator_trntype[actuator]) != int(mj.mjtTrn.mjTRN_JOINT)
+                    or int(model.actuator_trnid[actuator][0]) != joint
+                    or int(model.actuator_biastype[actuator]) != int(mj.mjtBias.mjBIAS_AFFINE)
+                    or int(model.actuator_gaintype[actuator]) != int(mj.mjtGain.mjGAIN_FIXED)
+                    or int(model.actuator_dyntype[actuator]) != int(mj.mjtDyn.mjDYN_NONE)
+                    or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))
+                    or float(model.actuator_gainprm[actuator, 0]) <= 0
+                    or not np.isfinite(model.actuator_biasprm[actuator]).all()
+                    or float(model.actuator_biasprm[actuator, 0]) != 0.
+                    or not math.isclose(float(model.actuator_biasprm[actuator, 1]),
+                                        -float(model.actuator_gainprm[actuator, 0]), rel_tol=0., abs_tol=1e-12)
+                    or float(model.actuator_biasprm[actuator, 2]) > 0.):
+                raise ValueError('independent position hold overlaps or differs from its source drive')
+            position_ids.add(actuator)
+            position_dofs.add(dof)
     for group in groups.values():
         actuator = int(model.actuator(group[0][0].native_actuator).id)
         if actuator in actuator_ids:
@@ -158,7 +191,23 @@ def validate_physical_joint_mapping(model, mj, binding, definitions, *, source_j
             equality_ids.append(matches[0])
         else:
             raise ValueError('unsupported compiled physical transmission')
-    if drive_mode == 'disabled':
+    if drive_mode == 'disabled' and direct_motor and position_actuators:
+        if (actuator_ids | position_ids) != set(range(int(model.nu))):
+            raise ValueError('selective drive isolation requires every actuator to be declared')
+        bit = int(mj.mjtDisableBit.mjDSBL_ACTUATION)
+        if int(model.opt.disableflags) & bit:
+            raise ValueError('independent position holds require native actuation enabled')
+        before = {aid: float(model.actuator_gainprm[aid, 0]) for aid in actuator_ids}
+        for aid in actuator_ids:
+            model.actuator_gainprm[aid, 0] = 0.0
+        if any(float(model.actuator_gainprm[aid, 0]) != 0.0 for aid in actuator_ids):
+            raise ValueError('MuJoCo public model did not isolate physical motor drives')
+        build_layout_facts['physical_drive_override'] = {
+            'schema_version': 'mujoco-selective-drive-isolation-v1',
+            'motor_actuator_ids': sorted(actuator_ids), 'position_hold_ids': sorted(position_ids),
+            'motor_gain_before': before, 'motor_gain_after': 0.0,
+            'source_mjcf_modified': False, 'api': 'mjModel.actuator_gainprm'}
+    elif drive_mode == 'disabled':
         if actuator_ids != set(range(int(model.nu))):
             raise ValueError('global drive isolation requires every actuator to be declared')
         bit = int(mj.mjtDisableBit.mjDSBL_ACTUATION)

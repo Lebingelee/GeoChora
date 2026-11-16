@@ -352,9 +352,13 @@ class _SessionValues:
             if self._provider != 'mujoco':
                 raise ValueError('source-bound ResetPlanV1 is currently admitted for MuJoCo mixed sessions only')
             plan.validate()
-            if getattr(self._source, 'mixed_actuator_plan', None) is None:
-                raise ValueError('source-bound ResetPlanV1 requires an admitted typed source profile')
             sample = plan.reset_sample
+            physical_source_bound = (
+                getattr(self, '_physical_port', None) is not None
+                and sample.control_policy == 'named_torque_and_finger_position_by_source_v1'
+                and bool(getattr(self._source, 'position_actuators', {})))
+            if getattr(self._source, 'mixed_actuator_plan', None) is None and not physical_source_bound:
+                raise ValueError('source-bound ResetPlanV1 requires an admitted typed source profile')
             if (sample.task_artifact_hash != self._artifact.identity_hash
                     or sample.source_id != self._source.scene_source.source_id
                     or sample.source_closure_digest != self._source.source_closure_digest):
@@ -363,7 +367,7 @@ class _SessionValues:
             # session gate or invoking a provider reset implementation.
             if sample.schema_version != 'reset-sample-v1':
                 raise ValueError('ResetPlanV1 requires ResetSampleV1')
-            if getattr(self._source, 'mixed_actuator_plan', None) is not None:
+            if getattr(self._source, 'mixed_actuator_plan', None) is not None or physical_source_bound:
                 preflight = getattr(self, '_preflight_reset_plan_sample', None)
                 if not callable(preflight):
                     raise RuntimeError('mixed actuator RuntimeSession lacks pre-mutation reset preflight')
@@ -447,7 +451,10 @@ class _SessionValues:
                 self._provider not in {'mujoco', 'geophys', 'isaacsim'}
                 or (getattr(self._source, 'mixed_actuator_plan', None) is None
                     and not (getattr(self, '_physical_port', None) is not None
-                             and sample.control_policy == 'named_physical_effort_by_source_v1'))):
+                             and (sample.control_policy == 'named_physical_effort_by_source_v1'
+                                  or (self._provider == 'mujoco'
+                                      and sample.control_policy == 'named_torque_and_finger_position_by_source_v1'
+                                      and bool(getattr(self._source, 'position_actuators', {}))))))):
             raise TypeError(
                 'ResetSampleV1 requires an admitted mixed actuator or physical-effort session before reset'
             )

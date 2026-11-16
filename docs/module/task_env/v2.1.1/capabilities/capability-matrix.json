@@ -2,7 +2,7 @@
   "schema_version": "geochora-v211-capability-plan-v1",
   "version": "2.1.1",
   "status": "CURRENT_BOUNDED_WITH_HISTORICAL_PLAN",
-  "updated_date": "2026-11-16",
+  "updated_date": "2026-11-17",
   "baseline": {
     "core_commit": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
     "geophys_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
@@ -889,6 +889,27 @@
         "Live Controller switching",
         "Full G06 native matrix / full Solution success / Qualification"
       ]
+    },
+    "g07a_attempt002_libero": {
+      "status": "TESTED_BOUNDED",
+      "scope": "LIBERO task1, MuJoCo 3.8.1 CPU in-process, fixed mounted Panda source, init row 0; no task success or qualification claim",
+      "source_scene_sha256": "4b53f509061e7ba9ade8c8afed43e8cbbf8f8d0bd1972efeb3be7e415e0961ed",
+      "source_closure_sha256": "395d46fd5876e17243e505df4b1df2d5df333c51dac74ee87eb8a42a349fd993",
+      "controllers": {
+        "direct_joint_effort_v1": "seven named N*m channels; all seven nonzero command and ACK, reset and 1/2 H5 readback",
+        "source_osc_pose_v1": "world TCP pose, 20 Hz effort hold over 25 2ms steps; 64/65 unloaded comparison does not regress against the frozen 500 Hz historical OSC reference"
+      },
+      "recording": "v3 H5; independent reader checks typed batch, native ACK, source/controller identity, boundary and close",
+      "limits": [
+        "source-owned finger position holds are not a gripper action writer",
+        "benchmark task success false in the bounded representative run",
+        "task2/3, GeoPhys replay and V8 Solution execution not migrated",
+        "no explicit Controller switching matrix, D0 replay, provider parity or Qualification"
+      ],
+      "evidence_root": "workspace/maintenance/v211_g07a_attempt002/",
+      "oracle": "osc-freeze/plan.json and osc-compare-006/result.json",
+      "reader": "native-033/reader.json and native-023/reader.json",
+      "close": "same-run session close and source cleanup receipts"
     }
   }
 }

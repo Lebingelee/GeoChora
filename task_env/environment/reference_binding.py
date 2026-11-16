@@ -427,7 +427,9 @@ class ReferenceTaskBinding:
         if type(self.physical_ignore_done) is not bool:
             raise TypeError('physical ignore_done policy must be a boolean')
         compiled_physical_action = self.action_space_factory is None and (
-            self.action_schema is None or self.external_action_contract is not None)
+            self.action_schema is None or self.external_action_contract is not None
+            or (isinstance(self.action_schema, dict)
+                and self.action_schema.get('schema_version') == 'physical-control-actions-v1'))
         if (not callable(self.prepare_action) or (not compiled_physical_action and (
                 not callable(self.action_space_factory)
                 or not isinstance(self.action_schema, dict) or not self.action_schema))):

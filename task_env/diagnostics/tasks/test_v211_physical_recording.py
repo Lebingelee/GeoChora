@@ -7,6 +7,21 @@ from task_env.recorders.physical_metadata import record_physical_transition
 from task_env.runtime.sessions.physical_control import ResolvedJointEffortV1
 
 
+def test_recording_selects_only_the_group_covering_physical_channels():
+    from task_env.artifacts import ActuatorReference, ControlGroup
+    from task_env.recorders.physical_metadata import physical_action_group
+    arm = ControlGroup('control-group-v1', 'arm', 'arm', (ActuatorReference('arm', 'motor'),))
+    hand = ControlGroup('control-group-v1', 'arm', 'hand', (ActuatorReference('arm', 'finger'),))
+    binding = SimpleNamespace(channels=(SimpleNamespace(entity_id='arm', native_actuator='motor'),))
+    execution = SimpleNamespace(scene=SimpleNamespace(control_groups=(arm, hand)),
+                                compiled=SimpleNamespace(binding=binding))
+    assert physical_action_group(execution) == arm
+    execution.scene.control_groups = (hand,)
+    import pytest
+    with pytest.raises(ValueError, match='matching the selected channels'):
+        physical_action_group(execution)
+
+
 def test_physical_record_keeps_spec_batch_ack_and_no_measured_force():
     plan, context, effort, _ = _case()
     batch = PhysicalCommandBatchV1('physical-command-batch-v1', context, (effort('effort-a',1.),), (), ())

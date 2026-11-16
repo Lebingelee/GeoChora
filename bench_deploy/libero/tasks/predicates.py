@@ -237,7 +237,9 @@ def evaluate_on_bowl_plate_v1(
 
 
 def _observation_payload_v1(env, state, success, metrics, info_fields, boundary_fields):
+    from task_env.runtime.sessions.source import source_resource_receipt
     source = env.value['source']
+    semantic_by_native = {native: semantic for semantic, native in source.joints.items()}
     identity = _predicate_boundary_fields(env, state)
     boundary_sha = digest(identity)
     ee = state.pose_world['panda-v1/ee']
@@ -245,7 +247,7 @@ def _observation_payload_v1(env, state, success, metrics, info_fields, boundary_
         'state': {
             'ee_pose': np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32),
             'joint_position': np.asarray(
-                [state.joint_position[f'joint{i}'] for i in range(1, 8)]
+                [state.joint_position[semantic_by_native[f'robot0_joint{i}']] for i in range(1, 8)]
                 + [state.joint_position['finger_joint1'], state.joint_position['finger_joint2']],
                 dtype=np.float32,
             ),
@@ -261,7 +263,7 @@ def _observation_payload_v1(env, state, success, metrics, info_fields, boundary_
     info = {
         'is_success': success, 'task_failure': False, 'task_metrics': dict(metrics),
         **{key: value for key, value in identity.items() if key != 'state_revision'},
-        'source_xml_sha256': source.execution_source_receipt.canonical_xml_sha256,
+        'source_xml_sha256': source_resource_receipt(source).canonical_xml_sha256,
         'state_boundary_identity_sha256': boundary_sha,
         'boundary_context_v1': {
             'schema_version': 'task-observation-context-v1', **identity,

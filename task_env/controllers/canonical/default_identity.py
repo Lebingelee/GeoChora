@@ -56,6 +56,13 @@ class DefaultCanonicalController:
         return self._children
 
     @property
+    def bound_controller(self):
+        """Expose the single admitted implementation for capability matching."""
+        if self._controller is None:
+            raise RuntimeError('default Controller requires a single source-bound subject')
+        return self._controller
+
+    @property
     def controllers(self):
         if self._children:
             return self._children

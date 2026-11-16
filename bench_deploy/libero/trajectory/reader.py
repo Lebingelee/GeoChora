@@ -65,13 +65,19 @@ def _validate_source_receipt(episode: Mapping[str, Any]) -> dict[str, Any]:
     files_by_path = {item["path"]: item for item in files}
     canonical = files_by_path.get("canonical-source.xml")
     importer = files_by_path.get("scene.xml")
+    projection = episode.get('source_projection')
+    projected = isinstance(projection, Mapping)
     if (canonical is None or importer is None
             or canonical["sha256"] != receipt.get("canonical_xml_sha256")
             or importer["sha256"] != receipt.get("importer_xml_sha256")
-            or receipt.get("source_id") != episode.get("source_id")
-            or receipt.get("source_closure_digest") != episode.get("source_closure_digest")
+            or (not projected and receipt.get("source_id") != episode.get("source_id"))
+            or (not projected and receipt.get("source_closure_digest") != episode.get("source_closure_digest"))
             or receipt.get("canonical_xml_sha256") != episode.get("source_xml_sha256")):
         raise ValueError("LIBERO RuntimeSource receipt differs from the episode identity")
+    if projected and (projection.get('source_id') != episode.get('source_id')
+            or projection.get('source_closure_digest') != episode.get('source_closure_digest')
+            or projection.get('source_id') != 'scene-definition-v3:' + str(projection.get('scene_identity_hash'))):
+        raise ValueError('LIBERO projected source differs from the selected Scene or episode')
     closure_payload = {"schema_version": "source-closure-v1", "files": files}
     closure_digest = hashlib.sha256(_canonical(closure_payload)).hexdigest()
     if closure_digest != receipt.get("source_closure_digest"):
@@ -124,6 +130,8 @@ def _validate_episode(episode: Mapping[str, Any], bundle: Path, mode: str) -> di
                != episode.get("runtime_progress", {}).get("provider_materialization_id")
             or metadata_context.get("solution_identity") != episode.get("solution_identity")):
         raise ValueError("LIBERO replay identity differs from independently stored H5 task metadata")
+    if episode.get('source_projection') is not None:
+        return _validate_physical_episode(episode, records, path, mode)
     if mode == "solution-v8":
         if episode.get("solution_schema_version") != "libero-bowl-to-plate-solution-v8":
             raise ValueError("LIBERO Solution replay omitted its V8 strategy identity")
@@ -224,6 +232,67 @@ def _validate_episode(episode: Mapping[str, Any], bundle: Path, mode: str) -> di
             "transition_count": count, "observation_count": count + 1,
             "end_reason": outcome.end_reason, "task_success": outcome.task_success,
             "mode": mode}
+
+
+def _validate_physical_episode(episode, records, path, mode):
+    """Verify the physical writer's typed batch and native ACK in the H5."""
+    from task_env.controllers.canonical.physical_commands import PhysicalCommandBatchV1, PhysicalControlReceiptV1
+    if mode != 'frozen-actions' or episode.get('solution_identity') is not None:
+        raise ValueError('physical frozen replay cannot claim a Solution')
+    actions, contexts = episode['action_trace'], records.get('boundary_contexts')
+    count = records['transition_count']
+    if not isinstance(contexts, list) or len(contexts) != count + 1:
+        raise ValueError('physical replay omitted boundary contexts')
+    for index, context in enumerate(contexts):
+        boundary, clock = context['state_boundary_identity'], context['state_sample_clock']
+        if (boundary['control_step'] != index or clock['sample_index'] != index
+                or boundary['episode_id'] != episode['episode_id']
+                or boundary['reset_sample_id'] != episode['reset_sample']['sample_id']
+                or boundary['scene_identity_hash'] != episode['source_projection']['scene_identity_hash']
+                or boundary['provider_materialization_id'] != episode['runtime_progress']['provider_materialization_id']
+                or abs(float(clock['simulation_time_s']) - index * .05) > 1e-9):
+            raise ValueError('physical replay boundary identity or clock differs')
+    for index, (control, trace) in enumerate(zip(records['structured_controls'], actions, strict=True)):
+        mapping = control.to_mapping()
+        groups, writers = mapping['request']['groups'], mapping['writer_controls']
+        action_value = trace['action']
+        if episode['action_schema'].get('mode') == 'joint_effort':
+            if not isinstance(action_value, Mapping) or set(action_value) != {'torque'}:
+                raise ValueError('physical replay torque action is malformed')
+            action_value = action_value['torque']
+        action = np.asarray(action_value, dtype=np.float64)
+        if (len(groups) != 1 or len(writers) != 1 or action.shape != (7,)
+                or not np.array_equal(np.asarray(groups[0]['values'], dtype=np.float64), action)):
+            raise ValueError('physical replay input differs from the recorded action')
+        writer = writers[0]
+        batch = PhysicalCommandBatchV1.from_mapping(writer['controller_target']['payload'])
+        payload = writer['applied_control']['payload']
+        accepted = PhysicalControlReceiptV1.from_mapping(payload['accepted'])
+        ack = PhysicalControlReceiptV1.from_mapping(payload['native_write_ack'])
+        batch.validate()
+        accepted.validate()
+        ack.validate()
+        contribution_ids = tuple(item.contribution.contribution_id for item in batch.joint_efforts)
+        if (batch.identity_hash != writer['controller_target']['identity_hash']
+                or accepted.batch_sha256 != batch.identity_hash or ack.batch_sha256 != batch.identity_hash
+                or accepted.stage != 'accepted' or ack.stage != 'native_write_ack'
+                or accepted.contribution_ids != contribution_ids or ack.contribution_ids != contribution_ids
+                or accepted.context != batch.context or ack.context != batch.context
+                or batch.context.boundary.to_mapping() != contexts[index]['state_boundary_identity']
+                or batch.context.source_id != episode['source_id']
+                or batch.context.source_closure_sha256 != episode['source_closure_digest']
+                or batch.context.artifact_sha256 != episode['task_artifact_identity_hash']
+                or any(item.contribution.owner_id != writer['writer_id'] for item in batch.joint_efforts)):
+            raise ValueError('physical replay typed batch, writer, source or ACK differs')
+    outcome = records['outcome']
+    if (episode['task_success'] is not outcome.task_success
+            or episode['episode_end']['outcome']['end_reason'] != outcome.end_reason
+            or episode['recording']['transition_count'] != count
+            or episode['recording']['observation_count'] != count + 1):
+        raise ValueError('physical replay outcome or recording counts differ')
+    return {'episode_id': outcome.episode_id, 'h5_path': str(path),
+            'transition_count': count, 'observation_count': count + 1,
+            'end_reason': outcome.end_reason, 'task_success': outcome.task_success, 'mode': mode}
 
 
 def consume_libero_replay_result(result_path: Path) -> dict[str, Any]:

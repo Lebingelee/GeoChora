@@ -297,6 +297,42 @@ def _mixed_actuator_manifest(artifact, execution, source):
     )
 
 
+def _scene_named_contact_manifest(artifact, execution, source):
+    """Admit the existing MuJoCo named-geom query for one versioned source."""
+    from pathlib import Path
+    if (execution.physics_provider != 'mujoco' or execution.backend != 'cpu'
+            or not isinstance(artifact, TaskArtifactV1) or source.scene_definition is None
+            or not source.contact_geom_groups or source.mixed_actuator_plan is not None
+            or not source.torque_actuators or not source.position_actuators
+            or source.source_composition_intent is None):
+        return None
+    if not set(source.contact_geom_groups) <= set(source.bodies) | set(source.fixture_bodies):
+        raise ValueError('contact geom groups require declared source bodies or fixtures')
+    from .source import source_resource_receipt
+    from ...assembly.source_composition import SourceCompositionIntentV1
+    receipt = source_resource_receipt(source)
+    intent = source.source_composition_intent
+    if (type(intent) is not SourceCompositionIntentV1 or intent.mode != 'reference'
+            or {(entity, actuator) for entity, actuator, _writer in intent.resource_writers}
+               != {(intent.robot_uid, actuator) for actuator in source.torque_actuators.values()}
+            or receipt is None or source.scene_source.base_dir is None
+            or receipt.source_id != intent.task_source_id
+            or receipt.source_closure_digest != intent.task_source_closure_sha256
+            or source.scene_source.xml.encode('utf-8') != receipt.importer_xml
+            or Path(source.scene_source.base_dir).resolve() != receipt.snapshot_root):
+        raise ValueError('named contact source differs from its bound composition snapshot')
+    receipt.validate_snapshot()
+    _validate_v1_materialization_source(artifact, execution, source)
+    if source.task_artifact_hash != artifact.identity_hash or not source.source_closure_digest:
+        raise ValueError('named contact requires the selected Artifact and source closure')
+    base = provider_manifest('mujoco')
+    evidence = 'source-bound named geom mapping; compiled body/geom identity checked at build'
+    return replace(base, capabilities=(*base.capabilities,
+        CapabilityClaim('contact_detection', 'implemented', evidence)),
+        known_unsupported=tuple(name for name in base.known_unsupported if name != 'contact_detection'),
+        evidence_reference=evidence)
+
+
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *,
                 source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
@@ -425,7 +461,8 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
     if source.mixed_actuator_plan is not None:
         actual = _mixed_actuator_manifest(artifact, execution, source)
     else:
-        actual = provider_manifest(execution.physics_provider)
+        actual = (_scene_named_contact_manifest(artifact, execution, source)
+                  or provider_manifest(execution.physics_provider))
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
         if source.mixed_actuator_plan is not None:
@@ -740,6 +777,15 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
             raise ValueError('no selected adapter for provider')
     except (TypeError, ValueError, OSError, AttributeError) as error:
         source_problem = f'{type(error).__name__}: {error}'
+    if (source_problem is None and selection.physics_provider == 'mujoco'
+            and selection.physics_backend == 'cpu' and source.contact_geom_groups
+            and source.mixed_actuator_plan is None):
+        try:
+            contact_execution = ExecutionSpec('mujoco', PROFILE, 'none', 'cpu', 0, 'strict')
+            if _scene_named_contact_manifest(artifact, contact_execution, source) is not None:
+                actual_capabilities.add('contact_detection')
+        except (TypeError, ValueError, OSError, AttributeError) as error:
+            source_problem = f'{type(error).__name__}: {error}'
     row('source_closure', 'task:' + artifact.task_id,
         valid='unsatisfied' if source_problem else 'satisfied',
         reason=source_problem or 'source declarations passed; native importer must verify the closure')

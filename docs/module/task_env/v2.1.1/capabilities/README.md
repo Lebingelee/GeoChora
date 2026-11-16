@@ -1,6 +1,6 @@
 # v2.1.1 能力与验收矩阵
 
-当前接收状态统一见[当前摘要](../maintenance/current-state.md)与[G06实施总结](../maintenance/g06/implementation-summary.md)：G01～G06 canonical范围有界结案，G07/版本收口待实施。JSON的`current_support.g06_closeout`记录当前G06；旧`targets`/`target_resolution`是显式保留的初建规划快照，其NOT_RUN不能否定当前受测结果，也不能因阶段接收把G07最终格升格。
+当前接收状态统一见[当前摘要](../maintenance/current-state.md)与[G06实施总结](../maintenance/g06/implementation-summary.md)：G01～G06 canonical范围有界结案，G07仍需独立主审和版本收口。JSON的`current_support.g06_closeout`记录G06；`g07a_attempt002_libero`记录MuJoCo task1 的有界 Controller／reader 证据和未迁路线。旧`targets`/`target_resolution`保留初建规划，其NOT_RUN不能否定当前受测结果，也不能因有界结果把G07最终九格升格。
 
 
 3b attempt003 经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)接收为 **ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION**：冻结三路线的实际模型／reset／执行／同次记录读回，以及Panda MuJoCo CPU开启补偿的最终350步保持与两任务方向检查已闭合。新N08-v2通过，原N08三路线FAIL保留；不外推全任务或跨后端重力补偿。3c的[ACCEPTED_BOUNDED_3C_RESET_REBUILD](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)限于显式PickCube profile、四条声明边、固定观测、随机流和故障处置。G03有界收尾。6.1辅助App状态为VERSION_VERIFIED_CLOSE_TIMEOUT，仅启动／版本有真实证据，完整运行和正常关闭未通过；不提升最终能力格或Qualification。

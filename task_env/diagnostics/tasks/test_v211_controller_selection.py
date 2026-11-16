@@ -10,6 +10,7 @@ from task_env.artifacts.state import (
 )
 from task_env.diagnostics.tasks.test_v211_physical_control_contract import _case
 from task_env.environment.configuration import resolve_task_env_config
+from task_env.controllers.canonical.physical_controller import select_subject_effort_controller
 from task_env.runtime.sessions.control import bind_selected_controller
 from task_env.runtime.sessions.physical_control import (
     ControlledSubjectV1, PhysicalControlExecutionV1,
@@ -25,8 +26,8 @@ def _selection(profile_id, *, state_fields=True):
         (('robot', 'arm-drive-joint'),), ('controller-a',),
         supported_controller_profiles=(
             'direct_joint_effort_v1', 'velocity_damped_joint_effort_v1'))
-    controller = subject.select_effort_controller(
-        compiled.binding, profile_id=profile_id, writer_id='controller-a',
+    controller = select_subject_effort_controller(
+        subject, compiled.binding, profile_id=profile_id, writer_id='controller-a',
         units=('N*m',), cadence_s=.01)
     requirements = ()
     if state_fields:
@@ -114,11 +115,11 @@ def test_public_control_profile_is_task_scoped_and_explicit():
 
     default = resolve_task_env_config(PendulumEnv, None)
     explicit = resolve_task_env_config(PendulumEnv, {
-        'control': {'profile_id': 'velocity_damped_joint_effort_v1'}})
+        'execution': {'physics_provider': 'mujoco'}, 'controller': {'profile_id': 'velocity_damped_joint_effort_v1'}})
     direct = resolve_task_env_config(TwoWheelBalanceEnv, {
-        'control': {'profile_id': 'direct_joint_effort_v1'}})
-    assert default.control.profile_id is None
-    assert explicit.control.profile_id == 'velocity_damped_joint_effort_v1'
-    assert direct.control.profile_id == 'direct_joint_effort_v1'
-    with pytest.raises(ValueError, match='unsupported task physical Controller profile'):
-        resolve_task_env_config(PendulumEnv, {'control': {'profile_id': 'r3_continuous_v1'}})
+        'controller': {'profile_id': 'direct_joint_effort_v1'}})
+    assert default.controller_profile == 'direct_joint_effort_v1'
+    assert explicit.controller_profile == 'velocity_damped_joint_effort_v1'
+    assert direct.controller_profile == 'direct_joint_effort_v1'
+    with pytest.raises(ValueError, match='unsupported selected controller profile'):
+        resolve_task_env_config(PendulumEnv, {'controller': {'profile_id': 'r3_continuous_v1'}})

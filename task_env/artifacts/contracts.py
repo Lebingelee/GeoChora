@@ -1230,9 +1230,11 @@ class ActionIntent(Contract):
             raise ValueError('joint action has no rotation representation')
         if self.mode not in {'absolute_joint', 'direct_joint_effort'} and self.rotation_representation == 'none':
             raise ValueError('pose action requires rotation representation')
-        expected_target = ('joint_effort' if self.mode == 'direct_joint_effort'
-                           else 'arm_joint_position_and_gripper')
-        _choice(self.controller_target, {expected_target}, 'controller target')
+        expected_targets = ({'joint_effort'} if self.mode == 'direct_joint_effort'
+                            else {'arm_joint_position_and_gripper', 'arm_joint_effort'}
+                            if self.mode in {'absolute_pose', 'delta_pose'}
+                            else {'arm_joint_position_and_gripper'})
+        _choice(self.controller_target, expected_targets, 'controller target')
 
 
 @dataclass(frozen=True)

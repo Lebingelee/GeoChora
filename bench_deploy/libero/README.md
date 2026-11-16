@@ -19,10 +19,11 @@ established. File-specific license and attribution for the `wine_bottle` and
 autonomous Solution success remain optional; tasks B/C and Isaac Sim are
 deferred.
 
-The CLI runs an explicitly selected frozen action sequence for task1, task2,
-or task3 on MuJoCo or GeoPhys. Task2/3 also require the accepted source reset
-sample. The optional V8 policy uses the same runner and result format; it is
-not selected by default.
+That acceptance describes its historical source and implementation. After the
+TaskEnv lifecycle migration, the active CLI route is task1 on MuJoCo CPU with
+the source-bound physical Controllers below. Task2/3, GeoPhys replay and V8
+Solution execution are not migrated and are explicitly unavailable here;
+historical mixed-control results remain readable.
 
 ## Current route
 
@@ -34,7 +35,7 @@ not selected by default.
    bytes and installs/verifies the source closure.
 3. `environment.selected_reference.build_libero_selected_candidate()` binds
    the source plan and LIBERO reset semantics to the existing TaskEnv route.
-4. `script/cli.py` runs a frozen A action sequence or the optional V8 policy.
+4. `script/cli.py` runs an action sequence in the selected Controller's schema.
 5. `trajectory/reader.py` validates task-specific result semantics on top of
    the existing TaskEnv record/readback owners.
 
@@ -44,11 +45,11 @@ task-owned.
 
 ## Reset realization record
 
-The normal-reset receipt uses `libero-normal-reset-realization-v2`. It stores
-the actual seed, selected `.pruned_init` row and hash, source and BDDL hashes,
-`ResetSampleV1` identity and state, placement draws, and asset geometry hashes.
-The fixed `libero-normal-reset-order-v1` algorithm is described here instead of
-being copied into every receipt.
+The migrated route records the actual source-bound `ResetSampleV1`, including
+the seed, `.pruned_init` row and hash, named state and fixture poses. The
+historical `libero-normal-reset-realization-v2` receipt additionally recorded
+placement draws and asset geometry hashes; the current physical worker does not
+claim those fields in its result.
 
 For each reset, the sampler uses a task-seeded `numpy.random.RandomState`. It
 consumes seven zero-magnitude Panda arm-noise draws before placement sampling,
@@ -60,9 +61,9 @@ retained even though the pruned row overwrites movable-object placement.
 
 ## Active versions and recovery
 
-The active A reference profile is `LiberoMixedControllerV6`; optional rim
-control remains V7. The only active Solution class is optional
-`LiberoPickPlaceSolutionV8`; its private V5–V7 parent-hash data remains inside
+The historical A reference profile is `LiberoMixedControllerV6`; V7 and the
+`LiberoPickPlaceSolutionV8` strategy remain source and history, not a migrated
+execution route. Its private V5–V7 parent-hash data remains inside
 identity construction to preserve existing V8 hashes. Only
 `solution_identity_v8` is exported as the identity entry point. The independent
 reader accepts one current replay-result schema. Retired D01 and V8 bundle
@@ -124,13 +125,20 @@ Use the selected source build, action sequence, task, and provider explicitly:
 
 ```sh
 PYTHONPATH=. python -m bench_deploy.libero.script.cli --run-replay /local/run \
-  --task task2 --provider mujoco --actions /local/task2-actions.json \
-  --reset-sample /local/task2-reset.json --source-xml /local/source.xml \
+  --task task1 --provider mujoco --controller source_osc_pose_v1 \
+  --actions /local/task1-actions.json --source-xml /local/source.xml \
   --composition-plan /local/composition-plan.json --install-root /local/libero \
-  --init-path /local/task2/install/init.pruned_init
+  --init-path /local/task1/init.pruned_init
 ```
 
-`--solution` selects optional V8 and uses the same runner and result reader.
+The default `direct_joint_effort_v1` expects `{"torque": [seven N*m values]}`;
+`source_osc_pose_v1` expects a seven-value world TCP pose `[x,y,z,qw,qx,qy,qz]`.
+Both use the source-bound seven arm channels. The two source position drives
+hold their reset finger positions; neither action commands the gripper.
+The pose Controller evaluates source dynamics at 20 Hz and holds its effort
+over 25 physics steps; it is not the historical 500 Hz OSC replay.
+Only init row zero is currently admitted by this route. `--solution` and the
+other historical mixed replay combinations are not currently migrated.
 The accepted A-stage reference profile and task 2 exception are recorded in
 [`20261101_r07_a123_sol_acceptance.md`](../../docs/module/task_env/v2.1.0/maintenance/reviews/r_route/20261101_r07_a123_sol_acceptance.md).
 A short smoke or completed worker bundle is not task success, provider parity,

@@ -48,7 +48,7 @@ class ControllerModelRequirementV1(Contract):
             raise ValueError('model input units are unsupported')
         if any(unit not in {'N*m', 'N'} for unit in self.output_units):
             raise ValueError('model output units are unsupported')
-        _choice(self.output_quantity, {'joint_bias'}, 'model output quantity')
+        _choice(self.output_quantity, {'joint_bias', 'operational_space_dynamics'}, 'model output quantity')
         _choice(self.clock_domain, {'evaluation_boundary'}, 'model clock')
         _choice(self.computation, {'pure_no_physics_step'}, 'model computation')
         _choice(self.requiredness, {'required', 'optional'}, 'model requiredness')

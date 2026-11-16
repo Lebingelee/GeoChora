@@ -141,6 +141,10 @@ class _WorkerEnv:
         self.artifact = SimpleNamespace(task_id="libero/task1", identity_hash="a" * 64,
                                         timebase=SimpleNamespace(control_substeps=25))
         self.controller = SimpleNamespace(identity="c" * 64, profile_id="osc-v6")
+        self.metadata = {'action_schema': {'schema_id': 'pose-v1'}}
+        self.session = SimpleNamespace(runtime_progress_receipt={
+            'episode_id': 'episode-1', 'control_step': 1, 'native_step_count': 25},
+            close_receipt=None)
         self.value = {"action_schema": {"schema_id": "pose-v1"}, "source": SimpleNamespace(
             execution_source_receipt=SimpleNamespace(
                 canonical_xml_sha256="e" * 64,
@@ -174,6 +178,7 @@ class _WorkerEnv:
 
     def close(self):
         self.close_receipt = {"session_closed": True, "cleanup_completed": True}
+        self.session.close_receipt = self.close_receipt
 
 
 def test_runner_closes_cleanly_and_marks_partial_step_failure(tmp_path):
@@ -184,6 +189,15 @@ def test_runner_closes_cleanly_and_marks_partial_step_failure(tmp_path):
     failed = run_libero_replay(failed_env, output_dir=tmp_path / "failure", action_sequence=[[0] * 8])
     assert failed["status"] == "failed" and failed_env.finish_reasons == ["execution_fault"]
     assert failed_env.close_receipt["session_closed"]
+
+
+def test_physical_replay_rejects_old_pose_before_creating_output_and_closes(tmp_path):
+    env = _WorkerEnv(tmp_path / 'invalid')
+    env.metadata = {'action_schema': {'schema_version': 'physical-control-actions-v1', 'mode': 'joint_effort'}}
+    with pytest.raises(ValueError, match='torque action mapping'):
+        run_libero_replay(env, output_dir=tmp_path / 'invalid', action_sequence=[[0.] * 8])
+    assert env.close_receipt['session_closed']
+    assert not (tmp_path / 'invalid').exists()
 
 
 @pytest.mark.parametrize("case", ["request", "target", "ack", "source", "boundary", "unavailable", "close", "counts"])

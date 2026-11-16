@@ -343,6 +343,8 @@ class DirectJointEffortControllerV1:
     physical-binding and session admission checks.
     """
 
+    profile_id = 'direct_joint_effort_v1'
+
     def __init__(self, binding, *, controller_id, channel_keys, action_key='torque'):
         from gymnasium.spaces import Box, Dict
         if type(binding) is not PhysicalControlBindingV1:
@@ -449,10 +451,8 @@ class DirectJointEffortControllerV1:
         """Release Controller-owned device constants after the batch closes."""
         self._device_limits.clear()
 
-    def compute(self, action, state, context):
+    def validate_action(self, action):
         from collections.abc import Mapping
-        if type(context) is not PhysicalCommandContextV1:
-            raise TypeError('direct effort requires a typed interval context')
         if isinstance(action, Mapping):
             if set(action) != {self._action_key}:
                 raise ValueError('direct effort action tree differs from its declaration')
@@ -472,6 +472,12 @@ class DirectJointEffortControllerV1:
         values = np.asarray(raw, dtype=np.float32)
         if not self.action_space.spaces[self._action_key].contains(values):
             raise ValueError('direct effort action exceeds its declared bounds')
+        return values
+
+    def compute(self, action, state, context):
+        if type(context) is not PhysicalCommandContextV1:
+            raise TypeError('direct effort requires a typed interval context')
+        values = self.validate_action(action)
         if (context.source_id, context.source_closure_sha256, context.artifact_sha256) != (
                 self.binding.source_id, self.binding.source_closure_sha256, self.binding.artifact_sha256):
             raise ValueError('direct effort context source differs from binding')

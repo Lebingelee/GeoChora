@@ -897,7 +897,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from contextlib import ExitStack
         with ExitStack() as preparation:
             if kwargs:
-                raise ValueError('selected reference admits no unsupported extra kwargs')
+                raise ValueError(f'selected reference admits no unsupported extra kwargs: {sorted(kwargs)}')
             observer_route = None
             if render_mode is not None:
                 from ..render.camera.task_rgb import selected_observer_route

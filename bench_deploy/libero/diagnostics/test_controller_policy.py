@@ -133,3 +133,12 @@ def test_factory_rejects_a_non_versioned_solution_selector():
 
     with pytest.raises(TypeError, match="named A-reference or V8"):
         build_libero_selected_candidate(_execution_profile=True)
+
+
+def test_unmigrated_libero_routes_reject_before_loading_source():
+    from bench_deploy.libero.environment.selected_reference import build_libero_selected_candidate
+    from task_env.environment.types import StageUnavailableError
+    with pytest.raises(StageUnavailableError, match='retired mixed-control'):
+        build_libero_selected_candidate(_execution_profile='v8')
+    with pytest.raises(StageUnavailableError, match='retired mixed-control'):
+        build_libero_selected_candidate(provider='geophys')

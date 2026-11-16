@@ -473,9 +473,18 @@ class PhysicalControlExecutionV1:
 
     def action_schema(self):
         """Describe the action inputs of the Controllers actually compiled here."""
+        from gymnasium.spaces import Box, Dict
+        def describe(controller):
+            space = self._controller_action_space(controller)
+            if isinstance(space, Box):
+                return {'identity': controller.identity, 'shape': list(space.shape)}
+            if isinstance(space, Dict) and all(isinstance(value, Box) for value in space.spaces.values()):
+                return {'identity': controller.identity, 'components': {
+                    key: {'shape': list(value.shape), 'dtype': str(value.dtype)}
+                    for key, value in space.spaces.items()}}
+            raise TypeError('physical Controller action schema requires a Box or named Box components')
         return {'schema_version': 'physical-control-actions-v1',
-                'controllers': [{'identity': controller.identity, 'shape': list(controller.action_shape)}
-                                for controller in self.controllers]}
+                'controllers': [describe(controller) for controller in self.controllers]}
 
     def action_space(self):
         """Compose declared Controller input spaces, retaining legacy shape-only callers."""

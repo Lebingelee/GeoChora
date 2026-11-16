@@ -323,13 +323,14 @@ def begin_structured_recording(path, *, horizon, observation, reset_info, metada
 def begin_selected_recording(env, path, *, adapter_path):
     """Choose the existing writer and prepare its metadata for one reset boundary."""
     if env.value.get('physical_execution') is not None or getattr(env, '_physical_reset_selection', None) is not None:
-        from .physical_metadata import physical_boundary_info, physical_record_metadata
+        from .physical_metadata import physical_action_group, physical_boundary_info, physical_record_metadata
         execution = env._physical_execution()
         if getattr(env, '_physical_reset_selection', None) is None:
-            groups = execution.scene.control_groups or ()
-            if (len(execution.controllers) != 1 or len(groups) != 1
-                    or env.binding.external_action_contract is None):
+            if (len(execution.controllers) != 1
+                    or not all(key in env.binding.action_schema
+                               for key in ('schema_id', 'mode', 'components'))):
                 raise ValueError('physical recording requires one declared controller and action group')
+            physical_action_group(execution)
         return begin_structured_recording(
             path, horizon=env.horizon, observation=env.obs,
             reset_info=physical_boundary_info(env, env.info),

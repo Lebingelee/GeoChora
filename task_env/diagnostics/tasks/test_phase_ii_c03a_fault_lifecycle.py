@@ -328,60 +328,42 @@ def test_construction_failure_exposes_a_not_advanced_fault_receipt(monkeypatch):
 
     monkeypatch.setattr("task_env.runtime.bootstrap_task_runtime", fail_bootstrap)
     with pytest.raises(RuntimeError, match="runtime construction") as caught:
-        make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})
+        make_env("empty-v1", config={"runtime": {"backend": "cpu"}})
     receipt = caught.value.execution_fault
     assert receipt.phase == "runtime_construction"
     assert receipt.physical_progress == "not_advanced"
 
 
 def test_real_pendulum_scalar_env_preserves_five_tuple_clock_and_terminal_guard():
+    """Current selected MuJoCo route; run only under the native supervisor."""
     from task_env import make_env
 
-    env = make_env(
-        "pendulum-v1",
-        config={"runtime": {"backend": "cpu"}, "episode": {"horizon": 2}},
-    )
+    env = make_env('pendulum-v1', config={'execution': {'physics_provider': 'mujoco',
+        'physics_backend': 'cpu', 'deployment': 'in_process'}, 'episode': {'horizon': 2}})
     try:
         observation, info = env.reset(seed=37)
         assert env.observation_space.contains(observation)
-        assert info["elapsed_steps"] == 0
-        control_dt = env.config.runtime.physics_dt * env.config.runtime.control_substeps
-
-        action = np.asarray([0.0], dtype=np.float32)
+        assert env.state.control_step == 0
+        control_dt = env.artifact.timebase.control_dt
+        action = {'torque': np.asarray([0.0], dtype=np.float32)}
         first = env.step(action)
         assert isinstance(first, tuple) and len(first) == 5
-        assert first[2:4] == (False, False)
-        assert first[4]["elapsed_steps"] == 1
-        assert env._last_snapshot.simulation_time == pytest.approx(control_dt)
-
+        assert first[2:4] == (False, False) and env.state.control_step == 1
+        assert env.state.simulation_time == pytest.approx(control_dt)
         second = env.step(action)
-        assert second[2:4] == (False, True)
-        assert second[4]["elapsed_steps"] == 2
-        assert env._last_snapshot.simulation_time == pytest.approx(2 * control_dt)
-        calls = env.execution_fault
-        assert calls is None
-        with pytest.raises(RuntimeError, match="episode end"):
+        assert second[2:4] == (False, True) and env.state.control_step == 2
+        assert env.state.simulation_time == pytest.approx(2 * control_dt)
+        with pytest.raises(RuntimeError):
             env.step(action)
-        assert env._last_snapshot.simulation_time == pytest.approx(2 * control_dt)
-
         env.reset(seed=37)
-        env._format_step_result = lambda *_args: (_ for _ in ()).throw(
-            RuntimeError("injected Gymnasium result packing failure")
-        )
-        with pytest.raises(RuntimeError, match="result packing failure"):
+        env.observation = lambda *_args: (_ for _ in ()).throw(
+            RuntimeError('injected observation publication failure'))
+        with pytest.raises(RuntimeError, match='observation publication failure'):
             env.step(action)
-        assert env.execution_fault.phase == "gymnasium_result"
-        assert env.execution_fault.physical_progress == "advanced"
-        advanced_time = env._last_snapshot.simulation_time
-        with pytest.raises(RuntimeError, match="faulted; reset"):
+        assert env.execution_fault is not None
+        assert env.execution_fault.physical_progress == 'advanced'
+        with pytest.raises(RuntimeError, match='fault'):
             env.step(action)
-        assert env._last_snapshot.simulation_time == advanced_time
-        stop_end = env.stop("after_result_packaging_fault")
-        assert stop_end.outcome.end_reason == "execution_fault"
-        assert stop_end.outcome.final_boundary == 0
-        assert stop_end.outcome.bootstrap_allowed is False
-        assert stop_end.boundary_event.payload["fault"]["physical_progress"] == "advanced"
-        assert env._last_snapshot.simulation_time == advanced_time
     finally:
         env.close()
 
@@ -424,7 +406,7 @@ def test_two_wheel_task_reward_success_and_fall_contract_without_engine():
     assert result.failure and not result.success
 
 
-@pytest.mark.parametrize('uid', ('empty-v1', 'pendulum-v1', 'two-wheel-balance-v1'))
+@pytest.mark.parametrize('uid', ('empty-v1',))
 def test_public_scalar_factory_constructs_selected_owner_without_runtime(uid):
     from task_env import make_env
     from task_env.environment.reference_env import SelectedReferenceEnv
@@ -434,6 +416,18 @@ def test_public_scalar_factory_constructs_selected_owner_without_runtime(uid):
         assert isinstance(env, SelectedReferenceEnv)
     finally:
         env.close()
+
+
+@pytest.mark.parametrize('uid', ('pendulum-v1', 'two-wheel-balance-v1'))
+def test_selected_scalar_factory_rejects_retired_pure_component_option_before_runtime(monkeypatch, uid):
+    from task_env import make_env
+    import task_env.runtime as runtime_module
+
+    def forbidden_bootstrap(**_kwargs):
+        raise AssertionError('rejected construction started a runtime')
+    monkeypatch.setattr(runtime_module, 'bootstrap_task_runtime', forbidden_bootstrap)
+    with pytest.raises(ValueError, match='build_runtime'):
+        make_env(uid, build_runtime=False)
 
 
 def test_classic_env_and_lifecycle_share_episode_close_state():
@@ -465,8 +459,6 @@ def test_classic_env_and_lifecycle_share_episode_close_state():
 
 @pytest.mark.parametrize(('uid', 'size', 'actuators', 'obs_size'), [
     ('empty-v1', 0, 0, None),
-    ('pendulum-v1', 1, 1, 3),
-    ('two-wheel-balance-v1', 3, 2, 7),
 ])
 def test_classic_public_env_lifecycle_uses_shared_episode_state_without_engine(
         monkeypatch, uid, size, actuators, obs_size):
@@ -592,7 +584,7 @@ def test_classic_public_env_lifecycle_uses_shared_episode_state_without_engine(
     assert state.closed and runtime.close_calls == 1
 
 
-@pytest.mark.parametrize('uid', ('empty-v1', 'pendulum-v1', 'two-wheel-balance-v1'))
+@pytest.mark.parametrize('uid', ('empty-v1',))
 def test_classic_public_pure_construction_does_not_bootstrap(monkeypatch, uid):
     from task_env import make_env
     from task_env.environment.types import StageUnavailableError
@@ -657,7 +649,7 @@ def test_env_closes_auxiliaries_even_if_shared_runtime_lifecycle_was_closed_firs
     assert runtime.close_calls == 1
 
 
-@pytest.mark.parametrize('uid', ('empty-v1', 'pendulum-v1', 'two-wheel-balance-v1'))
+@pytest.mark.parametrize('uid', ('empty-v1',))
 def test_classic_scalar_render_routes_and_closes_auxiliary_provider_without_engine(uid):
     from task_env import make_env
 

@@ -4,9 +4,21 @@ from __future__ import annotations
 import numpy as np
 
 
+def physical_action_group(execution):
+    """Resolve the one group covered by the selected physical channels."""
+    channels = execution.compiled.binding.channels
+    resources = {(channel.entity_id, channel.native_actuator) for channel in channels}
+    groups = [group for group in execution.scene.control_groups or ()
+              if {(ref.entity_id, ref.actuator_id) for ref in group.actuator_refs} == resources]
+    if len(groups) != 1:
+        raise ValueError('physical recording requires one group matching the selected channels')
+    return groups[0]
+
+
 def physical_record_metadata(env):
     """Describe the committed physical Controller and its source-bound state."""
     from ..observations.selected_reference import selected_reference_observation_schema
+    from ..runtime.sessions.provenance import provider_build_identity
 
     selection_owner = getattr(env, '_physical_reset_selection', None)
     execution = env._physical_execution()
@@ -42,16 +54,19 @@ def physical_record_metadata(env):
             'physical_action_spec_v1': spec,
             'task_artifact_identity_hash': artifact.identity_hash,
             'scene_identity_hash': execution.scene.identity_hash,
+            'source_id': source.source_id,
             'source_closure_digest': source.source_closure_digest,
             'reset_plan_identity_hash': reset_plan.identity_hash,
             'reset_sample_id': reset_plan.reset_sample.sample_id,
             'provider': env.provider, 'backend': env.backend,
+            'provider_build_identity': provider_build_identity(env.provider),
+            'controller_identity': execution.controllers[0].identity if len(execution.controllers) == 1 else None,
             'solution_identity': env.value.get('solution_identity'),
             'physical_binding_sha256': execution.compiled.binding.identity_hash,
             'feedback': 'independent force measurement unavailable',
         },
     }
-    return {
+    result = {
         'env_metadata': env_metadata,
         'universal_action_schema': {'version': 'physical-reset-action-v1',
                                     'components': components, 'dimension': len(components)},
@@ -60,8 +75,23 @@ def physical_record_metadata(env):
         'candidate_identity': {'task_artifact_identity_hash': artifact.identity_hash,
                                'source_closure_digest': source.source_closure_digest,
                                'reset_plan_identity_hash': reset_plan.identity_hash},
-        'execution_configuration_v1': env.get_execution_receipt(),
     }
+    from ..runtime.sessions.source import source_resource_receipt
+    receipt = source_resource_receipt(source)
+    if receipt is not None and len(execution.controllers) == 1:
+        result['task_context'] = {
+            'task_artifact_identity_hash': artifact.identity_hash,
+            'source_id': source.source_id, 'source_closure_digest': source.source_closure_digest,
+            'source_xml_sha256': receipt.canonical_xml_sha256,
+            'controller_identity': execution.controllers[0].identity,
+            'reset_sample_id': reset_plan.reset_sample.sample_id,
+            'episode_id': env.session.episode_id,
+            'provider_materialization_id': env.session.provider_materialization_id,
+            'solution_identity': env.value.get('solution_identity'),
+        }
+    if env._selected_execution_context()[0] is not None:
+        result['execution_configuration_v1'] = env.get_execution_receipt()
+    return result
 
 
 def record_physical_transition(env, action, batch, resolved, ack, *, terminated, truncated):
@@ -72,7 +102,12 @@ def record_physical_transition(env, action, batch, resolved, ack, *, terminated,
     selection = getattr(env, '_physical_reset_selection', None)
     execution = env._physical_execution()
     spec = env.physical_action_spec() if selection is not None else None
-    raw_action = action if spec is not None else action['torque']
+    if spec is not None or not isinstance(action, dict):
+        raw_action = action
+    else:
+        if set(action) != {'torque'}:
+            raise ValueError('physical recording requires the declared named action')
+        raw_action = action['torque']
     values = tuple(float(x) for x in np.asarray(raw_action, dtype=np.float64))
     entity = batch.joint_efforts[0].entity_id
     if spec is not None:
@@ -86,11 +121,11 @@ def record_physical_transition(env, action, batch, resolved, ack, *, terminated,
         components = tuple(env.binding.action_schema['components'])
         if len(values) != len(components):
             raise ValueError('physical action does not match the declared component count')
-        available = tuple(group for group in execution.scene.control_groups if group.entity_id == entity)
-        if len(available) != 1:
-            raise ValueError('physical recording requires one declared group for the action')
+        group = physical_action_group(execution)
+        if group.entity_id != entity:
+            raise ValueError('physical recording group differs from the action entity')
         schema_id = env.binding.action_schema['schema_id']
-        projections = ((available[0].group_id, components, values),)
+        projections = ((group.group_id, components, values),)
     groups = tuple(ControlGroupActionV1('control-group-action-v1', entity, group, schema_id, part)
                    for group, _names, part in projections)
     request = StructuredActionRequestV1('structured-action-request-v1', batch.context.boundary.scene_identity_hash,

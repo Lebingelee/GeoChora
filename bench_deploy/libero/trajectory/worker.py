@@ -18,7 +18,23 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_bytes(json.dumps(value, sort_keys=True, indent=2, allow_nan=False).encode() + b"\n")
 
 
-def _action_values(item: Any) -> list[float]:
+def _action_values(item: Any, *, physical_mode: str | None = None):
+    if physical_mode == 'joint_effort':
+        if isinstance(item, Mapping) and 'action' in item:
+            item = item['action']
+        if not isinstance(item, Mapping) or set(item) != {'torque'}:
+            raise ValueError('physical replay requires the declared torque action mapping')
+        values = np.asarray(item['torque'], dtype=np.float32)
+        if values.shape != (7,) or not np.isfinite(values).all():
+            raise ValueError('physical replay requires seven finite torque values')
+        return {'torque': values.tolist()}
+    if physical_mode == 'absolute_pose':
+        if isinstance(item, Mapping) and 'action' in item:
+            item = item['action']
+        values = np.asarray(item, dtype=np.float64)
+        if values.shape != (7,) or not np.isfinite(values).all() or np.linalg.norm(values[3:]) < 1e-12:
+            raise ValueError('physical replay requires a finite seven-value world TCP pose')
+        return values.tolist()
     if isinstance(item, Mapping):
         if "action" in item:
             item = item["action"]
@@ -44,18 +60,31 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
                       reset_options: Mapping[str, Any] | None = None,
                       maximum_steps: int = 1000) -> dict[str, Any]:
     """Use one lifecycle and result shape for captured actions or optional V8."""
-    if (type(seed) is not int or type(row_index) is not int or row_index not in (0, 1, 2)
-            or type(maximum_steps) is not int or not 1 <= maximum_steps <= 1000):
-        raise ValueError("LIBERO replay requires seed, row, and step limits in the supported range")
-    if (action_sequence is None) == (solution_factory is None):
-        raise ValueError("select exactly one frozen action sequence or optional Solution")
-    actions = None if action_sequence is None else [_action_values(row) for row in action_sequence]
-    if actions is not None and not actions:
-        raise ValueError("LIBERO replay action sequence must not be empty")
-    output_dir = Path(output_dir).resolve()
-    if output_dir.exists() and any(output_dir.iterdir()):
-        raise FileExistsError(f"replay output directory must be fresh and empty: {output_dir}")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        if (type(seed) is not int or type(row_index) is not int or row_index not in (0, 1, 2)
+                or type(maximum_steps) is not int or not 1 <= maximum_steps <= 1000):
+            raise ValueError("LIBERO replay requires seed, row, and step limits in the supported range")
+        if (action_sequence is None) == (solution_factory is None):
+            raise ValueError("select exactly one frozen action sequence or optional Solution")
+        physical = env.metadata.get('action_schema', {}).get('schema_version') == 'physical-control-actions-v1'
+        physical_mode = env.metadata['action_schema'].get('mode') if physical else None
+        if physical and physical_mode not in {'joint_effort', 'absolute_pose'}:
+            raise ValueError('physical LIBERO replay action mode is not declared')
+        if physical and (row_index != 0 or reset_options):
+            raise ValueError('physical LIBERO replay uses its declared init row zero')
+        actions = None if action_sequence is None else [_action_values(row, physical_mode=physical_mode) for row in action_sequence]
+        if actions is not None and not actions:
+            raise ValueError("LIBERO replay action sequence must not be empty")
+        output_dir = Path(output_dir).resolve()
+        if output_dir.exists() and any(output_dir.iterdir()):
+            raise FileExistsError(f"replay output directory must be fresh and empty: {output_dir}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except BaseException as error:
+        try:
+            env.close()
+        except BaseException as cleanup_error:
+            error.add_note(f'LIBERO preflight cleanup also failed: {cleanup_error!r}')
+        raise
     mode = "solution-v8" if solution_factory is not None else "frozen-actions"
     episode = None
     error = None
@@ -71,7 +100,7 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
     try:
         if solution_factory is None:
             _, reset_info = env.reset(
-                seed=seed, options=_reset_options(row_index, reset_options),
+                seed=seed, options=None if physical else _reset_options(row_index, reset_options),
             )
         else:
             solution = solution_factory(output_dir)
@@ -84,7 +113,7 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
         recording_started = True
         final_info = dict(reset_info)
         terminated = truncated = False
-        step_limit = len(actions) if actions is not None else maximum_steps
+        step_limit = min(len(actions), maximum_steps) if actions is not None else maximum_steps
         for index in range(step_limit):
             if actions is None:
                 _, _, terminated, truncated, info = env.step_with_solution(solution)
@@ -94,7 +123,9 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
                 values = np.asarray(action, dtype=np.float64).reshape(-1).tolist()
             else:
                 values = actions[index]
-                _, _, terminated, truncated, info = env.step(np.asarray(values))
+                action = ({'torque': np.asarray(values['torque'], dtype=np.float32)}
+                          if physical_mode == 'joint_effort' else np.asarray(values, dtype=np.float64))
+                _, _, terminated, truncated, info = env.step(action)
             trace.append({
                 "index": index,
                 "action": values,
@@ -117,13 +148,14 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
         recording_started = False
         h5_path = Path(finalized["path"]).resolve(strict=True)
         raw_h5 = h5_path.read_bytes()
-        progress = env.get_runtime_progress_receipt()
+        progress = env.session.runtime_progress_receipt
         if (progress.get("episode_id") != reset_info.get("episode_id")
                 or progress.get("control_step") != len(trace)
                 or progress.get("native_step_count") != len(trace) * env.artifact.timebase.control_substeps):
             raise ValueError("Runtime progress receipt differs from the frozen replay boundaries")
         source = env.value.get("source")
-        receipt = getattr(source, "execution_source_receipt", None)
+        from task_env.runtime.sessions.source import source_resource_receipt
+        receipt = source_resource_receipt(source)
         source_receipt = receipt.to_mapping() if callable(getattr(receipt, "to_mapping", None)) else None
         if source_receipt is None:
             raise ValueError("LIBERO replay requires the public RuntimeSource receipt")
@@ -140,10 +172,11 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
             "solution_schema_version": getattr(solution, "solution_schema_version", None),
             "solution_identity": getattr(solution, "identity", None),
             "arm_resolver_identity": env.value.get("arm_resolver_identity"),
-            "action_schema": env.value.get("action_schema"),
-            "reset_sample": reset_info.get("reset_sample_v1"),
+            "action_schema": env.metadata.get("action_schema"),
+            "reset_sample": env.sample.to_mapping() if physical else reset_info.get("reset_sample_v1"),
             "reset_realization": reset_info.get("reset_realization_v1"),
-            "reset_readback": reset_info.get("reset_readback_v1"),
+            "reset_readback": (env.session.reset_readback_v1.to_mapping()
+                               if physical else reset_info.get("reset_readback_v1")),
             "pre_reset_compiled_validation": reset_info.get("pre_reset_compiled_validation_v1"),
             "action_trace": trace,
             "task_success": bool(final_info.get("is_success", False)),
@@ -151,6 +184,10 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
             "episode_end": end,
             "runtime_progress": progress,
             "source_receipt": source_receipt,
+            "source_projection": ({'source_id': source.source_id,
+                                   'source_closure_digest': source.source_closure_digest,
+                                   'scene_identity_hash': source.scene_definition.identity_hash}
+                                  if physical else None),
             "recording": {
                 "relative_path": h5_path.relative_to(output_dir).as_posix(),
                 "bytes": len(raw_h5), "sha256": hashlib.sha256(raw_h5).hexdigest(),
@@ -168,15 +205,12 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
                     "type": type(finish_error).__name__, "message": str(finish_error),
                 }
     finally:
+        session = env.session
         try:
             env.close()
-            close_receipt = env.close_receipt
+            close_receipt = None if session is None else session.close_receipt
         except BaseException as exc:
             close_error = {"type": type(exc).__name__, "message": str(exc)}
-            try:
-                close_receipt = env.close_receipt
-            except BaseException:
-                pass
     payload = {
         "schema_version": "libero-replay-result-v1",
         "status": "complete" if episode is not None and error is None and close_error is None

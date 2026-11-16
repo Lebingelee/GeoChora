@@ -63,6 +63,14 @@ def _identifier(value, name: str) -> str:
     return value
 
 
+def _task_identifier(value):
+    """Validate an ordinary or namespaced task ID without admitting path traversal."""
+    if type(value) is not str or any(not _IDENTIFIER.fullmatch(part) or part in {'.', '..'}
+                                     for part in value.split('/')):
+        raise ValueError('task id must contain safe non-empty identifier segments')
+    return value
+
+
 def _choice(value, choices: set[str], name: str) -> str:
     if type(value) is not str or value not in choices:
         raise ValueError(f"unsupported {name}: {value!r}")
@@ -272,7 +280,7 @@ class TaskSourceV1:
 
     def __post_init__(self):
         _choice(self.schema_version, {_SOURCE_VERSION}, "Task Source schema")
-        _identifier(self.task_id, "task id")
+        _task_identifier(self.task_id)
         _identifier(self.version, "task source version")
         _reference(self.scene_ref, "scene ref")
         if self.initialization is not None and not isinstance(self.initialization, TaskInitializationV1):

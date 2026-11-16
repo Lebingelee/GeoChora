@@ -106,9 +106,11 @@ class PhysicalRuntimeBuilder:
             from .control import _match_physical_execution
             if _match_physical_execution(env.value) != match:
                 raise ValueError('physical Controller match changed after selection')
-            expected_resources = tuple((channel.entity_id, channel.joint_id, writer)
+            from ...controllers.canonical.default_identity import DefaultCanonicalController
+            expected_resources = tuple((channel.entity_id, channel.joint_id, controller.writer_id)
                 for controller in self.execution.controllers
-                for channel in controller._channels for writer in (controller.writer_id,))
+                for channel in (controller.bound_controller if isinstance(
+                    controller, DefaultCanonicalController) else controller)._channels)
             if (match.control_kind != 'joint_effort'
                     or match.selection_profile_id != env.value['selected_controller_profile_id']
                     or match.artifact_identity_sha256 != env.artifact.identity_hash

@@ -16,6 +16,8 @@
 - 原／装配Robot的正式Task必须沿共同构建、source和Controller绑定；默认Controller只在已声明的canonical通道、writer、单位和传动下绑定，Task显式选择不得被替换。普通reset验证选择、参数、绑定和状态重建；显式切换仍遵循已有能力范围，不由此扩充装配切换矩阵。
 - 保留正式source/provider能力、单位/三层映射、组合/冲突、generation/stale、partial-write fault、ACK与close检查。不为fixture恢复私有兼容桥、宽泛kwargs、getattr兜底链、吞异常、重复状态/hash或过严token保护；临时诊断与故障注入留外部。
 - 配置和普通caller只补案例实际需要的入口；现有入口足够则不新增CLI或SDK层。SB3/RSL保留固定空间与autoreset边界；LIBERO保留原source、Task predicate与reset语义。2026-11-17维护者revision002改为canonical action／默认恒等Controller真实链优先，再配置合适Controller；允许复用、扩展或必要新Controller，不要求新路线完整复刻OSC或旧500Hz/gripper cadence，但须声明新算法/profile/时钟并以可信可比OSC参考证明空载精度不退步，不能冒称旧OSC/A123等价。共享算法/模型/servo/记录归TaskEnv对应模块，bench仅留来源、任务语义、配置/薄binding及任务oracle。无受影响缺口可按调用/diff与匹配证据结案。
+- LIBERO已确认含七个扭矩电机及两个独立位置夹爪执行器：source声明、单位与native映射须分别核验，静态保持不等于夹爪writer或其ACK。迁入共同Scene时须保留原初始化行的自由物体位姿、速度与fixture语义，并使Artifact和source的关节身份一致；非零原生reset时刻与episode相对时钟不可混用。接触查询须经真实source和provider准入，不能删掉Task要求来促成构造。
+- LIBERO task1 的 MuJoCo CPU 代表路线已在正式 CLI／公共 builder 中实测默认七轴 effort 和显式 world-TCP pose Controller；后者的 source 模型要求、TCP 状态和 typed effort ACK 须绑定同一实际 source 与边界，scratch 模型计算不得推进物理。64/65 空载轨迹在冻结窗口内相对历史 500Hz OSC 的位置及姿态最大误差不退步；该证据不证明任务成功、任意模型、其他 provider、独立夹爪writer或切换矩阵。旧 mixed 记录继续可读，未迁移的 LIBERO 路线明确拒绝而不恢复退休生命周期。
 - 复用仍匹配的强证据，只跑会揭示实际错误的受影响检查。完整案例覆盖的smoke/开闭/抓放不重复运行，不加完整训练、全A123/G06矩阵、性能门或额外笛卡尔积。不按行数、文件数、删行数、PASS数或搬到新大文件评价架构。
 - 普通owner/可读性问题在同一窗口修正，不留给7c、不为每个小问题重新派包。超出原门的能力只登记，不自动开发；若原门确需超出最小适配的新能力，保全具体阻断供维护者决定，不自行删门或扩大范围。
 

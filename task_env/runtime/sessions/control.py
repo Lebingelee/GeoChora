@@ -223,7 +223,9 @@ def _match_physical_execution(value):
             raise ValueError('selected Controller implementation differs from the requested profile')
         if controller.binding is not execution.compiled.binding:
             raise ValueError('selected Controller binding is not the execution binding')
-        controller_channels = tuple(getattr(controller, '_channels', ()))
+        from ...controllers.canonical.default_identity import DefaultCanonicalController
+        channel_owner = controller.bound_controller if isinstance(controller, DefaultCanonicalController) else controller
+        controller_channels = tuple(getattr(channel_owner, '_channels', ()))
         if not controller_channels:
             raise ValueError('selected Controller does not expose its declared output channels')
         if tuple(item.component_path for item in controller_channels) != subject.channel_paths:
@@ -231,8 +233,8 @@ def _match_physical_execution(value):
         if any(item.entity_id != subject.entity_id or controller.writer_id not in item.owner_ids
                for item in controller_channels):
             raise ValueError('selected Controller channels or writer differ from subject binding')
-        action_profile = getattr(controller, 'profile', None)
-        model_requirement = getattr(controller, 'model_requirement', None)
+        action_profile = getattr(channel_owner, 'profile', None)
+        model_requirement = getattr(channel_owner, 'model_requirement', None)
         if model_requirement is None:
             model_requirement = getattr(action_profile, 'model_requirement', None)
         if model_requirement is not None:
@@ -253,6 +255,10 @@ def _match_physical_execution(value):
                 for field_name in ('joint_position', 'joint_velocity'):
                     if (field_name, item.entity_id, item.joint_id) not in required_fields:
                         raise ValueError(f'selected Controller model lacks required state field {field_name}')
+            if model_requirement.output_quantity == 'operational_space_dynamics':
+                tcp = getattr(channel_owner, 'tcp_frame', None)
+                if (tcp is None or ('frame_pose_world', tcp.entity_id, tcp.frame_id) not in required_fields):
+                    raise ValueError('operational-space Controller lacks its required TCP state')
             model_hashes.append(model_requirement.identity_hash)
         else:
             model_hashes.append(None)
@@ -267,8 +273,8 @@ def _match_physical_execution(value):
             })
         else:
             action_rows.append({
-                'action_key': getattr(controller, '_action_key', None),
-                'action_shape': getattr(controller, 'action_shape', None),
+                'action_key': getattr(channel_owner, '_action_key', None),
+                'action_shape': getattr(channel_owner, 'action_shape', None),
                 'ranges': tuple(item.effort_range for item in controller_channels),
             })
         for channel in controller_channels:

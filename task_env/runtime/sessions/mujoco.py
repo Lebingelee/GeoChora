@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 import math
 import hashlib
 import json
+import posixpath
 import numpy as np
 from pathlib import PurePosixPath
 
@@ -18,21 +19,20 @@ def _source_asset_bytes(base_dir, source_xml):
     return source_asset_bytes(base_dir, source_xml)
 
 
-def _lower_receipt_mjcf_assets(receipt):
+def _lower_mjcf_vfs_assets(source_xml, payloads):
     """Give every receipt-bound asset a unique flat MuJoCo VFS name.
 
     MuJoCo's in-memory VFS rejects distinct source files that share a
     basename.  The source receipt remains byte-for-byte authoritative; only
     this compiler input copy receives deterministic aliases.
     """
-    root = ET.fromstring(receipt.importer_xml)
+    root = ET.fromstring(source_xml)
     compiler = root.find('compiler')
-    if compiler is not None and any(compiler.get(key) for key in ('meshdir', 'texturedir')):
-        raise ValueError('mixed actuator receipt MJCF must use explicit source asset paths without compiler directories')
-    payloads = {
-        name: payload for name, payload in receipt.closure_files.items()
-        if name not in {'scene.xml', 'canonical-source.xml'}
-    }
+    meshdir = '' if compiler is None else compiler.get('meshdir', '')
+    texturedir = '' if compiler is None else compiler.get('texturedir', '')
+    if compiler is not None:
+        compiler.attrib.pop('meshdir', None)
+        compiler.attrib.pop('texturedir', None)
     referenced: set[str] = set()
     aliases: dict[str, str] = {}
     alias_payloads: dict[str, bytes] = {}
@@ -45,17 +45,25 @@ def _lower_receipt_mjcf_assets(receipt):
         if (not raw_path or raw_path.startswith('/') or '\\' in raw_path
                 or any(part in {'', '.', '..'} for part in raw_path.split('/'))):
             raise ValueError(f'mixed actuator source asset path is not canonical: {raw_path!r}')
-        if raw_path not in payloads:
+        directory = meshdir if node.tag in {'mesh', 'skin'} else texturedir if node.tag == 'texture' else ''
+        logical = posixpath.normpath(posixpath.join(directory, raw_path))
+        if logical in {'.', '..'} or logical.startswith('../') or logical.startswith('/'):
+            raise ValueError('MuJoCo asset path escapes its source closure')
+        if logical not in payloads:
             raise ValueError(f'mixed actuator source asset is missing from its immutable receipt: {raw_path!r}')
-        referenced.add(raw_path)
-        alias = aliases.get(raw_path)
+        # MuJoCo derives an unnamed mesh's semantic name from its original
+        # filename. Preserve that identity when changing only the VFS path.
+        if node.tag == 'mesh' and not node.get('name'):
+            node.set('name', PurePosixPath(raw_path).stem)
+        referenced.add(logical)
+        alias = aliases.get(logical)
         if alias is None:
-            suffix = PurePosixPath(raw_path).suffix
-            alias = f'gch_{hashlib.sha256(raw_path.encode("utf-8")).hexdigest()}{suffix}'
+            suffix = PurePosixPath(logical).suffix
+            alias = f'gch_{hashlib.sha256(logical.encode("utf-8")).hexdigest()}{suffix}'
             if alias in alias_payloads:
                 raise ValueError('mixed actuator deterministic MuJoCo asset alias collision')
-            aliases[raw_path] = alias
-            alias_payloads[alias] = payloads[raw_path]
+            aliases[logical] = alias
+            alias_payloads[alias] = payloads[logical]
         node.set('file', alias)
     if referenced != set(payloads):
         raise ValueError(
@@ -72,6 +80,12 @@ def _lower_receipt_mjcf_assets(receipt):
         for logical in sorted(aliases)
     ]
     return ET.tostring(root, encoding='unicode'), alias_payloads, rows
+
+
+def _lower_receipt_mjcf_assets(receipt):
+    payloads = {name: payload for name, payload in receipt.closure_files.items()
+                if name not in {'scene.xml', 'canonical-source.xml'}}
+    return _lower_mjcf_vfs_assets(receipt.importer_xml, payloads)
 
 
 def _mujoco_model_facts(model, mj):
@@ -224,6 +238,12 @@ class _MuJoCoSession(_SessionValues):
         """Create a source-bound, no-step model for the current physical episode."""
         if getattr(self, '_physical_port', None) is None:
             raise ValueError('source dynamics requires an admitted physical port')
+        requirements = tuple(getattr(controller, 'model_requirement', None)
+                             for controller in self._physical_port.execution.controllers)
+        if len(requirements) == 1 and requirements[0] is not None and (
+                requirements[0].output_quantity == 'operational_space_dynamics'):
+            from .mujoco_dynamics import MuJoCoArmOperationalSpaceV1
+            return MuJoCoArmOperationalSpaceV1(self)
         from .mujoco_dynamics import MuJoCoSourceDynamicsV1
         return MuJoCoSourceDynamicsV1(self)
 
@@ -266,6 +286,12 @@ class _MuJoCoSession(_SessionValues):
     def __init__(self, artifact, source, *, mixed_actuator_plan=None):
         self._initialize_values(artifact, source, 'mujoco')
         self._mixed_actuator_plan = mixed_actuator_plan
+        self._source_bound_reset_clock = False
+        self._reset_time_origin = 0.0
+        self._last_reset_readback_v1 = None
+        self._reset_count = 0
+        self._preprocess_calls = 0
+        self._forward_calls = 0
         if source.fixed_attachment_plan is not None:
             try:
                 self._initialize_fixed_attachment(artifact, source)
@@ -330,6 +356,7 @@ class _MuJoCoSession(_SessionValues):
                     source.scene_definition,
                     source.source_closure_digest,
                 )
+                source_xml, assets, _ = _lower_mjcf_vfs_assets(source_xml, assets)
             else:
                 receipt = source.execution_source_receipt
                 if receipt is None:
@@ -369,6 +396,24 @@ class _MuJoCoSession(_SessionValues):
             self._frames = {k: v['id'] for k, v in checked['frames'].items()}
             self._target_actuators = {k: checked['actuators'][k]['id'] for k in source.joint_targets}
             self._open_actuators = tuple(checked['actuators']['open:'+n]['id'] for n in source.open_actuators)
+            self._contact_geom_ids = {}
+            for semantic, names in source.contact_geom_groups.items():
+                if semantic not in self._bodies:
+                    raise ValueError(f'contact group has no declared native body: {semantic}')
+                root_body = self._bodies[semantic]
+                ids = tuple(int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_GEOM, name))
+                            for name in names)
+                if not ids or any(index < 0 for index in ids):
+                    raise ValueError(f'compiled geom group is incomplete: {semantic}')
+                for geom_id in ids:
+                    body = int(self._model.geom_bodyid[geom_id])
+                    while body and body != root_body:
+                        body = int(self._model.body_parentid[body])
+                    if body != root_body:
+                        raise ValueError(f'compiled geom is outside its declared body: {semantic}')
+                if any(set(ids) & existing for existing in self._contact_geom_ids.values()):
+                    raise ValueError('distinct contact entities cannot share a compiled geom')
+                self._contact_geom_ids[semantic] = frozenset(ids)
             self._build_layout_facts = {'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
                 'provider': 'mujoco', 'source_id': source.scene_source.source_id,
                 'source_closure': source.source_closure_digest, 'objects': checked,
@@ -782,7 +827,18 @@ class _MuJoCoSession(_SessionValues):
     @property
     def runtime_progress_receipt(self):
         if self._mixed_actuator_plan is None:
-            raise RuntimeError('mixed runtime progress is unavailable for this session profile')
+            if getattr(self, '_physical_port', None) is None or not self._source_bound_reset_clock:
+                raise RuntimeError('runtime progress is unavailable for this session profile')
+            self._require_reset()
+            return {'schema_version': 'runtime-progress-v1',
+                'provider_materialization_id': self._provider_materialization_id,
+                'episode_id': self._episode_id, 'reset_sample_id': self._reset_sample_id,
+                'control_step': int(self._control_step), 'state_revision': int(self._state_revision),
+                'native_step_count': int(self._native_steps), 'source_id': self._source.source_id,
+                'source_closure_digest': self._source.source_closure_digest,
+                'physical_binding_sha256': self._physical_port.binding.identity_hash,
+                'simulation_time_native_s': float(self._data.time),
+                'simulation_time_episode_s': float(self.snapshot().simulation_time)}
         result = self._mixed_runtime_progress_values()
         result.update({
             'preprocess_call_count': int(self._preprocess_calls),
@@ -795,7 +851,7 @@ class _MuJoCoSession(_SessionValues):
 
     @property
     def close_receipt(self):
-        if self._mixed_actuator_plan is None:
+        if self._mixed_actuator_plan is None and not getattr(self, '_source_bound_reset_clock', False):
             raise RuntimeError('mixed close evidence is unavailable for this session profile')
         if self._last_close_receipt is None:
             raise RuntimeError('mixed RuntimeSession close has not completed')
@@ -1384,6 +1440,12 @@ class _MuJoCoSession(_SessionValues):
                 raise TypeError('source-bound mixed actuator session requires ResetSampleV1 before native reset')
             return self._reset_mixed_actuator(sample)
         from ...artifacts.execution import ResetSample, ResetSampleV1
+        source_bound_physical = (type(sample) is ResetSampleV1
+            and sample.control_policy == 'named_torque_and_finger_position_by_source_v1'
+            and getattr(self, '_physical_port', None) is not None
+            and bool(self._source.position_actuators))
+        if source_bound_physical:
+            return self._reset_source_bound_v1(sample, physical=True)
         physical_sample = (type(sample) is ResetSampleV1 and
             sample.control_policy == 'named_physical_effort_by_source_v1')
         if type(sample) is not ResetSample and not physical_sample:
@@ -1410,6 +1472,9 @@ class _MuJoCoSession(_SessionValues):
         self._last_position_sequence_progress = None
         self._last_typed_force_publication = None
         self._mj.mj_resetData(self._model, self._data)
+        self._source_bound_reset_clock = False
+        self._reset_time_origin = 0.0
+        self._last_reset_readback_v1 = None
         self._native_steps = 0
         self._force_sample_sequence = 0
         self._force_configuration_revision = 0
@@ -1454,15 +1519,19 @@ class _MuJoCoSession(_SessionValues):
                 if not float(low) <= float(value) <= float(high):
                     raise ValueError(f'physical reset joint position exceeds source limits: {name}')
 
-    def _preflight_mixed_actuator_reset(self, sample):
+    def _preflight_source_bound_v1_reset(self, sample, *, physical):
         """Validate a source-bound reset completely before changing session state."""
         from ...artifacts import ResetSampleV1
 
         if type(sample) is not ResetSampleV1:
             raise TypeError('mixed actuator mixed materialization requires ResetSampleV1')
         self._validate_sample(sample)
-        if self._mixed_fault is not None:
+        if not physical and self._mixed_fault is not None:
             raise RuntimeError('mixed actuator MuJoCo session is fault-latched')
+        if physical and (self._provider != 'mujoco' or getattr(self, '_physical_port', None) is None
+                or sample.control_policy != 'named_torque_and_finger_position_by_source_v1'
+                or not self._source.position_actuators):
+            raise ValueError('source-bound physical reset requires admitted independent position holds')
         model, data, mj = self._model, self._data, self._mj
         # Every name/value/range is checked before the first mutable native write.
         if (set(sample.joint_position) != set(self._joint_addresses)
@@ -1491,7 +1560,8 @@ class _MuJoCoSession(_SessionValues):
             velocity = sample.free_joint_velocity[semantic]
             if len(velocity) != 6 or any(not math.isfinite(float(item)) for item in velocity):
                 raise ValueError(f'mixed actuator free-body velocity is invalid: {semantic}')
-        for semantic, aid in self._position_actuators.items():
+        position_actuators = self._target_actuators if physical else self._position_actuators
+        for semantic, aid in position_actuators.items():
             value = sample.joint_position[semantic]
             low, high = (float(item) for item in model.actuator_ctrlrange[aid])
             if not low <= float(value) <= high:
@@ -1499,14 +1569,28 @@ class _MuJoCoSession(_SessionValues):
         return model, data, mj
 
     def _preflight_reset_plan_sample(self, sample):
-        if self._mixed_actuator_plan is not None:
-            self._preflight_mixed_actuator_reset(sample)
+        physical = self._mixed_actuator_plan is None
+        self._preflight_source_bound_v1_reset(sample, physical=physical)
 
     def _reset_mixed_actuator(self, sample):
-        """Apply the exact v1 time, qvel, free-root, and fixture reset in one pass."""
+        return self._reset_source_bound_v1(sample, physical=False)
+
+    def _reset_source_bound_v1(self, sample, *, physical):
+        """Apply the exact source-bound time, velocities and placements once."""
         from ...artifacts import ResetReadbackV1
 
-        model, data, mj = self._preflight_mixed_actuator_reset(sample)
+        model, data, mj = self._preflight_source_bound_v1_reset(sample, physical=physical)
+        if physical:
+            external = getattr(self, '_external_com_port', None)
+            if external is not None:
+                external.preflight_reset()
+                external.finish()
+            port = self._physical_port
+            if (np.any(data.xfrc_applied) or (port.pending is None and np.any(data.qfrc_applied))
+                    or (port.pending is not None and not np.array_equal(data.qfrc_applied, port.pending_values))):
+                raise RuntimeError('physical reset cannot clear a foreign force buffer')
+            if port.pending is not None:
+                port.finish_interval()
 
         # Preserve an existing valid episode when schema, source, names or
         # ranges fail preflight. The reset gate changes only when the complete
@@ -1519,6 +1603,18 @@ class _MuJoCoSession(_SessionValues):
             self._preprocess_calls = 0
             self._forward_calls = 0
             self._reset_time_origin = float(sample.simulation_time_s)
+            self._source_bound_reset_clock = True
+            if physical:
+                self._pending_position_sequence = None
+                self._last_position_sequence_applied = None
+                self._last_position_sequence_progress = None
+                self._last_typed_force_publication = None
+                self._force_sample_sequence = 0
+                self._force_configuration_revision = 0
+                self._last_force_limit_N = None
+                self._completed_actuator_force = None
+                self._completed_actuator_ctrl = None
+                self._completed_force_measurement = None
             # Source-bound ResetSampleV1 declares the non-integrating native
             # preprocessing and restore order before this single reset pass.
             mj.mj_step1(model, data)
@@ -1533,7 +1629,7 @@ class _MuJoCoSession(_SessionValues):
             self._compiled_model_physics_fingerprint_v1_cache = None
             size_model = getattr(mj, 'mj_sizeModel', None)
             save_model = getattr(mj, 'mj_saveModel', None)
-            if callable(size_model) and callable(save_model):
+            if not physical and callable(size_model) and callable(save_model):
                 try:
                     model_binary = np.zeros(int(size_model(model)), dtype=np.uint8)
                     save_model(model, buffer=model_binary)
@@ -1558,15 +1654,18 @@ class _MuJoCoSession(_SessionValues):
                 data.qvel[dof:dof + 6] = sample.free_joint_velocity[semantic]
             data.time = self._reset_time_origin
             data.ctrl[:] = 0.0
-            for semantic, actuator_id in self._position_actuators.items():
+            position_actuators = self._target_actuators if physical else self._position_actuators
+            for semantic, actuator_id in position_actuators.items():
                 data.ctrl[actuator_id] = float(sample.joint_position[semantic])
             self._current_ctrl = data.ctrl.copy()
             mj.mj_forward(model, data)
             self._forward_calls = 1
-            self._mixed_consumed_boundaries.clear()
-            self._mixed_pending_target = None
+            if not physical:
+                self._mixed_consumed_boundaries.clear()
+                self._mixed_pending_target = None
             realized = self._realized(sample)
-            self._initialize_physical_monitor()
+            if not physical:
+                self._initialize_physical_monitor()
             joints = {name: float(data.qpos[address[0]])
                       for name, address in self._joint_addresses.items()}
             velocities = {name: float(data.qvel[address[1]])
@@ -1611,10 +1710,12 @@ class _MuJoCoSession(_SessionValues):
                                            rtol=0.0, atol=1e-12)):
                     raise ValueError(f'mixed actuator fixture readback differs from sampled root pose: {name}')
             self._last_reset_readback_v1 = receipt
-            self._assert_physical_monitor_clean_at_reset()
+            if not physical:
+                self._assert_physical_monitor_clean_at_reset()
             return realized
         except BaseException as error:
-            self._mixed_fault = {'phase': 'reset', 'error': f'{type(error).__name__}: {error}'}
+            if not physical:
+                self._mixed_fault = {'phase': 'reset', 'error': f'{type(error).__name__}: {error}'}
             self._reset_done = False
             raise
 
@@ -1629,7 +1730,7 @@ class _MuJoCoSession(_SessionValues):
             self._mj.mju_mat2Quat(quaternion, data.site_xmat[index])
             poses[name] = pose(data.site_xpos[index], quaternion)
         time = data.time
-        if self._mixed_actuator_plan is not None:
+        if self._mixed_actuator_plan is not None or self._source_bound_reset_clock:
             elapsed = float(data.time) - self._reset_time_origin
             expected = self._native_steps * self._artifact.timebase.physics_dt
             bound = (self._native_steps + 2) * max(
@@ -2044,8 +2145,8 @@ class _MuJoCoSession(_SessionValues):
     def read_contact_summary_v2(self, requested_pairs):
         from ...environment.types import ContactSummaryV2
         self._require_reset()
-        if self._mixed_actuator_plan is None:
-            raise RuntimeError('geom-group contact is limited to the admitted mixed actuator profile')
+        if not getattr(self, '_contact_geom_ids', None):
+            raise RuntimeError('geom-group contact requires admitted named source groups')
         normalized = []
         for pair in requested_pairs:
             if len(pair) != 2 or pair[0] == pair[1]:
@@ -2462,7 +2563,13 @@ class _MuJoCoSession(_SessionValues):
             physical_port = getattr(self, '_physical_port', None)
             if physical_port is not None and physical_port.pending is not None:
                 physical_port.finish_interval()
-            if self._mixed_actuator_plan is not None:
+            if physical_port is not None:
+                for controller in physical_port.execution.controllers:
+                    release = getattr(controller, 'release_model', None)
+                    if callable(release):
+                        release()
+            if self._mixed_actuator_plan is not None or (
+                    getattr(self, '_physical_port', None) is not None and self._source_bound_reset_clock):
                 self._last_close_receipt = {
                     'schema_version': 'runtime-close-v1',
                     'provider_materialization_id': self._provider_materialization_id,

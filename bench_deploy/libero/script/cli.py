@@ -45,6 +45,8 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--read-result", type=Path, metavar="RESULT_JSON")
     parser.add_argument("--task", choices=("task1", "task2", "task3"))
     parser.add_argument("--provider", choices=("mujoco", "geophys"), default="mujoco")
+    parser.add_argument("--controller", choices=('direct_joint_effort_v1', 'source_osc_pose_v1'),
+                        default='direct_joint_effort_v1')
     parser.add_argument("--actions", type=Path)
     parser.add_argument("--reset-sample", type=Path)
     parser.add_argument("--source-xml", type=Path)
@@ -64,7 +66,8 @@ def main(argv: list[str] | None = None) -> int:
     if not all((args.task, args.source_xml, args.composition_plan,
                 args.install_root, args.init_path)):
         parser.error("--run-replay requires --task, --source-xml, --composition-plan, --install-root, and --init-path")
-    task_uid = f"libero/{args.task}"
+    from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3
+    task_uid = {"task1": TASK_1, "task2": TASK_2, "task3": TASK_3}[args.task]
     if args.solution:
         transitions, embedded_reset = None, None
     else:
@@ -85,7 +88,6 @@ def main(argv: list[str] | None = None) -> int:
         from task_env.artifacts import ResetSampleV1
 
         reset_options = {"task_reset_sample_v1": ResetSampleV1.from_mapping(reset_payload)}
-    from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3
     from bench_deploy.libero.environment.selected_reference import (
         DEFAULT_INSTALL_ROOT, build_libero_selected_candidate,
         PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
@@ -103,32 +105,38 @@ def main(argv: list[str] | None = None) -> int:
         "composition_plan_path": plan_path, "install_root": install_root,
         "init_path": init_path, "horizon": min(1000, max((len(transitions) if transitions else args.maximum_steps) + 1, 1)),
         "provider": args.provider, "task_uid": task_id,
+        "controller_profile": args.controller,
     }
     env = build_libero_selected_candidate(
         **options,
         _execution_profile="v8" if args.solution else "a-reference",
         _gripper_action_profile=(
-            None if args.solution else PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+            None if args.solution or (args.task == 'task1' and args.provider == 'mujoco')
+            else PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
         ),
     )
-    args.run_replay.parent.mkdir(parents=True, exist_ok=True)
-    _source_gravity(env, plan_bytes, task_id)
-    solution_factory = None
-    if args.solution:
-        from bench_deploy.libero.tasks.solution import LiberoPickPlaceSolutionV8
+    try:
+        args.run_replay.parent.mkdir(parents=True, exist_ok=True)
+        if env.metadata.get('action_schema', {}).get('schema_version') != 'physical-control-actions-v1':
+            _source_gravity(env, plan_bytes, task_id)
+        solution_factory = None
+        if args.solution:
+            from bench_deploy.libero.tasks.solution import LiberoPickPlaceSolutionV8
 
-        solution_factory = lambda _root: LiberoPickPlaceSolutionV8(
-            env.value["runtime_model_xml_bytes"],
-            source_closure_digest=env.metadata["source_closure_digest"],
-            arm_resolver_identity=env.value["arm_resolver_identity"],
+            solution_factory = lambda _root: LiberoPickPlaceSolutionV8(
+                env.value["runtime_model_xml_bytes"],
+                source_closure_digest=env.metadata["source_closure_digest"],
+                arm_resolver_identity=env.value["arm_resolver_identity"],
+            )
+        result = run_libero_replay(
+            env, output_dir=args.run_replay, action_sequence=None if args.solution else transitions,
+            solution_factory=solution_factory, seed=args.seed, row_index=args.row,
+            reset_options=reset_options, maximum_steps=args.maximum_steps,
         )
-    result = run_libero_replay(
-        env, output_dir=args.run_replay, action_sequence=None if args.solution else transitions,
-        solution_factory=solution_factory, seed=args.seed, row_index=args.row,
-        reset_options=reset_options, maximum_steps=args.maximum_steps,
-    )
-    print(json.dumps({"status": result["status"], "result_sha256": result["result_sha256"]}, sort_keys=True))
-    return 0 if result["status"] == "complete" else 2
+        print(json.dumps({"status": result["status"], "result_sha256": result["result_sha256"]}, sort_keys=True))
+        return 0 if result["status"] == "complete" else 2
+    finally:
+        env.close()
 
 
 if __name__ == "__main__":

@@ -112,6 +112,16 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             if type(action) is PhysicalActionSequenceV1:
                 raise ValueError('physical action sequences do not support reset-scoped Controller switching')
             action = selection.validate_action(action)
+        if (mixed is None and type(action) is not PhysicalActionSequenceV1
+                and len(profile.controllers) == 1):
+            controller = profile.controllers[0]
+            validate = getattr(controller, 'validate_action', None)
+            if callable(validate):
+                from collections.abc import Mapping
+                candidate = action
+                if isinstance(action, Mapping) and set(action) == {controller.identity}:
+                    candidate = action[controller.identity]
+                validate(candidate)
         env._physical_controller_preparation_started = False
         try:
             _dispatch_record(env, ('physical-effort-sequence' if type(action) is PhysicalActionSequenceV1
