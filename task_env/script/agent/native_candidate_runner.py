@@ -77,8 +77,26 @@ def _wait_process_group(process):
 
 
 def _launch_process(command, *, environment, stdout, stderr):
-    # Defer parent alarms/Ctrl-C until the child handle has been assigned.
+    """Start the worker; return it with a callback that re-admits parent signals.
+
+    The caller must bind the process before calling the callback. Blocking
+    SIGALRM/SIGINT only defers signals aimed at this thread: a process-directed
+    signal can be taken by another thread, and CPython then runs the handler
+    here, possibly inside Popen after the child was forked. Until the callback
+    runs, such signals are held and then re-raised at this thread.
+    """
     old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM, signal.SIGINT})
+    deferred = []
+    previous = {}
+
+    def readmit_signals():
+        try:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+            for number in dict.fromkeys(deferred):
+                signal.raise_signal(number)
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
 
     def child_setup():
         signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
@@ -86,14 +104,17 @@ def _launch_process(command, *, environment, stdout, stderr):
             _set_child_affinity()
 
     try:
+        try:
+            for number in (signal.SIGALRM, signal.SIGINT):
+                previous[number] = signal.signal(number, lambda received, _frame: deferred.append(received))
+        except ValueError:
+            pass  # not the main thread: Python-level handlers never run here
         process = subprocess.Popen(command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
                                    start_new_session=True, preexec_fn=child_setup)
-        # Return the mask separately: the caller must assign the process before
-        # restoring it, since restoring may immediately deliver a pending alarm.
-        return process, old_mask
     except BaseException:
-        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+        readmit_signals()
         raise
+    return process, readmit_signals
 
 
 def _stop_worker_group(process):
@@ -189,9 +210,9 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
             group_alive = False
             try:
                 with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
-                    process, old_mask = _launch_process(command, environment=environment,
-                                                        stdout=stdout, stderr=stderr)
-                    signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+                    process, readmit_signals = _launch_process(command, environment=environment,
+                                                               stdout=stdout, stderr=stderr)
+                    readmit_signals()
                     while process.poll() is None:
                         if time.perf_counter() - wall_start > timeout_s:
                             violation = f'wall watchdog {timeout_s}s exceeded'
