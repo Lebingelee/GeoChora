@@ -1,6 +1,6 @@
 # G06a～c 工作分解与第一个实施包
 
-当前进度（2026-11-16）：6a及[6b attempt003](../maintenance/reviews/20261116_g06b_attempt003_acceptance.md)已有界独立主审接收；[6c attempt001](../maintenance/work-packages/20261116_g06c_attempt001_goal.md)已准备未派发，6c与R3未接收。后文旧派发状态保留历史时点。
+当前进度（2026-11-16）：G06a/b及[6c attempt001](../maintenance/reviews/20261116_g06c_attempt001_acceptance.md)已有界独立主审接收；维护者最终接收待确认，R3/G07另包。后文旧派发状态保留历史时点。
 
 日期：2026-11-15。设计输入：`41a09c87a7599f13adce9fb50501eb6378c2a17e`。本文是派发准备，不代表已经启动 agent、安装依赖或完成 native 验收。
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-16",
-  "status": "G06B_SOL_ACCEPTED_BOUNDED",
+  "status": "G06ABC_SOL_ACCEPTED_BOUNDED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -19,15 +19,8 @@
     "reason": "Existing G06 implementation branch; review and documentation closeout only."
   },
   "active_packages": [],
-  "next_candidate": {
-    "package_id": "V211_G06_6c_attempt001",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "package_path": "work-packages/20261116_g06c_attempt001_goal.md",
-    "input_head": "b0f27709eb2fa9a5974638d07eb1f9ca424af126",
-    "prompt_sha256": "a8a283dfdac876db7e50cefa7893fc598bcf86c98bc971347332f9aa8fc533e0",
-    "manual_forward_only": true
-  },
-  "next_action": "Maintainer requested preparation of 6c attempt001 after bounded 6b independent acceptance; package ready for manual forwarding, no execution started.",
+  "next_candidate": null,
+  "next_action": "G06abc canonical bounded independent review complete. Await maintainer disposition; R3 and G07 require separate packages. No new execution dispatched.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1899,14 +1892,31 @@
           "dependencies": [
             "6b"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
+          "status": "SOL_ACCEPTED_BOUNDED_6C",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": "SOL_ACCEPTED_BOUNDED_6C",
+              "input_head": "697102cc75b68dbc8f69e5ba26a007b241ca2d8f",
+              "executor_output_head": "a824b7df3ddbcafc9f886a4f476959cdbe6b60a7",
+              "output_head": "a4d9eb26de0a32b1cb515433f42a4304272d939c",
+              "geophys_pin": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
+              "report_ref": "../../../../../workspace/maintenance/v211_g06c_attempt001/report.md",
+              "review_ref": "reviews/20261116_g06c_attempt001_acceptance.md",
+              "supervised_native_minutes": 114.989584,
+              "review_cpu_tests_passed": 23,
+              "process_deviations": [
+                "Required pre-execution call-chain record not located.",
+                "API documentation added after initial implementation."
+              ]
+            }
+          ],
           "assigned_agent": null,
           "package_path": "work-packages/20261116_g06c_attempt001_goal.md",
           "package_sha256": "a8a283dfdac876db7e50cefa7893fc598bcf86c98bc971347332f9aa8fc533e0",
-          "input_head": null,
-          "output_head": null,
+          "input_head": "697102cc75b68dbc8f69e5ba26a007b241ca2d8f",
+          "output_head": "a4d9eb26de0a32b1cb515433f42a4304272d939c",
           "expected_duration_minutes": [
             240,
             360
@@ -1915,10 +1925,23 @@
             "wall_minutes_max": 480,
             "supervised_native_minutes_max": 120
           },
-          "last_observation": "Prepared same-Env fixed Rasterizer Isaac-MJWarp-Isaac rebuild for both tasks and three-provider partial reset; no dispatch.",
-          "evidence_refs": [],
-          "commits": [],
-          "review_decision": null,
+          "last_observation": "C1-C5 independently reviewed; composite construction/cleanup failure retry fixed during review. Process timing deviations retained without requiring fabricated history. No additional native runs.",
+          "evidence_refs": [
+            "reviews/20261116_g06c_attempt001_acceptance.md",
+            "../../../../../workspace/maintenance/v211_g06c_attempt001/report.md",
+            "../../../../../workspace/maintenance/v211_g06c_attempt001/gates.json",
+            "../../../../../workspace/maintenance/v211_g06c_attempt001/command-index.json"
+          ],
+          "commits": [
+            "a824b7df3ddbcafc9f886a4f476959cdbe6b60a7",
+            "a4d9eb26de0a32b1cb515433f42a4304272d939c"
+          ],
+          "review_decision": {
+            "status": "SOL_ACCEPTED_BOUNDED_6C",
+            "date": "2026-11-16",
+            "review_ref": "reviews/20261116_g06c_attempt001_acceptance.md",
+            "scope": "B3 partial reset across three providers and both tasks; fixed Rasterizer Isaac-MJWarp-Isaac for both tasks; failed construction cleanup retry fixed and CPU-tested; maintainer acceptance not asserted."
+          },
           "blockers": []
         }
       ]

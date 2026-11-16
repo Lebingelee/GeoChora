@@ -4,11 +4,11 @@
 
 ## 当前停门
 
-G06c [attempt001 工作包](work-packages/20261116_g06c_attempt001_goal.md)已完成有界执行，待独立主审，尚未获得维护者接收。三后端、两任务部分 reset 和错开终止，以及两个任务固定 Rasterizer 的 Isaac→MJWarp→Isaac 已验证；故障注入检查了 worker、IPC 和 GPU 引用释放。共享场景相机可看到其他行，证据及流程偏差由执行报告保留；未重复 6b 性能矩阵，GeoPhys 跨 provider 切换和 R3 尚未准入。
+G06abc canonical目标已有界独立主审接收。G06c [attempt001主审](reviews/20261116_g06c_attempt001_acceptance.md)为 **SOL_ACCEPTED_BOUNDED_6C**：执行Core `a824b7df`，主审清理重试小修`a4d9eb26`，GeoPhys `198d30ac`。三后端六格部分reset/错开终止、两个任务固定Rasterizer的Isaac→MJWarp→Isaac及故障资源清理成立；主审另有23项纯测试通过，未新增native。两项事前记录/API补写时序偏差保留，不补造历史、不阻断技术结案，无需6c attempt002。维护者最终接收待确认，R3与G07另包。
 
 2026-11-16：G06b attempt003 已[独立主审有界接收](reviews/20261116_g06b_attempt003_acceptance.md)（SOL_ACCEPTED_BOUNDED_6B），Core `8d0fd756`／GeoPhys `198d30ac`。18项性能为11项新测、7项复用，Isaac资源例外未使用；GeoPhys限显式discrete／32已验证配置。首次未监督CUDA执行偏差保留。维护者接收待确认，R3 未启动；下述早期未接收文字保留其时点。
 
-**G01～G05 与优化账本保持原有接收；G06a attempt002 已经[独立主审](reviews/20261115_g06a_attempt002_acceptance.md)有界接收（SOL_ACCEPTED_BOUNDED_6A）。Core 为 `3bc9e2a7`，GeoPhys pin 为 `a2c85b7f`；无需 attempt003。G06b／6c、完整 canonical 六格、R3 和 G07 尚未接收，v2.1.1 尚未完成。** GeoPhys 主分支合并与 AOT 按维护者决定暂缓，不记通过、不阻断本次接收。G06a 的 Isaac 第二来源证据是 scalar 物理；G06b 新增的 native batch 有界证据及限制见[API](../api/README.md)，仍待独立主审。下方早期启动表及历史记录保留其时点。
+2026-11-15的6a接收时点记录（后续状态以上文为准）：**G01～G05 与优化账本保持原有接收；G06a attempt002 已经[独立主审](reviews/20261115_g06a_attempt002_acceptance.md)有界接收（SOL_ACCEPTED_BOUNDED_6A）。Core 为 `3bc9e2a7`，GeoPhys pin 为 `a2c85b7f`；无需 attempt003。G06b／6c、完整 canonical 六格、R3 和 G07 尚未接收，v2.1.1 尚未完成。** GeoPhys 主分支合并与 AOT 按维护者决定暂缓，不记通过、不阻断本次接收。G06a 的 Isaac 第二来源证据是 scalar 物理；G06b 新增的 native batch 有界证据及限制见[API](../api/README.md)，仍待独立主审。下方早期启动表及历史记录保留其时点。
 
 [单元 9 综合主审](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)的 `SOL_ACCEPTED_BOUNDED_5C` 已由维护者在本次启动对话确认；原主审中的“维护者待确认”描述保留其审查时点。优化实施安排见[执行计划](../planning/post-5c-optimization-execution.md)。顺序为：G05 功能接收 → 代码优化、定向复验及人工接收 → 项目证据和 refs／worktree 整理及接收 → 决定进入 G06。G07 继续承担 G06 新增调用者及最终版本收口，7b 三 provider × 三 seed 门保留。
 
@@ -20,7 +20,7 @@ G06c [attempt001 工作包](work-packages/20261116_g06c_attempt001_goal.md)已�
 
 G06b attempt002 在 Core `f8c43d61`／GeoPhys `dd393187` 经[范围重估主审](reviews/20261116_g06b_attempt002_scope_reassessment.md)保持 **PARTIAL_NOT_ACCEPTED**。真实六格主链、GeoPhys显式discrete／32次预算的有界接触及reset、MJWarp B16双传感器与窗口800步已有证据。Sol此前将单次受控轨迹2mm界限扩大为通用门，现重估为不应沿用；scalar mixed缺陷和跨引擎接触力差异不自动阻断batch出口。窗口外观仍由维护者人工验收，AOT等既定暂缓事项保持。
 
-2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已执行，普通 attempt 计数为3；执行证据见[交接报告](../../../../../workspace/maintenance/v211_g06b_attempt003/report.md)。GeoPhys B1/B3 指定完整状态、Task及reset时钟对照、同源 Pendulum 无接触 scalar/B1 对照和诊断清理已完成。维护者调整内存后，同一 attempt 续跑完成 Isaac Pendulum B16 窗口、Isaac PickCube B3 最终 renderer 记录与关窗、以及此前三个受资源限制的 B16 渲染模式；18项性能中11项本轮实测、7项历史复用，没有使用资源例外。执行者报告满足有界接收条件，**等待独立主审；尚未获得维护者接收**。先前直接 pytest 中一次未监督 CUDA 执行及其后监督复验均在交接报告中保留。
+2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已执行，普通 attempt 计数为3；执行证据见[交接报告](../../../../../workspace/maintenance/v211_g06b_attempt003/report.md)。GeoPhys B1/B3 指定完整状态、Task及reset时钟对照、同源 Pendulum 无接触 scalar/B1 对照和诊断清理已完成。维护者调整内存后，同一 attempt 续跑完成 Isaac Pendulum B16 窗口、Isaac PickCube B3 最终 renderer 记录与关窗、以及此前三个受资源限制的 B16 渲染模式；18项性能中11项本轮实测、7项历史复用，没有使用资源例外。该段记录执行者返包时点；其后已按上文独立主审有界接收，维护者接收待确认。先前直接 pytest 中一次未监督 CUDA 执行及其后监督复验均在交接报告中保留。
 
 ## 启动输入与工作归属
 
