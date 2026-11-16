@@ -2,6 +2,20 @@
 
 规划标识：`V211_G07_INTEGRATION`。3 个子阶段；只收口已冻结范围，不恢复旧 P99／F05 研究门。最终能力仍是精确交集的有界工程结果，不自动授予 Qualification。
 
+<a id="g07-code-constraints"></a>
+## G07收尾期间的代码约束
+
+2026-11-16维护者revision003：G07以真实案例驱动的集成收尾和代码复审为主，尽量避免新增功能；保留原7a必要接线和验收。执行中持续对照[post-5c优化总账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)及其E00～E16/G06后续结案。总账的旧未勾选文字不重新变成开发任务，不重开已接收阶段，也不以功能通过替代owner与阅读成本的审查。
+
+- 沿原/装配Panda的PickCube、Nut和受影响caller核对实际构造、控制、状态、模型、记录与关闭。已有owner组合满足的直接复用；只修复由真实调用或运行证实、原门必需的缺口。owner定位表不要求每项产生diff。
+- 将“案例、实际问题/消费者、原owner、复用或最小修改、总账条目、验证”记在同一份包内结案表。执行中发现有产品意义的边界结论时，及时更新本节及该表；不另建审计schema、validator、能力注册或证据平台。
+- Task保留任务语义与薄binding；Robot/source拥有recipe、TCP/具名通道/传动；Controller拥有选择、状态与计算；session/provider/render/Recorder保留各自唯一owner。复用现有source composition、shared worker装配/物理端口/模型代理，不新增第二Env/Runtime/factory/调度器、通用RPC、profile分派或仅为缩短文件的Manager/mixin/helper层。
+- 装配本体模型/补偿仅作原用例中这一套recipe与代表路线所需适配，不扩大为任意Robot/装配树/provider动力学。原R3已正确包含的贡献用证据证明，不再重复施加。原Solution算法/策略与任务成功、严格完成语义保持。
+- 保留正式source/provider能力、单位/三层映射、组合/冲突、generation/stale、partial-write fault、ACK与close检查。不为fixture恢复私有兼容桥、宽泛kwargs、getattr兜底链、吞异常、重复状态/hash或过严token保护；临时诊断与故障注入留外部。
+- 配置和普通caller只补案例实际需要的入口；现有入口足够则不新增CLI或SDK层。SB3/RSL保留固定空间与autoreset边界；LIBERO保留其source、predicate、OSC/gripper cadence。无受影响缺口可按调用/diff与匹配证据结案。
+- 复用仍匹配的强证据，只跑会揭示实际错误的受影响检查。完整案例覆盖的smoke/开闭/抓放不重复运行，不加完整训练、全A123/G06矩阵、性能门或额外笛卡尔积。不按行数、文件数、删行数、PASS数或搬到新大文件评价架构。
+- 普通owner/可读性问题在同一窗口修正，不留给7c、不为每个小问题重新派包。超出原门的能力只登记，不自动开发；若原门确需超出最小适配的新能力，保全具体阻断供维护者决定，不自行删门或扩大范围。
+
 <a id="7a"></a>
 ## 7a：NutAssembly 复用与调用者兼容
 

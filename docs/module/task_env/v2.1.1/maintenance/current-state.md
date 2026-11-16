@@ -4,7 +4,7 @@
 
 ## 当前停门
 
-G07准备入口：[Agent handoff](20261116_g07_agent_handoff.md)已按维护者要求完成。7a先收口任务/装配Robot复用与caller，再冻结7b原三后端×三seed九格，最后7c文档；三个子阶段仍PLANNED／attempt0，尚未启动执行。
+G07／7a revision003已获维护者批准派发，完整[工作包索引](work-packages/20261116_g07a_attempt001_goal.md)继承worker修复后`bb2692d8`，阶段分支为`codex/v211-stage7-integration`。当前为AUTHORIZED_PENDING_DISPATCH，7a在执行者核验并启动后登记IN_PROGRESS／attempt001；7b/7c保持PLANNED／attempt0。G07以案例驱动代码复审和集成收尾为主，持续按[本阶段代码约束](../goals/07-integration.md#g07-code-constraints)与已结案优化总账约束必要改动；原装配用例及7b九格不删减。实时执行状态以[编排索引](orchestration.json)和执行者返包为准。
 
 **G01～G06 canonical范围有界结案，G07与版本收口待实施。** 维护者在6c主审后要求收尾G06；[开发实施总结](g06/implementation-summary.md)与[证据索引](g06/evidence-index.json)统一记录基本要求、abc成果、测试/性能、submodule和未覆盖项。生产代码结案`4332844f`；GeoPhys pin`198d30ac`，Menagerie`b846dd12`。该次结案后继提交仅文档/索引、没有native重跑；其后维护者另行授权的scalar/batch render修复与当前结果见[渲染收尾](20261116_scalar_render_followup.md)。不自动启动R3/G07。
 

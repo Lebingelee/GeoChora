@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-16",
-  "status": "G06_CANONICAL_CLOSED_BOUNDED",
+  "status": "G07_7A_AUTHORIZED_PENDING_DISPATCH",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -13,14 +13,15 @@
     "branch": "develop"
   },
   "branch_plan": {
-    "stage": "6",
+    "stage": "7",
     "reuse_existing_checkout": true,
-    "actual_stage_branch": "codex/v211-stage6-parallel",
-    "reason": "Reuse the committed G06 stage checkout for bounded canonical closeout; no branch synchronization or publication performed."
+    "actual_stage_branch": "codex/v211-stage7-integration",
+    "base_head": "bb2692d86aaf8eb20e424a4c0ea9f9108f966e24",
+    "reason": "Maintainer approved revision003 7a dispatch: case-driven code review and minimal necessary integration; preserve original gates and one stage branch."
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Read G07 handoff with scalar render and physical worker followups; use post-maintenance HEAD. G07 remains planned, attempt counts unchanged.",
+  "next_action": "Dispatch revision003 complete 7a package; executor records IN_PROGRESS/attempt001 at actual readback/start. 7b/7c remain PLANNED/attempt0.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1961,22 +1962,39 @@
             "5c",
             "6c"
           ],
-          "status": "PLANNED",
+          "status": "READY_TO_DISPATCH",
           "attempt_count": 0,
           "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "assigned_agent": "01a1dd92-e2d9-7f71-8823-37d8c0bc4680",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/7a-work-package.md",
+          "package_sha256": "a34e7f603246a87340b48653f492f94aeef3858d7c3318adeddb239aaeb20a6a",
+          "input_head": "bb2692d86aaf8eb20e424a4c0ea9f9108f966e24",
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
+          "expected_duration_minutes": 360,
+          "execution_budget": {
+            "active_minutes": 360,
+            "wall_minutes": 480,
+            "native_wall_minutes": 120,
+            "explicit_substeps": 200000,
+            "per_run_wall_seconds": 900,
+            "cpu_tree_rss_bytes": 6442450944,
+            "image_cuda_tree_rss_bytes": 10737418240,
+            "gpu_card_mib": 6144,
+            "min_available_ram_bytes": 1073741824,
+            "min_free_vram_mib": 512,
+            "per_run_output_bytes": 1073741824,
+            "total_new_evidence_target_bytes": 4294967296,
+            "native_threads": 1
+          },
+          "last_observation": {
+            "at": "2026-11-16T21:51:40.570282+08:00",
+            "state": "revision003 approved, pending dispatch"
+          },
           "evidence_refs": [],
           "commits": [],
           "review_decision": null,
           "blockers": [],
-          "auxiliary_use_case_schedule": "Maintainer-confirmed V211_UC_ASSEMBLED_PANDA complete integration at 7a; original 7a work retained; implementation not started."
+          "auxiliary_use_case_schedule": "Original AP-C1-C4 obligations retained; case-driven review, reuse and minimal owner fixes at 7a."
         },
         {
           "id": "7b",
@@ -2430,5 +2448,29 @@
     "authority": "Maintainer authorized implementation; explicitly added bounded MuJoCo model proxy and physical worker reset; required capability rather than profile dispatch.",
     "g07_started": false,
     "submodule_changes": false
+  },
+  "g07_revision003_dispatch": {
+    "date": "2026-11-16",
+    "status": "AUTHORIZED_PENDING_DISPATCH",
+    "revision": 3,
+    "scope": "7a only",
+    "source_head": "bb2692d86aaf8eb20e424a4c0ea9f9108f966e24",
+    "production_tree": "c649bba421f5781653a41beac36caa7fca918511",
+    "previous_branch_plan": {
+      "stage": "6",
+      "reuse_existing_checkout": true,
+      "actual_stage_branch": "codex/v211-stage6-parallel",
+      "reason": "Reuse the committed G06 stage checkout for bounded canonical closeout; no branch synchronization or publication performed."
+    },
+    "target_thread_id": "01a1dd92-e2d9-7f71-8823-37d8c0bc4680",
+    "target_title": "v.2.1.1 G06ab subagent (terra)",
+    "package_index_ref": "work-packages/20261116_g07a_attempt001_goal.md",
+    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/7a-work-package.md",
+    "prompt_sha256": "a34e7f603246a87340b48653f492f94aeef3858d7c3318adeddb239aaeb20a6a",
+    "authority": "G07以收尾/案例代码复审为主，持续对照post-5c总账更新G07代码约束，保留原7a必要义务；完成revision003后批准派发，注意修改状态。",
+    "code_constraints_ref": "../goals/07-integration.md#g07-code-constraints",
+    "no_7b_7c_dispatch": true,
+    "executor_records_attempt_at_start": true,
+    "actual_attempt_start_recorded": false
   }
 }
