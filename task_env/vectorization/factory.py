@@ -262,11 +262,47 @@ def make_framework_parallel_spec(
     return adapter
 
 
-def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_directory=None,
-                              render_mode=None):
-    """Use the selected task's shared source and Controller to construct a device batch."""
-    from dataclasses import asdict
+def _cleanup_failed_device_build(adapter, render_source, runtime, built, binding, error,
+                                 controller=None, definition=None):
     from ..runtime.sessions.source import close_source_and_task_resources
+
+    if adapter is not None:
+        if render_source is not None and adapter.parallel_render_provider is None:
+            try:
+                render_source.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'device render source cleanup also failed: {cleanup_error!r}')
+        try:
+            adapter.close()
+        except BaseException as cleanup_error:
+            error.add_note(f'device adapter cleanup also failed: {cleanup_error!r}')
+    else:
+        if runtime is not None:
+            try:
+                runtime.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'device runtime cleanup also failed: {cleanup_error!r}')
+        for owner in (controller, definition):
+            close_device = getattr(owner, 'close_device', None)
+            if callable(close_device):
+                try:
+                    close_device()
+                except BaseException as cleanup_error:
+                    error.add_note(f'device owner cleanup also failed: {cleanup_error!r}')
+        close_source_and_task_resources(None if built is None else built.get('source'), binding, error=error)
+
+
+def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_directory=None,
+                              render_mode=None, resolved_config=None, generation=None):
+    """Use the selected task's shared source and Controller to construct a device batch.
+
+    ``resolved_config`` allows a preflighted whole-batch reconfiguration to
+    reuse its accepted target without resolving the request a second time.
+    ``generation`` advances the provider-bound publication identity; the
+    session reads that integer when it assigns materialization identity.
+    """
+    from copy import deepcopy
+    from dataclasses import asdict
     from ..runtime.factory import load_device_provider
 
     if backend != 'cuda':
@@ -274,15 +310,41 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
     if render_mode not in (None, 'human', 'rgb_array'):
         raise ValueError('device batch render_mode must be human, rgb_array or None')
     environment_type = ENV_REGISTRY.get(uid)
-    config = resolve_task_env_config(environment_type, env_config, execution_scope='device_batch')
+    if resolved_config is None:
+        config = resolve_task_env_config(environment_type, env_config, execution_scope='device_batch')
+    else:
+        config = resolved_config
+        if getattr(config, 'task_uid', None) != str(uid):
+            raise ValueError('prepared device configuration belongs to another task')
     binding = environment_type._build_selected_binding(config)
     built = None
     runtime = None
+    adapter = None
+    render_source = None
+    controller = None
+    definition = None
     try:
         seed = config.environment.episode.seed
         seed = 73 if seed is None else seed
         built = binding.build_for_request(config.physics_provider, config.environment.runtime.backend,
                                           seed, config.environment.episode.horizon)
+        controller = built.get('controller')
+        if generation is not None:
+            physical_execution = built.get('physical_execution')
+            if physical_execution is None or not hasattr(physical_execution, 'generation'):
+                raise StageUnavailableError(
+                    'device build has no physical execution generation to advance'
+                )
+            built = {
+                **built,
+                'physical_execution': replace(
+                    physical_execution, generation=int(generation)
+                ),
+            }
+        actual_generation = int(
+            getattr(built.get('physical_execution'), 'generation', 0)
+        )
+        controller = built['controller']
         binding = binding.bind_compiled_control(built)
         if not callable(binding.task_definition_factory):
             raise StageUnavailableError('task does not declare a device TaskDefinition')
@@ -291,7 +353,6 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                     'evaluate_device', 'device_observation_space')
         if any(not callable(getattr(definition, name, None)) for name in required):
             raise StageUnavailableError('task does not declare the required device semantics')
-        controller = built['controller']
         if not callable(getattr(controller, 'convert_device_batch', None)):
             raise StageUnavailableError('compiled Controller has no device action capability')
         device_action_space = getattr(controller, 'device_action_space', None)
@@ -321,6 +382,10 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                 action_schema['components'] = list(names)
         metadata = {'task_uid': uid, 'num_envs': int(num_env), 'backend': backend,
                     'execution': 'device_worker', 'transfer_mode': 'device',
+                    'physics_provider': str(config.physics_provider),
+                    'physics_backend': str(config.execution_spec_v2.physics_backend),
+                    'physics_device': str(config.physics_device),
+                    'device_generation': actual_generation,
                     'runtime_resource_summary': runtime.resource_summary(),
                     'action_schema': action_schema,
                     'observation_schema': asdict(schema)}
@@ -361,14 +426,31 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                 adapter.metadata['observation_schema'] = asdict(replace(
                     schema, fields=(*schema.fields, *camera_fields),
                     groups=(*schema.groups, 'cameras')))
+        from .reconfiguration import DeviceBatchBuildInput, render_config_signature
+
+        adapter.resolved_config.update({
+            'physics_provider': str(config.physics_provider),
+            'physics_backend': str(config.execution_spec_v2.physics_backend),
+            'physics_device': str(config.physics_device),
+            'device_generation': actual_generation,
+        })
+        adapter.device_generation = actual_generation
+        adapter.device_build_input = DeviceBatchBuildInput(
+            uid=str(uid),
+            num_env=int(num_env),
+            backend=str(backend),
+            env_config=(deepcopy(env_config) if isinstance(env_config, Mapping) else env_config),
+            worker_directory=worker_directory,
+            render_mode=render_mode,
+            resolved_config=config,
+            provider=str(config.physics_provider),
+            generation=actual_generation,
+            render_signature=render_config_signature(config.environment.render),
+        )
         return adapter
     except BaseException as error:
-        if runtime is not None:
-            try:
-                runtime.close()
-            except BaseException as cleanup_error:
-                error.add_note(f'device runtime cleanup also failed: {cleanup_error!r}')
-        close_source_and_task_resources(None if built is None else built.get('source'), binding, error=error)
+        _cleanup_failed_device_build(adapter, render_source, runtime, built, binding, error,
+                                     controller=controller, definition=definition)
         raise
 
 

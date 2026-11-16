@@ -109,6 +109,7 @@ class HomogeneousVectorTaskEnv:
         self._terminal = (None if execution_mode == 'device'
                           else np.zeros(self.num_envs, dtype=np.bool_))
         self._has_reset = False
+        self._device_fault = None
 
     @property
     def task_uid(self) -> str:
@@ -117,6 +118,8 @@ class HomogeneousVectorTaskEnv:
     @property
     def robot(self):
         """Return the source-bound Robot view owned by the active batch."""
+        if self._execution_mode == 'device':
+            self._require_device_operational()
         robot = getattr(self._task_spec, 'robot', None)
         if robot is None:
             raise RuntimeError('this batch does not expose a Robot view')
@@ -136,13 +139,26 @@ class HomogeneousVectorTaskEnv:
                 "num_envs": self.num_envs,
                 "backend": self.metadata.get("backend", "unknown"),
             }
-        return {
+        metadata = {
             "env_metadata": tree_copy(self.metadata),
             "resolved_config": tree_copy(resolved_config),
             "universal_action_schema": tree_copy(
                 self.metadata.get("universal_action_schema", {})
             ),
         }
+        if self._execution_mode == 'device':
+            build_input = getattr(self._task_spec, 'device_build_input', None)
+            if build_input is not None:
+                metadata['device_execution'] = {
+                    'provider': str(build_input.provider),
+                    'backend': str(build_input.backend),
+                    'generation': int(build_input.generation),
+                }
+                if isinstance(metadata.get('resolved_config'), dict):
+                    metadata['resolved_config']['device_generation'] = int(
+                        build_input.generation
+                    )
+        return metadata
 
     @property
     def observation_noise_level(self) -> float:
@@ -180,12 +196,41 @@ class HomogeneousVectorTaskEnv:
         mask: np.ndarray | None = None,
     ):
         if self._execution_mode == 'device':
-            if self._closed:
-                raise RuntimeError('vector environment is closed')
-            if options:
-                raise ValueError('device reset does not support reset options')
+            self._require_device_operational()
             if self._scalar_device and mask is not None:
                 raise ValueError('scalar device reset does not accept a batch mask')
+            if self._scalar_device and options:
+                raise ValueError('scalar device reset does not support reset options')
+            target_execution = None
+            if options is not None:
+                from .reconfiguration import parse_switch_options
+
+                target_execution = parse_switch_options(options, num_envs=self.num_envs)
+            if target_execution is not None:
+                if self._scalar_device:
+                    raise ValueError(
+                        'whole-batch execution switching requires a batch device environment'
+                    )
+                if mask is not None:
+                    import torch
+
+                    if isinstance(mask, torch.Tensor):
+                        if mask.dtype != torch.bool:
+                            raise ValueError('reset mask must be boolean')
+                        mask_shape = tuple(mask.shape)
+                        all_selected = bool(mask.all().item())
+                    else:
+                        mask_value = np.asarray(mask, dtype=np.bool_)
+                        mask_shape = mask_value.shape
+                        all_selected = bool(mask_value.all())
+                    if mask_shape != (self.num_envs,):
+                        raise ValueError('reset mask must have shape (B,)')
+                    if not all_selected:
+                        raise ValueError(
+                            'whole-batch execution switching requires an omitted or '
+                            'all-true mask'
+                        )
+                return self._reset_reconfigured_device(seed=seed, execution=target_execution)
             result = self._task_spec.reset_sampled_device(seed=seed, mask=mask)
             self._has_reset = True
             if self._scalar_device:
@@ -206,6 +251,120 @@ class HomogeneousVectorTaskEnv:
             self._terminal[np.asarray(mask, dtype=np.bool_)] = False
         self._has_reset = True
         return tree_copy(result.observation), tree_copy(result.infos)
+
+    def _require_device_operational(self) -> None:
+        if self._closed:
+            raise RuntimeError('vector environment is closed')
+        if self._device_fault is not None:
+            raise RuntimeError(
+                'device vector environment is faulted; close and reconstruct it'
+            ) from self._device_fault
+
+    def _refresh_device_contract(self) -> None:
+        """Publish the replacement adapter at the same vector boundary."""
+
+        spec = self._task_spec
+        self.num_envs = int(spec.num_envs)
+        self.single_action_space = spec.single_action_space
+        self.single_observation_space = spec.single_observation_space
+        if self._scalar_device:
+            self.action_space = self.single_action_space
+            self.observation_space = self.single_observation_space
+        else:
+            from gymnasium.vector.utils import batch_space
+
+            self.action_space = batch_space(self.single_action_space, self.num_envs)
+            self.observation_space = batch_space(
+                self.single_observation_space, self.num_envs
+            )
+        self.metadata = tree_copy(spec.metadata)
+        self._parallel_render_provider = getattr(
+            spec, 'parallel_render_provider', None
+        )
+
+    def _reset_reconfigured_device(self, *, seed, execution):
+        """Preflight, tear down and rebuild one whole device batch.
+
+        The target is resolved and checked before the old provider is closed.
+        A failure after teardown leaves this same Env explicitly faulted.
+        """
+
+        from .reconfiguration import prepare_reconfiguration
+
+        build_input = getattr(self._task_spec, 'device_build_input', None)
+        if build_input is None:
+            raise RuntimeError(
+                'device batch does not declare a whole-batch reconfiguration input'
+            )
+        prepared = prepare_reconfiguration(
+            build_input,
+            execution,
+            generation=int(build_input.generation) + 1,
+        )
+        old_spec = self._task_spec
+        carry = None
+        if seed is None:
+            exporter = getattr(old_spec, 'export_reconfiguration_state', None)
+            if callable(exporter):
+                carry = exporter()
+
+        self._task_spec = None
+        self._parallel_render_provider = None
+        try:
+            old_spec.close()
+        except BaseException as error:
+            # Retain the failed owner only so close() can retry cleanup.
+            self._task_spec = old_spec
+            self._device_fault = error
+            raise RuntimeError(
+                'device batch teardown failed; environment is faulted'
+            ) from error
+
+        from .factory import make_selected_device_spec
+
+        try:
+            new_spec = make_selected_device_spec(
+                uid=build_input.uid,
+                num_env=build_input.num_env,
+                env_config=(prepared.target_request if prepared.target_request is not None
+                            else build_input.env_config),
+                backend=build_input.backend,
+                worker_directory=build_input.worker_directory,
+                render_mode=build_input.render_mode,
+                resolved_config=prepared.target_config,
+                generation=prepared.generation,
+            )
+        except BaseException as error:
+            self._device_fault = error
+            raise
+
+        try:
+            # Some space details only become available after native binding.
+            # Reject a mismatched target before publishing or resetting it.
+            if (int(new_spec.num_envs) != self.num_envs
+                    or new_spec.single_action_space != self.single_action_space
+                    or new_spec.single_observation_space != self.single_observation_space):
+                raise ValueError('replacement batch changes the action or observation contract')
+            importer = getattr(new_spec, 'import_reconfiguration_state', None)
+            if carry is not None and callable(importer):
+                importer(carry)
+            result = new_spec.reset_sampled_device(seed=seed, mask=None)
+        except BaseException as error:
+            try:
+                new_spec.close()
+            except BaseException as cleanup_error:
+                self._task_spec = new_spec
+                error.add_note(
+                    f'replacement device batch cleanup also failed: {cleanup_error!r}'
+                )
+            self._device_fault = error
+            raise
+
+        self._task_spec = new_spec
+        self._device_fault = None
+        self._refresh_device_contract()
+        self._has_reset = True
+        return result.observation, result.infos
 
     def step(self, actions: Any):
         if self._execution_mode == 'device':
@@ -241,8 +400,7 @@ class HomogeneousVectorTaskEnv:
         )
 
     def _step_device_with_autoreset(self, actions):
-        if self._closed:
-            raise RuntimeError('vector environment is closed')
+        self._require_device_operational()
         if not self._has_reset:
             raise RuntimeError('reset() must be called before vector step()')
         transition = self._task_spec.step_device(actions)
@@ -342,6 +500,8 @@ class HomogeneousVectorTaskEnv:
         )
 
     def resource_summary(self) -> dict[str, Any]:
+        if self._execution_mode == 'device':
+            self._require_device_operational()
         return dict(self._task_spec.resource_summary())
 
     def set_parallel_render_num(self, count: int) -> None:
@@ -361,6 +521,8 @@ class HomogeneousVectorTaskEnv:
         provider.set_parallel_render_layout(**kwargs)
 
     def render(self, mode: RenderMode | str | None = None):
+        if self._execution_mode == 'device':
+            self._require_device_operational()
         provider = self._require_parallel_render_provider()
         requested = self.render_mode if mode is None else mode
         normalized = normalize_render_mode(requested or RenderMode.HUMAN)
@@ -396,6 +558,8 @@ class HomogeneousVectorTaskEnv:
     def read_device_state(self, names: tuple[str, ...]):
         """Optional named device-state forwarding at the vector boundary."""
 
+        if self._execution_mode == 'device':
+            self._require_device_operational()
         reader = getattr(self._task_spec, "read_device_state", None)
         if not callable(reader):
             raise RuntimeError("homogeneous task has no read_device_state capability")
@@ -421,18 +585,24 @@ class HomogeneousVectorTaskEnv:
         return provider() if callable(provider) else None
 
     def get_privileged_observation(self):
+        if self._execution_mode == 'device':
+            self._require_device_operational()
         provider = getattr(self._task_spec, "get_privileged_observation", None)
         if not callable(provider):
             raise RuntimeError("homogeneous task has no privileged observation capability")
         return provider()
 
     def get_privileged_observation_device(self):
+        if self._execution_mode == 'device':
+            self._require_device_operational()
         provider = getattr(self._task_spec, "get_privileged_observation_device", None)
         if not callable(provider):
             raise RuntimeError("homogeneous task has no device privileged observation capability")
         return provider()
 
     def prepare_device_reset_selection(self, mask: Any):
+        if self._execution_mode == 'device':
+            self._require_device_operational()
         preparer = getattr(self._task_spec, "prepare_device_reset_selection", None)
         if not callable(preparer):
             raise RuntimeError("homogeneous task has no device reset selection capability")
@@ -463,7 +633,11 @@ class HomogeneousVectorTaskEnv:
             if self._close_complete:
                 return
             self._closed = True
-            self._task_spec.close()
+            spec = self._task_spec
+            if spec is not None:
+                spec.close()
+            self._task_spec = None
+            self._parallel_render_provider = None
             self._close_complete = True
             return
         try:

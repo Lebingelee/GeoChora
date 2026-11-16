@@ -332,6 +332,10 @@ def test_device_reset_streams_are_seeded_per_row_and_advance_only_when_selected(
     first_result = first.reset_sampled_device(mask=selected).state.arrays['qpos']
     second_result = second.reset_sampled_device(mask=selected).state.arrays['qpos']
     assert torch.equal(first_result[selected], second_result[selected])
+    for _ in range(3):
+        first_result = first.reset_sampled_device(mask=selected).state.arrays['qpos']
+        second_result = second.reset_sampled_device(mask=selected).state.arrays['qpos']
+        assert torch.equal(first_result[selected], second_result[selected])
     before = first_result.clone()
     episodes = first.device_episode_ids
     first.reset_sampled_device(mask=torch.zeros(3, dtype=torch.bool))
@@ -594,6 +598,11 @@ def test_pickcube_device_linear_effort_respects_tendon_and_row_identity():
         torch.testing.assert_close(command.values, expected, rtol=0, atol=0)
         assert torch.equal(command.episode_ids, state.episode_ids)
         assert torch.equal(command.episode_steps, state.episode_steps)
+        assert controller._device_constants
+        controller.close_device()
+        assert not controller._device_constants
+        zero_command = controller.convert_device_batch({'effort': torch.zeros_like(action)}, state)
+        assert torch.count_nonzero(zero_command.values).item() == 0
         with pytest.raises(ValueError, match='exceeds'):
             controller.convert_device_batch({'effort': action + 251.}, state)
         with pytest.raises(ValueError, match='action tree'):

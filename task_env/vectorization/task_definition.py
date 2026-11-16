@@ -268,6 +268,10 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         self._device_pcg_states = None
         self._device_episode_ids = None
         self._device_fault = None
+        # A prepared mask is valid only for the adapter that prepared it.
+        # Weak values avoid retaining one selection per autoreset boundary.
+        from weakref import WeakValueDictionary
+        self._device_reset_selections = WeakValueDictionary()
         self._last_state = None
         self._last_device_state = None
         runtime_admission = admit_runtime_port(
@@ -829,7 +833,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
             raise ValueError(f"device reset mask must have shape ({self.num_envs},)")
         host_mask = device_mask.detach().to("cpu").numpy()
         selected_slots = np.flatnonzero(host_mask).astype(np.int64, copy=False)
-        return DeviceResetSelection(
+        selection = DeviceResetSelection(
             device_mask=device_mask,
             host_mask=host_mask,
             selected_slots=selected_slots,
@@ -837,6 +841,12 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
             num_envs=self.num_envs,
             device=str(device_mask.device),
         )
+        self._device_reset_selections[id(selection)] = selection
+        return selection
+
+    def _require_owned_device_reset_selection(self, selection):
+        if self._device_reset_selections.get(id(selection)) is not selection:
+            raise ValueError('device reset selection is stale or belongs to another batch')
 
     def reset_device(
         self,
@@ -845,6 +855,8 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         *,
         selection: DeviceResetSelection | None = None,
     ):
+        if selection is not None:
+            self._require_owned_device_reset_selection(selection)
         if not callable(self._device_runtime_reset):
             raise StageUnavailableError("runtime has no public reset_device capability")
         if selection is not None and _accepts_keyword(
@@ -924,6 +936,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         elif not isinstance(selection, DeviceResetSelection):
             raise TypeError("selection must be a DeviceResetSelection")
         else:
+            self._require_owned_device_reset_selection(selection)
             reset_mask = mask
             expected_device = (
                 getattr(getattr(self, "device_field_plan", None), "device", None)
@@ -1016,6 +1029,39 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         if self._device_fault is None:
             self._device_fault = error
 
+    def export_reconfiguration_state(self):
+        """Freeze provider-independent reset streams before a whole-batch rebuild."""
+        import copy
+
+        return {
+            'host_rng': copy.deepcopy(self._rng.bit_generator.state),
+            'device_rng': (None if self._device_rng_state is None
+                           else self._device_rng_state.detach().clone()),
+            'device_pcg': copy.deepcopy(self._device_pcg_states),
+            'device': self.device_field_plan.device,
+        }
+
+    def import_reconfiguration_state(self, state):
+        """Continue reset sampling after a rebuild when no explicit seed was given.
+
+        Only the reset stream continues; episode ids, clocks and provider
+        materialization are new.  A state captured on another device is
+        ignored rather than copied across a different CUDA route.
+        """
+        import copy
+
+        if not isinstance(state, Mapping):
+            raise TypeError('reconfiguration state must be a mapping')
+        host_rng = state.get('host_rng')
+        if host_rng is not None:
+            self._rng.bit_generator.state = copy.deepcopy(host_rng)
+        if str(state.get('device')) != str(self.device_field_plan.device):
+            return
+        device_rng = state.get('device_rng')
+        if device_rng is not None:
+            self._device_rng_state = device_rng.to(self.device_field_plan.device)
+        self._device_pcg_states = copy.deepcopy(state.get('device_pcg'))
+
     def _with_device_episode_metadata(self, state):
         return replace(state, episode_ids=self.device_episode_ids,
                        episode_steps=self.device_episode_steps)
@@ -1051,6 +1097,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
         if selection is None:
             selection = self.prepare_device_reset_selection(mask)
         else:
+            self._require_owned_device_reset_selection(selection)
             validate_device_reset_selection(selection, mask=mask, num_envs=self.num_envs,
                                             device=device, require_data_pointer=True)
         pcg = getattr(self.task_definition, 'device_random_algorithm', None) == 'pcg64-v0'

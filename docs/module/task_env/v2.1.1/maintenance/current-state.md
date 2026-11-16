@@ -4,9 +4,9 @@
 
 ## 当前停门
 
-维护者已要求准备6c：[attempt001完整工作包](work-packages/20261116_g06c_attempt001_goal.md)已落盘，未派发、未运行。范围为三后端部分reset、两个任务的固定Rasterizer Isaac→MJWarp→Isaac、generation失效和失败清理；复用6b证据，不重复性能矩阵。
+G06c [attempt001 工作包](work-packages/20261116_g06c_attempt001_goal.md)已完成有界执行，待独立主审，尚未获得维护者接收。三后端、两任务部分 reset 和错开终止，以及两个任务固定 Rasterizer 的 Isaac→MJWarp→Isaac 已验证；故障注入检查了 worker、IPC 和 GPU 引用释放。共享场景相机可看到其他行，证据及流程偏差由执行报告保留；未重复 6b 性能矩阵，GeoPhys 跨 provider 切换和 R3 尚未准入。
 
-2026-11-16最新结论：G06b attempt003 已[独立主审有界接收](reviews/20261116_g06b_attempt003_acceptance.md)（SOL_ACCEPTED_BOUNDED_6B），Core `8d0fd756`／GeoPhys `198d30ac`。18项性能为11项新测、7项复用，Isaac资源例外未使用；GeoPhys限显式discrete／32已验证配置。首次未监督CUDA执行偏差保留。维护者接收待确认，未启动6c或R3；下述早期未接收文字保留其时点。
+2026-11-16：G06b attempt003 已[独立主审有界接收](reviews/20261116_g06b_attempt003_acceptance.md)（SOL_ACCEPTED_BOUNDED_6B），Core `8d0fd756`／GeoPhys `198d30ac`。18项性能为11项新测、7项复用，Isaac资源例外未使用；GeoPhys限显式discrete／32已验证配置。首次未监督CUDA执行偏差保留。维护者接收待确认，R3 未启动；下述早期未接收文字保留其时点。
 
 **G01～G05 与优化账本保持原有接收；G06a attempt002 已经[独立主审](reviews/20261115_g06a_attempt002_acceptance.md)有界接收（SOL_ACCEPTED_BOUNDED_6A）。Core 为 `3bc9e2a7`，GeoPhys pin 为 `a2c85b7f`；无需 attempt003。G06b／6c、完整 canonical 六格、R3 和 G07 尚未接收，v2.1.1 尚未完成。** GeoPhys 主分支合并与 AOT 按维护者决定暂缓，不记通过、不阻断本次接收。G06a 的 Isaac 第二来源证据是 scalar 物理；G06b 新增的 native batch 有界证据及限制见[API](../api/README.md)，仍待独立主审。下方早期启动表及历史记录保留其时点。
 

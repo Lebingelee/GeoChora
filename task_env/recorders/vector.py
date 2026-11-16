@@ -129,6 +129,25 @@ class VectorTransitionRecorder:
             raise TypeError("raw VecEnv record metadata must be a dictionary")
         return tree_copy(metadata)
 
+    def _refresh_record_metadata(self) -> None:
+        """Pick up a new provider/generation before opening the next rows."""
+
+        metadata = self._get_record_metadata()
+        if self._device_mode and not metadata.get("universal_action_schema"):
+            components = (
+                metadata.get("env_metadata", {})
+                .get("action_schema", {})
+                .get("components")
+            )
+            if components:
+                metadata["universal_action_schema"] = {
+                    "version": "direct-device-action-v1",
+                    "dimension": len(components),
+                    "components": list(components),
+                }
+        self._metadata = metadata
+        self.metadata = dict(getattr(self.venv, "metadata", self.metadata))
+
     def _new_recorders(self, observation: Any, reset_infos: list[dict[str, Any]]) -> None:
         self._recorders = [TransitionRecorder(self.config) for _ in range(self.num_envs)]
         for slot, recorder in enumerate(self._recorders):
@@ -419,6 +438,7 @@ class VectorTransitionRecorder:
         # episode fails. A later start_record must use this new boundary.
         self._current_observation, self._device_last_info = observation, info
         try:
+            self._refresh_record_metadata()
             if self.record_enabled and self._device_recorders:
                 selected = (self._device_slots if mask is None else
                             tuple(slot for slot in self._device_slots if bool(mask[slot].item())))
