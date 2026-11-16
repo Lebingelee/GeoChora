@@ -314,7 +314,7 @@ class ParallelRenderProvider:
                     or frame.dtype != torch.uint8 or tuple(frame.shape) != (self.height, self.width, 3)):
                 raise RuntimeError('parallel device renderer must return CUDA uint8 HWC RGB')
             if normalized is RenderMode.RGB_ARRAY:
-                return frame
+                return frame.detach().cpu().numpy().copy()
             source.present_parallel(frame=frame, world_ids=world_ids,
                                     world_transforms=world_transforms)
             return None
@@ -329,7 +329,8 @@ class ParallelRenderProvider:
             raise RuntimeError("parallel renderer returned non-finite pixels")
         frame = np.ascontiguousarray(np.clip(frame, 0.0, 1.0), dtype=np.float32)
         if normalized is RenderMode.RGB_ARRAY:
-            return frame
+            from ..camera.color import rgb_to_uint8
+            return rgb_to_uint8(frame)
         present = getattr(source, "present_parallel", None)
         if not callable(present):
             raise RenderUnavailableError(

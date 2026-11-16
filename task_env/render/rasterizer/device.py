@@ -62,6 +62,7 @@ class DeviceBatchRasterSource:
         self._body_order = None
         self._source_lease = None
         self._closed = False
+        self._window_closed_by_user = False
 
     def _configure_visualizer(self, scene_source):
         """Bind cameras and retain renderer ownership if setup cleanup fails."""
@@ -278,20 +279,22 @@ class DeviceBatchRasterSource:
 
     def present_parallel(self, *, frame, world_ids, world_transforms):
         del frame, world_ids, world_transforms
+        if self._window_closed_by_user:
+            return
         if self._visualizer is None:
             raise RuntimeError('device raster has not rendered a frame')
         if self._window is None:
             self._window = self._ti.ui.Window('GeoChora', (self._width, self._height), vsync=False)
             self._canvas = self._window.get_canvas()
         if not self._window.running:
-            self._window.destroy()
-            self._window = self._canvas = None
+            self.close_window()
             return
         self._visualizer.present_current_frame(self._canvas)
         self._window.show()
 
     def close_window(self):
         """Release the optional window without closing sensor rendering."""
+        self._window_closed_by_user = True
         if self._window is not None:
             self._window.destroy()
             self._window = self._canvas = None

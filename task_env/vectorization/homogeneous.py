@@ -102,10 +102,11 @@ class HomogeneousVectorTaskEnv:
             None,
         )
         self.render_mode = (
-            task_spec.metadata.get('render_mode', RenderMode.HUMAN.value)
+            task_spec.metadata.get('render_mode')
             if self._parallel_render_provider is not None
             else None
         )
+        self._human_render_enabled = True
         self._terminal = (None if execution_mode == 'device'
                           else np.zeros(self.num_envs, dtype=np.bool_))
         self._has_reset = False
@@ -234,6 +235,8 @@ class HomogeneousVectorTaskEnv:
                 return self._reset_reconfigured_device(seed=seed, execution=target_execution)
             result = self._task_spec.reset_sampled_device(seed=seed, mask=mask)
             self._has_reset = True
+            if self.render_mode == 'human' and self._human_render_enabled:
+                self.render()
             if self._scalar_device:
                 return (_scalar_device_tree(result.observation, add_batch_axis=False),
                         _scalar_device_tree(result.infos, add_batch_axis=False))
@@ -251,6 +254,8 @@ class HomogeneousVectorTaskEnv:
         else:
             self._terminal[np.asarray(mask, dtype=np.bool_)] = False
         self._has_reset = True
+        if self.render_mode == 'human' and self._human_render_enabled:
+            self.render()
         return tree_copy(result.observation), tree_copy(result.infos)
 
     def _require_device_operational(self) -> None:
@@ -366,6 +371,8 @@ class HomogeneousVectorTaskEnv:
         self._device_fault = None
         self._refresh_device_contract()
         self._has_reset = True
+        if self.render_mode == 'human' and self._human_render_enabled:
+            self.render()
         return result.observation, result.infos
 
     def step(self, actions: Any):
@@ -393,6 +400,8 @@ class HomogeneousVectorTaskEnv:
         if len(result.infos) != self.num_envs:
             raise ValueError("task step must return one info mapping per slot")
         self._terminal = np.logical_or(terminated, truncated)
+        if self.render_mode == 'human' and self._human_render_enabled:
+            self.render()
         return (
             tree_copy(result.observation),
             reward.copy(),
@@ -466,6 +475,8 @@ class HomogeneousVectorTaskEnv:
             if 'native_world_time' in reset.infos:
                 infos['native_world_time'] = reset.infos['native_world_time'].clone()
                 infos['reset_info']['native_world_time'] = reset.infos['native_world_time'].clone()
+        if self.render_mode == 'human' and self._human_render_enabled:
+            self.render()
         return observation, transition.reward, transition.terminated, transition.truncated, infos
 
     def _validate_action(self, actions: Any) -> None:
@@ -525,10 +536,11 @@ class HomogeneousVectorTaskEnv:
     def render(self, mode: RenderMode | str | None = None):
         if self._execution_mode == 'device':
             self._require_device_operational()
+        if mode is None and self.render_mode is None:
+            return None
         provider = self._require_parallel_render_provider()
         requested = self.render_mode if mode is None else mode
         normalized = normalize_render_mode(requested or RenderMode.HUMAN)
-        self.render_mode = normalized.value
         snapshot = getattr(self._task_spec, "_last_state", None)
         return provider.render(mode=normalized, snapshot=snapshot)
 
@@ -548,6 +560,7 @@ class HomogeneousVectorTaskEnv:
         provider = self._parallel_render_provider
         if provider is not None:
             provider.close_render()
+            self._human_render_enabled = False
 
     def _require_parallel_render_provider(self):
         provider = self._parallel_render_provider

@@ -59,8 +59,6 @@ def run(interpreter, *, provider='mujoco_warp', num_env=3, seed=31, steps=20,
         effort = torch.zeros((num_env, *shape), dtype=torch.float32, device='cuda')
         for _ in range(steps):
             observation, reward, terminated, truncated, info = env.step({'effort': effort})
-            if window:
-                env.render()
         state = env.read_device_state(('qpos', 'qvel'))
         result = {'task': 'pick-cube-p16-reference-v1', 'provider': provider, 'num_envs': num_env,
                   'steps': steps, 'seed': seed, 'device': str(reward.device),

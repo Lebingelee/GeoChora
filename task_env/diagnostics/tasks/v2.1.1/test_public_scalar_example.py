@@ -45,7 +45,7 @@ def test_pendulum_rgb_example_uses_formal_config_and_camera(monkeypatch, capsys)
 
         return SimpleNamespace(
             observation_space=space, reset=reset, step=step,
-            render=lambda: np.zeros((observer_camera.height, observer_camera.width, 3), dtype=np.float32),
+            render=lambda: np.zeros((observer_camera.height, observer_camera.width, 3), dtype=np.uint8),
             close=lambda: events.append(('close',)),
         )
 

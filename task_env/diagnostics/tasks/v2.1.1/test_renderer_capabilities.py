@@ -34,6 +34,9 @@ def test_capability_query_and_camera_math_do_not_import_native_sdk(monkeypatch):
     ('panda-v1', 'panda-joint-effort-reference-v1', 'geophys', 'cpu', 'rgb_array', '{}'),
     ('panda-v1', 'panda-joint-effort-reference-v1', 'mujoco', 'cpu', 'rgb_array', '{"reset_selection":true}'),
     ('panda-v1', 'panda-joint-effort-reference-v1', 'isaacsim', 'cuda', 'rgb_array', '{}'),
+    ('panda-v1', 'r3_continuous_v1', 'mujoco', 'cpu', 'rgb_array', '{}'),
+    ('panda-v1', 'r3_continuous_v1', 'geophys', 'cpu', 'human', '{}'),
+    ('pendulum-v1', 'direct_joint_effort_v1', 'mujoco', 'cpu', 'rgb_array', '{}'),
 ])
 def test_observer_route_is_consumed_by_camera_factory(robot, profile, provider, backend, mode, parameters):
     import task_env.tasks  # registers Robot declarations without starting a provider
@@ -44,7 +47,9 @@ def test_observer_route_is_consumed_by_camera_factory(robot, profile, provider, 
 
     config = SimpleNamespace(robot_uid=robot, controller_profile=profile,
         controller_parameters_json=parameters, physics_provider=provider,
-        environment=SimpleNamespace(runtime=SimpleNamespace(backend=backend)))
+        environment=SimpleNamespace(runtime=SimpleNamespace(backend=backend),
+            render=SimpleNamespace(backend={'geophys': 'rasterizer', 'mujoco': 'mujoco_reference',
+                                            'isaacsim': 'isaac_rtx'}[provider])))
     route = selected_observer_route(config, mode)
     artifact = SimpleNamespace(identity_hash='a' * 64)
     camera = CameraGeometry.from_camera_spec(CameraSpec('observer', width=4, height=3, depth=False),
@@ -55,7 +60,7 @@ def test_observer_route_is_consumed_by_camera_factory(robot, profile, provider, 
     assert (request is not None) == (capability.ownership == 'borrowed Runtime camera')
 
 
-def test_observer_route_rejects_unadmitted_control_and_foreign_descriptor():
+def test_observer_route_rejects_wrong_backend_and_foreign_descriptor():
     from dataclasses import replace
     import task_env.tasks
     from task_env.environment.config import CameraSpec
@@ -64,10 +69,11 @@ def test_observer_route_rejects_unadmitted_control_and_foreign_descriptor():
 
     config = SimpleNamespace(robot_uid='panda-v1', controller_profile='r3_continuous_v1',
         controller_parameters_json='{}', physics_provider='isaacsim',
-        environment=SimpleNamespace(runtime=SimpleNamespace(backend='cuda')))
-    with pytest.raises(ValueError, match='state-only'):
+        environment=SimpleNamespace(runtime=SimpleNamespace(backend='cuda'),
+                                    render=SimpleNamespace(backend='rasterizer')))
+    with pytest.raises(ValueError, match='requires render.backend'):
         selected_observer_route(config, 'rgb_array')
-    config.controller_profile = 'panda-direct-effort-v1'
+    config.environment.render.backend = 'isaac_rtx'
     route = selected_observer_route(config, 'rgb_array')
     artifact = SimpleNamespace(identity_hash='a' * 64)
     camera = CameraGeometry.from_camera_spec(CameraSpec('observer', width=4, height=3, depth=False),

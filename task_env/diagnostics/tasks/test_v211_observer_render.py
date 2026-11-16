@@ -31,7 +31,7 @@ def test_rgb_render_returns_independent_copy_and_invalidates_on_capture_failure(
     frame = provider.render(mode=RenderMode.RGB_ARRAY, snapshot=None)
     assert frame.flags.owndata and not np.shares_memory(frame, native)
     native[:] = 0.75
-    assert np.all(frame == 0.25)
+    assert frame.dtype == np.uint8 and np.all(frame == 64)
     assert provider.last_frame_receipt['capture_identity'] == {'boundary': 7}
     state['fail'] = True
     with pytest.raises(RuntimeError, match='readback failed'):

@@ -483,7 +483,7 @@ class TrainingRenderConfig:
 @dataclass(frozen=True)
 class RenderConfig:
     camera_obs: bool = False
-    backend: str = "raytracer"
+    backend: str = "rasterizer"
     cameras: tuple[CameraSpec, ...] = ()
     width: int = 640
     height: int = 480
@@ -497,10 +497,11 @@ class RenderConfig:
             "rasterizer",
             "flora",
             "mujoco_reference",
+            "isaac_rtx",
         }:
             raise ValueError(
-                "render backend must be raytracer, rasterizer, flora, or "
-                "mujoco_reference"
+                "render backend must be raytracer, rasterizer, flora, "
+                "mujoco_reference, or isaac_rtx"
             )
         if int(self.width) < 1 or int(self.height) < 1:
             raise ValueError("render width and height must be positive")

@@ -1,7 +1,7 @@
 # Task-owned public defaults.  ``render.parallel.num`` is an upper bound;
 # training resolves it to min(num_env, render.parallel.num).
 render:
-  backend: raytracer
+  backend: rasterizer
   width: 960
   height: 720
   parallel:

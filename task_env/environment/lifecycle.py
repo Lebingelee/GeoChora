@@ -155,8 +155,11 @@ class EpisodeExecutionState:
 
     def execute_selected_interval(self, env, **operations):
         """Run selected hooks against the Env's single state and observation owner."""
-        return self.execute_interval(
+        result = self.execute_interval(
             read_state=lambda: env.state, observe=lambda _state: env.obs, **operations)
+        if getattr(env, 'render_mode', None) == 'human':
+            env.render()
+        return result
 
     def finish_episode(self) -> None:
         self.stopped = True

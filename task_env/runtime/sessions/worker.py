@@ -113,6 +113,15 @@ def _materialize_selected(payload):
         if assessment.decision == 'rejected':
             raise ValueError('worker rebuilt request failed capability preflight')
         selected = bind_selected_controller(value, binding=binding, provider=provider, backend=backend)
+        observer = payload.get('observer_render_request')
+        if observer is not None:
+            from ...observations.canonical_camera import CameraGeometry
+            from ...render.base.contracts import ObserverRenderRequestV1
+            observer = ObserverRenderRequestV1(**{
+                **observer, 'camera': CameraGeometry.from_mapping(observer['camera'])})
+        render_options = {'observer_render_request': observer,
+                          'task_render_requested': payload.get('task_render_requested', False),
+                          'geophys_contact_mode': config.geophys_contact_mode}
         handlers = {}
         if len(selected.position_profiles) > 1:
             raise ValueError('worker route does not implement multi-writer profiles')
@@ -126,6 +135,7 @@ def _materialize_selected(payload):
                 artifact, execution, source=source, binding=control_binding,
                 controller_binding_plan=plan, controller_profile=selected.position_profiles,
                 session_admission_input=value.get('session_admission_input'),
+                **render_options,
             )
             profile = selected.position_profiles[0]
             scene = source.scene_definition
@@ -138,7 +148,8 @@ def _materialize_selected(payload):
             session = materialize_control(artifact, execution, source=source,
                                           binding=binding.scalar_control_binding,
                                           selected_controller=(selected.controller
-                                              if binding.interval_mode == 'native' else None))
+                                              if binding.interval_mode == 'native' else None),
+                                          **render_options)
             from contextlib import nullcontext
             from .control import position_subject_interval
 
@@ -272,7 +283,8 @@ def main():
         # reconstructed, independently of which Task supplied that source.
         if payload.get('selection', {}).get('physics_provider') == 'isaacsim':
             from .isaac_native_io import isaac_worker_app_owner, open_isaac_worker_app
-            early_app_owner = isaac_worker_app_owner()
+            early_app_owner = isaac_worker_app_owner(rendering=bool(
+                payload.get('observer_render_request') or payload.get('task_render_requested')))
             open_isaac_worker_app(early_app_owner)
         session, handlers, source, binding = _materialize_selected(payload)
         from .source import close_source_and_task_resources

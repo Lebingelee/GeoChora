@@ -1,6 +1,6 @@
 # Keep the empty task on the same public render configuration surface.
 render:
-  backend: raytracer
+  backend: rasterizer
   width: 960
   height: 720
   parallel:

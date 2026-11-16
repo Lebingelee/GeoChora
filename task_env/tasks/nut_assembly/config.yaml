@@ -154,7 +154,7 @@ environment:
       reference: world
       rotation_representation: quaternion_wxyz
   render:
-    backend: raytracer
+    backend: rasterizer
     width: 960
     height: 720
     parallel:

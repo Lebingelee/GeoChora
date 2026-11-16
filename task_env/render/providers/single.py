@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..base.contracts import RenderMode
+from ..camera.color import rgb_to_uint8
 from ..tools.processing import RenderProcessor
 
 
@@ -273,7 +274,7 @@ class TaskEnvRenderProvider:
         if self._frame_capture is not None:
             self.invalidate_frame()
             if mode is RenderMode.RGB_ARRAY:
-                return self._capture_owned_frame()
+                return rgb_to_uint8(self._capture_owned_frame())
             if mode is RenderMode.HUMAN:
                 try:
                     if self._frame_presenter is None:
@@ -290,7 +291,7 @@ class TaskEnvRenderProvider:
                     raise
                 return None
         if mode is RenderMode.RGB_ARRAY:
-            return self._render_rgb()
+            return rgb_to_uint8(self._render_rgb())
         if mode is RenderMode.HUMAN:
             self._render_human()
             return None

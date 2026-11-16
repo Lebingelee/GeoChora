@@ -27,8 +27,6 @@ def run(interpreter, *, output=None, seed=73, steps=20, provider='mujoco_warp', 
         actions = {'torque': torch.linspace(-1.5, 1.5, num_env, device='cuda').reshape(-1, 1)}
         for _ in range(steps):
             observation, reward, terminated, truncated, info = env.step(actions)
-            if window:
-                env.render()
         state = env.read_device_state(('qpos', 'qvel'))
         result = {'task': 'pendulum-v1', 'provider': provider, 'num_envs': env.num_envs,
                   'steps': steps, 'seed': seed, 'device': str(reward.device),

@@ -322,6 +322,9 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
         config = resolved_config
         if getattr(config, 'task_uid', None) != str(uid):
             raise ValueError('prepared device configuration belongs to another task')
+    if ((render_mode is not None or config.environment.render.camera_obs)
+            and config.environment.render.backend != 'rasterizer'):
+        raise StageUnavailableError('device rendering requires the shared rasterizer')
     binding = environment_type._build_selected_binding(config)
     built = None
     runtime = None
@@ -394,7 +397,7 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                     'device_generation': actual_generation,
                     'runtime_resource_summary': runtime.resource_summary(),
                     'action_schema': action_schema,
-                    'observation_schema': asdict(schema)}
+                    'observation_schema': asdict(schema), 'render_modes': []}
         adapter = BatchTaskLifecycleAdapter(uid=uid, num_envs=num_env, backend=backend,
             base_seed=seed, runtime=runtime, reset_sampler=binding.task_reset_sampler,
             compiled_scene=None, initial_state=None, task_definition=definition,
@@ -408,8 +411,6 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
             from ..render.providers.parallel import ParallelRenderLayout, ParallelRenderProvider
             from ..render.rasterizer.device import DeviceBatchRasterSource
 
-            if render_config.camera_obs and render_config.backend != 'rasterizer':
-                raise StageUnavailableError('device camera observations require the shared rasterizer')
             cameras = render_config.cameras if render_config.camera_obs else ()
             render_source = DeviceBatchRasterSource(runtime=runtime, source=built['source'], cameras=cameras)
             grid = render_config.parallel
@@ -419,7 +420,9 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                 num_envs=num_env, render_source=render_source,
                 width=render_config.width, height=render_config.height, layout=layout)
             adapter.parallel_render_provider.set_parallel_render_num(num_env)
-            adapter.metadata['render_mode'] = render_mode
+            adapter.metadata.update(render_mode=render_mode, render_modes=['human', 'rgb_array'],
+                                    render_backend=render_config.backend,
+                                    render_resolution=(render_config.width, render_config.height))
             adapter.resolved_config['render'] = asdict(render_config)
             if cameras:
                 from ..environment.types import ObservationFieldSpec

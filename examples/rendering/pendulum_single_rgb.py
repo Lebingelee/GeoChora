@@ -56,12 +56,14 @@ def main(argv=None) -> int:
                 "pendulum-v1",
                 config={
                     "execution": {"physics_provider": "geophys", "physics_backend": "cpu",
-                                  "physics_device": "cpu"},
+                                  "physics_device": "cpu", "deployment": "in_process",
+                                  "interpreter": sys.executable},
                     "episode": {"horizon": 2},
                 },
                 render_mode="rgb_array",
                 observer_camera=CameraSpec("observer", width=args.width, height=args.height,
-                                           position=(0.0, 0.0, 2.0)),
+                                           position=(0.0, 0.0, 2.0),
+                                           quaternion_wxyz=(2**-.5, 0.0, 2**-.5, 0.0)),
             )
             observation, info = env.reset(seed=args.seed)
             reset_observation_valid = env.observation_space.contains(observation)
@@ -69,10 +71,10 @@ def main(argv=None) -> int:
             if (
                 not isinstance(frame, np.ndarray)
                 or frame.shape != (args.height, args.width, 3)
-                or frame.dtype != np.dtype("float32")
+                or frame.dtype != np.dtype("uint8")
                 or not np.isfinite(frame).all()
             ):
-                raise RuntimeError("scalar rasterizer did not return a finite HWC float32 frame")
+                raise RuntimeError("scalar rasterizer did not return a finite HWC uint8 frame")
             observation, reward, terminated, truncated, info = env.step(
                 {"torque": np.zeros(1, dtype=np.float32)}
             )

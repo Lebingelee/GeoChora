@@ -461,9 +461,10 @@ def _process_app_owner(*, launch_profile_id: str | None = None) -> IsaacSimAppOw
         return _PROCESS_APP_OWNER
 
 
-def isaac_worker_app_owner() -> IsaacSimAppOwnerV1:
+def isaac_worker_app_owner(*, rendering=False) -> IsaacSimAppOwnerV1:
     """Select the provider's App profile before worker source reconstruction."""
-    return _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
+    return _process_app_owner(launch_profile_id=(V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1
+                                               if rendering else F06_ISAAC_APP_LAUNCH_PROFILE_V1))
 
 
 def open_isaac_worker_app(owner: IsaacSimAppOwnerV1) -> None:

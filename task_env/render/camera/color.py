@@ -4,6 +4,12 @@ from __future__ import annotations
 import numpy as np
 
 
+def rgb_to_uint8(frame):
+    """Export a normalized host RGB frame for the Gymnasium render boundary."""
+    return np.array(np.rint(np.clip(frame, 0, 1) * 255), dtype=np.uint8,
+                    order='C', copy=True)
+
+
 def gamma22_to_srgb(native):
     """Convert bounded gamma-2.2 encoded RGB to the standard sRGB transfer.
 

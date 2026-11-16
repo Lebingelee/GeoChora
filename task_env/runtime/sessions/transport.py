@@ -29,6 +29,8 @@ _METHODS = frozenset({
     'bind_mixed_controller', 'step_mixed_actuator_interval',
     'position_preflight', 'position_apply',
     'device_pose_description', 'publish_device_poses',
+    'capture_observer', 'bind_task_camera', 'capture_task_camera',
+    'task_camera_binding', 'task_camera_completion',
 })
 _PROPERTIES = frozenset({
     'provider_materialization_id', 'episode_id', 'state_revision',
@@ -38,6 +40,8 @@ _PROPERTIES = frozenset({
 
 
 def _types():
+    from ...observations.canonical_camera import CameraGeometry, ResolvedCameraMetadata
+    from ...render.camera.source import CameraCaptureIdentityV1
     from ...artifacts import (CanonicalStateView, CanonicalStateViewV1,
         CanonicalStateViewV2, CanonicalStatePublicationV1, CanonicalStatePublicationV2,
         SceneDefinition, JointDefinition, FrameReference, StateRequirements, StateBoundaryIdentity)
@@ -56,7 +60,8 @@ def _types():
         ResetPlanV1, EpisodeResetPlanV1, RealizedInitialState, CanonicalControlTarget,
         AppliedCanonicalControl, GripperControlTarget, MixedActuatorCommandV1,
         AppliedMixedActuatorCommandV1, PositionControlTargetV1, CanonicalControlFeedback,
-        NativeControlFeedbackSampleV1)
+        NativeControlFeedbackSampleV1, CameraGeometry, ResolvedCameraMetadata,
+        CameraCaptureIdentityV1)
     return {item.__name__: item for item in values}
 
 
@@ -70,6 +75,15 @@ def _encode(value):
     # Provider layout facts may contain NumPy scalar values. Convert the
     # scalar to its ordinary JSON value without accepting arrays or handles.
     import numpy as np
+    from ...observations.canonical_camera.images import CanonicalCameraObservation
+    if type(value) is CanonicalCameraObservation:
+        import base64
+        if (value.rgb is None or value.depth is not None or value.segmentation is not None
+                or value.rgb.dtype != np.float32 or value.metadata.camera.rgb_layout != 'HWC'):
+            raise ValueError('scalar camera transport supports HWC float32 RGB only')
+        return {'$type': 'CanonicalCameraObservation', 'value': {
+            'rgb': base64.b64encode(value.rgb.tobytes(order='C')).decode('ascii'),
+            'metadata': _encode(value.metadata), 'capture_identity': _encode(value.capture_identity)}}
     if isinstance(value, np.generic):
         converted = value.item()
         if type(converted) in (bool, int, float, str):
@@ -97,6 +111,8 @@ def _decode(value):
                 raise ValueError('invalid transport tuple')
             return tuple(_decode(item) for item in value['$tuple'])
         if '$type' in value:
+            if value['$type'] == 'CanonicalCameraObservation':
+                return _decode_camera_frame(value)
             if set(value) != {'$type', 'value'} or value['$type'] not in _types():
                 raise ValueError('unknown transport contract')
             return _types()[value['$type']].from_mapping(value['value'])
@@ -106,6 +122,28 @@ def _decode(value):
     if type(value) is float and math.isfinite(value):
         return value
     raise ValueError('invalid transport value')
+
+
+def _decode_camera_frame(value):
+    """Decode the admitted image value without transporting native handles."""
+    import base64
+    import numpy as np
+    from ...observations.canonical_camera import ResolvedCameraMetadata
+    from ...observations.canonical_camera.images import CanonicalCameraObservation
+
+    if set(value) != {'$type', 'value'} or set(value['value']) != {'rgb', 'metadata', 'capture_identity'}:
+        raise ValueError('invalid scalar camera transport value')
+    payload = value['value']
+    metadata = _decode(payload['metadata'])
+    if type(metadata) is not ResolvedCameraMetadata:
+        raise ValueError('camera transport requires resolved metadata')
+    camera = metadata.camera
+    raw = base64.b64decode(payload['rgb'], validate=True)
+    if (camera.rgb_dtype != 'float32' or camera.rgb_layout != 'HWC'
+            or len(raw) != camera.height * camera.width * 3 * 4):
+        raise ValueError('camera transport RGB bytes differ from declared dimensions')
+    rgb = np.frombuffer(raw, dtype=np.float32).reshape(camera.height, camera.width, 3)
+    return CanonicalCameraObservation(rgb, None, metadata, _decode(payload['capture_identity']))
 
 
 def _send(sock, message):

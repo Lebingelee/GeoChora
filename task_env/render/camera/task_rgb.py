@@ -2,10 +2,10 @@
 
 
 def selected_observer_route(config, render_mode):
-    """Select an observer using Robot, Controller and renderer declarations."""
-    import json
+    """Select a source/renderer route independently of the control algorithm."""
     from ...registry import AGENT_REGISTRY
-    from ..base.contracts import OBSERVER_CAPABILITIES, normalize_render_mode
+    from ..base.contracts import (OBSERVER_CAPABILITIES, SCALAR_OBSERVER_BACKENDS,
+                                  normalize_render_mode)
 
     mode = normalize_render_mode(render_mode).value
     try:
@@ -13,14 +13,13 @@ def selected_observer_route(config, render_mode):
     except KeyError as error:
         raise ValueError('selected configuration admits state-only execution without observer rendering') from error
     family = getattr(robot, 'observer_source_family', None)
-    kind_provider = getattr(robot, 'physical_controller_kinds', None)
-    kind = kind_provider().get(config.controller_profile) if callable(kind_provider) else None
-    reset_selection = json.loads(config.controller_parameters_json).get('reset_selection', False)
     route = OBSERVER_CAPABILITIES.get((family, config.physics_provider, config.environment.runtime.backend))
-    if (route is None or kind is None or mode not in route.modes
-            or (route.controller_kinds is not None and kind not in route.controller_kinds)
-            or (route.reset_selection is not None and reset_selection != route.reset_selection)):
-        raise ValueError('selected configuration admits state-only execution without observer rendering')
+    if route is None or mode not in route.modes:
+        raise ValueError('no observer renderer for the selected source family and physics route')
+    expected = SCALAR_OBSERVER_BACKENDS[config.physics_provider]
+    if config.environment.render.backend != expected:
+        raise ValueError(f'scalar observer on {config.physics_provider} requires '
+                         f'render.backend={expected!r}')
     return route
 
 

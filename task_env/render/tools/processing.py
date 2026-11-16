@@ -60,7 +60,7 @@ class RenderBuildRequest:
             backend=str(
                 backend
                 if backend is not None
-                else getattr(config, "backend", "raytracer")
+                else getattr(config, "backend", "rasterizer")
             ),
             width=int(
                 width if width is not None else getattr(config, "width", 640)

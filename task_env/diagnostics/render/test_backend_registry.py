@@ -185,7 +185,7 @@ class BackendRegistryContractTests(unittest.TestCase):
             print(json.dumps(default.describe()))
         """)
         self.assertEqual(result, {
-            "schema": "task_env.render_build_request.v1", "backend": "raytracer",
+            "schema": "task_env.render_build_request.v1", "backend": "rasterizer",
             "width": 640, "height": 480, "render_preset": "interactive",
             "render_preset_overrides": None, "use_render_snapshot": None,
             "render_snapshot_consumer": "slot",

@@ -403,7 +403,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def render(self, mode: str | None = None):
-        """Render the configured single-environment UI frame.
+        """Present human rendering or return an owned CPU HWC uint8 RGB frame.
 
         This intentionally does not return a camera observation. RGB/depth policy
         observations are captured by ``task_env.observations`` during reset/step.
@@ -411,28 +411,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         from ..render import RenderUnavailableError, normalize_render_mode
 
-        if getattr(self, '_human_display_unavailable', False):
-            self._episode_execution_state().require_open('environment is closed')
-            if self._execution_fault is not None:
-                raise RuntimeError('selected execution is faulted; reset() is required before rendering')
-            normalized = normalize_render_mode(mode or self.render_mode)
-            if normalized.value != self.render_mode:
-                raise ValueError('TaskEnv render mode is fixed at construction')
-            raise RenderUnavailableError('human display is not available for this environment')
-
-        if getattr(self, '_legacy_observer_requested', False):
-            self._episode_execution_state().require_open('environment is closed')
-            if self._execution_fault is not None or self.session is None:
-                raise RuntimeError('observer requires a healthy reset session')
-            normalized = normalize_render_mode(mode or self.render_mode)
-            if normalized.value != self.render_mode:
-                raise ValueError('TaskEnv render mode is fixed at construction')
-            try:
-                return self.session.render_legacy_rgb(self.config.render)
-            except BaseException as error:
-                self._latch_fault('observer_render', error, before_state=self.state,
-                                  transition_status='rejected')
-                raise
+        self._episode_execution_state().require_open('environment is closed')
+        if mode is None and self.render_mode is None:
+            return None
 
         if getattr(self, '_selected_observer_camera', None) is not None:
             execution_state = self._episode_execution_state()
@@ -889,6 +870,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if selected or observer_camera is not None or task_camera is not None:
             validate_camera_declarations(render_mode=render_mode, observer_camera=observer_camera,
                 task_camera=task_camera, task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
+        if selected and observer_camera is not None:
+            # Explicit camera dimensions own the observer viewport in both
+            # the native request and the resolved configuration/record metadata.
+            config = replace(config, environment=replace(config.environment,
+                render=replace(config.environment.render,
+                    width=observer_camera.width, height=observer_camera.height)))
         camera, renderer = task_rgb_camera, task_renderer
         if (camera is None) != (renderer is None):
             raise ValueError('task RGB camera and fixed renderer must be declared together')
@@ -944,15 +931,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         camera_specs=(camera,) if camera is not None else environment.render.cameras)
                     env.metadata['reference_profile'] = env.reference_profile()
                     env._legacy_camera_observations = bool(environment.render.camera_obs)
-                    if render_mode is not None and observer_camera is None:
-                        env.render_mode = render_mode
-                        env._human_display_unavailable = True
-                        env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
-                            render_mode=render_mode, human_display_available=False)
-                        if render_mode == 'rgb_array':
-                            env._legacy_observer_requested = True
-                            env.metadata.update(render_backend=environment.render.backend,
-                                render_resolution=(environment.render.width, environment.render.height))
                 if camera is not None:
                     from .config import CameraSpec
                     from ..observations.canonical_camera import CameraGeometry
@@ -1629,7 +1607,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if not self._has_component_assembly():
             return self._reset_selected_task(seed=seed, options=options)
         result = self._execute_reset_operations(prepare)
-        return self._format_component_reset(component_lifecycle, result, seed)
+        result = self._format_component_reset(component_lifecycle, result, seed)
+        if self.render_mode == 'human':
+            self.render()
+        return result
 
     def _reset_selected_task(self, *, seed, options, external_solution=None):
         resolved = getattr(self, 'resolved_public_config', None)
@@ -1669,6 +1650,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     episode_id=self.session.episode_id, resolved_control_metadata=self.metadata['action_schema'],
                     termination_policy=EpisodeTerminationPolicyV1().to_mapping())
                 result = observation, info
+            if self.render_mode == 'human':
+                self.render()
             return result
         except BaseException:
             if sampled and not preflight_complete:
@@ -2019,6 +2002,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     'preflight_identity_facts': deployment_receipt['identity_facts'],
                     'core_root': str(GEOCHORA_ROOT), 'geophys_src': str(GEOPHYS_PROVIDER_ROOT / 'src'),
                     'environment': deployment_receipt['environment'],
+                    'observer_render_request': (asdict(self._observer_render_request)
+                        if getattr(self, '_observer_render_request', None) is not None else None),
+                    'task_render_requested': getattr(self, '_task_rgb_config', None) is not None,
                 }
                 # Native startup and the first control interval can compile
                 # provider kernels; keep a finite operation deadline for both.
@@ -2592,16 +2578,17 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             frame_color_space=capability.color_space)
         self.metadata = dict(self.metadata)
         self.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
-                             render_backend=f'{capability.renderer}-{capability.backend}')
+                             render_backend=self.config.render.backend,
+                             render_resolution=(camera.width, camera.height))
 
     def _observer_publication(self):
         """Provide the renderer's V1 view at the current physical boundary."""
         from ..artifacts import CanonicalStateViewV1
 
         publication = getattr(self, '_published_position_typed_state', None)
-        if publication is None or self._execution_fault is not None:
+        if self._execution_fault is not None or self.session is None:
             raise RuntimeError('observer requires a successfully published state')
-        if isinstance(publication.view, CanonicalStateViewV1):
+        if publication is not None and isinstance(publication.view, CanonicalStateViewV1):
             return publication
         if getattr(self, '_task_rgb_state_binding', None) is None:
             from ..render.camera.api import prepare_task_rgb_state_binding
@@ -2669,9 +2656,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         provider = getattr(self, '_ui_render_provider', None)
         if provider is None or provider.last_frame_receipt is None:
             raise RuntimeError('no completed observer render')
-        publication = getattr(self, '_published_position_typed_state', None)
         identity = provider.last_frame_receipt['capture_identity']
-        if (publication is None or self._execution_fault is not None or self.session is None or
+        if (self._execution_fault is not None or self.session is None or
                 identity['state_boundary'] != self.session.state_boundary_identity().to_mapping() or
                 identity['camera_geometry_identity_hash'] != self._selected_observer_camera.identity_hash):
             provider.invalidate_frame()
@@ -2837,7 +2823,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 operations = self._prepare_selected_step(action)
             if component_lifecycle is not None:
                 result = self._episode_execution_state().execute_interval(**operations)
-                return self._format_component_step(component_lifecycle, result)
+                result = self._format_component_step(component_lifecycle, result)
+                if self.render_mode == 'human':
+                    self.render()
+                return result
             return self._episode_execution_state().execute_selected_interval(self, **operations)
 
     def _prepare_selected_step(self, action):
