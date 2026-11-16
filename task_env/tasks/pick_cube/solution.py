@@ -14,7 +14,6 @@ from decimal import Decimal, ROUND_CEILING
 from enum import Enum
 import hashlib
 import json
-import math
 from pathlib import Path
 from typing import Callable, Mapping
 
@@ -23,12 +22,10 @@ import numpy as np
 from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAction
 from ...planners.completion import StageCompletionPolicy, ExpertExecutionInfo
 from ...artifacts.contracts import Contract
-from ...artifacts.state import StateBoundaryIdentity, StateSampleClock
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1
 from ...controllers.canonical.feedback import boundary_interval_clock_tolerance
 from ...objects.pick_cube import CUBE_HALF_SIZE
-from ...utils.rotation import matrix_to_quat_wxyz, quat_wxyz_to_matrix, rotvec_to_matrix
 
 
 _ABOVE_CLEARANCE = 0.12
@@ -41,47 +38,10 @@ _R3_HIGH_CLEARANCE_COMMAND_ABOVE_CUBE_TOP = 0.09
 # R3 can settle below an absolute-pose target.  Keep the measured gate below the
 # commanded high-clearance pose by this headroom and the existing tolerance.
 _MEASURED_CLEARANCE_COMMAND_HEADROOM = 0.020
-# A small outward wrist pitch avoids the high, fully extended R3 approach
-# singularity. Restore the grasp orientation continuously on the hover path.
-_R3_APPROACH_WRIST_PITCH_RAD = -0.20
-_CAPTURE_GEOMETRY_DWELL_S = 0.10
-# Source pad OBBs must agree with the measured cube within 0.1 mm. This
-# geometric tolerance is not a contact-force observation or a success gate.
-_CAPTURE_PAD_GAP_MIN_M = -0.0001
-_CAPTURE_PAD_GAP_MAX_M = 0.0001
-_CAPTURE_RELATIVE_SPEED_M_S = 0.002
-_CAPTURE_RELATIVE_ROTATION_SPEED_RAD_S = 0.05
 # Clearance is confirmed from the public measured EE pose before the preplanned
 # path is allowed to traverse over the cube or descend toward it.
 _MEASURED_CLEARANCE_TOLERANCE = 0.005
 _OVER_CUBE_HORIZONTAL_TOLERANCE = 0.010
-# While a measured-TCP gate holds, the held absolute-pose command is nudged by a
-# bounded integral of the measured TCP error. Position servos can settle with a
-# steady-state offset at high, extended poses; re-emitting the identical command
-# would never close that gap. The physical gate thresholds stay unchanged.
-# Integrate only once the TCP has settled, so slow-tracking servos are not
-# driven by wind-up while still converging on the held command.
-_MEASURED_TCP_HOLD_INTEGRAL_GAIN = 0.10
-_MEASURED_TCP_HOLD_MAX_CORRECTION_M = 0.040
-_MEASURED_TCP_HOLD_SETTLED_STEP_M = 0.0005
-# The hold integrator only accumulates while the measured TCP is static
-# relative to its error, which is a steady servo offset.  A TCP that is still
-# converging toward the command would otherwise wind the correction up and
-# drag the command past the target.
-_MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO = 0.05
-# A servo offset the bounded correction can close is at most the correction
-# limit.  A larger error is a transient (the TCP momentarily static at the top
-# of a joint-space overshoot), and integrating it drives the command through
-# the target, e.g. down onto the cube after a descend.
-_MEASURED_TCP_HOLD_INTEGRATE_MAX_ERROR_M = _MEASURED_TCP_HOLD_MAX_CORRECTION_M
-# A settled gate needs this many consecutive in-band, low-motion observations,
-# so the turnaround of a joint-space overshoot inside the band does not pass it.
-_MEASURED_TCP_GATE_SETTLED_DWELL_TICKS = 3
-# The descend stage ends on a measured grasp-height interlock: a TCP that settles
-# above the planned grasp height leaves only the pad tips on the cube top edge.
-_GRASP_HEIGHT_LOWER_TOLERANCE = 0.003
-_GRASP_HEIGHT_UPPER_TOLERANCE = 0.005
-_GRASP_HORIZONTAL_TOLERANCE = 0.005
 # Nominal EE-site clearance above the cube top for this PickCube expert.
 # The current hand/knuckle proxy needs about 17.6 mm in a downward grasp;
 # 20 mm leaves a small geometry margin, not contact-precision qualification.
@@ -112,17 +72,10 @@ class MeasuredTcpGate:
     after_actions: int
     minimum_height_above_cube_top_m: float
     max_horizontal_error_m: float | None = None
-    maximum_height_above_cube_top_m: float | None = None
-    require_settled: bool = False
-    # Wait budget in pose-hold units.  The grasp-height descend ends with a
-    # joint-space servo transient that can take most of one hold to settle.
-    wait_hold_multiple: int = 1
 
     def __post_init__(self) -> None:
         if not self.name or type(self.after_actions) is not int or self.after_actions < 0:
             raise ValueError("measured TCP gate requires a name and nonnegative action boundary")
-        if type(self.wait_hold_multiple) is not int or self.wait_hold_multiple < 1:
-            raise ValueError("measured TCP gate wait budget must be a positive hold multiple")
         if (not np.isfinite(self.minimum_height_above_cube_top_m)
                 or self.minimum_height_above_cube_top_m <= 0.0):
             raise ValueError("measured TCP gate clearance must be finite and positive")
@@ -130,11 +83,6 @@ class MeasuredTcpGate:
                 and (not np.isfinite(self.max_horizontal_error_m)
                      or self.max_horizontal_error_m <= 0.0)):
             raise ValueError("measured TCP gate horizontal error must be finite and positive")
-        if (self.maximum_height_above_cube_top_m is not None
-                and (not np.isfinite(self.maximum_height_above_cube_top_m)
-                     or self.maximum_height_above_cube_top_m
-                     <= self.minimum_height_above_cube_top_m)):
-            raise ValueError("measured TCP gate height band must be finite and nonempty")
 
 
 @dataclass(frozen=True)
@@ -447,34 +395,6 @@ class PickCubeSolution:
         return np.asarray(observation["state"]["ee_pose"], dtype=np.float32).reshape(7)
 
     @staticmethod
-    def _face_aligned_orientation(hand_quaternion, cube_quaternion) -> np.ndarray:
-        """Yaw the hand about world z so the finger closing axis meets a cube face.
-
-        The finger pads close along the hand y axis. A pad axis that is yawed
-        against the cube face normals contacts the cube edges, and the squeeze
-        then rotates the cube out of the grasp. The smallest yaw (|delta| <= 45
-        degrees) that aligns the closing axis with a face normal is applied.
-        """
-        hand = quat_wxyz_to_matrix(np.asarray(hand_quaternion, dtype=np.float64))
-        cube = quat_wxyz_to_matrix(np.asarray(cube_quaternion, dtype=np.float64))
-        closing = hand[:, 1]
-        face = cube[:, 0]
-        if np.hypot(closing[0], closing[1]) < 1e-6 or np.hypot(face[0], face[1]) < 1e-6:
-            return np.asarray(hand_quaternion, dtype=np.float32)
-        delta = math.atan2(face[1], face[0]) - math.atan2(closing[1], closing[0])
-        delta = (delta + math.pi / 4.0) % (math.pi / 2.0) - math.pi / 4.0
-        return matrix_to_quat_wxyz(
-            rotvec_to_matrix(np.asarray([0.0, 0.0, delta])) @ hand
-        ).astype(np.float32)
-
-    @staticmethod
-    def _cube_quaternion(observation) -> np.ndarray:
-        return np.asarray(
-            observation["privileged_state"]["cube_v1_body_pose"][0, 3:7],
-            dtype=np.float64,
-        ).reshape(4)
-
-    @staticmethod
     def _cube_position(observation) -> np.ndarray:
         return np.asarray(
             observation["privileged_state"]["cube_v1_body_pose"][0, :3],
@@ -497,15 +417,6 @@ class PickCubeSolution:
         target[:3] = cube + np.array(
             [0.0, 0.0, CUBE_HALF_SIZE + above_clearance], dtype=np.float32
         )
-        # The face-aligned yaw is composed into the high pitched rotation, so the
-        # final descend toward the above pose only removes the wrist pitch.
-        yaw = np.eye(3)
-        if getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False):
-            target[3:7] = self._face_aligned_orientation(
-                start[3:7], self._cube_quaternion(observation)
-            )
-            yaw = quat_wxyz_to_matrix(target[3:7].astype(np.float64)) @ quat_wxyz_to_matrix(
-                start[3:7].astype(np.float64)).T
         clearance_headroom = (
             _MEASURED_CLEARANCE_COMMAND_HEADROOM if r3_clearance_profile else 0.0
         )
@@ -525,31 +436,17 @@ class PickCubeSolution:
             target_position=clear[:3],
             gripper=1.0,
         )
-        rotation_actions = np.empty((0, 8), dtype=np.float32)
-        if clearance_headroom:
-            pitched = clear.copy()
-            pitched[3:7] = matrix_to_quat_wxyz(
-                yaw
-                @ rotvec_to_matrix(np.asarray([0.0, _R3_APPROACH_WRIST_PITCH_RAD, 0.0]))
-                @ quat_wxyz_to_matrix(clear[3:7])
-            )
-            rotation_actions = self._planner.plan_to_pose(
-                current_pose=clear, goal_pose=pitched, gripper=1.0, settle_steps=0,
-            )
-            transit[3:7] = pitched[3:7]
-        else:
-            pitched = clear
         lateral_actions = self._planner.plan_translation_only(
-            current_pose=pitched,
+            current_pose=clear,
             target_position=transit[:3],
             gripper=1.0,
         )
-        descend_actions = self._planner.plan_to_pose(
+        descend_actions = self._planner.plan_translation_only(
             current_pose=transit,
-            goal_pose=target,
+            target_position=target[:3],
             gripper=1.0,
         )
-        action_segments = (vertical_actions, rotation_actions, lateral_actions, descend_actions)
+        action_segments = (vertical_actions, lateral_actions, descend_actions)
         actions = np.concatenate([segment for segment in action_segments if len(segment)], axis=0)
         minimum_height = (
             _R3_HIGH_CLEARANCE_COMMAND_ABOVE_CUBE_TOP
@@ -559,7 +456,7 @@ class PickCubeSolution:
             - _MEASURED_CLEARANCE_TOLERANCE
         )
         vertical_end = len(vertical_actions)
-        lateral_end = vertical_end + len(rotation_actions) + len(lateral_actions)
+        lateral_end = vertical_end + len(lateral_actions)
         return SegmentPlan(
             actions=actions,
             target_pose=target,
@@ -596,24 +493,6 @@ class PickCubeSolution:
             ),
             target_pose=target,
         )
-        gates = ()
-        if gated:
-            gates = (
-                MeasuredTcpGate(
-                    "grasp_height",
-                    len(actions),
-                    minimum_height_above_cube_top_m=(
-                        _GRASP_CLEARANCE_ABOVE_CUBE_TOP - _GRASP_HEIGHT_LOWER_TOLERANCE
-                    ),
-                    max_horizontal_error_m=_GRASP_HORIZONTAL_TOLERANCE,
-                    maximum_height_above_cube_top_m=(
-                        _GRASP_CLEARANCE_ABOVE_CUBE_TOP + _GRASP_HEIGHT_UPPER_TOLERANCE
-                    ),
-                    require_settled=True,
-                    wait_hold_multiple=2,
-                ),
-            )
-        return SegmentPlan(actions=actions, target_pose=target, measured_tcp_gates=gates)
 
     def _plan_close(self, observation, info: Mapping[str, object]) -> SegmentPlan:
         del info
@@ -851,8 +730,7 @@ class PickCubeReadinessConfig:
     @property
     def global_safety_cap(self):
         gate_holds = (
-            # Two clearance gate holds plus a two-hold grasp-height gate.
-            4 * self.policies[0].hold_ticks if self.measured_tcp_clearance_gate else 0
+            2 * self.policies[0].hold_ticks if self.measured_tcp_clearance_gate else 0
         )
         return self.base.action_budget + sum(policy.hold_ticks for policy in self.policies) + gate_holds
 
@@ -887,13 +765,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_index = 0
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
-        self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
-        self._measured_tcp_hold_previous_tcp = None
-        self._measured_tcp_gate_settled_ticks = 0
         self._last_public_observation = None
-        self._clear_capture_candidate()
-        self._capture_episode_context = None
-        self._capture_last_revision = None
         super().__init__(config=config.base)
         self.identity = self.identity_for_config(config)
 
@@ -958,18 +830,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_index = 0
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
-        self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
-        self._measured_tcp_hold_previous_tcp = None
-        self._measured_tcp_gate_settled_ticks = 0
         self._last_public_observation = observation
-        self._clear_capture_candidate()
-        self._capture_episode_context = None
-        self._capture_last_revision = None
-        if isinstance(execution_info, PickCubePositionExecutionInfoV1):
-            publication = self._position_publication(observation, info, execution_info)
-            if publication is not None:
-                self._capture_episode_context = self._publication_context(publication)
-                self._capture_last_revision = publication.state_revision
         super().reset(observation, info, metadata)
         if self._done:
             self._done = bool(info.get("is_success")) and float(
@@ -978,7 +839,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
             if not self._done:
                 self._refresh_current_segment(observation, info)
         if (self.readiness_config.measured_tcp_clearance_gate
-                and not self.done and not self.failed):
+                and not self.done and not self.failed and self.stage == "move_above_cube"):
             self._advance_measured_tcp_gates(observation)
 
     def act(self, observation=None, info=None):
@@ -995,18 +856,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
             if gate.after_actions == 0:
                 self._fail(f"measured_tcp_gate_has_no_prior_action:{gate.name}")
                 raise RuntimeError(self.failure_reason)
-            action = self._corrected_gate_hold_action(
-                segment.plan.actions[gate.after_actions - 1]
-            )
-        elif self._last_wait:
-            action = segment.plan.actions[-1]
-            # A pose-readiness hold faces the same steady-state servo offset as a
-            # gate hold, so it uses the same settled, clipped TCP correction.
-            if (self.readiness_config.measured_tcp_clearance_gate
-                    and self.readiness_config.policies[self._segment_index].kind == "pose_ready"):
-                action = self._corrected_gate_hold_action(action)
+            action = segment.plan.actions[gate.after_actions - 1]
         else:
-            action = segment.plan.actions[self._action_index]
+            action = segment.plan.actions[-1] if self._last_wait else segment.plan.actions[self._action_index]
         diagnostics = {
             "expert_version": self.version, "readiness_hold": self._last_wait,
             "planned_actions_emitted": self.planned_actions_emitted,
@@ -1056,8 +908,6 @@ class PickCubeReadinessSolution(PickCubeSolution):
         policy = self.readiness_config.policies[self._segment_index]
         plan = self._segments[self._segment_index].plan
         exhausted = self._action_index >= len(plan.actions)
-        authorization = "measured_closed_gripper"
-        capture_evidence = {}
         if (policy.kind == "gripper_ready"
                 and isinstance(execution_info, PickCubePositionExecutionInfoV1)):
             ready = execution_info.close_ready
@@ -1077,12 +927,11 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if truncated or terminated or info.get("task_failure", False):
             self._fail("episode_truncated" if truncated else "environment_terminated")
             return
-        if self.readiness_config.measured_tcp_clearance_gate:
+        if self.readiness_config.measured_tcp_clearance_gate and self._segment_index == 0:
             self._advance_measured_tcp_gates(observation)
             gate = self._pending_measured_tcp_gate(self._segments[self._segment_index])
             if gate is not None and self._action_index >= gate.after_actions:
-                if (self._measured_tcp_gate_wait_ticks
-                        >= gate.wait_hold_multiple * self.readiness_config.policies[0].hold_ticks):
+                if self._measured_tcp_gate_wait_ticks >= self.readiness_config.policies[0].hold_ticks:
                     self._fail(f"measured_tcp_clearance_timeout:{gate.name}")
                 return
         if not exhausted:
@@ -1091,163 +940,21 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self.completion_events.append({
                 "stage": self.stage, "control_step": self._boundary_step,
                 "wait_ticks": self._wait_count, "kind": policy.kind,
-                **({"authorization": authorization, **capture_evidence}
-                   if policy.kind == "gripper_ready" else {}),
             })
             self._segment_index += 1
             self._action_index = 0
             self._wait_count = 0
-            self._reset_measured_tcp_gate_state()
             self._refresh_current_segment(observation, info)
         elif self._wait_count >= policy.hold_ticks:
             self._fail(policy.failure_reason)
 
-    def _clear_capture_candidate(self):
-        self._capture_candidate_ticks = 0
-        self._capture_previous_pose = None
-        self._capture_anchor_pose = None
-        self._capture_first_sample_step = None
-        self._capture_first_sample_time = None
-
-    @staticmethod
-    def _publication_context(boundary):
-        return (
-            boundary.episode_id, boundary.reset_sample_id, boundary.scene_identity_hash,
-            boundary.scene_instance_id, boundary.provider_materialization_id,
-        )
-
-    @staticmethod
-    def _position_publication(observation, info, execution_info):
-        """Bind geometric readback to the same public execution boundary."""
-        try:
-            boundary = StateBoundaryIdentity.from_mapping(info["state_boundary_identity"])
-            clock = StateSampleClock.from_mapping(info["state_sample_clock"])
-            observed_digest = np.asarray(observation["state"]["boundary_identity_sha256"])
-            expected_digest = np.frombuffer(
-                bytes.fromhex(boundary.boundary_id.removeprefix("state-boundary-")), dtype=np.uint8,
-            )
-            if (boundary.control_step != execution_info.control_step
-                    or info["control_step"] != execution_info.control_step
-                    or clock.clock_domain != "evaluation_boundary"
-                    or clock.sample_index != execution_info.control_step
-                    or info["state_boundary_id"] != boundary.boundary_id
-                    or observed_digest.dtype != np.uint8
-                    or observed_digest.shape != (32,)
-                    or not np.array_equal(observed_digest, expected_digest)):
-                return None
-            for sample_time in (clock.simulation_time_s, info["simulation_time_s"]):
-                if (not math.isfinite(sample_time)
-                        or abs(sample_time - execution_info.simulation_time) > max(
-                            math.ulp(sample_time), math.ulp(execution_info.simulation_time))):
-                    return None
-            return boundary
-        except (KeyError, TypeError, ValueError, OverflowError):
-            return None
-
-    @staticmethod
-    def _position_capture_geometry(observation, execution_info):
-        """Check only a public, near-contact grasp geometry; this is not a contact claim."""
-        if (execution_info.target_opening_m > 0.045
-                or abs(execution_info.measured_opening_velocity_m_s) > 0.005):
-            return None
-        state = observation.get("state", {})
-        privileged = observation.get("privileged_state", {})
-        if "joint_position" not in state or "hand_pose" not in state:
-            return None
-        cube_values = privileged.get("cube_v1_body_pose")
-        if cube_values is None:
-            return None
-        joints = np.asarray(state["joint_position"], dtype=np.float64).reshape(-1)
-        hand = np.asarray(state["hand_pose"], dtype=np.float64).reshape(-1)
-        cube = np.asarray(cube_values, dtype=np.float64).reshape(-1, 7)[0]
-        if (joints.size < 9 or hand.size != 7 or not np.isfinite(joints).all()
-                or not np.isfinite(hand).all() or not np.isfinite(cube).all()):
-            return None
-        if not np.allclose(hand, np.asarray(state["ee_pose"]), atol=1e-5, rtol=0.0):
-            return None
-        measured = float(joints[7] + joints[8])
-        if abs(measured - execution_info.measured_opening_m) > 1e-4:
-            return None
-        if not 0.045 <= measured <= 0.060:
-            return None
-
-        hand_rotation = quat_wxyz_to_matrix(hand[3:7])
-        cube_rotation = hand_rotation.T @ quat_wxyz_to_matrix(cube[3:7])
-        cube_center = hand_rotation.T @ (cube[:3] - hand[:3])
-        if (abs(cube_center[0]) > 0.008
-                or abs(cube_center[1]) > 0.008
-                or not 0.040 <= cube_center[2] <= 0.057):
-            return None
-
-        cube_half = np.full(3, CUBE_HALF_SIZE, dtype=np.float64)
-        def separating_gap(pad_center, pad_half):
-            axes = [*np.eye(3), *cube_rotation.T]
-            axes.extend(np.cross(a, b) for a in np.eye(3) for b in cube_rotation.T)
-            maximum_gap = -np.inf
-            for axis in axes:
-                length = float(np.linalg.norm(axis))
-                if length < 1e-9:
-                    continue
-                unit = axis / length
-                gap = (
-                    abs(float(np.dot(cube_center - pad_center, unit)))
-                    - float(np.dot(np.abs(cube_rotation.T @ unit), cube_half))
-                    - float(np.dot(np.abs(unit), pad_half))
-                )
-                maximum_gap = max(maximum_gap, gap)
-            return maximum_gap
-
-        side_gaps = []
-        for sign, opening in zip((1.0, -1.0), joints[7:9], strict=True):
-            gaps = []
-            for x in (-0.0055, 0.0055):
-                for z in (0.0395, 0.0500):
-                    half = np.asarray([0.003, 0.002, 0.0035 if z < 0.045 else 0.003])
-                    center = np.asarray([sign * x, sign * (opening + 0.002), z])
-                    gaps.append(separating_gap(center, half))
-            side_gaps.append(min(gaps))
-        if not all(_CAPTURE_PAD_GAP_MIN_M <= gap <= _CAPTURE_PAD_GAP_MAX_M for gap in side_gaps):
-            return None
-        return cube_center, cube_rotation
-
     def _pending_measured_tcp_gate(self, segment):
         if (not self.readiness_config.measured_tcp_clearance_gate
+                or self._segment_index != 0
                 or self._measured_tcp_gate_index >= len(segment.plan.measured_tcp_gates)):
             return None
         gate = segment.plan.measured_tcp_gates[self._measured_tcp_gate_index]
         return gate if self._action_index >= gate.after_actions else None
-
-    def _reset_measured_tcp_gate_state(self):
-        self._measured_tcp_gate_index = 0
-        self._measured_tcp_gate_wait_ticks = 0
-        self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
-        self._measured_tcp_hold_previous_tcp = None
-        self._measured_tcp_gate_settled_ticks = 0
-
-    def _corrected_gate_hold_action(self, planned_action):
-        action = np.array(planned_action, dtype=np.float32, copy=True)
-        observation = self._last_public_observation
-        if observation is not None:
-            tcp = self._ee_pose(observation)[:3].astype(np.float32)
-            previous = self._measured_tcp_hold_previous_tcp
-            self._measured_tcp_hold_previous_tcp = tcp
-            error = action[:3] - tcp
-            settled = previous is not None and float(
-                np.linalg.norm(tcp - previous)
-            ) <= min(
-                _MEASURED_TCP_HOLD_SETTLED_STEP_M,
-                _MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO * float(np.linalg.norm(error)),
-            )
-            if (settled and np.isfinite(error).all()
-                    and float(np.linalg.norm(error)) <= _MEASURED_TCP_HOLD_INTEGRATE_MAX_ERROR_M):
-                self._measured_tcp_hold_correction = np.clip(
-                    self._measured_tcp_hold_correction
-                    + _MEASURED_TCP_HOLD_INTEGRAL_GAIN * error.astype(np.float32),
-                    -_MEASURED_TCP_HOLD_MAX_CORRECTION_M,
-                    _MEASURED_TCP_HOLD_MAX_CORRECTION_M,
-                ).astype(np.float32)
-        action[:3] += self._measured_tcp_hold_correction
-        return action
 
     @classmethod
     def _measured_tcp_gate_metrics(cls, gate, observation):
@@ -1260,8 +967,6 @@ class PickCubeReadinessSolution(PickCubeSolution):
         ready = height >= gate.minimum_height_above_cube_top_m
         if gate.max_horizontal_error_m is not None:
             ready = ready and horizontal_error <= gate.max_horizontal_error_m
-        if gate.maximum_height_above_cube_top_m is not None:
-            ready = ready and height <= gate.maximum_height_above_cube_top_m
         return {
             "ready": bool(ready),
             "height_above_cube_top_m": height,
@@ -1278,17 +983,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 return
             metrics = self._measured_tcp_gate_metrics(gate, observation)
             if not metrics["ready"]:
-                self._measured_tcp_gate_settled_ticks = 0
                 return
-            if gate.require_settled:
-                previous = self._measured_tcp_hold_previous_tcp
-                if previous is None or float(np.linalg.norm(
-                        metrics["tcp_pose"][:3] - previous)) > _MEASURED_TCP_HOLD_SETTLED_STEP_M:
-                    self._measured_tcp_gate_settled_ticks = 0
-                    return
-                self._measured_tcp_gate_settled_ticks += 1
-                if self._measured_tcp_gate_settled_ticks < _MEASURED_TCP_GATE_SETTLED_DWELL_TICKS:
-                    return
             self.completion_events.append({
                 "stage": segment.name,
                 "kind": "measured_tcp_clearance",
@@ -1298,19 +993,12 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 "required_height_above_cube_top_m": gate.minimum_height_above_cube_top_m,
                 "horizontal_error_m": metrics["horizontal_error_m"],
                 "max_horizontal_error_m": gate.max_horizontal_error_m,
-                "max_height_above_cube_top_m": gate.maximum_height_above_cube_top_m,
-                "require_settled": gate.require_settled,
                 "tcp_pose": metrics["tcp_pose"].tolist(),
                 "cube_position": metrics["cube_position"].tolist(),
                 "wait_ticks": self._measured_tcp_gate_wait_ticks,
             })
             self._measured_tcp_gate_index += 1
             self._measured_tcp_gate_wait_ticks = 0
-            # Each hold integrates its own correction: a correction carried from a
-            # clearance gate would offset the later pose hold away from its target.
-            self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
-            self._measured_tcp_hold_previous_tcp = None
-        self._measured_tcp_gate_settled_ticks = 0
 
 
 __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
