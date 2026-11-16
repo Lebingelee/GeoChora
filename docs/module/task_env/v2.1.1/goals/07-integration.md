@@ -11,6 +11,8 @@
 - 将“案例、实际问题/消费者、原owner、复用或最小修改、总账条目、验证”记在同一份包内结案表。执行中发现有产品意义的边界结论时，及时更新本节及该表；不另建审计schema、validator、能力注册或证据平台。
 - Task保留任务语义与薄binding；Robot/source拥有recipe、TCP/具名通道/传动；Controller拥有选择、状态与计算；session/provider/render/Recorder保留各自唯一owner。复用现有source composition、shared worker装配/物理端口/模型代理，不新增第二Env/Runtime/factory/调度器、通用RPC、profile分派或仅为缩短文件的Manager/mixin/helper层。
 - 装配本体模型/补偿仅作原用例中这一套recipe与代表路线所需适配，不扩大为任意Robot/装配树/provider动力学。原R3已正确包含的贡献用证据证明，不再重复施加。原Solution算法/策略与任务成功、严格完成语义保持。
+- 装配替换的R3模型须来自同一source组合及实际装配后的具名本体，并与session核对来源；位置驱动重力补偿须核对实际施加与ACK。任务原有驱动参数须随具名执行器保留，不能仅开放profile就声称装配行为等同。
+- 既有装配`r1_split`的MuJoCo CPU进程内控制可用；隔离worker首个提交会因远端缺少同一存活Controller的分路输出而拒绝。保留该边界，不以本包装配接线声称多Position writer的worker支持。
 - 保留正式source/provider能力、单位/三层映射、组合/冲突、generation/stale、partial-write fault、ACK与close检查。不为fixture恢复私有兼容桥、宽泛kwargs、getattr兜底链、吞异常、重复状态/hash或过严token保护；临时诊断与故障注入留外部。
 - 配置和普通caller只补案例实际需要的入口；现有入口足够则不新增CLI或SDK层。SB3/RSL保留固定空间与autoreset边界；LIBERO保留其source、predicate、OSC/gripper cadence。无受影响缺口可按调用/diff与匹配证据结案。
 - 复用仍匹配的强证据，只跑会揭示实际错误的受影响检查。完整案例覆盖的smoke/开闭/抓放不重复运行，不加完整训练、全A123/G06矩阵、性能门或额外笛卡尔积。不按行数、文件数、删行数、PASS数或搬到新大文件评价架构。

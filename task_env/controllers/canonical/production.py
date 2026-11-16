@@ -50,6 +50,14 @@ class ProductionCanonicalPandaController:
         return self._arm.model.source_sha256
 
     @property
+    def source_composition_binding(self):
+        return self._arm.model.composition_binding
+
+    @property
+    def kinematics_model(self):
+        return self._arm.model
+
+    @property
     def tcp_profile_identity(self):
         """Identity of the explicit TCP profile, or None for the legacy site path."""
         profile = getattr(self._arm.model, 'tcp_profile', None)

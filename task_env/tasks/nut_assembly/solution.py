@@ -77,11 +77,11 @@ class NutAssemblySolutionLifecycle(CanonicalSolutionLifecycle):
 OUTCOME_POLICY_ID = "nutassembly-outcome-oriented-completion-v1"
 
 
-def _validate_nut_native_force_contract(sample):
+def _validate_nut_native_force_contract(sample, expected_actuator_id='actuator8'):
     """Keep the selected Panda actuator and five 2 ms samples strict for Nut."""
     measurement, feedback = sample.actuator_force_measurement, sample.feedback
-    if measurement.actuator_id != 'actuator8':
-        raise ValueError('selected NutAssembly native Guard requires the Panda actuator8 sample in N')
+    if measurement.actuator_id != expected_actuator_id:
+        raise ValueError('selected NutAssembly native Guard requires its source-bound actuator sample in N')
     dt = 0.002
     native_index = measurement.native_step_index
     sample_time = measurement.native_sample_time_s
@@ -131,6 +131,7 @@ class NutAssemblyNativeFeedbackSampleV1:
     target_hash: str
     applied_acknowledgement: Mapping[str, object]
     grasped_nut: bool | None = None
+    expected_actuator_id: str = 'actuator8'
 
     def __post_init__(self):
         object.__setattr__(self, "end_effector_pose", tuple(float(v) for v in self.end_effector_pose))
@@ -171,7 +172,9 @@ class NutAssemblyNativeFeedbackSampleV1:
         if not isinstance(self.provider_feedback_sample, NativeControlFeedbackSampleV1):
             raise TypeError("native Guard sample requires the RuntimeSession force-sample receipt")
         self.provider_feedback_sample.validate()
-        _validate_nut_native_force_contract(self.provider_feedback_sample)
+        if not isinstance(self.expected_actuator_id, str) or not self.expected_actuator_id:
+            raise ValueError('native Guard requires its source-bound actuator name')
+        _validate_nut_native_force_contract(self.provider_feedback_sample, self.expected_actuator_id)
         measurement = self.provider_feedback_sample.actuator_force_measurement
         mismatches = []
         for name, matches in (
@@ -253,6 +256,7 @@ class NutAssemblyNativeFeedbackSampleV1:
             "target_hash": self.target_hash,
             "applied_acknowledgement": deepcopy(dict(self.applied_acknowledgement)),
             "grasped_nut": self.grasped_nut,
+            "expected_actuator_id": self.expected_actuator_id,
         }
 
     @classmethod
@@ -278,6 +282,7 @@ class NutAssemblyNativeFeedbackSampleV1:
             tuple(value["end_effector_pose"]), feedback, value["controller_diagnostics"],
             NativeControlFeedbackSampleV1.from_mapping(value["provider_feedback_sample"]),
             value["target_hash"], value["applied_acknowledgement"], value.get("grasped_nut"),
+            value.get("expected_actuator_id", 'actuator8'),
         )
 
 

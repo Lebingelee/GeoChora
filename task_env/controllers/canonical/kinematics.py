@@ -178,9 +178,12 @@ PANDA_PICKCUBE_EE_TCP_V1 = PandaTcpProfileV1(
 
 
 class PandaKinematics:
-    def __init__(self,xml,*,tcp_profile=None,native_prefix='',base_body_id=None):
+    def __init__(self,xml,*,tcp_profile=None,native_prefix='',base_body_id=None,
+                 fixed_hand_mount=None, hand_body_id=None, tcp_site_name=None,
+                 finger_body_ids=None, finger_joint_ids=None):
         raw_xml = xml.encode() if isinstance(xml, str) else bytes(xml)
         self.source_sha256=hashlib.sha256(raw_xml).hexdigest();root=ET.fromstring(raw_xml)
+        self.composition_binding = None
         if root.find('compiler').get('angle','degree')!='radian':raise ValueError('kinematic source must use radians')
         native_prefix=str(native_prefix)
         root_body_id = f'{native_prefix}link0' if base_body_id is None else str(base_body_id)
@@ -189,6 +192,12 @@ class PandaKinematics:
         self._gravity_source_xml = raw_xml
         self._gravity_native_prefix = native_prefix
         self._gravity_root_body_id = root_body_id
+        self._gravity_hand_mount = fixed_hand_mount
+        self._gravity_hand_body = hand_body_id if fixed_hand_mount is not None else f'{native_prefix}hand'
+        self._gravity_finger_bodies = (tuple(finger_body_ids) if finger_body_ids is not None else
+                                      tuple(f'{native_prefix}{side}_finger' for side in ('left', 'right')))
+        self._gravity_finger_joints = (tuple(finger_joint_ids) if finger_joint_ids is not None else
+                                      tuple(f'{native_prefix}finger_joint{i}' for i in (1, 2)))
         body=next((item for item in root.iter('body') if item.get('name')==root_body_id),None)
         if body is None:raise ValueError(f'unsupported Panda chain; source root body is absent: {root_body_id}')
         self.base_transform=_body_world_transform(root, root_body_id);self.chain=[];self.limits=[]
@@ -204,6 +213,24 @@ class PandaKinematics:
             axis=np.fromstring(j.get('axis','0 0 1'),sep=' ');axis/=np.linalg.norm(axis)
             pivot=np.fromstring(j.get('pos','0 0 0'),sep=' ')
             self.chain.append((transform(next_body),axis,pivot));self.limits.append(np.fromstring(j['range'],sep=' '));body=next_body
+        if fixed_hand_mount is not None:
+            if (not hand_body_id or not tcp_site_name or tcp_profile is not None
+                    or len(self._gravity_finger_bodies) != 2 or len(self._gravity_finger_joints) != 2):
+                raise ValueError('fixed hand mount requires explicit hand and task TCP site names')
+            mount = body.find(f"body[@name='{fixed_hand_mount}']")
+            if mount is None or mount.findall('joint'):
+                raise ValueError('declared fixed hand mount is absent or movable')
+            hand = mount.find(f"body[@name='{hand_body_id}']")
+            site = None if hand is None else hand.find(f"site[@name='{tcp_site_name}']")
+            if hand is None or hand.findall('joint') or site is None:
+                raise ValueError('declared fixed hand or task TCP site is absent or movable')
+            self.tip = transform(mount) @ transform(hand) @ transform(site)
+            self.tcp_profile = None
+            self.limits = np.array(self.limits)
+            return
+        if (hand_body_id is not None or tcp_site_name is not None
+                or finger_body_ids is not None or finger_joint_ids is not None):
+            raise ValueError('hand and TCP names require a fixed hand mount')
         if tcp_profile is not None and isinstance(tcp_profile, PandaTcpProfileV2):
             hand_name=tcp_profile.hand_frame_id
         else:
@@ -276,7 +303,7 @@ class PandaKinematics:
         gravity_base = rotation.T @ gravity
         coordinates = dict(zip(
             [*(f'{self._gravity_native_prefix}joint{i}' for i in range(1, 8)),
-             *(f'{self._gravity_native_prefix}finger_joint{i}' for i in (1, 2))],
+             *self._gravity_finger_joints],
             (*q, *fingers), strict=True,
         ))
         torque = np.zeros(7, dtype=np.float64)
@@ -294,7 +321,7 @@ class PandaKinematics:
                     motion[:3, :3] = rotvec_to_matrix(axis * coordinates[joint])
                     motion[:3, 3] = pivot - motion[:3, :3] @ pivot
                 else:
-                    finger_index = int(joint.removeprefix(self._gravity_native_prefix + 'finger_joint')) - 1
+                    finger_index = self._gravity_finger_joints.index(joint)
                     finger_axis = body[:3, :3] @ axis
                     motion = np.eye(4)
                     motion[:3, 3] = axis * coordinates[joint]
@@ -326,16 +353,19 @@ class PandaKinematics:
         if len(bases) != 1:
             raise ValueError('gravity source must contain exactly one selected Panda base')
         base = bases[0]
-        allowed = {*(f'{prefix}link{i}' for i in range(1, 8)),
-                   f'{prefix}hand', f'{prefix}left_finger', f'{prefix}right_finger'}
+        hand = self._gravity_hand_body
+        left, right = self._gravity_finger_bodies
+        allowed = {*(f'{prefix}link{i}' for i in range(1, 8)), hand, left, right}
         expected_parent = {f'{prefix}link{i}': (self._gravity_root_body_id if i == 1
                             else f'{prefix}link{i-1}') for i in range(1, 8)}
-        expected_parent.update({f'{prefix}hand': f'{prefix}link7',
-                                f'{prefix}left_finger': f'{prefix}hand',
-                                f'{prefix}right_finger': f'{prefix}hand'})
+        if self._gravity_hand_mount is not None:
+            allowed.add(self._gravity_hand_mount)
+            expected_parent[self._gravity_hand_mount] = f'{prefix}link7'
+        expected_parent.update({hand: self._gravity_hand_mount or f'{prefix}link7',
+                                left: hand, right: hand})
         expected_joint = {f'{prefix}link{i}': (f'{prefix}joint{i}', 'hinge') for i in range(1, 8)}
-        expected_joint.update({f'{prefix}left_finger': (f'{prefix}finger_joint1', 'slide'),
-                               f'{prefix}right_finger': (f'{prefix}finger_joint2', 'slide')})
+        expected_joint.update({left: (self._gravity_finger_joints[0], 'slide'),
+                               right: (self._gravity_finger_joints[1], 'slide')})
         panda_default = root.find(".//default[@class='panda']/joint")
         finger_default = root.find(".//default[@class='finger']/joint")
         defaults = {} if panda_default is None else dict(panda_default.attrib)
@@ -352,10 +382,14 @@ class PandaKinematics:
                     raise ValueError(f'gravity source body {name!r} has an unsupported parent')
                 seen.add(name); parents[name] = parent.get('name')
                 inertial = child.find('inertial')
-                if inertial is None or inertial.get('mass') is None or inertial.get('pos') is None:
+                if inertial is None and name == self._gravity_hand_mount:
+                    mass, com = 0., np.zeros(3)
+                elif inertial is None or inertial.get('mass') is None or inertial.get('pos') is None:
                     raise ValueError(f'gravity source body {name!r} requires explicit mass and COM')
-                mass = float(inertial.get('mass')); com = np.fromstring(inertial.get('pos'), sep=' ')
-                if not np.isfinite(mass) or mass <= 0 or com.shape != (3,) or not np.isfinite(com).all():
+                else:
+                    mass = float(inertial.get('mass')); com = np.fromstring(inertial.get('pos'), sep=' ')
+                if (not np.isfinite(mass) or (mass <= 0 and name != self._gravity_hand_mount)
+                        or mass < 0 or com.shape != (3,) or not np.isfinite(com).all()):
                     raise ValueError(f'gravity source body {name!r} has invalid mass or COM')
                 joints = child.findall('joint'); expected = expected_joint.get(name)
                 if len(joints) != (1 if expected else 0):

@@ -28,6 +28,9 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-id", choices=ENV_IDS, required=True)
     parser.add_argument("--provider", choices=("geophys", "mujoco"), required=True)
+    parser.add_argument("--robot-uid")
+    parser.add_argument("--deployment", choices=("in_process", "isolated_worker"))
+    parser.add_argument("--gravity-compensation", action="store_true")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--horizon", type=int, default=6000)
     parser.add_argument("--output", type=Path, required=True)
@@ -66,23 +69,22 @@ def main(argv=None) -> int:
         with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
             from task_env import make_env
 
-            env = make_env(args.env_id, config={"execution": {"physics_provider": args.provider, "physics_backend": "cpu"}, "episode": {"horizon": args.horizon}})
+            execution = {"physics_provider": args.provider, "physics_backend": "cpu"}
+            if args.deployment is not None:
+                execution["deployment"] = args.deployment
+            config = {"execution": execution, "episode": {"horizon": args.horizon}}
+            if args.robot_uid is not None:
+                config["robot"] = {"uid": args.robot_uid}
+            if args.gravity_compensation:
+                config["controller"] = {"gravity_compensation": True}
+            env = make_env(args.env_id, config=config)
             obs, reset_info = env.reset(seed=seed)
-            if args.env_id == ENV_IDS[1]:
-                from task_env.tasks.nut_assembly.task import build_outcome_solution
-                solution = build_outcome_solution(provider=args.provider)
-                solution.reset(obs, reset_info, env.metadata)
-            else:
-                from task_env.tasks.pick_cube import build_readiness_solution
-                solution = build_readiness_solution(backend='cpu', controller_profile='r3_continuous_v1')
-                solution.reset(obs, reset_info, env.metadata)
+            solution = env.value['solution_factory']()
+            solution.reset(obs, reset_info, env.metadata)
             # Recording begins with the measured reset boundary, before the first expert action.
             env.start_recording(output)
             recording_started = True
-            if args.env_id == ENV_IDS[1]:
-                episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
-            else:
-                episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
+            episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
             identity = identity_summary(env, provider=args.provider)
             status = episode["status"]
     except RunTimeout as exc:

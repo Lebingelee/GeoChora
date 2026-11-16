@@ -184,6 +184,136 @@ def coalesce_identical_world_elements(*, robot_xml: str, task_world_xml: str) ->
     return ET.tostring(robot, encoding='unicode'), tuple(coalesced)
 
 
+def _fixed_robot_task_spec(*, lowered, fixed, task_xml, task_xml_sha256, task_world_xml, task_site_transfers):
+    """Build the same fixed Robot/task MjSpec for model and session owners."""
+    import mujoco
+    def without_keyframes(xml):
+        root = ET.fromstring(xml)
+        for element in tuple(root.findall('keyframe')):
+            root.remove(element)
+        return ET.tostring(root, encoding='unicode')
+    # The Task source declares its position-drive tuning. Preserve those
+    # settings on the same named joints and tendon when replacing its Robot;
+    # the attached component still owns the transmission topology.
+    task_root = ET.fromstring(task_xml)
+    arm_root = ET.fromstring(without_keyframes(lowered.parent_xml))
+    hand_root = ET.fromstring(without_keyframes(lowered.child_xml))
+    for index in range(1, 9):
+        name = f'actuator{index}'
+        donor = task_root.find(f"./actuator/general[@name='{name}']")
+        target_root = arm_root if index < 8 else hand_root
+        target = target_root.find(f"./actuator/general[@name='{name}']")
+        channel = 'joint' if index < 8 else 'tendon'
+        expected = f'joint{index}' if index < 8 else 'split'
+        if donor is None or target is None or donor.get(channel) != expected or target.get(channel) != expected:
+            raise ValueError(f'Task and fixed Robot actuator transmission differs: {name}')
+        for attribute in ('gainprm', 'biasprm', 'forcerange', 'ctrlrange'):
+            if attribute in donor.attrib:
+                target.set(attribute, donor.attrib[attribute])
+    parent_xml, coalesced = coalesce_identical_world_elements(
+        robot_xml=ET.tostring(arm_root, encoding='unicode'), task_world_xml=task_world_xml)
+    parent = mujoco.MjSpec.from_string(parent_xml, assets=lowered.parent_assets)
+    if type(task_site_transfers) is not tuple:
+        raise TypeError('task site transfers must be an immutable tuple')
+    child_xml = ET.tostring(hand_root, encoding='unicode')
+    for transfer in task_site_transfers:
+        if type(transfer) is not tuple or len(transfer) != 3:
+            raise ValueError('task site transfer requires source body, site and target body')
+        child_xml = transfer_declared_task_site(
+            task_xml=task_xml, expected_xml_sha256=task_xml_sha256,
+            source_body=transfer[0], site_name=transfer[1],
+            robot_xml=child_xml, target_body=transfer[2])
+    child = mujoco.MjSpec.from_string(child_xml, assets=lowered.child_assets)
+    child_body = child.body(fixed.child_mount_body_name.removeprefix(fixed.namespace_prefix))
+    if child_body is None:
+        raise ValueError('fixed robot child source lacks the declared root')
+    frame = child.worldbody.add_frame(pos=fixed.attach_frame_from_child_worldbody.position,
+                                      quat=fixed.attach_frame_from_child_worldbody.quaternion_wxyz)
+    child_body.set_frame(frame)
+    if parent.attach(child, site=fixed.parent_mount_site_name, prefix=fixed.namespace_prefix) is None:
+        raise ValueError('MuJoCo failed to attach the declared fixed robot')
+    task_spec = mujoco.MjSpec.from_string(task_world_xml)
+    if parent.attach(task_spec, frame=parent.worldbody.add_frame(), prefix='') is None:
+        raise ValueError('MuJoCo failed to attach the task world')
+    return parent, coalesced
+
+
+def fixed_robot_kinematics(source, *, robot, task_body_names, task_site_transfers):
+    """Build R3's model from the same verified fixed source and task mount."""
+    import mujoco
+    from ...assembly import panda_source_profiles
+    from ...assembly.fixed_attachment import lower_fixed_attachment_sources
+    from ...assembly.panda_fixed_source import declare_panda_fixed_source
+    from ...controllers.canonical.kinematics import PandaKinematics
+    from .source import source_resource_receipt
+
+    if len(task_site_transfers) != 1:
+        raise ValueError('fixed Robot kinematics requires the declared Task TCP')
+    receipt = source_resource_receipt(source)
+    receipt.validate_snapshot()
+    declaration = declare_panda_fixed_source(robot.asset_manifest())
+    source_hand, site, child_hand = task_site_transfers[0]
+    declaration = derive_task_compatible_attachment(declaration=declaration,
+        task_receipt=receipt, task_hand_name=source_hand, source_hand_name=child_hand)
+    fixed = declaration.attachment_plan
+    lowered = lower_fixed_attachment_sources(parent_source=declaration.parent_source,
+        source_by_entity=declaration.source_by_entity, scene=declaration.scene,
+        plan=fixed, assembly=declaration.assembly, source_profile=panda_source_profiles)
+    task_xml = receipt.closure_files['canonical-source.xml'].decode('utf-8')
+    roots = tuple(name for _, name in task_body_names)
+    robot_root = fixed.native_body_names[f'{fixed.parent_entity_id}/{fixed.parent_root.frame_id}']
+    world = extract_task_world_mjcf(task_xml=task_xml,
+        expected_xml_sha256=receipt.canonical_xml_sha256,
+        retained_roots=roots, replaced_robot_roots=(robot_root,))
+    spec, _ = _fixed_robot_task_spec(lowered=lowered, fixed=fixed, task_xml=task_xml,
+        task_xml_sha256=receipt.canonical_xml_sha256, task_world_xml=world,
+        task_site_transfers=task_site_transfers)
+    native = spec.compile()
+    root = ET.fromstring(spec.to_xml())
+    # MjSpec's XML export rounds floats. Restore the actual compiled transforms
+    # and joint parameters before the pure kinematics owner consumes them.
+    for tag, objtype in (('body', mujoco.mjtObj.mjOBJ_BODY),
+                         ('joint', mujoco.mjtObj.mjOBJ_JOINT),
+                         ('site', mujoco.mjtObj.mjOBJ_SITE)):
+        for node in root.iter(tag):
+            name = node.get('name')
+            if not name:
+                continue
+            index = int(mujoco.mj_name2id(native, objtype, name))
+            if index < 0:
+                raise ValueError(f'compiled {tag} is missing: {name}')
+            values = ((('pos', native.body_pos[index]), ('quat', native.body_quat[index]))
+                      if tag == 'body' else
+                      (('pos', native.jnt_pos[index]), ('axis', native.jnt_axis[index]),
+                       ('range', native.jnt_range[index])) if tag == 'joint' else
+                      (('pos', native.site_pos[index]), ('quat', native.site_quat[index])))
+            for key, value in values:
+                node.set(key, ' '.join(format(float(x), '.17g') for x in value))
+            if tag == 'joint':
+                joint_types = {int(mujoco.mjtJoint.mjJNT_HINGE): 'hinge',
+                               int(mujoco.mjtJoint.mjJNT_SLIDE): 'slide',
+                               int(mujoco.mjtJoint.mjJNT_FREE): 'free'}
+                node.set('type', joint_types[int(native.jnt_type[index])])
+            elif tag == 'body' and node.find('inertial') is not None:
+                inertial = node.find('inertial')
+                inertial.set('mass', format(float(native.body_mass[index]), '.17g'))
+                inertial.set('pos', ' '.join(format(float(x), '.17g') for x in native.body_ipos[index]))
+    site_id = int(mujoco.mj_name2id(native, mujoco.mjtObj.mjOBJ_SITE, fixed.parent_mount_site_name))
+    if site_id < 0:
+        raise ValueError('compiled fixed Robot mount site is missing')
+    mount_name = mujoco.mj_id2name(native, mujoco.mjtObj.mjOBJ_BODY, int(native.site_bodyid[site_id]))
+    model = PandaKinematics(ET.tostring(root, encoding='unicode'),
+        fixed_hand_mount=mount_name, hand_body_id=fixed.child_mount_body_name,
+        tcp_site_name=fixed.namespace_prefix + site,
+        finger_body_ids=tuple(fixed.native_body_names[f'{fixed.child_entity_id}/{side}_finger']
+                              for side in ('left', 'right')),
+        finger_joint_ids=tuple(fixed.native_joint_names[f'{fixed.child_entity_id}/finger_joint{i}']
+                               for i in (1, 2)))
+    model.composition_binding = (receipt.source_closure_digest, fixed.source_closure_sha256,
+                                 fixed.identity_hash, task_site_transfers)
+    return model
+
+
 def materialize_fixed_robot_task(*, composition, task_receipt, fixed_declaration,
                                  retained_roots, replaced_robot_roots,
                                  entity_body_names, allowed_free_joints,
@@ -237,38 +367,12 @@ def materialize_fixed_robot_task(*, composition, task_receipt, fixed_declaration
         task_xml=task_xml, expected_xml_sha256=task_receipt.canonical_xml_sha256,
         retained_roots=retained_roots, replaced_robot_roots=replaced_robot_roots)
 
-    def without_keyframes(xml):
-        root = ET.fromstring(xml)
-        for element in tuple(root.findall('keyframe')):
-            root.remove(element)
-        return ET.tostring(root, encoding='unicode')
-    parent_xml, coalesced = coalesce_identical_world_elements(
-        robot_xml=without_keyframes(lowered.parent_xml), task_world_xml=task_world_xml)
-    parent = mujoco.MjSpec.from_string(parent_xml, assets=lowered.parent_assets)
-    if type(task_site_transfers) is not tuple:
-        raise TypeError('task site transfers must be an immutable tuple')
     if task_site_transfers != composition.task_site_transfers:
         raise ValueError('task site transfers differ from the composition plan')
-    child_xml = without_keyframes(lowered.child_xml)
-    for transfer in task_site_transfers:
-        if type(transfer) is not tuple or len(transfer) != 3:
-            raise ValueError('task site transfer requires source body, site and target body')
-        child_xml = transfer_declared_task_site(
-            task_xml=task_xml, expected_xml_sha256=task_receipt.canonical_xml_sha256,
-            source_body=transfer[0], site_name=transfer[1],
-            robot_xml=child_xml, target_body=transfer[2])
-    child = mujoco.MjSpec.from_string(child_xml, assets=lowered.child_assets)
-    child_body = child.body(fixed.child_mount_body_name.removeprefix(fixed.namespace_prefix))
-    if child_body is None:
-        raise ValueError('fixed robot child source lacks the declared root')
-    frame = child.worldbody.add_frame(pos=fixed.attach_frame_from_child_worldbody.position,
-                                      quat=fixed.attach_frame_from_child_worldbody.quaternion_wxyz)
-    child_body.set_frame(frame)
-    if parent.attach(child, site=fixed.parent_mount_site_name, prefix=fixed.namespace_prefix) is None:
-        raise ValueError('MuJoCo failed to attach the declared fixed robot')
-    task_spec = mujoco.MjSpec.from_string(task_world_xml)
-    if parent.attach(task_spec, frame=parent.worldbody.add_frame(), prefix='') is None:
-        raise ValueError('MuJoCo failed to attach the task world')
+    parent, coalesced = _fixed_robot_task_spec(
+        lowered=lowered, fixed=fixed, task_xml=task_xml,
+        task_xml_sha256=task_receipt.canonical_xml_sha256,
+        task_world_xml=task_world_xml, task_site_transfers=task_site_transfers)
     model = parent.compile()
     if type(entity_body_names) is not tuple or len(dict(entity_body_names)) != len(entity_body_names):
         raise ValueError('entity mapping must contain unique canonical names')

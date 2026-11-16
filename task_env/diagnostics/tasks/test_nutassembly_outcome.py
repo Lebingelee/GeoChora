@@ -22,6 +22,28 @@ META = {'action_schema': {'controller_kind':'absolute_pose','reference':'world',
 OUTCOME_COMPLETION = OUTCOME_POLICY_ID
 
 
+def test_native_guard_uses_the_selected_source_actuator_and_keeps_time_checks():
+    from types import SimpleNamespace
+    from task_env.tasks.nut_assembly.solution import _validate_nut_native_force_contract
+    from task_env.tasks.nut_assembly.specialization import _native_feedback_sample
+
+    measurement = SimpleNamespace(actuator_id='probe_hand_actuator8', native_step_index=5,
+        native_sample_time_s=.008, phase='native_step_pre_integration', evaluation_control_step=1)
+    sample = SimpleNamespace(actuator_force_measurement=measurement,
+        feedback=SimpleNamespace(simulation_time=.01))
+    _validate_nut_native_force_contract(sample, 'probe_hand_actuator8')
+    with pytest.raises(ValueError, match='source-bound actuator'):
+        _validate_nut_native_force_contract(sample)
+    measurement.actuator_id = 'foreign_actuator'
+    env = SimpleNamespace(value={'source': SimpleNamespace(open_actuators=('probe_hand_actuator8',))})
+    with pytest.raises(ValueError, match='differs from the source-bound'):
+        _native_feedback_sample(env, None, None, None, None, None, None, None, sample, None)
+    measurement.actuator_id = 'probe_hand_actuator8'
+    measurement.native_sample_time_s = .006
+    with pytest.raises(ValueError, match='phase/time/freshness'):
+        _validate_nut_native_force_contract(sample, 'probe_hand_actuator8')
+
+
 class Ideal:
     def __init__(self, *, residual=0.0, release=True, authorize=True):
         value = build_reference()

@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-16",
-  "status": "G07_7A_USER_INTERRUPTED_AWAITING_MANUAL_HANDOFF",
+  "status": "G07_7A_IN_PROGRESS",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -19,9 +19,20 @@
     "base_head": "bb2692d86aaf8eb20e424a4c0ea9f9108f966e24",
     "reason": "Maintainer approved revision003 7a dispatch: case-driven code review and minimal necessary integration; preserve original gates and one stage branch."
   },
-  "active_packages": [],
+  "active_packages": [
+    {
+      "package_id": "V211_G07_7A_ATTEMPT001",
+      "substage": "7a",
+      "attempt": 1,
+      "continuation": "continuation001",
+      "status": "IN_PROGRESS",
+      "started_at": "2026-11-16T22:18:17.512023+08:00",
+      "input_head": "c2ed2f3d236ba480fc6f66c368af4b707b69b15c",
+      "output_root": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_g07a_attempt001/continuation001"
+    }
+  ],
   "next_candidate": null,
-  "next_action": "Await maintainer manual forwarding to a new chat; continue the same 7a attempt001 only after input/dirty/budget readback. Do not redispatch to the old executor. 7b/7c remain planned.",
+  "next_action": "Complete 7a attempt001 continuation001; 7b/7c remain planned pending independent review.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1962,7 +1973,7 @@
             "5c",
             "6c"
           ],
-          "status": "USER_INTERRUPTED_AWAITING_MANUAL_HANDOFF",
+          "status": "IN_PROGRESS",
           "attempt_count": 1,
           "attempts": [
             {
@@ -2007,10 +2018,33 @@
                 "native_actual_consumption": "UNVERIFIED_NO_RUN_RECEIPTS",
                 "explicit_substeps_actual": "UNVERIFIED_NO_RUN_RECEIPTS",
                 "rule": "Keep original aggregate native/substep ceilings and reconcile prior launches before native continuation; absence of receipts alone is not a zero-consumption claim. User interruption interval is recorded separately, no reset of attempt or consumed budget."
-              }
+              },
+              "continuations": [
+                {
+                  "id": "continuation001",
+                  "executor_thread": "01a1e4b7-d90e-7fd0-9e04-bb5ef18eb964",
+                  "started_at": "2026-11-16T22:18:17.512023+08:00",
+                  "input_head": "c2ed2f3d236ba480fc6f66c368af4b707b69b15c",
+                  "output_root": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_g07a_attempt001/continuation001",
+                  "budget_carry_forward": {
+                    "original_active_minutes": 360,
+                    "original_wall_minutes": 480,
+                    "original_native_minutes": 120,
+                    "original_explicit_substeps": 200000,
+                    "visible_turn_duration_ms": 303914,
+                    "conservative_active_and_wall_charge_minutes": 6,
+                    "remaining_active_ceiling_minutes": 354,
+                    "remaining_running_wall_ceiling_minutes": 474,
+                    "native_actual_consumption": "UNVERIFIED_NO_RUN_RECEIPTS",
+                    "explicit_substeps_actual": "UNVERIFIED_NO_RUN_RECEIPTS",
+                    "rule": "Keep original aggregate native/substep ceilings and reconcile prior launches before native continuation; absence of receipts alone is not a zero-consumption claim. User interruption interval is recorded separately, no reset of attempt or consumed budget."
+                  },
+                  "status": "IN_PROGRESS"
+                }
+              ]
             }
           ],
-          "assigned_agent": null,
+          "assigned_agent": "01a1e4b7-d90e-7fd0-9e04-bb5ef18eb964",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/7a-work-package.md",
           "package_sha256": "a34e7f603246a87340b48653f492f94aeef3858d7c3318adeddb239aaeb20a6a",
           "input_head": "7862433cafef91800e7b0321b774dcb64b22c777",
@@ -2032,15 +2066,13 @@
             "native_threads": 1
           },
           "last_observation": {
-            "at": "2026-11-16T22:13:39.965216+08:00",
-            "state": "USER_INTERRUPTED_AWAITING_MANUAL_HANDOFF",
-            "interrupted_at": "2026-11-16T22:02:29+08:00",
-            "partial_work": "Four uncommitted SB3/RSL code/test edits preserved; unvalidated. No AP gate accepted.",
-            "checks": "No run/test/supervisor/recording result found; previous final handoff not received.",
-            "manual_forwarding_owner": "maintainer; new executor unassigned"
+            "at": "2026-11-16T23:14:14+08:00",
+            "state": "continuation001: four MuJoCo intersections and assembled-source checks completed; current GeoPhys Nut failure delegated separately by user, 7a remains in progress"
           },
           "evidence_refs": [
-            "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/interruption-20261116T220229/interruption-receipt.json"
+            "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/interruption-20261116T220229/interruption-receipt.json",
+            "20261116_g07a_attempt001_continuation001.md",
+            "../../../../../workspace/maintenance/v211_g07a_attempt001/continuation001/report.md"
           ],
           "commits": [],
           "review_decision": null,

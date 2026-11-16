@@ -67,6 +67,9 @@ from .task import (NutAssemblyTaskDefinition, semantic_definition, evaluate, sam
 
 def _native_feedback_sample(env, stage, index, state, feedback, target, applied, diagnostics,
                             provider_feedback_sample, request_boundary):
+    actuators = env.value['source'].open_actuators
+    if len(actuators) != 1 or provider_feedback_sample.actuator_force_measurement.actuator_id != actuators[0]:
+        raise ValueError('NutAssembly native feedback differs from the source-bound gripper actuator')
     metrics = None
     if stage == "close_gripper":
         _, observation_info, _ = env.observation(state)
@@ -99,6 +102,7 @@ def _native_feedback_sample(env, stage, index, state, feedback, target, applied,
         target.identity_hash,
         applied.to_mapping(),
         None if metrics is None else bool(metrics.get("grasped_nut", False)),
+        actuators[0],
     )
     return sample
 
@@ -391,14 +395,26 @@ def _reference_builder(*, include_solution, resolved_config=None, lift_height_m=
     dynamic = load_r3_dynamic_profile()
     profile = (resolved_config.control.profile_id if resolved_config is not None
                else NutAssemblyReferenceEnv.selected_default_controller_profile())
+    from ...runtime.sessions.source_composition_adapters import reference_task_source_robot
+    source_robot = None if robot is None else reference_task_source_robot(robot, profile)
+
+    def controller_options(compiled, context, request):
+        options = dict(profile_id=profile, dynamic_profile=dynamic,
+            force_limit_N=context.task_config['recipe']['controller']['force_cap_N'])
+        if robot is not None and source_robot is None:
+            if (request.provider, request.backend) != ('mujoco', 'cpu'):
+                raise ValueError('fixed Robot R3 model requires MuJoCo CPU')
+            from ...runtime.sessions.mujoco_composition import fixed_robot_kinematics
+            options['kinematics_model'] = fixed_robot_kinematics(compiled.source,
+                robot=robot, task_body_names=NutAssemblyReferenceEnv.robot_source_roots,
+                task_site_transfers=NutAssemblyReferenceEnv.robot_source_site_transfers)
+        return options
     return SourceBoundTaskBuilder(
         lambda request: _compile_reference_source(request, resolved_config=resolved_config,
-            lift_height_m=lift_height_m, task_config=task_config, robot=robot),
+            lift_height_m=lift_height_m, task_config=task_config, robot=source_robot),
         None, backend=backend,
         controller_factory=build_reference_position_controller,
-        controller_options=lambda compiled, context, request: dict(
-            profile_id=profile, dynamic_profile=dynamic,
-            force_limit_N=context.task_config['recipe']['controller']['force_cap_N']),
+        controller_options=controller_options,
         compile_control=lambda compiled, context, selection, request: _bind_reference_controller(
             compiled, context, selection, request,
             include_solution=include_solution, dynamic=dynamic))
@@ -445,8 +461,12 @@ def _validate_external_solution(value, solution):
 
 def _binding(resolved_config=None, lift_height_m=None, task_config=None, robot=None):
     task_config = _configuration() if task_config is None else task_config
+    from ...runtime.sessions.source_composition_adapters import reference_task_source_robot
+    profile = (resolved_config.control.profile_id if resolved_config is not None
+               else NutAssemblyReferenceEnv.selected_default_controller_profile())
+    source_robot = None if robot is None else reference_task_source_robot(robot, profile)
     declaration = NutAssemblyTaskDefinition.from_artifact(
-        build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot),
+        build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=source_robot),
         task_config['recipe']['reset'],
     )
     return ReferenceTaskBinding(build=_reference_builder(include_solution=False,
@@ -481,7 +501,7 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     selected_controller_profiles = frozenset(('r3_continuous_v1',))
     selected_parameter_limits = {"lift_height_m": (0.01, 0.15)}
     selected_supports_isaac = False
-    selected_robot_uids = frozenset(('panda-v1',))
+    selected_robot_uids = frozenset(('panda-v1', 'panda-arm-hand-v1'))
     robot_source_roots = (('tabletop-v1', 'grasp_table'), ('square-nut-v1', 'SquareNut'),
                           ('square-peg-v1', 'peg1'), ('round-peg-v1', 'peg2'))
     robot_source_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)

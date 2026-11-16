@@ -121,6 +121,20 @@ def test_sb3_autoreset_preserves_terminal_observation_and_owner(remote):
     assert infos[1]['TimeLimit.truncated'] is True
 
 
+def test_sb3_rejects_coordinated_device_before_reset_or_step():
+    from task_env.vectorization.sb3 import TaskEnvSB3VecAdapter
+    from task_env.vectorization.homogeneous import HomogeneousVectorTaskEnv
+
+    class DeviceSpec:
+        num_envs = 2
+        single_action_space = gym.spaces.Box(-1, 1, shape=(1,), dtype=np.float32)
+        single_observation_space = gym.spaces.Box(-1, 1, shape=(1,), dtype=np.float32)
+        metadata = {'execution': 'local'}  # admission follows actual execution, not metadata
+
+    with pytest.raises(ValueError, match='coordinated device same-step autoreset'):
+        TaskEnvSB3VecAdapter(HomogeneousVectorTaskEnv(DeviceSpec(), execution_mode='device'))
+
+
 def test_renderer_close_failure_still_closes_task_and_runtime():
     from task_env.vectorization.homogeneous import HomogeneousVectorTaskEnv
     from task_env.vectorization.task_definition import BatchTaskLifecycleAdapter

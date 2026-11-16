@@ -34,6 +34,10 @@ class TaskEnvSB3VecAdapter(VecEnv):
     """Translate Gymnasium five-tuples to the SB3 four-tuple VecEnv API."""
 
     def __init__(self, env: HomogeneousVectorTaskEnvProtocol) -> None:
+        from .homogeneous import HomogeneousVectorTaskEnv
+
+        if isinstance(env, HomogeneousVectorTaskEnv) and env._execution_mode == 'device' and not env._scalar_device:
+            raise ValueError('SB3 adapter does not support coordinated device same-step autoreset')
         self.env = env
         if not hasattr(self.env, "render_mode"):
             self.env.render_mode = None

@@ -13,6 +13,7 @@ from .panda import PANDA_ASSET_ROOT, PandaAgent
 class AssembledPandaAgent(BaseAgent):
     """Describe the exact pinned arm/hand recipe, without allocating a runtime."""
     uid = 'panda-arm-hand-v1'
+    control_capabilities = frozenset(('position_drive_gravity_compensation',))
 
     @staticmethod
     def construction_source_paths():
@@ -50,8 +51,11 @@ class AssembledPandaAgent(BaseAgent):
     def source_recipe_for_profile(self, profile):
         """Keep the historical recipe identity and bind split writers explicitly."""
         recipe = self.source_recipe()
-        if profile == 'r1':
-            return recipe
+        if profile in ('r1', 'r3_continuous_v1'):
+            if profile == 'r1':
+                return recipe
+            from dataclasses import replace
+            return replace(recipe, control_profiles=(profile,))
         if profile != 'r1_split':
             raise ValueError('assembled Panda does not declare this Controller profile')
         from dataclasses import replace
@@ -120,7 +124,7 @@ class AssembledPandaAgent(BaseAgent):
 
     @classmethod
     def selected_controller_profiles(cls):
-        return ('r1', 'r1_split')
+        return ('r1', 'r1_split', 'r3_continuous_v1')
 
     @classmethod
     def declared_controller_profiles(cls):

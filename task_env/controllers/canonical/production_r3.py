@@ -328,11 +328,11 @@ class ProductionCanonicalPandaControllerR3(ProductionCanonicalPandaControllerR2)
         })
 
     @classmethod
-    def from_source(cls, artifact, source, *, profile, **kwargs):
+    def from_source(cls, artifact, source, *, profile, model=None, **kwargs):
         if source.task_artifact_hash != artifact.identity_hash:
             raise ValueError("source/Artifact mismatch")
         from .kinematics import PandaKinematics
-        return cls(PandaKinematics(source.scene_source.xml), artifact_hash=artifact.identity_hash,
+        return cls(PandaKinematics(source.scene_source.xml) if model is None else model, artifact_hash=artifact.identity_hash,
                    config=source.config.action, gripper_config=source.config.robot.gripper,
                    control_dt=artifact.timebase.control_dt, profile=profile, **kwargs)
 

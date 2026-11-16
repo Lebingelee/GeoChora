@@ -35,6 +35,10 @@ class TaskEnvRslVecAdapter:
         action_profile: str | RslActionTransformSpec | Mapping[str, Any] | None = None,
         observation_profile: RslObservationProfile | Mapping[str, Any] | None = None,
     ) -> None:
+        from ...vectorization.homogeneous import HomogeneousVectorTaskEnv
+
+        if isinstance(env, HomogeneousVectorTaskEnv) and env._execution_mode == 'device' and not env._scalar_device:
+            raise ValueError('RSL adapter does not support coordinated device same-step autoreset')
         self.env = env
         self.num_envs = int(env.num_envs)
         self.single_observation_space = (

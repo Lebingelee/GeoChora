@@ -21,7 +21,7 @@ def build_reference_position_controller(artifact, source, *, profile_id, dynamic
                                         force_limit_N=10.0, gripper_rate_hz=500,
                                         joint_velocity_limit_rad_s=2.0, execution=None,
                                         action_config=None, entity_id=None, hand_frame_id=None,
-                                        tcp_profile=None):
+                                        tcp_profile=None, kinematics_model=None):
     """Construct the selected Panda position Controller from its bound source."""
     from ...runtime.sessions.source import UsdRuntimeSourceV1
 
@@ -47,7 +47,7 @@ def build_reference_position_controller(artifact, source, *, profile_id, dynamic
         return ReferenceExecutionController.from_source(
             artifact, source, profile=dynamic_profile, force_limit_N=force_limit_N,
             gripper_rate_hz=gripper_rate_hz,
-            joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
+            joint_velocity_limit_rad_s=joint_velocity_limit_rad_s, model=kinematics_model)
     raise ValueError(f'unsupported reference Position Controller profile: {profile_id!r}')
 
 
@@ -216,12 +216,13 @@ class ReferenceExecutionController:
 
     @classmethod
     def from_source(cls, artifact, source, *, profile, force_limit_N,
-                    gripper_rate_hz=500, joint_velocity_limit_rad_s=2.0):
+                    gripper_rate_hz=500, joint_velocity_limit_rad_s=2.0, model=None):
         """Bind the declared source and compose the R3 execution owners."""
         from .production_r3 import ProductionCanonicalPandaControllerR3
 
         controller = ProductionCanonicalPandaControllerR3.from_source(
-            artifact, source, profile=profile, joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
+            artifact, source, profile=profile, model=model,
+            joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
         controller.gripper_config = replace(controller.gripper_config, force_limit_N=force_limit_N)
         return cls(StableArmTargetHold(controller), artifact.timebase.control_dt,
                    gripper_rate_hz=gripper_rate_hz)

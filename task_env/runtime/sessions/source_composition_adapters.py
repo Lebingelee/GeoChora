@@ -571,12 +571,21 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                                        if reset_selection else None)),
             compile_control=finish_control)
     from ...controllers.canonical.execution import build_reference_position_controller
+    def position_options(compiled, context, request):
+        options = dict(profile_id=controller_profile, dynamic_profile=context.dynamic_profile,
+            force_limit_N=force_limit_N, joint_velocity_limit_rad_s=velocity_limit)
+        if context.composition.intent.mode == 'replace' and controller_profile == 'r3_continuous_v1':
+            if (request.provider, request.backend) != ('mujoco', 'cpu'):
+                raise ValueError('fixed Robot R3 model requires MuJoCo CPU')
+            from .mujoco_composition import fixed_robot_kinematics
+            options['kinematics_model'] = fixed_robot_kinematics(compiled.source,
+                robot=context.robot, task_body_names=task_body_names,
+                task_site_transfers=task_site_transfers)
+        return options
     return SourceBoundTaskBuilder(
         compile_source, None, backend=backend, allow_sampled_reset=False,
         source_composer=compose, controller_factory=build_reference_position_controller,
-        controller_options=lambda compiled, context, request: dict(
-            profile_id=controller_profile, dynamic_profile=context.dynamic_profile,
-            force_limit_N=force_limit_N, joint_velocity_limit_rad_s=velocity_limit),
+        controller_options=position_options,
         compile_control=finish_control)
 
 

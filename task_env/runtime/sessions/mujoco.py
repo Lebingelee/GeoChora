@@ -1749,7 +1749,7 @@ class _MuJoCoSession(_SessionValues):
         sample.validate()
         return sample
 
-    def configure_gravity_compensation(self):
+    def configure_gravity_compensation(self, *, model=None):
         """Admit source-bound arm gravity on the exact affine MuJoCo drive.
 
         This profile composes the torque through a position-reference offset;
@@ -1763,8 +1763,17 @@ class _MuJoCoSession(_SessionValues):
         if int(self._model.opt.disableflags) & int(self._mj.mjtDisableBit.mjDSBL_GRAVITY):
             raise ValueError('gravity compensation requires native gravity to be enabled')
         from ...controllers.canonical.kinematics import PandaKinematics, PANDA_HAND_ORIGIN_TCP_V1
-        source_xml = self._source.scene_source.xml
-        model = PandaKinematics(source_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
+        composition = self._source.composition_runtime_input
+        if composition is None:
+            if model is not None:
+                raise ValueError('uncomposed gravity requires its own selected source model')
+            model = PandaKinematics(self._source.scene_source.xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
+        else:
+            fixed = composition.fixed_declaration.attachment_plan
+            expected = (self._source.source_closure_digest, fixed.source_closure_sha256,
+                        fixed.identity_hash, composition.plan.task_site_transfers)
+            if not isinstance(model, PandaKinematics) or model.composition_binding != expected:
+                raise ValueError('gravity model differs from the selected fixed Robot source')
         bodies = model._compile_gravity_bodies()
         model._gravity_bodies = bodies
         base = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, model._gravity_root_body_id))
@@ -1784,7 +1793,7 @@ class _MuJoCoSession(_SessionValues):
                 self._mj.mju_quat2Mat(native_rotation, self._model.body_quat[body])
             if (body < 0 or int(self._model.body_parentid[body]) != parent_id
                     or abs(float(self._model.body_mass[body]) - mass) > 1e-10
-                    or not np.allclose(self._model.body_ipos[body], com, rtol=0, atol=1e-10)
+                    or (mass > 0 and not np.allclose(self._model.body_ipos[body], com, rtol=0, atol=1e-10))
                     or not np.allclose(self._model.body_pos[body], fixed[:3, 3], rtol=0, atol=1e-10)
                     or not np.allclose(native_rotation.reshape(3, 3), fixed[:3, :3], rtol=0, atol=1e-10)
                     or abs(float(self._model.body_gravcomp[body])) > 0):

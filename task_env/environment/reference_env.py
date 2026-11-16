@@ -2020,7 +2020,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if build.skip_gravity:
                 return
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
-                self.session.configure_gravity_compensation()
+                if self.value['source'].composition_runtime_input is None:
+                    self.session.configure_gravity_compensation()
+                else:
+                    self.session.configure_gravity_compensation(model=self.value['controller'].kinematics_model)
 
         def reset_runtime():
             nonlocal failure_phase

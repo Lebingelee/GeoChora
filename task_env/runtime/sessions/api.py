@@ -817,8 +817,15 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
             import hashlib
             controller_artifact = getattr(selected.controller, 'source_artifact_hash', None)
             controller_source = getattr(selected.controller, 'source_xml_sha256', None)
-            if (controller_artifact != artifact.identity_hash
-                    or controller_source != hashlib.sha256(source.scene_source.xml.encode()).hexdigest()):
+            composition = source.composition_runtime_input
+            model_matches = controller_source == hashlib.sha256(source.scene_source.xml.encode()).hexdigest()
+            from ...controllers.canonical.execution import ReferenceExecutionController
+            if composition is not None and isinstance(selected.controller, ReferenceExecutionController):
+                fixed = composition.fixed_declaration.attachment_plan
+                model_matches = selected.controller.source_composition_binding == (
+                    source.source_closure_digest, fixed.source_closure_sha256,
+                    fixed.identity_hash, composition.plan.task_site_transfers)
+            if controller_artifact != artifact.identity_hash or not model_matches:
                 raise ValueError('Controller model does not match the selected Artifact and source')
     except (TypeError, ValueError, OSError, AttributeError) as error:
         control_problem = f'{type(error).__name__}: {error}'
