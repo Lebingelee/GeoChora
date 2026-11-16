@@ -16,6 +16,8 @@
 
 G06b attempt002 在 Core `f8c43d61`／GeoPhys `dd393187` 经[范围重估主审](reviews/20261116_g06b_attempt002_scope_reassessment.md)保持 **PARTIAL_NOT_ACCEPTED**；执行 attempt 计数为2，维护者已要求暂停，attempt003未派发。真实六格主链、GeoPhys显式discrete／32次预算的有界接触及reset、MJWarp B16双传感器与窗口800步已有证据。Sol此前将单次受控轨迹2mm界限扩大为通用门，现重估为不应沿用；scalar mixed缺陷和跨引擎接触力差异不自动阻断batch出口。待收口项是受影响渲染／记录、正确配置性能索引及Isaac B16资源处置；尚不表示六格完整接收。窗口外观仍由维护者人工验收，AOT等既定暂缓事项保持。
 
+2026-11-16 补充交接已[独立复核](reviews/20261116_g06b_attempt002_supplement_review.md)：B1/B3 已保存字段逐值一致，完整 Task/clock/reset 仍待补齐；无效探索清理也列入收口。维护者已批准仅 Isaac PickCube 三个 B16 渲染组合的资源例外，B3 正确性不豁免。[attempt003](work-packages/20261116_g06b_attempt003_goal.md)已准备、未派发，执行计数仍为2。
+
 ## 启动输入与工作归属
 
 | 项目 | 2026-11-11 启动核对 |

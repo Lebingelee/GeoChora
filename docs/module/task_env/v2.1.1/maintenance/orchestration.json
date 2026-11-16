@@ -20,14 +20,14 @@
   },
   "active_packages": [],
   "next_candidate": {
-    "package_id": "V211_G06_6b_attempt002",
+    "package_id": "V211_G06_6b_attempt003",
     "status": "PREPARED_NOT_DISPATCHED",
-    "package_path": "work-packages/20261116_g06b_attempt002_goal.md",
-    "input_head": "1ad14dd82812ef69587e5ca6aabdb1a4e6cdc818",
-    "prompt_sha256": "3438b9fc1a4466beaee39c6bf455d991ea49ea8daba495b2176087550c7852a5",
+    "package_path": "work-packages/20261116_g06b_attempt003_goal.md",
+    "input_head": "a2ebc2efcaf937cd4a0d9b85de1be8501060658c",
+    "prompt_sha256": "1fd893c5340a1aadd1e1a061405243f5e353ecee37e437bd1505ce9a3dac0ac0",
     "manual_forward_only": true
   },
-  "next_action": "Maintainer may forward G06b attempt002 for contact and rendering fixes. No dispatch. Preserve scalar receipt schema; broader no-SHA receipt migration is a separate decision. Preserve existing evidence and approved discrete configuration without waiving numerical defects.",
+  "next_action": "Maintainer may forward attempt003 bounded canonical closure package. Isaac PickCube three B16 rendered combinations have an explicitly approved resource exception; B3 correctness remains required. No dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1739,7 +1739,7 @@
             "review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
             "ordinary_attempts_preserved": true,
             "code_optimization_accepted": false,
-    "code_optimization_accepted_scope": "Legacy broad optimization flag is not project acceptance; E11-E14 U4 code scope has maintainer bounded acceptance as recorded in E14.",
+            "code_optimization_accepted_scope": "Legacy broad optimization flag is not project acceptance; E11-E14 U4 code scope has maintainer bounded acceptance as recorded in E14.",
             "project_optimization_accepted": false
           }
         }
@@ -1830,12 +1830,13 @@
           "output_head": "f8c43d61163e6774b3869875842337b427781fe4",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Maintainer paused implementation. Attempt002 scope reassessment: canonical batch contact/reset and MJWarp B16 render stall fixes have bounded evidence; no automatic scalar mixed repair or cross-engine force parity gate. Final affected render/record evidence, performance index and Isaac B16 resource disposition remain. Attempt003 not dispatched; no new native run in this review.",
+          "last_observation": "Supplement reviewed; B1/B3 recorded fields exact. Full Task/clock/reset and affected rendering remain. Attempt003 prepared, not dispatched. Maintainer approved only three Isaac PickCube B16 rendered resource exceptions.",
           "evidence_refs": [
             "reviews/20261116_g06b_attempt001_review.md",
             "../../../../../workspace/maintenance/v211_g06b_attempt001/report.md",
             "reviews/20261116_g06b_attempt002_scope_reassessment.md",
-            "../../../../../workspace/maintenance/v211_g06b_attempt002/brief-for-sol.md"
+            "../../../../../workspace/maintenance/v211_g06b_attempt002/brief-for-sol.md",
+            "reviews/20261116_g06b_attempt002_supplement_review.md"
           ],
           "commits": [],
           "review_decision": {
@@ -1845,12 +1846,11 @@
             "scope": "original G06b gate reassessment, source/diff review and offline evidence verification; implementation remains paused"
           },
           "blockers": [
-            "Final affected provider/render/record evidence and matching performance index are not closed.",
-            "Isaac B16 rendered cases require current resource assessment or an explicit maintainer scope decision."
+            "B1 complete lifecycle/Task evidence, bounded scalar comparison, diagnostic cleanup and final affected render/record/performance closure remain."
           ],
           "supplement": {
             "attempt": 2,
-            "status": "PREPARED_NOT_DISPATCHED",
+            "status": "REVIEWED_HANDOFF_COMPLETE",
             "package_path": "work-packages/20261116_g06b_attempt002_supplement.md",
             "package_sha256": "199fb5d5956eb185e97126cab95f6825084a017febe19cacb434c3d3b94a088c",
             "input_head": "b2ea985c63534cb8c0f49dfdcfddb0d8c9efd438",
@@ -1862,7 +1862,15 @@
             "timebox_minutes": 90,
             "additional_native_budget_minutes": 20,
             "output_directory": "workspace/maintenance/v211_g06b_attempt002/supplement001",
-            "scope": "Evidence handoff and bounded missing B1 replay only; no implementation or cleanup mutation. Maintainer forwards to original executor; await final supplement before attempt003 planning."
+            "scope": "Evidence handoff and bounded missing B1 replay only; no implementation or cleanup mutation. Maintainer forwards to original executor; await final supplement before attempt003 planning.",
+            "review_ref": "reviews/20261116_g06b_attempt002_supplement_review.md"
+          },
+          "resource_exception": {
+            "approved_by": "maintainer",
+            "date": "2026-11-16",
+            "scope": "Isaac PickCube B16 sensor/window/sensor+window only when resources insufficient",
+            "result_status": "RESOURCE_LIMIT",
+            "b3_correctness_waived": false
           }
         },
         {
