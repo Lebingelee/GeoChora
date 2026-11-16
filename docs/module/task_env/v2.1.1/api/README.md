@@ -8,6 +8,42 @@ v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会�
 
 当前（2026-11-16）：G01～G06 canonical范围已有界接收并按维护者要求收尾；G07与版本整体尚未完成，R3另包。G06的[实施总结](../maintenance/g06/implementation-summary.md)及[当前摘要](../maintenance/current-state.md)记录三后端六格、部分reset、固定Rasterizer整批切换、测试和未覆盖项；以下API仍限各自实测交集，不授予任意资产/backend/renderer资格。
 
+<a id="render-contract"></a>
+
+## 当前 scalar／batch 渲染合同
+
+2026-11-16维护者要求补齐scalar断线；改动与实测范围见[渲染收尾记录](../maintenance/20261116_scalar_render_followup.md)。原G06的六格设备验收没有证明默认scalar R3 observer和worker采图完整，不能据此省略这些检查。
+
+- `render_mode=None` 不自动展示，`env.render()` 返回`None`；未启用观测相机时也不分配图像资源。
+- `render_mode='human'` 在成功的`reset/step`发布后更新窗口，返回值不含图像；可显式调用`env.render()`，它不额外推进物理。默认不做帧率等待。
+- `render_mode='rgb_array'` 仅在`env.render()`时导出拥有的CPU NumPy HWC `uint8` RGB（0～255）；device scalar／batch的展示图也相同，导出才发生GPU→CPU复制。batch展示图是共享场景视口，不是额外B轴。
+- 观测合同独立：已有scalar `task_rgb`保留CPU float32 0～1，device具名相机保留CUDA uint8 `[B,H,W,3]`；不从UI导出重建训练观测，也不修改same-step终止帧。
+- scalar与batch共同接受顶层`render` mapping／YAML，并保留在resolved配置往返中。scalar native observer缺省backend：GeoPhys为`rasterizer`、MuJoCo为`mujoco_reference`、Isaac为`isaac_rtx`；device scalar／batch使用`rasterizer`。显式不支持的展示backend在native构建前拒绝，不静默替换。
+- scalar observer仍须显式`observer_camera=CameraSpec(...)`，世界挂载，HWC float32 RGB的**内部捕获**声明；其尺寸决定最终视口并写回resolved配置。`render.width/height`是共享视口字段，显式observer尺寸优先；相机姿态遵守原`+X forward/+Z up`安装坐标，不是光学坐标。
+- GeoPhys scalar保留worker默认；`GEOCHORA_GEOPHYS_PYTHON`未设置时使用当前解释器作为worker解释器。直接effort路线仍不准入scalar worker，Pendulum／双轮等相应caller须显式`execution.deployment='in_process'`并指定当前`interpreter`；本轮按维护者决定仅修正示例，不扩建该worker能力。PickCube原R3 worker的observer／RGB已实测。
+- scalar的`render.camera_obs/cameras`尚未形成具名多相机观测，本轮按维护者决定明确拒绝；使用`task_rgb_camera/task_renderer`保留已有单任务相机能力。device的同名字段仍配置具名观测相机。
+- `execution.render_default`是执行合同中的renderer身份声明，现行selected路线仍使用`none`；它不替代上述独立observer／任务相机声明。
+- batch的`close_render()`同时停止自动窗口展示，物理可继续；有传感器时保留其renderer。原batch显式`render(mode=...)`兼容调用只导出/展示本次请求，不改变构造时的`render_mode`；普通新caller使用无参`render()`。scalar原固定mode限制保留。
+
+旧caller若需要0～1图像，应对`render()`返回值显式除以255；需要CUDA策略图像时直接消费obs相机叶。capture receipt描述内部float32捕获及状态边界，不把其dtype误当作UI导出dtype。本合同采用[Gymnasium的构造时mode与human逐步展示约定](https://gymnasium.farama.org/api/env/#gymnasium.Env.render)；CPU uint8导出由本项目维护者明确确认。
+
+```python
+from task_env import make_env
+from task_env.environment.config import CameraSpec
+
+env = make_env('pick-cube-p16-reference-v1',
+    config={'execution': {'physics_provider': 'mujoco'},
+            'render': {'backend': 'mujoco_reference'}},
+    render_mode='rgb_array',
+    observer_camera=CameraSpec('observer', width=320, height=240,
+        position=(.5, 0., 2.), quaternion_wxyz=(2**-.5, 0., 2**-.5, 0.)))
+try:
+    observation, info = env.reset(seed=31)
+    rgb = env.render()  # CPU uint8 [240,320,3]，不推进物理
+finally:
+    env.close()
+```
+
 G06 的 PickCube canonical physical observation 不再包含 `state.boundary_identity_sha256`；单环境和设备批量的 `state` 均为 `ee_pose`、`joint_position`、`hand_pose`，后者只增加 B 轴。边界元数据在 `info` 中：设备路径按 `env_id`、`episode_id`、`episode_step`，以及 `boundary` 的 source、materialization、generation、revision、native step／time 组合识别；同一步的部分 reset 会改变 revision 和选中行 episode，不会倒退 native clock。显式设备记录使用这些字段和实际状态独立核对；不为 observation 计算或填充 SHA。旧 Position profile 的 digest 和对应历史 H5 读取器保留为兼容路径。已有 scalar physical 控制提交合同仍使用摘要，完全移除 scalar 默认 step 中的摘要计算尚未完成，不能将其写成设备热路径之外的全部路径均已迁移。
 
 G06b 已通过普通设备入口接通三后端的 Pendulum 与 PickCube native CUDA batch，并获[独立主审接收](../maintenance/reviews/20261116_g06b_attempt003_acceptance.md)。GeoPhys PickCube必须显式选择离散模式与contact/coupled 32次预算：B=3原源mesh/接触、双指耦合、部分reset、base/hand相机及H5均有证据；三组冻结轨迹最大桌面重叠约1.715 mm。旧默认预算约10 mm级异常未被该显式配置修复，continuous mesh+约束仍不支持，不能外推通用稳定接触。Isaac复用一个PhysX owner，重叠cube、机器人及跨环境机器人/cube过滤均有独立开关对照，源阻尼由provider在设备端逐子步实现。跨后端不要求瞬时接触力或整条轨迹一致；不得用求解器差异放过实际输入/接触错误。
@@ -41,7 +77,7 @@ PYTHONPATH="$PWD:$PWD/GeoPhys/src" python examples/parallel/pick_cube_device.py 
 
 设备相机渲染共享的平铺场景，其他行的几何若进入视野，重置这些行可能改变未选行的图像，即使未选行物理状态和相机绑定保持不变。对需要视觉隔离的使用场景应检查相机视野和场景布局，不能仅凭行状态未变就假定图像逐像素不变。
 
-`render_mode='rgb_array'` 显式创建共享 GeoPhys Rasterizer，`env.render()` 返回 owned CUDA uint8 `[480, 640, 3]`；`render_mode='human'` 使用窗口，`close_render()` 关闭窗口／renderer，物理仍可继续。默认不创建可选 renderer 或相机传感器。B=3、非默认 CUDA stream、重复 capture 和真实 Xorg 窗口已作短程验证。device batch 可在 `render` 配置中声明 RGB-only、HWC、uint8 的 `CameraSpec`，返回 `obs["cameras"][name]["rgb"]`，形状为 CUDA `[B,H,W,3]`；有限 near/far 使用 compute mesh／analytic 路径，粒子、native graphics、TAA 和 overlay 的有限裁剪仍不准入。一次 B=3 Pendulum 诊断用显式测试相机核对了 reset／step 采集；默认 Pendulum 不创建传感器。启用相机时 `close_render()` 只关闭窗口，保留相机共享 renderer。代表性诊断将真实 Isaac scalar session 的公开设备 body pose 接入同一 Rasterizer，验证了真实 PickCube base／hand 相机与 Xorg 窗口的开关组合；三格仅复制一个 scalar 物理状态供渲染，不表示 Isaac parallel Task 获得资格。
+`render_mode='rgb_array'` 显式创建共享 GeoPhys Rasterizer，`env.render()` 返回owned CPU NumPy uint8视口图（尺寸由配置决定）；`render_mode='human'` 在reset/step后自动展示窗口，`close_render()` 关闭窗口／renderer，物理仍可继续。默认不创建可选 renderer 或相机传感器。B=3、非默认 CUDA stream、重复 capture 和真实 Xorg 窗口已作短程验证。device batch 可在 `render` 配置中声明 RGB-only、HWC、uint8 的 `CameraSpec`，返回 `obs["cameras"][name]["rgb"]`，形状为 CUDA `[B,H,W,3]`；有限 near/far 使用 compute mesh／analytic 路径，粒子、native graphics、TAA 和 overlay 的有限裁剪仍不准入。一次 B=3 Pendulum 诊断用显式测试相机核对了 reset／step 采集；默认 Pendulum 不创建传感器。启用相机时 `close_render()` 只关闭窗口，保留相机共享 renderer。代表性诊断将真实 Isaac scalar session 的公开设备 body pose 接入同一 Rasterizer，验证了真实 PickCube base／hand 相机与 Xorg 窗口的开关组合；三格仅复制一个 scalar 物理状态供渲染，不表示 Isaac parallel Task 获得资格。
 
 MJWarp session 还按 source 声明发布环境局部坐标的具名 frame pose；合成 Scene 的具名 site 已在 B=3、seed 73 和共享 Rasterizer 路径中核对运动学、masked reset 与保留快照。该 fixture 不代表注册任务已配置传感器。
 
@@ -199,7 +235,7 @@ MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=Tr
 <a id="observer-candidate"></a>
 ## 5b observer 路线（历史有界接收）
 
-MuJoCo CPU 的 PickCube 候选及 Isaac 6.2 的 F06 候选可在构造时传入 `render_mode='human'` 或 `'rgb_array'` 和显式 `observer_camera`。`render()` 使用已发布边界；RGB 为拥有的 HWC float32 数组，窗口与任务 observation 分离。MuJoCo 的 RGB 路线检查 offscreen GL 附件为 `GL_LINEAR` 且禁用 framebuffer sRGB 写转换；无法核实时拒绝该帧并使 renderer fault。receipt 所述为未经色彩校准的 framebuffer RGB，不能推断标准 sRGB、已知原色或输入纹理色域。Isaac 候选将公开 PhysX body 位姿同步到 renderer-facing Fabric，再核对全部发布 body 和具名 frame；变换或时钟不一致时拒绝帧。其 RGB 声明为 RTX tone mapping 后的 sRGB 传递函数；采集前后核验指定 RTX 设置和 OCIO 文件摘要，未通过时拒绝该帧。该声明不校准原色或源素材色域。该候选依赖实际 F06 source／App，并不证明任意 Isaac 场景。
+MuJoCo CPU 的 PickCube 候选及 Isaac 6.2 的 F06 候选可在构造时传入 `render_mode='human'` 或 `'rgb_array'` 和显式 `observer_camera`。`render()` 使用已发布边界；当前UI导出为拥有的CPU HWC uint8数组（历史5b捕获/receipt为float32）；窗口与任务observation分离，现行合同见上方render-contract。MuJoCo 的 RGB 路线检查 offscreen GL 附件为 `GL_LINEAR` 且禁用 framebuffer sRGB 写转换；无法核实时拒绝该帧并使 renderer fault。receipt 所述为未经色彩校准的 framebuffer RGB，不能推断标准 sRGB、已知原色或输入纹理色域。Isaac 候选将公开 PhysX body 位姿同步到 renderer-facing Fabric，再核对全部发布 body 和具名 frame；变换或时钟不一致时拒绝帧。其 RGB 声明为 RTX tone mapping 后的 sRGB 传递函数；采集前后核验指定 RTX 设置和 OCIO 文件摘要，未通过时拒绝该帧。该声明不校准原色或源素材色域。该候选依赖实际 F06 source／App，并不证明任意 Isaac 场景。
 
 此前 Isaac 原生 viewport 的关闭会使共享 App 的物理时钟和运行态失效。当前选定候选使用 headless App 和 GeoChora 自有窗口；正常关闭窗口与 App 崩溃是不同情形，适用证据及限制见[诊断主审](../maintenance/reviews/20261107_5b_diagnostic_attempt002_sol_review.md)。
 

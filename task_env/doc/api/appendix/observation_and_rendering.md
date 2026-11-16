@@ -17,19 +17,17 @@
 
 **Kind**：class；**Stability**：Advanced boundary；**Defined in**：`observations/camera.py`、`capture.py`
 
-`CameraSensor(*, spec, references)` 从同一次 `RuntimeSnapshot` 解析 pose/metadata。`CameraObservationProvider(*, render_source, config, camera_sensors)` 实现 `reset()`、`capture(snapshot) -> SensorObservation`、`close()`。它属于 env 可选传感器采集，不是 private solver 数据的读取入口，也不是未来 `env.render()` 的 UI API。
+`CameraSensor(*, spec, references)` 从同一次 `RuntimeSnapshot` 解析pose/metadata。`CameraObservationProvider(*, render_source, config, camera_sensors)`实现reset/capture/close，属于env可选传感器采集，与`env.render()`的UI导出分离。
 
 ## UI rendering
 
-**Import path**：`task_env.render`；**状态**：以下描述 classic-control 的 render 路线，不适用于当前 selected manipulation。selected 普通配置只接受 state-only，并明确拒绝非空 `render_mode` 和非 none renderer。真实 capability 按具体任务、provider、backend 与 renderer 的验证范围判断。
+**Import path**：`task_env.render`。正式scalar／device batch的当前合同以[版本API](../../../../docs/module/task_env/v2.1.1/api/README.md#render-contract)为准；默认scalar R3 observer与worker断线已在2026-11-16收尾中补齐。以下component/merged-scene细节仅保留其原适用范围，不外推任意renderer组合。
 
 创建环境时传入 `render_mode="human"` 或 `render_mode="rgb_array"`，之后调用 `env.render()`。UI
-render source 在 runtime 装配时准备，但 visualizer 在第一次 `render()` 时 lazy 创建；`rgb_array` 返回
-场景初始化固定视角下的 HWC `float32` 数组（范围 `[0, 1]`），不会继承 human 交互后的相机位姿。
+render source在runtime装配时准备，visualizer在首次需要采图时lazy创建；`rgb_array`返回拥有的CPU HWC `uint8`数组（0～255）。`human`在成功reset/step后自动展示，仍可显式render，不额外推进物理。未配置render_mode时，无参render返回None。
 `human` 使用已有单 scene visualizer 建立 headed window，并支持按住鼠标右键拖拽旋转、滚轮推拉以及
 W/S/A/D/E/Q 键盘移动。
-`env.close()` 会幂等释放窗口/provider；未配置 `render_mode` 或 runtime 没有 render source 时会抛出
-`RenderUnavailableError`/`StageUnavailableError`。
+`env.close()`幂等释放窗口/provider；显式请求未配置的展示或不支持的renderer路线时会报错。
 
 UI rendering 绝不会把 `CameraObservationProvider` 的 sensor image 冒充为 UI render 结果。相机 RGB/depth、
 未来的触觉/力觉等均继续属于 `task_env.observations` 的 sensor 路径。训练渲染 control mailbox、render toggle、metrics overlay 与 render-event manifest 仍不是该 public sensor API 的一部分。
@@ -45,12 +43,11 @@ UI rendering 绝不会把 `CameraObservationProvider` 的 sensor image 冒充为
 proxy 和有界 `RenderSnapshotRing`，不进行完整 B 的 host state readback。内部仍保留对 `(world, local)` 字段形状的历史读取分支，但 public `develop` 集成 S4 后没有 TaskEnv physics route 产生该布局。选中的每个 world 在同一帧内写入
 自己的 renderer record range，然后一次性发布快照。旧 parallel 路线保留，不能以该实现描述推断统一 Env 的 batch 能力。
 
-真实 source 当前支持内部 `rasterizer`/`raytracer`。`rgb_array` 保持 renderer 创建时的固定网格视角，
+旧component source接口保留`rasterizer`/`raytracer`；RayTracer目前有未修复的helper兼容缺口，不能从接口或旧运行推断本pin已可用。当前正式GeoPhys展示默认选择Rasterizer。`rgb_array`保持renderer创建时的固定网格视角，
 `human` 使用同一 visualizer/window，并保留单环境的右键拖拽、滚轮与 W/S/A/D/E/Q 相机控制；窗口关闭
 不会触碰 batch physics lifecycle。运行中调整 `parallel_render_num` 或布局只失效 renderer-owned
 visualizer/proxy/snapshot binding，并在下一帧重建；不会 reset、丢失 physics step 或改变 rollout transition。
-human presentation 会在窗口关闭后重开，并显示 renderer rebuild、snapshot publish、帧耗时/FPS 和窗口重开
-次数 metrics；这些 metrics 不写入 `rgb_array`。
+旧component renderer的交互和metrics仍由原owner负责，不写入`rgb_array`。现行device Rasterizer在用户关窗后不自动重开；`close_render()`停止自动展示并保留必要的sensor renderer。
 
 并行 world 的刚体几何优先使用 surface 表示，以保留 `SubGeomDesc` 的局部位置/姿态；这对 Pendulum 的
-`fromto` link 尤其重要。PickCube 尚未声明同构并行 task contract；其 selected public route 当前也不提供单环境 render API。
+`fromto` link尤其重要。G06已经接通PickCube的native CUDA batch；具体provider/source/相机范围及当前scalar展示见上述版本API，不能沿用旧“未声明/不可render”的结论。

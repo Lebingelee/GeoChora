@@ -4,20 +4,20 @@
 
 ## Selected 配置
 
-PickCube 和 Nut 使用 `execution`、`episode`、`task`。例如：
+四个正式任务使用`execution`、`episode`、`task`、`controller`、`robot`、`runtime`及`render`。例如：
 
 ```python
 from task_env import make_env
 env = make_env("pick-cube-p16-reference-v1", config={
     "execution": {"physics_provider": "mujoco", "physics_backend": "cpu"},
     "episode": {"horizon": 1000},
-    "task": {"controller_profile": "r3_continuous_v1"},
+    "controller": {"profile_id": "r3_continuous_v1"},
 })
 print(env.resolved_public_config)
 env.close()
 ```
 
-该片段本维护版本未运行。解析顺序是 Core → task class → task YAML → caller；允许的顶层兼容 alias 为 `provider`、`backend`、`horizon`、`controller_profile`、`source_delivery_manifest`，与其嵌套等价项同时指定会报冲突。`task` 可用字段由任务声明，不可任意叠加。当前 selected CPU 接受 GeoPhys 或 MuJoCo；Isaac 仅限明确的 PickCube/R3/CUDA 和 delivery manifest 准入。`execution.render_default` 当前只接受 none/cpu/none/null 的 state-only 组合，`render_mode` 非空也会被拒绝。精确类型、缺失值和错误以 [`configuration.py`](../../../environment/configuration.py) 为准。
+该片段本维护版本未单独运行。解析顺序是Core → task class → task YAML → caller；旧顶层provider/backend/horizon/controller等alias已退休，不能继续用于正式配置。`task`可用字段由任务声明。`execution.render_default`当前仍限none/cpu/none/null，但这不禁止独立的observer与task RGB。scalar与device batch均接受顶层`render`及resolved往返；实际native observer backend、显式CameraSpec、CPU uint8导出和未支持sensor字段见[当前渲染合同](../../../../docs/module/task_env/v2.1.1/api/README.md#render-contract)。精确类型和准入以[`configuration.py`](../../../environment/configuration.py)为准。
 
 ## 配置层次
 

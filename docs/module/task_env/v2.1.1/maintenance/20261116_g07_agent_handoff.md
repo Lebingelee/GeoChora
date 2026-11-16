@@ -2,6 +2,8 @@
 
 交接日期：2026-11-16。维护者已要求逐步进入G07，本轮交付上下文与实施起点，**没有启动7a/7b/7c执行Goal、native或新的工作包**。G01～G06的有界结论保持；G07三个子阶段均为PLANNED／attempt0。接手后先准备一个完整的7a工作包，再按7a→7b→7c推进，不将全部最终矩阵塞进首次调研窗口。
 
+前置维护更新：本交接初建提交bff786e6之后，维护者又授权修复scalar/batch render，见[收尾记录](20261116_scalar_render_followup.md)和[当前API](../api/README.md#render-contract)。接手应从该修复的最终后继HEAD开始；下表G06原结案身份保留，不应checkout回去丢掉修复。UI rgb_array现为CPU uint8、human自动展示；sensor合同不变；scalar具名多相机仍明确拒绝。
+
 ## 1. 真实输入与恢复入口
 
 | 项目 | 本轮核实的交接输入 |

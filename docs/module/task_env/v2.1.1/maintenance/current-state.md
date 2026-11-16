@@ -6,7 +6,7 @@
 
 G07准备入口：[Agent handoff](20261116_g07_agent_handoff.md)已按维护者要求完成。7a先收口任务/装配Robot复用与caller，再冻结7b原三后端×三seed九格，最后7c文档；三个子阶段仍PLANNED／attempt0，尚未启动执行。
 
-**G01～G06 canonical范围有界结案，G07与版本收口待实施。** 维护者在6c主审后要求收尾G06；[开发实施总结](g06/implementation-summary.md)与[证据索引](g06/evidence-index.json)统一记录基本要求、abc成果、测试/性能、submodule和未覆盖项。生产代码结案`4332844f`；GeoPhys pin`198d30ac`，Menagerie`b846dd12`。本次后继提交仅文档/索引，无native重跑，不自动启动R3/G07。
+**G01～G06 canonical范围有界结案，G07与版本收口待实施。** 维护者在6c主审后要求收尾G06；[开发实施总结](g06/implementation-summary.md)与[证据索引](g06/evidence-index.json)统一记录基本要求、abc成果、测试/性能、submodule和未覆盖项。生产代码结案`4332844f`；GeoPhys pin`198d30ac`，Menagerie`b846dd12`。该次结案后继提交仅文档/索引、没有native重跑；其后维护者另行授权的scalar/batch render修复与当前结果见[渲染收尾](20261116_scalar_render_followup.md)。不自动启动R3/G07。
 
 6a、6b、6c独立主审分别为[6a](reviews/20261115_g06a_attempt002_acceptance.md)、[6b](reviews/20261116_g06b_attempt003_acceptance.md)、[6c](reviews/20261116_g06c_attempt001_acceptance.md)，普通attempt计数2/3/1。三后端×两任务CUDA native batch、canonical action、设备Task/state、相机/窗口独立、same-step终止帧、部分reset及两个任务固定Rasterizer的Isaac→MJWarp→Isaac已成立。GeoPhys限显式discrete/contact32/coupled32配置，跨provider未准入；shared scene不承诺视觉隔离。R3、旧scalar SHA迁移、AOT/上游反向合并等后续或暂缓边界不记通过。
 

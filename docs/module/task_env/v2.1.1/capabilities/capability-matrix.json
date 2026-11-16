@@ -818,6 +818,39 @@
       "geophys_mode": "explicit discrete contact32/coupled32 tested configuration",
       "R3_status": "SEPARATE_FUTURE_PACKAGE",
       "g07_status": "NOT_RUN"
+    },
+    "scalar_render_followup": {
+      "date": "2026-11-16",
+      "status": "IMPLEMENTED_BOUNDED_MAINTENANCE",
+      "production_head": "ae54597695e65968928458a8c9d42a80858e7315",
+      "report_ref": "../maintenance/20261116_scalar_render_followup.md",
+      "evidence_index_ref": "../maintenance/g06/scalar-render-evidence-index.json",
+      "public_render_output": "Owned CPU HWC uint8; human automatic after successful reset/step; no mode does not render",
+      "native_observer_routes": {
+        "geophys/cpu": "rasterizer",
+        "mujoco/cpu": "mujoco_reference",
+        "isaacsim/cuda": "isaac_rtx"
+      },
+      "tested_intersections": [
+        "MuJoCo CPU Pendulum scalar RGB",
+        "MuJoCo CPU PickCube default R3 scalar RGB",
+        "MuJoCo CPU PickCube default R3 automatic human",
+        "GeoPhys CPU PickCube default R3 worker RGB",
+        "GeoPhys CPU PickCube default R3 worker automatic human",
+        "Isaac6.2 CUDA PickCube default R3 worker RGB",
+        "MJWarp Pendulum B2 automatic human and CPU RGB export",
+        "MJWarp Pendulum device scalar RGB",
+        "MuJoCo PickCube task RGB float32 and UI uint8 / second reset",
+        "GeoPhys CPU Pendulum ordinary example explicit in_process"
+      ],
+      "limitations": [
+        "Scalar named multicamera not implemented and rejected",
+        "GeoPhys Pendulum direct-effort worker remains rejected; explicit in_process example tested",
+        "RayTracer compatibility not implemented",
+        "Isaac human window not rerun this maintenance",
+        "Worker camera RGB-only host-copy transport retains 16MiB limit"
+      ],
+      "g07_started": false
     }
   }
 }

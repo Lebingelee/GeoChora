@@ -4,6 +4,8 @@
 
 沿用Env、RuntimeSession、render/camera、observation与batch owner，不新建第二Runtime／Recorder／RenderManager；Depth、segmentation、Flora及非刚体实际运行不在本版必达。
 
+2026-11-16维护者确认并实施UI边界调整：scalar／batch无参`render()`在rgb_array模式统一导出owned CPU NumPy HWC uint8；human在成功reset/step后自动展示；mode=None不自动渲染。sensor的host float32／CUDA uint8合同保持。配置、显式CameraSpec、worker值传输及确切实测范围见[当前API](../api/README.md#render-contract)与[收尾记录](../maintenance/20261116_scalar_render_followup.md)。后文历史候选和设计值保留其原时点。
+
 2026-11-07 维护者修订：renderer 在 public Env 创建时选择并准入，从创建到 close 保持同一选择；reset 可按需重建该 renderer 的 session、worker/App 或 lease，但不更换 renderer。同一 Env 的 renderer 往返切换留待后续未排期任务，不是 5c 出口。若 reset 的其他配置与固定 renderer 不兼容，应在可静态判断的副作用前拒绝。配置解析、相机绑定和内部身份由 Core 协调，调用者不手工拼接 receipt／generation。目标和验证范围见[5c 范围](../planning/stage5-5c-fixed-renderer-scope.md)。
 
 5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、构建时固定 renderer 和真实跨组合已按[单元9综合主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)有界接收，后续当前源码影响核对见[G05→G06复核](../maintenance/reviews/20261114_g05_pre_g06_readiness_7f8796b4.md)。Isaac受测frame-mounted RGB为后续明确扩展，不向CPU相机推广；不得把5b observer证据或state-only Solution当成5c task RGB。

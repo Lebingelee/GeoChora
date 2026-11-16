@@ -2,6 +2,8 @@
 
 当前进度（2026-11-16）：G06abc canonical范围已依独立主审及维护者收尾指令有界结案，详见[实施总结](../maintenance/g06/implementation-summary.md)及其证据索引。基本要求无未闭合项；可选/暂缓项逐项列示，R3/G07另包。后文原派发与设计记录保留历史时点。
 
+2026-11-16后续维护：G07前另行修复scalar render配置、默认R3 observer与worker采图等断线，见[渲染收尾](../maintenance/20261116_scalar_render_followup.md)。原canonical设备六格不自动证明全部scalar入口；原attempt与已测输入保留。
+
 日期：2026-11-15。设计输入：`41a09c87a7599f13adce9fb50501eb6378c2a17e`。本文是派发准备，不代表已经启动 agent、安装依赖或完成 native 验收。
 
 以[现行实施方案](stage6-parallel-execution-plan.md)和[G06 Goal](../goals/06-parallel.md)为共同依据；维护者最近决定优先于早期交接的“至少两后端”“不做规模测试”等旧规划。canonical 主包覆盖三后端×两任务；R3 后端名单另定、独立接收。

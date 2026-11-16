@@ -1,0 +1,1350 @@
+{
+  "schema_version": "scalar-render-maintenance-evidence-v1",
+  "date": "2026-11-16",
+  "status": "IMPLEMENTED_BOUNDED_MAINTENANCE",
+  "input_head": "bff786e6ab21a1d5a5c7da0f28237c8db28f0a1f",
+  "production_head": "ae54597695e65968928458a8c9d42a80858e7315",
+  "report_ref": "../20261116_scalar_render_followup.md",
+  "raw_workspace": "workspace/maintenance/v211_scalar_render_closeout_20261116",
+  "provenance_note": "Native runs exercised the incremental dirty implementation over input_head; final production patch and file hashes freeze the delivered implementation. Final focused pure tests follow window/metadata/default fixes. No claim that every native intersection was rerun after each small change.",
+  "raw_storage": "Ignored workspace retained in place; this committed index preserves receipts/hashes, not raw log payloads.",
+  "submodules": {
+    "GeoPhys": "198d30ac64ce873a1467f55d2adfc471db18fbc5",
+    "mujoco_menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+  },
+  "protected_log": {
+    "path": "MUJOCO_LOG.TXT",
+    "sha256": "3b08b858f62dcbaa6521802455c76126f9876a3d6727c7586db90c94296ed6a8",
+    "modified": false
+  },
+  "scope_exclusions": [
+    "RayTracer native/private payload compatibility",
+    "scalar named multicamera observations",
+    "direct-effort scalar worker",
+    "full Solution / Qualification / throughput matrix",
+    "new G07 attempt"
+  ],
+  "cases": [
+    {
+      "id": "device-batch-human-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MJWarp Pendulum B2 automatic human and CPU RGB export",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/device_probe.py",
+          "batch",
+          "human"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 17.091381674050353,
+        "peak_tree_rss_bytes": 2323939328,
+        "peak_card_gpu_mib": 1514
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/result.json"
+    },
+    {
+      "id": "device-scalar-rgb-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MJWarp Pendulum device scalar RGB",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/device_probe.py",
+          "scalar",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 14.936814050073735,
+        "peak_tree_rss_bytes": 2069561344,
+        "peak_card_gpu_mib": 1491
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/result.json"
+    },
+    {
+      "id": "final-regression-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_renderer_capabilities.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_public_scalar_example.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_task_rgb.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/render/test_backend_registry.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_device_semantics.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_observer_render.py::test_rgb_render_returns_independent_copy_and_invalidates_on_capture_failure",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_observer_render.py::test_observer_window_close_keeps_capture_live_without_reopening",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 12.85788272996433,
+        "peak_tree_rss_bytes": 1174974464,
+        "peak_card_gpu_mib": 1293
+      }
+    },
+    {
+      "id": "final-regression-002",
+      "status": "PASS_REGRESSION",
+      "scope": "106 passed / 6 subtests passed",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_renderer_capabilities.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_public_scalar_example.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_task_rgb.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/render/test_backend_registry.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_device_semantics.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_observer_render.py::test_rgb_render_returns_independent_copy_and_invalidates_on_capture_failure",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_observer_render.py::test_observer_window_close_keeps_capture_live_without_reopening",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-002",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 10.701622809981927,
+        "peak_tree_rss_bytes": 1183154176,
+        "peak_card_gpu_mib": 1175
+      }
+    },
+    {
+      "id": "geophys-pendulum-example-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/examples/rendering/pendulum_single_rgb.py",
+          "--width",
+          "96",
+          "--height",
+          "72"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 1.0662589109269902,
+        "peak_tree_rss_bytes": 581632,
+        "peak_card_gpu_mib": 1110
+      }
+    },
+    {
+      "id": "geophys-pendulum-example-002",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys CPU Pendulum ordinary example explicit in_process",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/examples/rendering/pendulum_single_rgb.py",
+          "--width",
+          "96",
+          "--height",
+          "72"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-002",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 13.847642536042258,
+        "peak_tree_rss_bytes": 652664832,
+        "peak_card_gpu_mib": 1072
+      },
+      "result_from_stdout": {
+        "backend": "cpu",
+        "capability_intersection": "Pendulum / GeoPhys CPU / scalar TaskEnv / rasterizer RGB",
+        "expert_complete": null,
+        "frame_dtype": "uint8",
+        "frame_shape": [
+          72,
+          96,
+          3
+        ],
+        "height": 72,
+        "provider": "geophys",
+        "qualification": "NOT_ASSESSED",
+        "reset_observation_valid": true,
+        "resource_budget": {
+          "address_space_limit_bytes": 8589934592,
+          "address_space_limit_scope": "single_process_rlimit_as",
+          "cpu_limit_s": 120,
+          "cpu_limit_scope": "single_process_rlimit_cpu",
+          "native_threads": 1,
+          "wall_limit_s": 120,
+          "wall_limit_scope": "coordinating_process_alarm"
+        },
+        "reward": 0.9779344970878069,
+        "status": "PASS_BOUNDED_RENDER_SMOKE_NOT_QUALIFICATION",
+        "step_observation_valid": true,
+        "task_success": false,
+        "terminated": false,
+        "truncated": false,
+        "width": 96
+      }
+    },
+    {
+      "id": "geophys-pickcube-human-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys CPU PickCube default R3 worker automatic human",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "geophys",
+          "pickcube",
+          "human"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 26.67837527790107,
+        "peak_tree_rss_bytes": 1127301120,
+        "peak_card_gpu_mib": 917
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/result.json"
+    },
+    {
+      "id": "geophys-pickcube-rgb-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "geophys",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 1.0714223879622295,
+        "peak_tree_rss_bytes": 577536,
+        "peak_card_gpu_mib": 948
+      }
+    },
+    {
+      "id": "geophys-pickcube-rgb-002",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "geophys",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-002",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 10.68281546595972,
+        "peak_tree_rss_bytes": 623976448,
+        "peak_card_gpu_mib": 921
+      }
+    },
+    {
+      "id": "geophys-pickcube-rgb-003",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "GeoPhys CPU PickCube default R3 worker RGB",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "geophys",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 27.71410509501584,
+        "peak_tree_rss_bytes": 1203183616,
+        "peak_card_gpu_mib": 915
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/result.json"
+    },
+    {
+      "id": "isaac-pickcube-rgb-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "isaacsim",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 1.0759819829836488,
+        "peak_tree_rss_bytes": 655360,
+        "peak_card_gpu_mib": 1024
+      }
+    },
+    {
+      "id": "isaac-pickcube-rgb-002",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "isaacsim",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-002",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 122.02651262690779,
+        "peak_tree_rss_bytes": 4707618816,
+        "peak_card_gpu_mib": 2844
+      }
+    },
+    {
+      "id": "isaac-pickcube-rgb-003",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "Isaac6.2 CUDA PickCube default R3 worker RGB",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "isaacsim",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 98.97431646101177,
+        "peak_tree_rss_bytes": 5821333504,
+        "peak_card_gpu_mib": 2963
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/result.json"
+    },
+    {
+      "id": "mujoco-pendulum-rgb-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "mujoco",
+          "pendulum",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 2.226984178996645,
+        "peak_tree_rss_bytes": 109735936,
+        "peak_card_gpu_mib": 953
+      }
+    },
+    {
+      "id": "mujoco-pendulum-rgb-002",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "mujoco",
+          "pendulum",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-002",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 1.0648172170622274,
+        "peak_tree_rss_bytes": 638976,
+        "peak_card_gpu_mib": 958
+      }
+    },
+    {
+      "id": "mujoco-pendulum-rgb-003",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MuJoCo CPU Pendulum scalar RGB",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "mujoco",
+          "pendulum",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 1.0654333640122786,
+        "peak_tree_rss_bytes": 622592,
+        "peak_card_gpu_mib": 950
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/result.json"
+    },
+    {
+      "id": "mujoco-pickcube-human-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MuJoCo CPU PickCube default R3 automatic human",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "mujoco",
+          "pickcube",
+          "human"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 4.308371108956635,
+        "peak_tree_rss_bytes": 619970560,
+        "peak_card_gpu_mib": 916
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001/result.json"
+    },
+    {
+      "id": "mujoco-pickcube-rgb-001",
+      "status": "PRESERVED_FAILED_RUN",
+      "scope": "Not positive evidence; failure reason and subsequent fix are in maintenance report",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "mujoco",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-001",
+        "exit_code": 1,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 3.205573681043461,
+        "peak_tree_rss_bytes": 266608640,
+        "peak_card_gpu_mib": 953
+      }
+    },
+    {
+      "id": "mujoco-pickcube-rgb-002",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MuJoCo CPU PickCube default R3 scalar RGB",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "mujoco",
+          "pickcube",
+          "rgb_array"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 3.2023972329916432,
+        "peak_tree_rss_bytes": 421720064,
+        "peak_card_gpu_mib": 953
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/result.json"
+    },
+    {
+      "id": "mujoco-pickcube-sensor-rgb-001",
+      "status": "PASS_BOUNDED_NATIVE",
+      "scope": "MuJoCo PickCube task RGB float32 and UI uint8 / second reset",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+          "mujoco",
+          "pickcube",
+          "rgb_array",
+          "task-rgb"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 4.258971192059107,
+        "peak_tree_rss_bytes": 593506304,
+        "peak_card_gpu_mib": 1117
+      },
+      "result_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/result.json"
+    },
+    {
+      "id": "pendulum-preflight-001",
+      "status": "EXPECTED_REJECTION_PREFLIGHT_ONLY",
+      "scope": "GeoPhys Pendulum direct physical execution remains rejected in worker; no physics",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/pendulum-preflight-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/preflight_probe.py"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/pendulum-preflight-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 1.071458298014477,
+        "peak_tree_rss_bytes": 1146880,
+        "peak_card_gpu_mib": 998
+      }
+    },
+    {
+      "id": "regression-001",
+      "status": "PASS_REGRESSION",
+      "scope": "244 passed",
+      "supervisor": "workspace/maintenance/v211_scalar_render_closeout_20261116/regression-001/supervisor.json",
+      "receipt": {
+        "command": [
+          "/home/lly/miniconda3/envs/geochora/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_formal_configuration.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_renderer_capabilities.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/test_worker_resources.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_g03_3a_transport.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/test_v211_render_fault_cleanup.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_device_semantics.py",
+          "/home/lly/Program_Files/Geochora/task_env/diagnostics/tasks/v2.1.1/g06/test_reconfiguration.py",
+          "-p",
+          "no:cacheprovider"
+        ],
+        "cwd": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_scalar_render_closeout_20261116/regression-001",
+        "exit_code": 0,
+        "violation": null,
+        "forced_retirement": false,
+        "wall_seconds": 35.416707203025,
+        "peak_tree_rss_bytes": 1219813376,
+        "peak_card_gpu_mib": 1101
+      }
+    }
+  ],
+  "additional_validation": {
+    "example-final-tests.log": "2 passed after explicit in_process example change",
+    "pure-tests.log": "Initial source-path import failures preserved; superseded by supervised regression-001",
+    "doc_validation": {
+      "result": "ONLY_KNOWN_PROTECTED_INPUT_BASELINE_MISMATCH",
+      "exit_code": 1,
+      "errors": [
+        "protected local input changed: MUJOCO_LOG.TXT"
+      ],
+      "stale_path_references": [],
+      "log_ref": "workspace/maintenance/v211_scalar_render_closeout_20261116/doc-validation.log"
+    }
+  },
+  "production_files": [
+    {
+      "path": "examples/parallel/pendulum_device.py",
+      "sha256": "58b9fd47da50f81b3cf8320ef0b66b3c58182f9d7f74612670ab8e35234fc740",
+      "deleted": false
+    },
+    {
+      "path": "examples/parallel/pick_cube_device.py",
+      "sha256": "34114e8a39b5c46131d8efda906a1d98c55dacfdfcad69dbe5111be6437163af",
+      "deleted": false
+    },
+    {
+      "path": "examples/rendering/pendulum_single_rgb.py",
+      "sha256": "f373af20e6c80374a1c76b359bdadb0332d87dd7dc430630759c70882497e26d",
+      "deleted": false
+    },
+    {
+      "path": "task_env/diagnostics/render/test_backend_registry.py",
+      "sha256": "ca326497f85dd607a65ec1ff559249788f8462320366918d2a563abd1c6ce4b6",
+      "deleted": false
+    },
+    {
+      "path": "task_env/diagnostics/tasks/test_v211_observer_render.py",
+      "sha256": "9814d61adec8c4176a4e0cf788214d3889df4893df19e4896d17ec59ee1db061",
+      "deleted": false
+    },
+    {
+      "path": "task_env/diagnostics/tasks/test_v211_pendulum_human_contract.py",
+      "sha256": null,
+      "deleted": true
+    },
+    {
+      "path": "task_env/diagnostics/tasks/v2.1.1/test_public_scalar_example.py",
+      "sha256": "713aa3dfeed7520a93d5db4a39b4aa9f0eadfeb0bae98e080b4bcff2679aa4ef",
+      "deleted": false
+    },
+    {
+      "path": "task_env/diagnostics/tasks/v2.1.1/test_renderer_capabilities.py",
+      "sha256": "554607db5f8e5021b360233a7d71cea7e9f3ab4db0959bfcaa888adc5d999650",
+      "deleted": false
+    },
+    {
+      "path": "task_env/diagnostics/tasks/v2.1.1/test_scalar_render_contract.py",
+      "sha256": "abdb57d896d810ec26f59e99844b14e719843eb9203b3b12abf374b32c9b5c7a",
+      "deleted": false
+    },
+    {
+      "path": "task_env/environment/config.py",
+      "sha256": "35c495621fe188dd4a76468b5e668e6b3079656e1278888ad50d7221eea64fe3",
+      "deleted": false
+    },
+    {
+      "path": "task_env/environment/configuration.py",
+      "sha256": "03da2bf8b42931ac6531e617ceb7825e654fbf75d3f02148f5c09a934c7941bc",
+      "deleted": false
+    },
+    {
+      "path": "task_env/environment/lifecycle.py",
+      "sha256": "c56d41600eafda92089e0eb3be384c6999f92759dbeb966e07bc81213d35ba3b",
+      "deleted": false
+    },
+    {
+      "path": "task_env/environment/reference_env.py",
+      "sha256": "73d12c636a311a9eaf4b9d5d3b298780d06f1f8ba64080d4e23d4f7b72979a46",
+      "deleted": false
+    },
+    {
+      "path": "task_env/render/base/contracts.py",
+      "sha256": "8311773b6ddb3d1519b53e4a9a2e2012a518d38010dd28a3111e2516d4659236",
+      "deleted": false
+    },
+    {
+      "path": "task_env/render/camera/color.py",
+      "sha256": "42d7c060c23c2d717c113c34dcf883fb5dc3b3cf14806eb2fede3550b5936c9f",
+      "deleted": false
+    },
+    {
+      "path": "task_env/render/camera/task_rgb.py",
+      "sha256": "ab9dad5670dfa54b960a60dfdb40ca4f19af2703de4d23dc59729db4f3c650fa",
+      "deleted": false
+    },
+    {
+      "path": "task_env/render/providers/parallel.py",
+      "sha256": "74b0d9dae6ce48520ae079b037bbd31508980086f8d5762926172060f585864d",
+      "deleted": false
+    },
+    {
+      "path": "task_env/render/providers/single.py",
+      "sha256": "79fb39111c11a07a65ccf8aecacee86e15b4c8ed7b88ed9a36b9fa64430ac48c",
+      "deleted": false
+    },
+    {
+      "path": "task_env/render/rasterizer/device.py",
+      "sha256": "0c2668e14eb062174ed59648159626178e404e5128a2536d3eec17dcca32bcf3",
+      "deleted": false
+    },
+    {
+      "path": "task_env/render/tools/processing.py",
+      "sha256": "97d484f3081056b06f23c4bde84e9cc758339ac22569c7b336c62b621577b294",
+      "deleted": false
+    },
+    {
+      "path": "task_env/runtime/sessions/isaac_native_io.py",
+      "sha256": "05d116ac767772393b3ce1cd892bbc00b095a7826ef4c375cba2fea59ddd7592",
+      "deleted": false
+    },
+    {
+      "path": "task_env/runtime/sessions/transport.py",
+      "sha256": "2db5deefa87c970e4140f15bae1e5de2984254c2637aaa0885cb9618b6df58f1",
+      "deleted": false
+    },
+    {
+      "path": "task_env/runtime/sessions/worker.py",
+      "sha256": "de8a81f14c0310a2288116c5332147f89a5a89d0b40eb362e1dcfcf3741849e7",
+      "deleted": false
+    },
+    {
+      "path": "task_env/tasks/empty/default.yaml",
+      "sha256": "0cd07dae7aed55cfaed59de35e43ef6509d0bcd81191f9e863b4ffeef207f19b",
+      "deleted": false
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/config.yaml",
+      "sha256": "8c30ee15bc646febb746da83b913a87b49bfb8f80ef78c238393fc90cc864a81",
+      "deleted": false
+    },
+    {
+      "path": "task_env/tasks/pendulum/default.yaml",
+      "sha256": "d22d74cf298cbe8a39088db377b88d4186d654a7e63f60d0390b69ec22ba98f4",
+      "deleted": false
+    },
+    {
+      "path": "task_env/tasks/pick_cube/config.yaml",
+      "sha256": "f17d05ba90426c3e7c30e206382434ff2b28baf9e5afbb3402d27f698cefca40",
+      "deleted": false
+    },
+    {
+      "path": "task_env/tasks/two_wheel_balance/default.yaml",
+      "sha256": "d22d74cf298cbe8a39088db377b88d4186d654a7e63f60d0390b69ec22ba98f4",
+      "deleted": false
+    },
+    {
+      "path": "task_env/vectorization/factory.py",
+      "sha256": "7267a8db9b1b40565e8f51c92cf61335256a62a3af21777c7c8d90eacb3a27ec",
+      "deleted": false
+    },
+    {
+      "path": "task_env/vectorization/homogeneous.py",
+      "sha256": "f3845dbbe6b69508ff05decf445f80daac0deadcc2c98e18fad7b464f58af36a",
+      "deleted": false
+    }
+  ],
+  "raw_files": [
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "81e8938ff19562b63f09975717c9d5a9a235cf5de4e4445170e85856fa1faa59"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/result.json",
+      "bytes": 264,
+      "sha256": "5d625faedf26b61ee7083e6347d4b36fccbaeb7d6f7146dd87e6ac0831aced2f"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/stderr.log",
+      "bytes": 4513,
+      "sha256": "c675e2754f8bbe72ebaf0a480a4cf7da792dc40a996675789d723607c47902ce"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/stdout.log",
+      "bytes": 525,
+      "sha256": "368bf1fc515fcc2cae9c706dba43980326f5f34ca28eeef5b2e0e75f90b5003a"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/supervisor.json",
+      "bytes": 516,
+      "sha256": "b94400181421c9e89de11788d05ac38b1f1331aebae4fc1c87d49c5869e0d4b8"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-batch-human-001/temp_outputs/logs/geophys-20261116T115309-956154-8eb41e8080ba.jsonl",
+      "bytes": 13235,
+      "sha256": "8a49af07e56508b5149bdd6be403902671c50f88c18424b19504338d93d84cfe"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "ddae4f0dca1057ee8ad21c79a88057d6737ee427b691894ba3e19421403360ab"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/result.json",
+      "bytes": 267,
+      "sha256": "212f0f7f87f32088ed1e0247d01af20de01e87b26b1fd0d95a0785d06c94149d"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/stderr.log",
+      "bytes": 4513,
+      "sha256": "24d9e217a28efa5248df704662f5a044b20a951700f298ea2a40434cf4786aed"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/stdout.log",
+      "bytes": 528,
+      "sha256": "b6cd4c9ef5008e2a7949290a61b55b2617e14042e862c8e80f00a7ef20851a69"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/supervisor.json",
+      "bytes": 520,
+      "sha256": "a2a3bf583060d0eeea7eb0b94811bc93df5d11ea1bbe4893671f24d318f778ee"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device-scalar-rgb-001/temp_outputs/logs/geophys-20261116T120104-962483-23134208243c.jsonl",
+      "bytes": 4475,
+      "sha256": "af9ad1bbbfebfe0d53a76fddb74214fea7ff605cbd2c8669be76eb7ba2806d08"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/device_probe.py",
+      "bytes": 1765,
+      "sha256": "4129c7911ef6b3ccb6fd7f9ae4a93ab2b329d9433040a6cd6797f150bfe7f8a8"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/doc-validation.log",
+      "bytes": 18808,
+      "sha256": "fb76068f447147454782c7b309829f9c6e716cae73b74cf79f6de4ba00d4dd1d"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/example-final-tests.log",
+      "bytes": 98,
+      "sha256": "aad379e7b2a64858e712e62619e117bec18395755c8c673c8e0ff100744c7455"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-001/stdout.log",
+      "bytes": 3680,
+      "sha256": "30cfa189c10f1fbbe0bc246ddd9ce669a27b49ec3d2f13a7a244571715daf43c"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-001/supervisor.json",
+      "bytes": 1374,
+      "sha256": "030204b8e1ff603651accd1865e2d8f2da55c65fd33d43efebd7c175b0fc4a24"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-001/temp_outputs/logs/geophys-20261116T120252-963656-032279a018f5.jsonl",
+      "bytes": 7602,
+      "sha256": "f6e327908b6e1a3a941d40455f35c641502658452df387d9a809a20354032e79"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-002/stdout.log",
+      "bytes": 193,
+      "sha256": "2b429cbdb5f8fb4f78076131c53ddaa16b47e8e3115c0c4ea56ce92b1b022243"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-002/supervisor.json",
+      "bytes": 1375,
+      "sha256": "50122e2255a8f646c3677682e19e39a6301f62f491d244f6e331e65e8df8566b"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/final-regression-002/temp_outputs/logs/geophys-20261116T120752-967264-8df06c2233d2.jsonl",
+      "bytes": 7602,
+      "sha256": "bedc70e9f137f86f34dc504c34e62b392bf05442e8f63d26aa7a5088689930eb"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/finalize_evidence.py",
+      "bytes": 7679,
+      "sha256": "7be6f93c4a164a50210eb9f01c1ebee4c5870bf630852ccf101dffd37f8e2587"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-001/stdout.log",
+      "bytes": 358,
+      "sha256": "0bba8d640cf2d84aff0fa7c77ed828417bf2f6b65f11be3a1d001bf1cb184d64"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-001/supervisor.json",
+      "bytes": 510,
+      "sha256": "3c0f56de855086618c0392ae802108fb67345f2e755fd087a3883c702f7d9a0e"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-002/stdout.log",
+      "bytes": 1470,
+      "sha256": "81df2e34897507eb8fdf44d3a1ab6c2f441644fa333bf53e8991f4285baabc32"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-002/supervisor.json",
+      "bytes": 513,
+      "sha256": "1a58654ca10dd625e5dfd95d2012757e524bd66038d245cf4f19173f0b974266"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pendulum-example-002/temp_outputs/logs/geophys-20261116T121133-969915-c9b1d43d4b79.jsonl",
+      "bytes": 13444,
+      "sha256": "59ca89273777d99a63b7982962bbde4f750faa9b01ed5e693ee32444d4f5ed68"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/result.json",
+      "bytes": 5692,
+      "sha256": "e75b4f2320715e9dda303252bdd1d901c80d9aef4c5c3f21ac0e6af6983be47b"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/stdout.log",
+      "bytes": 4472,
+      "sha256": "03dd529b14a726d2f03d2a964bf10ec179fc9b2555e7024e6abbb2f4d80a7578"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/supervisor.json",
+      "bytes": 536,
+      "sha256": "b4e3aebc963e6dd99c57139d5459228c2f060efff0c4a94eba8aaea5bc06bd1b"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/temp_outputs/logs/geophys-20261116T114953-953866-bfc07deac341.jsonl",
+      "bytes": 7602,
+      "sha256": "cdf1972612be2fb9d70dd4f181a5b33aa3d5e913e709650184dfe489f7e753d1"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-human-001/temp_outputs/logs/geophys-20261116T114955-953907-a54373b4827b.jsonl",
+      "bytes": 28987,
+      "sha256": "c30ea69d327f6f1bd0eb839b1d4bc98fe62f6b232c746ed094d4fb3b9bae67e6"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-001/stderr.log",
+      "bytes": 1673,
+      "sha256": "5c3e1f04ac42703f2baa94af777b2943d57c71e576b92a1837d7e5036d390dad"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-001/stdout.log",
+      "bytes": 407,
+      "sha256": "03068f471a154b03ae70d30a380de38f3f0b4d215c7a376d8641470b242f8c33"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-001/supervisor.json",
+      "bytes": 535,
+      "sha256": "4460a9404143d3b1afdad6ae1673a3c78d81889d26cad147b203b7c9025befed"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-001/temp_outputs/logs/geophys-20261116T114510-950571-22a899643bea.jsonl",
+      "bytes": 3801,
+      "sha256": "d2ca426a6f0a62730bdf41741b92865cfcfaa9d9ed385d770f5ef905cae881ba"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-002/stderr.log",
+      "bytes": 2458,
+      "sha256": "49b853d9a00db22b0fc67f3b78c96c5fe38a268bffab323df9e9a75f2ee37424"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-002/stdout.log",
+      "bytes": 814,
+      "sha256": "c06a7a44707754bd6fad578b2d5b2e3f61704dbc59041dc907e161893e3ce9eb"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-002/supervisor.json",
+      "bytes": 537,
+      "sha256": "ed6ca615371b793abbf07d45a4b91ea19f8d33d1f0926b11f359f2b411aa8e85"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-002/temp_outputs/logs/geophys-20261116T114731-951968-4447bca73fb3.jsonl",
+      "bytes": 7602,
+      "sha256": "1ff6cea82647fbb88e51c1d47895a76ead49a9719ba96ef28677b64191c1665a"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-002/temp_outputs/logs/geophys-20261116T114733-952000-1dc60b17db82.jsonl",
+      "bytes": 9001,
+      "sha256": "f1d684ca7898100433693cfbbc37119179d3d149ba141fbb4d2b91a498779c5b"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/final-rgb.npy",
+      "bytes": 20864,
+      "sha256": "e319fbee26225a48a4be1efeb0e62595e032b999278eb7a584539a40bb65a8ba"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "4fef6dc88b22ce62b4183403456d41b2686548fccd3e4abc0e24516b9bc3040b"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/result.json",
+      "bytes": 5525,
+      "sha256": "f7582dab8fe349815274c6381a6e3358df14b84ff4e713b17be832d848b5fb07"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/stdout.log",
+      "bytes": 4339,
+      "sha256": "fc51c08c91e678062493b780ec1e658b21febaac7fe9cebc333adbc13fbad69e"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/supervisor.json",
+      "bytes": 538,
+      "sha256": "a08b83f125956f0ad421fd5ab739a7a5efeef35804dae7c499810f0c73d6e1c5"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/temp_outputs/logs/geophys-20261116T114839-952731-ecb0762a9d03.jsonl",
+      "bytes": 7602,
+      "sha256": "c9d905769da594322c680e613113cbf6ab2b629fb78730a5596364b6b91cca84"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/geophys-pickcube-rgb-003/temp_outputs/logs/geophys-20261116T114841-952788-6751f6a2799b.jsonl",
+      "bytes": 20154,
+      "sha256": "51938e1832d3afafade1029da96df5d93e3af9c800b35c73b7c3591494a30b73"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/implementation.patch",
+      "bytes": 60689,
+      "sha256": "63cc914a086ec543221a2315a2487b56b9562fa471eb600cd4a605937534be1d"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/input-head.txt",
+      "bytes": 41,
+      "sha256": "d41c2473893be085c76b0bf7e8160e394aa578971cce95f9d9d47ed7671f1fba"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/input-status.txt",
+      "bytes": 18,
+      "sha256": "a5ef037d0a0b511e56643f5d4f53322cde927c69f106164a711a8bebfc9aeff0"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/investigation.md",
+      "bytes": 2942,
+      "sha256": "8059b3bb63de34451c6f89f050da78cc3f843b2b38d2ea2248efada9c790b7a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-001/stderr.log",
+      "bytes": 1675,
+      "sha256": "5b9b826b6f5031349dfa149e7d3d1235400676a8cda402041c5eccca3498766b"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-001/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-001/supervisor.json",
+      "bytes": 535,
+      "sha256": "b856c08e834f6c0879a94d376f8aba5ba087889fd21284dadcfcb5af5306cb01"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-002/stderr.log",
+      "bytes": 1622,
+      "sha256": "462ef879734e31fd93bc1edf93e1cc43b9c7c887f2b8b089bd093f041264cfa9"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-002/stdout.log",
+      "bytes": 38745,
+      "sha256": "f40bd4b31007e911c98bc575961d656c118f6c711f69a2084a175f27fa10042f"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-002/supervisor.json",
+      "bytes": 539,
+      "sha256": "1c29942992d1829ac9e67d00e4cf18ae6f28ee494844c2e579cb4d845ad4999a"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-002/temp_outputs/logs/geophys-20261116T115529-957833-37193dd93338.jsonl",
+      "bytes": 7602,
+      "sha256": "dd25386663231bf4b9216bfa9370cc7e26e55d0396beddbe7c1be109b8e17ede"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-002/temp_outputs/logs/geophys-20261116T115612-957891-0d3b67e0352c.jsonl",
+      "bytes": 3801,
+      "sha256": "fa4188c694d9d80414f427904d2a47493b1b844827afd8666a463244484dd6fa"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/final-rgb.npy",
+      "bytes": 20864,
+      "sha256": "243a5d94c1bfb409520c1b9833eb2879354cc25ed81663c87526cd41353ba499"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "711b147f4634d99a9b7bded4b8e2989ce51a82b5d3d9cfdde05285aa09d3f09f"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/result.json",
+      "bytes": 5578,
+      "sha256": "3960ab9d4e6e192c3e5c4a352180cd31b0ab8edca515f61e2204d9d74c63194f"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/stderr.log",
+      "bytes": 475,
+      "sha256": "f423c41612d408bfdacfc50d981463f27ee912130fb53203f7c2d81be61d05ad"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/stdout.log",
+      "bytes": 38241,
+      "sha256": "4da939d2f45f017d49d0bca7eb724da3e045682284ba5c11fa2ec8480d950cc8"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/supervisor.json",
+      "bytes": 538,
+      "sha256": "8490f5b06bc5179210cd09e97907975c6ecd22db23b8d12e2d1b92a96ad3d8c7"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/temp_outputs/logs/geophys-20261116T115841-960487-b94521bda413.jsonl",
+      "bytes": 7602,
+      "sha256": "3a0cc33dbe14646e8ec2dfca4df925e6aaacac4a653ce0a4b65b6309971b687e"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/isaac-pickcube-rgb-003/temp_outputs/logs/geophys-20261116T115900-960540-fa70eca86345.jsonl",
+      "bytes": 3801,
+      "sha256": "4c95a7b982a6fb968976a4e30a7a2a7d0e1cf78e07e43d81ad73e491a4f7a209"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-001/stderr.log",
+      "bytes": 474,
+      "sha256": "de05b802e5d49eae13ad6559e86be8907bf4e6658b1007370ed57f415cdbe81d"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-001/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-001/supervisor.json",
+      "bytes": 535,
+      "sha256": "c684e6f27173a73f5665ef1caf2ca3039e9df1115d74320ba5cb11bfc67dae0d"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-002/stderr.log",
+      "bytes": 474,
+      "sha256": "ac105bdf25638128311eaa8362979fef42b0a0385cf6f4d8aaddc2b17d04c9a1"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-002/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-002/supervisor.json",
+      "bytes": 533,
+      "sha256": "62b9f23dcf941c527689be65f63bedd401be3ab424e653c7ecc21a5aedeaddfa"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/final-rgb.npy",
+      "bytes": 20864,
+      "sha256": "1cddfaa363a452a6cee1e7ef97d3779eb8b2f1036946a13fb1ca182b8d1f3798"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "193ce061e001d3dbca9986b3d67f71df4146b38a44644ca7db6f276e371b1fb8"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/result.json",
+      "bytes": 5532,
+      "sha256": "1d020926e47079e60898f5301b1c5e46726c65c649a73e3fca158462d9684196"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/stdout.log",
+      "bytes": 3532,
+      "sha256": "5086f60010acf53f1e46ef4d3a17523025389c5a931c9f67ac619dc5cbc60f87"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pendulum-rgb-003/supervisor.json",
+      "bytes": 533,
+      "sha256": "6752ab4d550f93effa5b2134de7356c5144fe0ad953e9ef5f373d124d48105f0"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001/result.json",
+      "bytes": 5651,
+      "sha256": "c4143fc1de018b070b5e155254cfc1527adf6a53aca1d6331dbaaf331ec28b88"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001/stdout.log",
+      "bytes": 4431,
+      "sha256": "ca16ce53343d3b59c6e6b04ecce34aa29f1bb0b4e931df34b98c4006fa3808dd"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001/supervisor.json",
+      "bytes": 533,
+      "sha256": "c608ad83d919ced1def89ee7c569bf500b54bc1b5b5149eaf1e5ff46b01b4f38"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-human-001/temp_outputs/logs/geophys-20261116T114917-953330-815b6820fbe7.jsonl",
+      "bytes": 7602,
+      "sha256": "698eb4bb0a694075718e20ab319c5d011c5305bf2234bec58fa2e889080bce20"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-001/stderr.log",
+      "bytes": 1509,
+      "sha256": "1e9e7322c5dace4ea6a61b382cee00c59bb70d02a70866251a5904a222d467a9"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-001/stdout.log",
+      "bytes": 814,
+      "sha256": "7129bda56a014a62ca290855122541c51d8ae430f8cd51e56869a82f2344fe98"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-001/supervisor.json",
+      "bytes": 535,
+      "sha256": "bb319205073d9ff3ed544b3a30f5a54eed88d3511d486e05ee811a2a5656e04e"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-001/temp_outputs/logs/geophys-20261116T114358-949771-6338ab8ec43b.jsonl",
+      "bytes": 7602,
+      "sha256": "638e73b3a71040cd76997f06b58c04ee213c8170b75b3cf9acbdf3f70cad8a2c"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/final-rgb.npy",
+      "bytes": 20864,
+      "sha256": "1efbecfc4478190fdbb961bb98753806b6fb506be1aa1459ffb71928eac9d480"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "9e019f4583d36271561ea799215e4ef84dc23c3862fa478481f048aed2387d61"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/result.json",
+      "bytes": 5484,
+      "sha256": "5dcd3507b3ee19cd2fb4e3c3ddd290c06fde72a16a44b7ac4bb6a47c86823c72"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/stdout.log",
+      "bytes": 4298,
+      "sha256": "63273a5eb89ea843642d557ae5dd00c2465c29c5ffb9a670edab6904a27fbd92"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/supervisor.json",
+      "bytes": 536,
+      "sha256": "9ecb8906f6ef14c135acd28211c348457f0c94640d35a1205d5fa8507efa64fe"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-rgb-002/temp_outputs/logs/geophys-20261116T114449-950307-b3955e7324de.jsonl",
+      "bytes": 7602,
+      "sha256": "2c3eb2c26ecf5503015ed2b7e828e1106bd1b307d1b191bbf1884b42c468aecf"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/final-rgb.npy",
+      "bytes": 20864,
+      "sha256": "1efbecfc4478190fdbb961bb98753806b6fb506be1aa1459ffb71928eac9d480"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/initial-rgb.npy",
+      "bytes": 20864,
+      "sha256": "9e019f4583d36271561ea799215e4ef84dc23c3862fa478481f048aed2387d61"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/result.json",
+      "bytes": 5597,
+      "sha256": "acd4a0f634b7c1d75584aff481a15b7e0af3119ab89f6f568cf5c6020d5358c4"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/stdout.log",
+      "bytes": 1552,
+      "sha256": "80fe3c7b9b03aeb5ac5cedfae87064731c1da9a14b2f2672415c220d699d8c6e"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/supervisor.json",
+      "bytes": 559,
+      "sha256": "da10ea62b2be1f9c46ac8bd5ab4085384694b2242e2654737d72b60eadfe7673"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/mujoco-pickcube-sensor-rgb-001/temp_outputs/logs/geophys-20261116T120216-963315-70cf5d66fd85.jsonl",
+      "bytes": 11406,
+      "sha256": "1b3a60263e093c29c59bb3edf4afb0f91adb7348d6d2d48e3fa0ec1aac4c72c0"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/pendulum-preflight-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/pendulum-preflight-001/stdout.log",
+      "bytes": 40153,
+      "sha256": "ba40cf60dfb4cfd01cd8257856bdb96f24388d59a4bd349ec1d5a8a560e57fca"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/pendulum-preflight-001/supervisor.json",
+      "bytes": 488,
+      "sha256": "d17f809242a9909c001cd1ce52b94c3425c00d2d3523245df028b074bffdefb2"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/preflight_probe.py",
+      "bytes": 527,
+      "sha256": "55e33776b479b6e7492422ef63d327127f7d84ca6ccb7ffb3afb060627b89f49"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/pure-tests.log",
+      "bytes": 15938,
+      "sha256": "ec34bed080767ee2f9acdde09f736eb21a633b552c0c3fd1833f3735c82db73d"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/regression-001/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/regression-001/stdout.log",
+      "bytes": 341,
+      "sha256": "0631befa2a8f0d29d1b8b23e8228d08eeaa3f0352aa4004416d4daac324d9912"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/regression-001/supervisor.json",
+      "bytes": 1246,
+      "sha256": "89c24e11ecbffba2e105aeeb58a6c5068ee03043f3b07b63fd3402e6d93f0396"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/regression-001/temp_outputs/logs/geophys-20261116T115156-955187-436b41ca32a5.jsonl",
+      "bytes": 49456,
+      "sha256": "612b541db8279ade768ea6256558f3ff2356888de012db2bb825db91cc922714"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/regression-001/temp_outputs/logs/geophys-20261116T115210-955576-ef129cc73f2d.jsonl",
+      "bytes": 3801,
+      "sha256": "c015feb1a73d149cc67a2c0e6bfbf93280c4f4cdce5a275be6a6540429b4ee48"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/scalar_probe.py",
+      "bytes": 3805,
+      "sha256": "c9e173408464eda90fbf33c481229b6213c4f048cb025f8fb36ce2b5f0ee0806"
+    },
+    {
+      "path": "workspace/maintenance/v211_scalar_render_closeout_20261116/supervise.py",
+      "bytes": 3108,
+      "sha256": "d0fd1d79e4816351b1ba2fcd09a600e30f72ed3dbf16b2ce09869de4cd295c95"
+    }
+  ]
+}
