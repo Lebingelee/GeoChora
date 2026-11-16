@@ -1,6 +1,7 @@
 """Deterministic external pick-lift-v0 compiler. No registration or Core writes."""
 from dataclasses import asdict, dataclass, replace
 import argparse
+import copy
 import hashlib
 import json
 import math
@@ -20,6 +21,7 @@ else:
 
 COMPILER_VERSION='0.2.0'
 ISAAC_CONTROLLER_PROFILE='r3_continuous_v1'
+MJCF_CONTROLLER_PROFILE='r3_continuous_v1'
 ISAAC_CONSTRUCTION_SEED=31
 
 
@@ -446,34 +448,9 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
 
     spec_hash=spec.spec_sha256()
     position=(*obj['initial_pos_xy'],scene['table_top_z']+CUBE_HALF_SIZE+CUBE_CONTACT_MARGIN)
-    semantics=SemanticDefinition(
-        'semantics-v0', 'harness_pick_lift_v0', ('cube-v1', 'panda-v1/ee'),
-        ('panda-v1/finger_joint1', 'panda-v1/finger_joint2'), {
-            'rest_height': scene['table_top_z']+CUBE_HALF_SIZE,
-            'lift_height': spec.success_config['lift_height_m'],
-            'reach_distance': spec.success_config['reach_distance_m'],
-            'gripper_closed_opening': spec.success_config['gripper_closed_opening_m'],
-        }, 'cube_lifted_v1')
-    declaration=PandaBoxDeclaration(
-        task_id=spec.task_id, artifact_id=f'{spec.task_id}/compiler-{COMPILER_VERSION}/spec-{spec_hash}',
-        version='ver_001', object_id='cube-v1', success_definition='cube_lifted_v1',
-        table_half_size=tuple(scene['table_half_size']), table_top_z=scene['table_top_z'],
-        table_center_xy=tuple(scene['table_center_xy']), source_box_position=position,
-        source_box_quaternion_wxyz=(1.,0.,0.,0.), reset_center_xy=tuple(obj['initial_pos_xy']),
-        reset_half_extent_m=obj['reset_half_extent_m'], semantics=semantics,
-        timebase=Timebase(.002,5,.01), cast_reset_center_float32=False, include_table_center=True,
-        object_asset_reference=(f"external-mock/{external['uid']}/{external['sha256']}"
-                                if external is not None else 'cube-v1/task-local'),
-        capabilities=tuple(spec.required_capabilities),
-    )
-    artifact=compile_panda_box_artifact(declaration)
-    initial=artifact.initialization
-    dims=initial.randomization
-    default_config=PickCubeReferenceEnv.selected_default_config()
-    config=replace(default_config,task=replace(default_config.task,task_uid=spec.task_id))
-    source=compile_panda_box_source(declaration,artifact,config)
-
     if external is not None:
+        # The proxy contract is still checked byte-for-byte; v2.1.1 Core builds the
+        # scene from declarations, so the proxy's visual shell is not materialized.
         body=ET.fromstring(Path(external['path']).read_text())
         if body.tag!='body' or body.get('name')!='PickCube' or body.find("freejoint[@name='PickCube_joint']") is None:
             raise ValueError('external proxy must implement the template named body/freejoint contract')
@@ -483,78 +460,71 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
             raise ValueError('external pick-lift proxy collision must be the declared 0.025 m half-size box')
         if inertial is None or float(inertial.get('mass','0'))!=.08:
             raise ValueError('external pick-lift proxy mass must be 0.08 kg')
-        body.set('pos',' '.join(map(str,position)));body.set('quat','1 0 0 0')
-        xml=ET.fromstring(source.scene_source.xml)
-        replaced=False
-        for parent in xml.iter():
-            for child in list(parent):
-                if child.tag=='body' and child.get('name')=='PickCube':
-                    index=list(parent).index(child);parent.remove(child);parent.insert(index,body);replaced=True
-        if not replaced:raise ValueError('template cube body missing')
-        source=replace(source,scene_source=replace(source.scene_source,xml=ET.tostring(xml,encoding='unicode'),
-            source_id=f"harness-mock:{external['sha256']}"))
 
-    def build(requested_provider):
-        # Native provider materialization/admission remains owned by Core.
-        readiness=PickCubeReadinessConfig.from_source(artifact,source)
-        controller=ProductionCanonicalPandaController.from_source(artifact,source)
-        solution_identity=PickCubeReadinessSolution.identity_for_config(readiness)
-        source_ids={name:hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest()
-            for name in ('harness_compiler.py','harness_spec_schema.py')}
-        for name in ('task_env/tasks/pick_cube/task.py','task_env/tasks/pick_cube/solution.py',
-                     'task_env/assembly/panda_box.py','task_env/assembly/compiler.py',
-                     'task_env/environment/task_source.py','task_env/controllers/canonical/production.py',
-                     'task_env/robots/panda.py','task_env/observations/selected_reference.py'):
-            path=Path(catalog['core_repo'])/name
-            if path.is_file():source_ids[name]=hashlib.sha256(path.read_bytes()).hexdigest()
-        return dict(construction_id='harness-pick-lift-v0',artifact=artifact,source=source,
-            resolved_configuration={'candidate_spec':spec.to_dict(),'spec_sha256':spec_hash,
-                'compiler_version':COMPILER_VERSION,'source_xml_sha256':hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
-                'artifact':artifact.to_mapping(),'artifact_sha256':artifact.identity_hash,
-                'runtime_config':asdict(source.config),'readiness':asdict(readiness),
-                'resolved_controller_action':asdict(controller.config),
-                'resolved_controller_gripper':asdict(controller.gripper_config),
-                'runtime_source_bindings':{name:dict(getattr(source,name)) for name in
-                    ('joints','bodies','frames','free_joints','joint_targets')},
-                'runtime_open_actuators':list(source.open_actuators),
-                'external_asset':external,'asset_bundle_sha256':catalog.get('asset_bundle_sha256'),
-                'source_revision':catalog['core_commit'],'source_sha256':source_ids},
-            source_revision=catalog['core_commit'],source_sha256=source_ids,
-            controller=controller, solution=None, solution_identity=solution_identity,
-            solution_factory=lambda:PickCubeReadinessSolution(config=readiness))
+    # v2.1.1 construction entry: the candidate is Core's PickCube recipe with the
+    # spec's scene, reset and success fields overlaid. Core owns Artifact, source,
+    # Robot subject binding, Controller and Solution; the Harness adds identity only.
+    import types
+    from task_env.registry import make_agent
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
+    selected_config=PickCubeReferenceEnv.selected_task_configuration()
+    task_config=copy.deepcopy({key:selected_config[key] for key in ('recipe','environment')})
+    recipe=task_config['recipe']
+    # TaskSourceV1 identifiers reject '/', so the Core task_uid stays; the
+    # candidate identity is the spec hash carried in artifact_id and reports.
+    recipe['artifact_id']=f"{recipe['task_uid']}/harness-{COMPILER_VERSION}/spec-{spec_hash}"
+    recipe['scene']={**recipe['scene'],'table_half_size':[float(v) for v in scene['table_half_size']],
+        'table_top_z':float(scene['table_top_z']),'table_center_xy':[float(v) for v in scene['table_center_xy']],
+        'initial_cube_position':[float(v) for v in position]}
+    recipe['reset']={**recipe['reset'],'center_xy':[float(v) for v in obj['initial_pos_xy']],
+        'half_extent_m':float(obj['reset_half_extent_m'])}
+    recipe['success']={'lift_height_m':float(spec.success_config['lift_height_m']),
+        'reach_distance_m':float(spec.success_config['reach_distance_m']),
+        'gripper_closed_opening_m':float(spec.success_config['gripper_closed_opening_m'])}
+    default_config=PickCubeReferenceEnv.selected_default_config(task_config)
+    resolved_config=replace(default_config,runtime=replace(default_config.runtime,backend=route['backend']),
+        episode=replace(default_config.episode,horizon=spec.horizon))
+    robot=make_agent('panda-v1')
+    core_binding=make_reference_binding(controller_profile=MJCF_CONTROLLER_PROFILE,resolved_config=resolved_config,
+        task_config=task_config,interval_provider=provider,robot_uid=robot.uid,robot=robot)
+    # Same step make_env performs for formal tasks: bind the provider's Robot source composer.
+    core_binding=PickCubeReferenceEnv._bind_robot_source_composer(replace(core_binding,robot=robot),
+        types.SimpleNamespace(controller_profile=MJCF_CONTROLLER_PROFILE,physics_provider=provider,
+            environment=resolved_config,robot_uid=robot.uid))
+    if core_binding.compose_robot_source is None:
+        raise ValueError('Core did not provide a Robot source composer for this provider')
+    harness_sources={f'task_env/script/agent/{name}':hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest()
+        for name in ('harness_compiler.py','harness_spec_schema.py')}
+    for name in ('task_env/tasks/pick_cube/task.py','task_env/tasks/pick_cube/solution.py','task_env/tasks/pick_cube/specialization.py',
+                 'task_env/assembly/panda_box.py','task_env/assembly/compiler.py',
+                 'task_env/environment/task_source.py','task_env/controllers/canonical/production.py',
+                 'task_env/robots/panda.py','task_env/observations/selected_reference.py'):
+        path=Path(catalog['core_repo'])/name
+        if path.is_file():harness_sources[name]=hashlib.sha256(path.read_bytes()).hexdigest()
+    core_build=core_binding.build
 
-    def sample_reset(requested_artifact,seed):
-        if requested_artifact.identity_hash!=artifact.identity_hash:raise ValueError('compiled artifact required')
-        if type(seed) is not int or seed<0:raise ValueError('nonnegative integer seed required')
-        rng=np.random.Generator(np.random.PCG64(seed))
-        pos=list(position)
-        for i,dim in enumerate(dims):pos[i]=float(rng.uniform(*dim.training_bounds))
-        return ResetSample.create(schema_version='reset-sample-v0',task_artifact_hash=artifact.identity_hash,
-            sampler_id='harness/uniform-xy',sampler_version='pcg64-v0',task_seed=seed,
-            joint_position=dict(initial.joint_position),poses_world={'cube-v1':PoseWorld(tuple(pos),(1.,0.,0.,0.))},
-            velocity_policy='zero_named_joint_and_entity_velocities',
-            control_policy='arm_targets_at_initial_joints_gripper_open',settle_steps=initial.settle_steps)
+    def build(request):
+        value=dict(core_build(request))
+        resolved=dict(value.get('resolved_configuration') or {})
+        resolved.update({'candidate_spec':spec.to_dict(),'spec_sha256':spec_hash,'compiler_version':COMPILER_VERSION,
+            'harness_construction_id':'harness-pick-lift-v0','harness_controller_profile':MJCF_CONTROLLER_PROFILE,
+            'harness_task_config_recipe_overlay':{key:recipe[key] for key in ('artifact_id','scene','reset','success')},
+            'external_asset':external,'external_asset_visual_materialized':False if external is not None else None,
+            'asset_bundle_sha256':catalog.get('asset_bundle_sha256'),
+            'source_revision':catalog['core_commit'],'source_sha256':harness_sources})
+        value['resolved_configuration']=resolved
+        value['source_revision']=catalog['core_commit']
+        value['source_sha256']=harness_sources
+        return value
 
-    def execution_info(env):
-        return {'execution_info':ExpertExecutionInfo('expert-execution-info-v1',env.state.control_step,
-            env.state.simulation_time,env.controller.readiness(env.state,env.feedback))}
-
-    from task_env.robots.panda import PandaAgent, panda_reference_control_binding
-    from task_env.controllers.canonical.contracts import (
-        REFERENCE_POSE_ACTION_SCHEMA, reference_pose_action, reference_pose_action_space,
-    )
-    from task_env.observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
-    binding=ReferenceTaskBinding(build=lambda request: build(request.provider),reset_sample=sample_reset,evaluate=evaluate_lift,
-        action_schema=REFERENCE_POSE_ACTION_SCHEMA,action_space_factory=reference_pose_action_space,
-        prepare_action=reference_pose_action,
-        observation_space_factory=selected_reference_observation_spaces,observation_projection=build_selected_observation,
-        scalar_control_binding=panda_reference_control_binding(),
-        robot=PandaAgent(), object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
-        interval_mode='grouped',recorder_mode='canonical',
-        reset_expert_kwargs=execution_info,observe_expert_kwargs=lambda env,guard:execution_info(env))
+    binding=replace(core_binding,build=build)
+    initial=binding.build_for_request(provider,route['backend'],0,spec.horizon)
+    artifact=initial['artifact']
+    source=initial['source']
     return CompiledTask(artifact,binding,spec_hash,artifact.identity_hash,spec.horizon,
         hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
-        provider=provider,backend=route['backend'],device=route['device'],source_kind='mjcf',route=route)
+        provider=provider,backend=route['backend'],device=route['device'],source_kind='mjcf',
+        route={**route,'controller_profile':MJCF_CONTROLLER_PROFILE})
 
 
 def main():
