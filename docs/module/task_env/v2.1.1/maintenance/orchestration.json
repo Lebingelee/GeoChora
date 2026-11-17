@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7C_ATTEMPT001_READY_ISOLATED_DOCUMENTATION",
+  "status": "G07_7C_ATTEMPT001_RETURNED_PARTIAL_PENDING_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -38,7 +38,7 @@
     "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
     "scope": "independent docs only; finalclose awaits accepted7b"
   },
-  "next_action": "Maintainer may manually forward frozen7c001 in isolated docs checkout. Actual start increments7c count0to1. Keep7b records as fork snapshots; do not merge active7b. Attempt002 finalreconciliation waits for accepted7b.",
+  "next_action": "Independent review of returned7c attempt001 docs (PARTIAL, T-NUT-RANDOM unmet, WAIT_7B_ACCEPTANCE). Keep7b records as fork snapshots; do not merge active7b. Attempt002 final reconciliation waits for accepted7b and maintainer authorization.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2373,14 +2373,32 @@
           "dependencies": [
             "7b"
           ],
-          "status": "PREPARED_ATTEMPT001_INDEPENDENT_DOCS",
-          "attempt_count": 0,
-          "attempts": [],
+          "status": "ATTEMPT001_RETURNED_PARTIAL_DOCS_PENDING_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "revision": "revision001",
+              "package_id": "V211_G07_7C_ATTEMPT001",
+              "status": "RETURNED_PARTIAL_DOCS_WITH_KNOWN_CAPABILITY_GAP",
+              "started_date": "2026-11-17",
+              "returned_date": "2026-11-17",
+              "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
+              "output_head": "f943e193",
+              "native_starts": 0,
+              "explicit_physics_substeps": 0,
+              "gpu_usage": 0,
+              "report_path": "workspace/maintenance/v211_g07c_attempt001/report.md",
+              "tracked_summary": "reviews/20261117_g07c_attempt001_docs.md",
+              "result": "PARTIAL_DOCS_WITH_KNOWN_CAPABILITY_GAP",
+              "known_gaps": ["T-NUT-RANDOM", "WAIT_7B_ACCEPTANCE"]
+            }
+          ],
           "assigned_agent": null,
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt001_20261117/work-package.md",
           "package_sha256": "80bbcbc4990a80ee8f1f848154455ecb5349a5ec7d06892f1bcce9628001ddc5",
-          "input_head": null,
-          "output_head": null,
+          "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
+          "output_head": "f943e193",
           "expected_duration_minutes": [
             180,
             240
@@ -2398,13 +2416,13 @@
           },
           "last_observation": {
             "date": "2026-11-17",
-            "state": "Maintainer authorized isolated independent docs before7b acceptance; package prepared, not started."
+            "state": "Attempt001 returned PARTIAL docs with T-NUT-RANDOM unmet and WAIT_7B_ACCEPTANCE; no native/SDK/CUDA. Await independent review; attempt002 owns final 7b reconciliation."
           },
           "evidence_refs": [
             "work-packages/20261117_g07c_attempt001_goal.md",
             "../planning/stage7-7c-tutorial-blueprint.md"
           ],
-          "commits": [],
+          "commits": ["f943e193"],
           "review_decision": null,
           "blockers": [
             "Final7c close waits for accepted7b; independent001 is explicitly allowed.",
@@ -2414,7 +2432,7 @@
           "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt001_20261117/goal-prompt.md",
           "goal_prompt_sha256": "8e706f546ee007794b36433a0b090c1fbee36f448d5677acee768752f0864fc2",
           "input_head_role": "Actual documentation-successor HEAD in external dispatch-input.json; source base4fdf9379",
-          "package_status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+          "package_status": "ATTEMPT001_RETURNED_PARTIAL_PENDING_REVIEW",
           "dependency_exception": "Maintainer authorized independent documentation work before 7b acceptance; full7c close still requires accepted7b and attempt002.",
           "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt001_20261117/dispatch-input.json"
         }
@@ -3067,10 +3085,15 @@
     "do_not_overwrite_primary_orchestration_during_active7b": true
   },
   "g07c_attempt001_preparation": {
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "status": "ATTEMPT001_RETURNED_PARTIAL_PENDING_REVIEW",
     "worktree": "/home/lly/Program_Files/Geochora-worktrees/v211-g07c-docs",
     "branch": "codex/v211-stage7-docs",
     "source_baseline": "4fdf9379482af6bb913eb1a6587316e64b6a0fed",
+    "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
+    "output_head": "f943e193",
+    "attempt_count": 1,
+    "report_path": "workspace/maintenance/v211_g07c_attempt001/report.md",
+    "tracked_summary": "reviews/20261117_g07c_attempt001_docs.md",
     "budget": {
       "wall_minutes": 240,
       "expected_minutes": [
@@ -3083,8 +3106,8 @@
       "text_output_target_bytes": 104857600
     },
     "dependency_exception": "Maintainer authorized independent documentation work before 7b acceptance; full7c close still requires accepted7b and attempt002.",
-    "assigned_executor": null,
-    "goal_started": false,
+    "assigned_executor": "open-source coding agent (this documentation window)",
+    "goal_started": true,
     "native_started": false,
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt001_20261117/work-package.md",
     "package_sha256": "80bbcbc4990a80ee8f1f848154455ecb5349a5ec7d06892f1bcce9628001ddc5",
