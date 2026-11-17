@@ -543,7 +543,7 @@
     ],
     "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped. Isaac 6.2 PhysX CUDA × Isaac RTX also supports a qualified frame-mounted task camera in the measured PickCube seed31 controlled-lift diagnostic (430 transitions, 431 RGB observations); MuJoCo/GeoPhys moving task cameras remain unsupported. This diagnostic is not the state-only full Solution run or a general renderer qualification. Post-optimization C4 separately exercised reset, one nonzero step, two same-boundary captures, second reset and close on that Isaac wrist RGB route; its seven listed frozen source hashes match 7f8796b4, and the closed H5 was independently reread. See ../maintenance/reviews/20261114_post_optimization_c4_task_rgb.md. C5 full Solutions remain state-only; other native/cross/window evidence is reused at its original source identity, not claimed as a final-HEAD rerun.",
     "batch_scope": "G06a/b/c canonical goals have bounded independent acceptance; see ../maintenance/reviews/20261116_g06c_attempt001_acceptance.md and the linked 6a/6b reviews. Three providers × Pendulum/PickCube native CUDA batch, source-bound canonical actions, device Task/state, same-step terminal observations/images, independent sensor/window paths and device Recorder have bounded evidence. G06c B3 partial reset and staggered truncation cover all six cells; whole-batch same-Env switching is limited to Isaac ↔ MJWarp with fixed shared Rasterizer on both tasks. Geometry from other rows can enter a camera view; cross-row visual isolation is not promised. GeoPhys PickCube acceptance requires explicit discrete mode and contact/coupled 32 iterations under the tested configuration; default-budget penetration and continuous mesh/constraint limitations are not resolved by that acceptance. GeoPhys cross-provider switching is not admitted. R3 is separate; G07 and version closeout remain pending. GeoPhys main merge/AOT remain maintainer-deferred, not PASS.",
-    "g07_scope": "Three providers × three seeds remains an unrun final gate; these single-seed records do not fill final_pickcube_cells.",
+    "g07_scope": "7a independently closed bounded; 7b PR #3 integration and final three-provider × three-seed gate prepared, not started. Final cells remain NOT_RUN with null input identity.",
     "record_completion_scope": "Five routes use same-run joint evidence: independent H5 readback and caller completion with verified identities. Four canonical H5 files lack completion field; Isaac v3 field is null. No H5-only completion claim; independent review supports bounded maintainer-authorized acceptance.",
     "complete_solution_intersections": [
       {
@@ -907,9 +907,11 @@
         "no explicit Controller switching matrix, D0 replay, provider parity or Qualification"
       ],
       "evidence_root": "workspace/maintenance/v211_g07a_attempt002/",
-      "oracle": "osc-freeze/plan.json and osc-compare-006/result.json",
+      "oracle": "osc-freeze/plan.json; review001/independent-comparison.json with matched finger-hold reference (original comparison preserved)",
       "reader": "native-033/reader.json and native-023/reader.json",
-      "close": "same-run session close and source cleanup receipts"
+      "close": "native-033 same-run full close association; native-040 reset only; osc-selected-006 and native-023 each own close association",
+      "review_status": "INDEPENDENTLY_ACCEPTED_BOUNDED_7A",
+      "review_ref": "maintenance/reviews/20261117_g07a_attempt002_acceptance.md"
     }
   }
 }

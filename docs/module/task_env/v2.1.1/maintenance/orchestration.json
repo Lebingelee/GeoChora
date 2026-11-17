@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7A_ATTEMPT002_AWAITING_INDEPENDENT_REVIEW",
+  "status": "G07_7A_CLOSED_BOUNDED_7B_READY_NOT_STARTED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -20,8 +20,8 @@
     "reason": "Maintainer approved revision003 7a dispatch: case-driven code review and minimal necessary integration; preserve original gates and one stage branch."
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "Independently review the attempt002 bounded implementation and evidence; 7b/7c remain planned.",
+  "next_candidate": "7b",
+  "next_action": "Maintainer manually forwards the prepared 7b attempt001 package; first integrate frozen PR #3 locally, then freeze final inputs and execute the original nine cells and independent gates.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1962,7 +1962,7 @@
             "5c",
             "6c"
           ],
-          "status": "AWAITING_INDEPENDENT_REVIEW",
+          "status": "ACCEPTED_BOUNDED_7A",
           "attempt_count": 2,
           "attempts": [
             {
@@ -2059,7 +2059,7 @@
             {
               "attempt": 2,
               "package_id": "V211_G07_7A_ATTEMPT002",
-              "status": "AWAITING_INDEPENDENT_REVIEW",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
               "started_at": "2026-11-17T01:30:15.013786+08:00",
               "hard_deadline": "2026-11-17T05:30:15.013786+08:00",
               "input_head": "eeaa16192db950c29c93993ed9d15385f92ea03f",
@@ -2078,53 +2078,58 @@
                 "native_threads": 1
               },
               "delivery_report": "workspace/maintenance/v211_g07a_attempt002/report.md",
-              "result": "BOUNDED_IMPLEMENTATION_DELIVERED_NOT_YET_ACCEPTED",
-              "explicit_substeps_after_authorized_reset": 16460
+              "result": "PASS_BOUNDED_A3_A4_AND_FROZEN_ASSET_BRANCH",
+              "explicit_substeps_after_authorized_reset": 16460,
+              "output_head": "0a6213c040e06e6385b6d1f5509af34a8d5b8372",
+              "merge_commit": "94e865e3cd272f5c8c5b8ca8892799270457cc84",
+              "review_ref": "reviews/20261117_g07a_attempt002_acceptance.md",
+              "window_released": true,
+              "independent_review_supplement": {
+                "native_substeps": 1600,
+                "native_wall_seconds": 21.09381620993372,
+                "output_ref": "../../../../../workspace/maintenance/v211_g07a_attempt002/review001/",
+                "old_executor_window_reopened": false,
+                "ordinary_attempt_increment": false
+              }
             }
           ],
-          "assigned_agent": "Codex current thread 01a1e4b7-d90e-7fd0-9e04-bb5ef18eb964",
+          "assigned_agent": null,
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_attempt002_20261117/work-package.md",
           "package_sha256": "de8414bfd82bd7c2fe4a7c2f7c655d0f5ba25ff2eb74ee2a5a97bf781b31703b",
           "input_head": "7862433cafef91800e7b0321b774dcb64b22c777",
-          "output_head": "73e5ea2f37df31c778a14f70e837415f26ac553b",
+          "output_head": "0a6213c040e06e6385b6d1f5509af34a8d5b8372",
           "expected_duration_minutes": 240,
           "execution_budget": null,
           "last_observation": {
-            "at": "2026-11-17T01:22:26.946647+08:00",
-            "state": "attempt001 returned/released, maintainer accepted before-A3 bounded content; attempt002 prepared and unassigned",
-            "actual_production_head": "73e5ea2f37df31c778a14f70e837415f26ac553b",
-            "attempt002_started": false
+            "at": "2026-11-17T11:36:47.632857+08:00",
+            "state": "Independent bounded review and maintainer-directed 7a closeout completed; window released; 7b prepared, not started.",
+            "actual_production_head": "0a6213c040e06e6385b6d1f5509af34a8d5b8372"
           },
           "evidence_refs": [
             "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/interruption-20261116T220229/interruption-receipt.json",
             "20261116_g07a_attempt001_continuation001.md",
             "../../../../../workspace/maintenance/v211_g07a_attempt001/continuation001/report.md",
-            "reviews/20261117_g07a_attempt001_partial_acceptance.md"
+            "reviews/20261117_g07a_attempt001_partial_acceptance.md",
+            "reviews/20261117_g07a_attempt002_acceptance.md",
+            "../../../../../workspace/maintenance/v211_g07a_attempt002/report.md",
+            "../../../../../workspace/maintenance/v211_g07a_attempt002/review001/independent-comparison.json"
           ],
           "commits": [
             "cd8a6362",
             "948f69f9",
-            "73e5ea2f"
+            "73e5ea2f",
+            "94e865e3cd272f5c8c5b8ca8892799270457cc84",
+            "0a6213c040e06e6385b6d1f5509af34a8d5b8372"
           ],
           "review_decision": {
-            "status": "MAINTAINER_PARTIALLY_ACCEPTED",
+            "status": "ACCEPTED_BOUNDED_7A",
+            "reviewer": "Sol with independent source/evidence review",
             "date": "2026-11-17",
-            "review_ref": "reviews/20261117_g07a_attempt001_partial_acceptance.md",
-            "accepted_scope": [
-              "A1 bounded delivered scope",
-              "A2 bounded scope with current-GeoPhys identity limitation retained",
-              "AP-C1",
-              "AP-C2",
-              "AP-C3",
-              "AP-C4 MuJoCo four intersections"
-            ],
-            "remaining_scope": [
-              "A3",
-              "A4",
-              "Maintainer-added frozen v2.1.1-asset-skills local integration"
-            ],
-            "review_type": "Explicit maintainer scope acceptance plus bounded read-only evidence checks; not a new full-source independent audit.",
-            "whole_7a_accepted": false
+            "review_ref": "reviews/20261117_g07a_attempt002_acceptance.md",
+            "whole_7a_closed_bounded": true,
+            "qualification_claim": false,
+            "maintainer_previous_partial_acceptance_ref": "reviews/20261117_g07a_attempt001_partial_acceptance.md",
+            "remaining_limits_preserved": true
           },
           "blockers": [],
           "auxiliary_use_case_schedule": "Original AP-C1-C4 obligations retained; case-driven review, reuse and minimal owner fixes at 7a.",
@@ -2134,7 +2139,7 @@
             "title": "v.2.1.1 G06ab subagent (terra)",
             "status": "USER_INTERRUPTED"
           },
-          "package_status": "IN_PROGRESS",
+          "package_status": "CLOSED_REVIEWED_BOUNDED",
           "historical_recovery": {
             "resume_package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_preparation_20261116/7a-resume-package.md",
             "resume_package_sha256": "a69f9791b3ab2d6c7e1c45bf7449171f1dda3f1c1d2567a6d3e2b0ba5b2e2f13",
@@ -2153,10 +2158,10 @@
               "rule": "Keep original aggregate native/substep ceilings and reconcile prior launches before native continuation; absence of receipts alone is not a zero-consumption claim. User interruption interval is recorded separately, no reset of attempt or consumed budget."
             }
           },
-          "planned_next_attempt": {
+          "completed_attempt002_package": {
             "attempt": 2,
             "package_id": "V211_G07_7A_ATTEMPT002",
-            "status": "AWAITING_INDEPENDENT_REVIEW",
+            "status": "CLOSED_REVIEWED_BOUNDED",
             "assigned_agent": null,
             "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_attempt002_20261117/work-package.md",
             "package_sha256": "de8414bfd82bd7c2fe4a7c2f7c655d0f5ba25ff2eb74ee2a5a97bf781b31703b",
@@ -2205,21 +2210,55 @@
           "dependencies": [
             "7a"
           ],
-          "status": "PLANNED",
+          "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
           "attempt_count": 0,
           "attempts": [],
           "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/work-package.md",
+          "package_sha256": "4e32c85def7d260a4742c3c4bd161c5035a077306233d8a6ddd9d5fce876d785",
+          "input_head": "0a6213c040e06e6385b6d1f5509af34a8d5b8372",
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
+          "expected_duration_minutes": [
+            180,
+            225
+          ],
+          "execution_budget": {
+            "wall_minutes": 240,
+            "native_wall_minutes": 120,
+            "explicit_substeps": 100000,
+            "per_run_wall_seconds": {
+              "mujoco": 480,
+              "geophys": 660,
+              "isaacsim": 1260
+            },
+            "cpu_tree_rss_bytes": 6442450944,
+            "image_cuda_tree_rss_bytes": 10737418240,
+            "gpu_card_mib": 6144,
+            "per_run_output_bytes": 1073741824,
+            "total_evidence_target_bytes": 4294967296,
+            "native_threads": 1
+          },
+          "last_observation": {
+            "at": "2026-11-17T11:36:47.632899+08:00",
+            "state": "Complete package independently prepared/reviewed; no execution Goal/native or actual PR merge; count remains0."
+          },
           "evidence_refs": [],
           "commits": [],
           "review_decision": null,
-          "blockers": []
+          "blockers": [],
+          "input_head_role": "Reviewed production parent; actual document-successor start HEAD in dispatch-input.json",
+          "package_status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+          "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/goal-prompt.md",
+          "goal_prompt_sha256": "bd4128f757fea60bf485e759959efa87ac1d5fe1af33f3924938caf6cf1bab18",
+          "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/dispatch-input.json",
+          "merge_input": {
+            "url": "https://github.com/Lebingelee/GeoChora/pull/3",
+            "remote": "public",
+            "branch": "v2.1.1-asset-skills-develop",
+            "head": "23387a9cffd82fe02fb69fb5d2993141fdd54ae9",
+            "into": "codex/v211-stage7-integration",
+            "actual_merge_started": false
+          }
         },
         {
           "id": "7c",
@@ -2704,7 +2743,7 @@
     "recorded_at": "2026-11-17T01:22:26.946647+08:00",
     "attempt": 2,
     "package_id": "V211_G07_7A_ATTEMPT002",
-    "status": "AWAITING_INDEPENDENT_REVIEW",
+    "status": "CLOSED_REVIEWED_BOUNDED",
     "assigned_agent": null,
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7a_attempt002_20261117/work-package.md",
     "package_sha256": "de8414bfd82bd7c2fe4a7c2f7c655d0f5ba25ff2eb74ee2a5a97bf781b31703b",
@@ -2745,6 +2784,62 @@
       "future_tip_or_other_branches_not_automatically_included": true
     },
     "attempt_count_increments_on_actual_start": true,
-    "started_at": "2026-11-17T01:30:15.013786+08:00"
+    "started_at": "2026-11-17T01:30:15.013786+08:00",
+    "review_ref": "reviews/20261117_g07a_attempt002_acceptance.md"
+  },
+  "g07a_closeout": {
+    "date": "2026-11-17",
+    "production_head": "0a6213c040e06e6385b6d1f5509af34a8d5b8372",
+    "review_ref": "reviews/20261117_g07a_attempt002_acceptance.md",
+    "ordinary_attempt_count": 2,
+    "original_attempt002_steps": 16460,
+    "review_supplement_steps": 1600,
+    "source_changed_in_review": false,
+    "protected_input_unchanged": true
+  },
+  "g07b_attempt001_preparation": {
+    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "package_ref": "work-packages/20261117_g07b_attempt001_goal.md",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/work-package.md",
+    "package_sha256": "4e32c85def7d260a4742c3c4bd161c5035a077306233d8a6ddd9d5fce876d785",
+    "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/goal-prompt.md",
+    "goal_prompt_sha256": "bd4128f757fea60bf485e759959efa87ac1d5fe1af33f3924938caf6cf1bab18",
+    "manifest_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/manifest.json",
+    "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/dispatch-input.json",
+    "reviewed_production_head": "0a6213c040e06e6385b6d1f5509af34a8d5b8372",
+    "budget": {
+      "wall_minutes": 240,
+      "native_wall_minutes": 120,
+      "explicit_substeps": 100000,
+      "per_run_wall_seconds": {
+        "mujoco": 480,
+        "geophys": 660,
+        "isaacsim": 1260
+      },
+      "cpu_tree_rss_bytes": 6442450944,
+      "image_cuda_tree_rss_bytes": 10737418240,
+      "gpu_card_mib": 6144,
+      "per_run_output_bytes": 1073741824,
+      "total_evidence_target_bytes": 4294967296,
+      "native_threads": 1
+    },
+    "merge_input": {
+      "url": "https://github.com/Lebingelee/GeoChora/pull/3",
+      "remote": "public",
+      "branch": "v2.1.1-asset-skills-develop",
+      "head": "23387a9cffd82fe02fb69fb5d2993141fdd54ae9",
+      "into": "codex/v211-stage7-integration",
+      "actual_merge_started": false
+    },
+    "question_target": {
+      "thread_id": "01a1e460-6b8d-7c32-9c11-2d6739f1ba33",
+      "host_id": "local",
+      "title": "准备G07 7a工作包",
+      "share_url": "https://chatgpt.com/s/cx_6afbcae03558819185bd591836e39ecc",
+      "authorized_purpose": "Actual blockers in this frozen work package; planning thread may answer within scope, without concurrent source writing."
+    },
+    "execution_goal_started": false,
+    "native_started": false,
+    "actual_merge_started": false
   }
 }

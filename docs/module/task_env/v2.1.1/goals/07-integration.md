@@ -43,13 +43,24 @@ A3默认Controller必须按声明通道真实绑定并执行非零canonical acti
 
 总连续wall硬上限240分钟，包含实现、合并、验证、实际阻塞问答/等待、报告及提交；不因subagent/换线程重置。维护者明确允许实施者/subagent就实际阻塞点向规划线程提问，规划者可在原范围回应，仍保持单writer、原共享锁和native累计预算；该授权取代旧“一律不发送执行中补充”的绝对限制，不允许无问叠加新任务或超范围默示批准。7b/7c与原9/9门不变，本窗口不自动启动后续阶段。
 
+<a id="g07a-closeout"></a>
+### 2026-11-17独立主审与7a关闭
+
+生产 `0a6213c040e06e6385b6d1f5509af34a8d5b8372`、旧资产来支本地merge `94e865e3cd272f5c8c5b8ca8892799270457cc84` 已按[独立主审](../maintenance/reviews/20261117_g07a_attempt002_acceptance.md)有界收尾，7a普通attempt数2。默认七轴effort、typed ACK、reset、同运行记录/关闭成立；显式pose空载在补齐同手指保持输入的历史OSC参考后，四项冻结指标均未退步。64步LIBERO正式caller仍task_success=false、Solution completion未评估，不扩张为任务成功、独立夹爪或其他provider/切换能力。原四个MuJoCo完整交集和GeoPhys当前源码未重跑等限制继续保留。
+
+主审外部补证新增1600子步/21.094秒，单独事前冻结并计账；不重开原执行窗口或普通attempt。原attempt002重置后16460子步不变。7b工作包仅准备，不能从此节推断九格已运行。
+
 <a id="7b"></a>
 ## 7b：稳定输入下的最终矩阵
 
-- **输入／依赖：**7a，冻结的最终 Core／provider／source／Controller／Solution／renderer／device／seed／horizon／预算和 oracle。
+- **输入／依赖：**已关闭的7a；先完成本节新增PR整合和验收必需的最小适配，再冻结最终 Core／provider／source／Robot／TCP／Controller／Solution／renderer／device／seed／horizon／预算和 oracle。
 - **工作：**执行 PickCube 三后端×三 seed（初始 31/32/33），目标 9/9 task-success；收口阶段 3–6 已冻结的同一Env切换、Controller／7＋2／BodyWrench与贡献组合、图像与并行代表性交集。
 - **检查：**runtime validity、原任务 predicates、生命周期有效成功、Solution completion、图像同步、独立同运行 H5 读回及 close／进程清理分别报告。对受影响输入才重跑；可以复用仍精确匹配的更强证据。
 - **交付／出口：**九格成功与其他独立门都有可审核证据；失败／NOT_RUN／未测项如实保留，不能用 runtime-valid 或不同 run 的部分结果拼接成通过。
+
+2026-11-17维护者新增：将[PR #3](https://github.com/Lebingelee/GeoChora/pull/3)冻结head `23387a9cffd82fe02fb69fb5d2993141fdd54ae9`（`v2.1.1-asset-skills-develop`）本地合入当前G07阶段分支，此项归7b，不倒写为7a成果。逐语义裁决实际12处冲突，保留当前共享锁继承/进程清理、正式PickCube/Robot/source与桌面＋asset-object准入owner；来支setup/doctor不自动部署、下载或改用户MCP。其作者运行证据不替代本版最终九格。合并/必要修复与图像/独立reader薄驱动稳定后才冻结矩阵输入。
+
+[7b attempt001完整包与Goal提示](../maintenance/work-packages/20261117_g07b_attempt001_goal.md)已准备，READY_FOR_MANUAL_FORWARD_NOT_STARTED／attempt0。总连续wall硬上限240分钟，含PR合并、问答等待、验证和收尾；native累计≤120分钟、显式子步≤100000，单run/内存/GPU/输出/原锁监督见包。三provider各seed31在同次完整Solution中保留reset、首个非零step和最终返回边界图像；其余seed可state-only。H5、caller严格完成与各provider实际schema的close分别关联，不新增跨provider记录平台。原三条路线为MuJoCo CPU、GeoPhys CPU、Isaac PhysX CUDA；seeds31/32/33，MJWarp不替换MuJoCo，附加Robot不乘进九格。准备不创建Goal/native或实际merge，收到转发并核验后才启动。
 
 最终九格不等于每个 backend×renderer×Controller×batch 都跑三 seed；组合覆盖在阶段 1 冻结，各维度有最小真实代表例。不同 solver 不要求轨迹或像素逐点相同。若九格有失败则本门未完成；范围改变须维护者决定，保留原门和失败历史。
 
@@ -63,4 +74,4 @@ A3默认Controller必须按声明通道真实绑定并执行非零canonical acti
 
 ## 发布边界
 
-当前文档与阶段接收不自动授权发布操作。2026-11-17维护者仅授权上述冻结开发分支合入G07的本地merge；不授权合并回develop/main、push／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。
+当前文档与阶段接收不自动授权发布操作。2026-11-17维护者授权上述旧资产冻结分支及7b指定PR #3冻结head合入G07的本地merge；不授权合并回develop/main、push／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。
