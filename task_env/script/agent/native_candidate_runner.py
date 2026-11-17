@@ -66,8 +66,48 @@ def _wait_process_group(process):
 
 
 def _launch_process(command, *, environment, stdout, stderr, lock_fd):
-    # Defer parent alarms/Ctrl-C until the child handle has been assigned.
-    old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM, signal.SIGINT})
+    """Start the worker; return it with (deliver, release) for held parent signals.
+
+    From here until ``release()`` the parent's SIGALRM/SIGINT are held: blocked
+    for this thread, and recorded by a non-raising handler when another thread
+    takes a process-directed signal (CPython still runs the handler here, at an
+    arbitrary bytecode). ``deliver()`` hands held signals to the original
+    handlers synchronously, so an Oracle alarm or Ctrl-C raises only at the
+    supervision loop's own safe points, after the process is bound. An
+    asynchronous raise could land inside ``Popen`` before the child is bound, or
+    inside stdlib code that catches ``OSError`` (``TimeoutError`` is one) and
+    drops it, e.g. ``Popen.poll``.
+    """
+    held = {signal.SIGALRM, signal.SIGINT}
+    old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, held)
+    deferred = []
+    previous = {}
+    released = []
+
+    def release():
+        if released:
+            return
+        released.append(True)
+        try:
+            while (received := signal.sigtimedwait(held, 0)) is not None:
+                deferred.append(received.si_signo)
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+            for number in dict.fromkeys(deferred):
+                signal.raise_signal(number)
+        finally:
+            # Unblocking runs the original handlers for anything pending, here.
+            signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+
+    def deliver():
+        if released:
+            return
+        # Dequeue pending signals here rather than unblocking: once unblocked, another
+        # thread may take one and the handler would again run at an arbitrary bytecode.
+        while (received := signal.sigtimedwait(held, 0)) is not None:
+            deferred.append(received.si_signo)
+        if deferred:
+            release()
 
     def child_setup():
         signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
@@ -75,14 +115,17 @@ def _launch_process(command, *, environment, stdout, stderr, lock_fd):
             _set_child_affinity()
 
     try:
+        try:
+            for number in held:
+                previous[number] = signal.signal(number, lambda received, _frame: deferred.append(received))
+        except ValueError:
+            pass  # not the main thread: Python-level handlers never run here
         process = subprocess.Popen(command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
                                    start_new_session=True, preexec_fn=child_setup, pass_fds=(lock_fd,))
-        # Return the mask separately: the caller must assign the process before
-        # restoring it, since restoring may immediately deliver a pending alarm.
-        return process, old_mask
     except BaseException:
-        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+        release()
         raise
+    return process, deliver, release
 
 
 def _stop_worker_group(process):
@@ -186,11 +229,12 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
         violation = None
         process = None
         group_alive = False
+        release_signals = lambda: None
         try:
             with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
-                process, old_mask = _launch_process(command, environment=environment,
+                process, deliver_signals, release_signals = _launch_process(command, environment=environment,
                                                     stdout=stdout, stderr=stderr, lock_fd=lock_stream.fileno())
-                signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+                deliver_signals()
                 while process.poll() is None:
                     if time.perf_counter() - wall_start > timeout_s:
                         violation = f'wall watchdog {timeout_s}s exceeded'
@@ -217,7 +261,9 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
                     if violation:
                         _stop_worker_group(process)
                         break
+                    deliver_signals()
                     time.sleep(1.0)
+                    deliver_signals()
                 returncode = process.wait()
             group_alive = not _wait_process_group(process)
             if group_alive:
@@ -257,7 +303,7 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
                                       'process_group_id': process.pid, 'output_dir': str(output),
                                       'cleanup_error': 'process group retirement was not confirmed'})
             # Descriptor close retains the lock while any child inherits it.
-            pass
+            release_signals()
     status = 'COMPLETED' if violation is None else ('TIMEOUT' if violation.startswith('wall watchdog') else 'RESOURCE_VIOLATION')
     if violation is None and returncode != 0:
         violation = f'native worker exited with status {returncode}'

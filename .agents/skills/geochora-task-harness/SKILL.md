@@ -29,8 +29,9 @@ this source preparation does not launch Isaac or establish source verification.
 ## Current Core construction handoff
 
 The strict `pick-lift-v0` candidate path keeps its own spec, reset and
-feasibility policy, but delegates Panda/table/box Artifact and RuntimeSource
-construction through Core's shared `PandaBoxDeclaration` compiler. Its
+feasibility policy, but delegates Artifact and RuntimeSource construction to
+Core's PickCube construction entry (`PickCubeReferenceEnv` selected config plus
+the candidate recipe overlay, Core UID `pick-cube-v1`; identity in the spec hash). Its
 `ReferenceTaskBinding` is an internal Harness adapter; do not make it a task
 authoring requirement. The built-in runtime example resolves the nested
 selected config once, calls public `make_env`, and returns facts from that same

@@ -1,0 +1,21 @@
+{
+  "schema_version": "harness-mock-asset-bundle-v0",
+  "synthetic": true,
+  "assets": [
+    {
+      "uid": "mock/akita-black-bowl-proxy-v0",
+      "source_request_uid": "akita_black_bowl",
+      "version": "mock-001",
+      "representation": "authored visual bowl shell; box collision proxy, not source geometry",
+      "template_kind": "pick-lift-box-proxy-v0",
+      "path": "mock_bowl.body.xml",
+      "sha256": "0e30fe01ecd9a3d31469bc7169ef6de8bd603e1ae8d2ef241cfd3bb65799f142",
+      "semantic_body": "cube-v1",
+      "native_body": "PickCube",
+      "native_joint": "PickCube_joint",
+      "half_size_m": 0.025,
+      "mass_kg": 0.08,
+      "license_note": "Locally generated procedural proxy; no LIBERO meshes copied."
+    }
+  ]
+}

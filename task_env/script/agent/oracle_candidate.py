@@ -52,8 +52,8 @@ def record_episode(compiled, spec, *, provider, seed, h5, deadline):
     """Construct, reset, record and drive the expert once; storage inspection stays with the caller."""
     facts = {'episode': None, 'identity': None, 'controller_identity': None, 'expert_identity': None,
              'verification': None, 'execution_fault': None, 'errors': [], 'recording_started': False,
-             'close_attempted': False, 'close_succeeded': False, 'backend': compiled.backend,
-             'device': compiled.device}
+             'close_attempted': False, 'close_succeeded': False,
+             'backend': getattr(compiled, 'backend', None), 'device': getattr(compiled, 'device', None)}
     env = None
     try:
         env = compiled.env_class()(provider=provider, backend=compiled.backend)

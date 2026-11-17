@@ -34,7 +34,7 @@ def record_candidate_preflight(spec_path, catalog_path, output):
     )
     from task_env.controllers.canonical.kinematics import ARM, FINGERS
     from task_env.runtime.sessions.api import PROFILE
-    from task_env.tasks.reference_env import SelectedReferenceEnv
+    from task_env.environment.reference_env import SelectedReferenceEnv
     import numpy as np
 
     spec = CandidateSpec.load(spec_path)
@@ -233,7 +233,7 @@ class OracleCandidateWiringTests(unittest.TestCase):
             def close(self):
                 self.closed = True
         env = Env()
-        compiled = SimpleNamespace(artifact_hash='a' * 64,
+        compiled = SimpleNamespace(artifact_hash='a' * 64, backend='cpu', device='cpu',
             artifact=SimpleNamespace(to_mapping=lambda: {}), env_class=lambda: lambda **kwargs: env)
         context = {'core_repo': str(Path(__file__).resolve().parents[3]),
                    'core_commit': 'c' * 40, 'core_dirty': False}

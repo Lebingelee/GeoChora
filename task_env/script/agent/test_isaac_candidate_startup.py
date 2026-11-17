@@ -121,6 +121,12 @@ def test_supervisor_preserves_worker_compilation_identity(tmp_path, monkeypatch)
     assert row['worker_process_group_ended'] is True
 
 
+def _solution_value():
+    """Core-owned Solution factory shape: the caller constructs and resets it."""
+    solution = SimpleNamespace(identity='solution', reset=lambda *_args: None)
+    return {'solution_factory': lambda: solution, 'solution_identity': 'solution'}
+
+
 @pytest.mark.parametrize('actual_seed', (31, 32))
 def test_oracle_binds_position_recording_without_mixed_control_metadata(tmp_path, actual_seed):
     import oracle_candidate as oracle
@@ -136,7 +142,7 @@ def test_oracle_binds_position_recording_without_mixed_control_metadata(tmp_path
             self.value = {'session_admission_input': SimpleNamespace(
                 execution=execution, delivery_manifest_sha256='manifest'),
                 'reset_plan': SimpleNamespace(identity_hash='reset', reset_sample=sample),
-                'source': source}
+                'source': source, **_solution_value()}
             self.controller = SimpleNamespace(identity='controller')
             solution = SimpleNamespace(identity='solution', reset=lambda *_: None)
             self.value.update(solution_factory=lambda: solution, solution_identity='solution')
@@ -194,9 +200,10 @@ def test_oracle_finalizes_position_with_the_public_lifecycle_reason(tmp_path, ou
         value = {'solution_factory': lambda: Env.solution, 'solution_identity': 'solution'}
         metadata = {}
         execution_fault = None
+        metadata = {}
 
         def __init__(self, **_kwargs):
-            pass
+            self.value = _solution_value()
 
         def reset(self, **_kwargs):
             return {}, {}

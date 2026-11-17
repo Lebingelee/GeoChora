@@ -26,6 +26,9 @@
 - Current direction: [v2.1.0 roadmap and follow-ups](docs/roadmap/README.md).
 - Repository governance: [.agents/skills/geochora/SKILL.md](.agents/skills/geochora/SKILL.md), [documentation](.agents/skills/geochora-doc-governance/SKILL.md), [architecture](.agents/skills/geochora-architecture-refactor/SKILL.md), [public API](.agents/skills/geochora-public-api-governance/SKILL.md), [tests](.agents/skills/geochora-test-governance/SKILL.md), and [TaskEnv](.agents/skills/geochora-task-env/SKILL.md).
 
+Machine setup for Codex/Claude Code (environment script, `scripts/setup/setup.sh`,
+read-only `scripts/setup/doctor.py`, MCP registration): [agent setup](docs/global/agent-setup.md).
+
 ## Module Skill activation
 
 Use ordinary prompt text; this convention is not a native Codex slash command:

@@ -1,0 +1,32 @@
+{
+  "schema_version": "harness-upstream-task-v0",
+  "synthetic": true,
+  "task_id": "mock-upstream/bowl-lift-v0",
+  "requested_asset_uid": "mock/akita-black-bowl-proxy-v0",
+  "asset_sha256": "0e30fe01ecd9a3d31469bc7169ef6de8bd603e1ae8d2ef241cfd3bb65799f142",
+  "source_request_uid": "akita_black_bowl",
+  "goal": {
+    "predicate": "lift_height",
+    "height_m": 0.08
+  },
+  "scene": {
+    "table_top_z": 0.462,
+    "table_center_xy": [
+      0.6045,
+      0.0
+    ],
+    "table_half_size": [
+      0.28,
+      0.2,
+      0.01
+    ]
+  },
+  "initial_pos_xy": [
+    0.6045,
+    0.0
+  ],
+  "initial_reset_half_extent_m": 0.06,
+  "asset_bundle": "asset_bundle.json",
+  "semantic_examples": "semantic_examples.json",
+  "scope": "Synthetic upstream delivery for Harness integration. Lift-only surrogate, not LIBERO On/In equivalence."
+}

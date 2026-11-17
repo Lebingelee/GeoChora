@@ -325,7 +325,7 @@ def main(argv=None):
         print(json.dumps({'status': report.status, 'output': str(args.output), 'totals': report.details.get('totals')}))
         return {'pass': 0, 'fail': 1, 'error': 2}[report.status]
     args.horizon = args.horizon or 6000
-    from task_env.tasks.reference_env import SelectedReferenceEnv
+    from task_env.environment.reference_env import SelectedReferenceEnv
     import task_env
     repo = args.core_repo.resolve()
     if Path(task_env.__file__).resolve().parent.parent != repo:

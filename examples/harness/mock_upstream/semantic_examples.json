@@ -1,0 +1,19 @@
+{
+  "schema_version": "harness-semantic-examples-v0",
+  "synthetic": true,
+  "source": "mock upstream task adapter; not a LIBERO demonstration",
+  "goal_predicate": "lift_height",
+  "rest_height_m": 0.487,
+  "cases": [
+    {
+      "name": "initial",
+      "cube_world_z_m": 0.488,
+      "expected_success": false
+    },
+    {
+      "name": "mock_positive_endpoint",
+      "cube_world_z_m": 0.577,
+      "expected_success": true
+    }
+  ]
+}
