@@ -19,6 +19,7 @@
 | 7a 正式共同构建／装配与原 Panda | 正式 Task config → `make_env` → 共同 builder/source composition → Robot recipe 与 Controller binding；详见 7a 两份独立主审 | 按对应输入复用原共同构建、默认／显式选择与 reset 有界证据；新 PickCube Solution 已对装配 Panda 正式 caller 补跑，870 transitions、任务及 Solution 成功、独立 H5 和 close。四个 MuJoCo 交集原结论不推广为任意装配树或任意 Controller 切换。Nut 的当前 GeoPhys 源码未复验。 |
 | G03 provider 切换 | 当前同 Env MuJoCo→GeoPhys→MuJoCo→Isaac→MuJoCo，5 条独立 H5 | 当前短程及关闭通过；旧更强证据只按原输入引用，GeoPhys↔Isaac 直接切换未准入。 |
 | G04 Controller/reset | 同 Env joint→R3→joint，generation 1/2/3，返回参数 kp=100，3 条独立 v3 H5 | 当前短程与关闭通过；旧故障／stale 条件只按原输入引用，不扩成任意装配切换。 |
+| G04 7＋2 effort | 当前 MuJoCo 同 Env joint→R3→joint 的 3 条独立 H5 与 native ACK | 三段各有七个具名 N·m 臂关节及两个具名 N 手指关节准入项，9 个 contribution ID 与写入 ACK 对应；非独立测力或逐输入方向验证。GeoPhys／Isaac 原 4b 有界证据保留原输入。 |
 | G04 BodyWrench | 真实 Panda source、subject、Controller 和公共选择 | 原 subject 仅声明 effort writer，WrenchController 未声明同一 selection profile；真实组合在零步被 guard 拒绝。历史 4b 的数学及原生记录与本次 COM +2 N ACK 均不能证明当前 BodyWrench 链。缺少合法 composite authority 的最小路线，未伪造声明或放宽 guard。`BODYWRENCH_CURRENT_CHAIN_NOT_VERIFIED`。 |
 | G06 设备运行 | 当前固定 Rasterizer Isaac↔MJWarp 同 Env A→B→A，Pendulum、PickCube 各 9 条独立 H5；GeoPhys PickCube 单／非相邻部分 reset 与独立相机归因 | 两个切换代表与 GeoPhys 部分 reset 33 项检查通过。当前 MJWarp PickCube 交错终止及同运行 7 条 H5 独立读回通过；未把旧多 provider stagger／随机流全矩阵自动迁为当前源码通过；GeoPhys 直接跨 provider 未准入。首次无相机归因的两项像素检查失败已保留。 |
 | LIBERO | 7a 正式 caller、当前未改相关 owner | 仅复用已接收的 64 步有界结果；task_success=false，Solution 未评估，无完整任务或独立夹爪宣称。 |
