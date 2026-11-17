@@ -60,9 +60,15 @@ A3默认Controller必须按声明通道真实绑定并执行非零canonical acti
 
 2026-11-17维护者新增：将[PR #3](https://github.com/Lebingelee/GeoChora/pull/3)冻结head `23387a9cffd82fe02fb69fb5d2993141fdd54ae9`（`v2.1.1-asset-skills-develop`）本地合入当前G07阶段分支，此项归7b，不倒写为7a成果。逐语义裁决实际12处冲突，保留当前共享锁继承/进程清理、正式PickCube/Robot/source与桌面＋asset-object准入owner；来支setup/doctor不自动部署、下载或改用户MCP。其作者运行证据不替代本版最终九格。合并/必要修复与图像/独立reader薄驱动稳定后才冻结矩阵输入。
 
-[7b attempt001完整包与Goal提示](../maintenance/work-packages/20261117_g07b_attempt001_goal.md)已准备，READY_FOR_MANUAL_FORWARD_NOT_STARTED／attempt0。总连续wall硬上限240分钟，含PR合并、问答等待、验证和收尾；native累计≤120分钟、显式子步≤100000，单run/内存/GPU/输出/原锁监督见包。三provider各seed31在同次完整Solution中保留reset、首个非零step和最终返回边界图像；其余seed可state-only。H5、caller严格完成与各provider实际schema的close分别关联，不新增跨provider记录平台。原三条路线为MuJoCo CPU、GeoPhys CPU、Isaac PhysX CUDA；seeds31/32/33，MJWarp不替换MuJoCo，附加Robot不乘进九格。准备不创建Goal/native或实际merge，收到转发并核验后才启动。
+[7b attempt001完整包与Goal提示](../maintenance/work-packages/20261117_g07b_attempt001_goal.md)最初准备时为 READY_FOR_MANUAL_FORWARD_NOT_STARTED／attempt0，现已启动，见下方实施状态。原总连续wall硬上限240分钟，含PR合并、问答等待、验证和收尾；native累计≤120分钟、显式子步≤100000，单run/内存/GPU/输出/原锁监督见包。三provider各seed31在同次完整Solution中保留reset、首个非零step和最终返回边界图像；其余seed可state-only。H5、caller严格完成与各provider实际schema的close分别关联，不新增跨provider记录平台。原三条路线为MuJoCo CPU、GeoPhys CPU、Isaac PhysX CUDA；seeds31/32/33，MJWarp不替换MuJoCo，附加Robot不乘进九格。准备本身不创建Goal/native或实际merge；后续启动与本地合并见下方实施状态。
 
 最终九格不等于每个 backend×renderer×Controller×batch 都跑三 seed；组合覆盖在阶段 1 冻结，各维度有最小真实代表例。不同 solver 不要求轨迹或像素逐点相同。若九格有失败则本门未完成；范围改变须维护者决定，保留原门和失败历史。
+
+### 7b attempt001实施状态（2026-11-17）
+
+已在本地合入指定 PR #3 冻结 head；最终生产输入 `78349184d0600e2fb804e6461930c475bfcc67c1`。维护者明确允许在原 PickCube Solution 内压缩前段固定等待，保留实际 TCP gate、下降／闭合／抬升、原任务与完成判据及 1000 步上限；这是一项特定时序授权，不扩展到改变其他任务策略。最终三 provider × 三 seed 均有同运行任务成功、原事件驱动 Solution 完成、独立记录读回和关闭；计划轨迹完成字段为 null，不补造。原失败与截断记录仍保留。
+
+7b实施返包为 PARTIAL，待独立主审：其他独立门必须单独核验，不能从九格成功推定全部通过。当前 BodyWrench 真实 source 下的组合选择被一致性 guard 拒绝，当前链路尚未验证；历史 4b 与当前 COM 力证据不能替代。维护者随后授权将显式子步预算重新设为 200000，以新周期计数并保留此前实际消耗；其他预算不变。7c仍为 PLANNED／0。
 
 <a id="7c"></a>
 ## 7c：版本文档与能力记录

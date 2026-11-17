@@ -913,5 +913,13 @@
       "review_status": "INDEPENDENTLY_ACCEPTED_BOUNDED_7A",
       "review_ref": "maintenance/reviews/20261117_g07a_attempt002_acceptance.md"
     }
+  },
+  "g07b_attempt001_execution": {
+    "status": "PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+    "production_freeze": "78349184d0600e2fb804e6461930c475bfcc67c1",
+    "pickcube_nine_cells": "9/9 task and event-driven Solution success, independent same-run H5 and close; seed31 same-run RGB",
+    "body_wrench_current_chain": "NOT_VERIFIED: real subject/profile combination rejected before native stepping",
+    "limits": "No current-source GeoPhys Nut claim, no generalized controller switching or independent grasp force/hold claim.",
+    "evidence_ref": "../maintenance/reviews/20261117_g07b_attempt001_execution.md"
   }
 }
