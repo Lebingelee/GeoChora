@@ -103,6 +103,29 @@ MuJoCo3.8.1 FREE角向armature／implicitfast的原生数值边界保留写入�
 - **检查：**文档结构／链接／JSON、公开例子与真实 caller、能力语言和证据身份、dirty／gitlink／refs；Skills 按源码和调用者刷新，不只做文字同步。记录检查运行与未运行项。
 - **交付／出口：**版本文档准确描述实现与未支持组合，7 个 Goal 的摘要和编排索引可恢复，原始日志／图片／H5 不入库。必要本地提交与审阅意见完整。
 
+<a id="g07c-split-doc-worktree"></a>
+### 2026-11-17维护者调整：独立工作树提前完善文档
+
+维护者明确允许在7b尚待接收时，先完成与其最终结果无关的文档工作；这是本节依赖的**有界提前执行例外**，不取消7c整体收口对7b接收的依赖。
+7c attempt001使用独立`codex/v211-stage7-docs`工作树，源码基线`4fdf9379482af6bb913eb1a6587316e64b6a0fed`，不复制主实施树正在变化的7b源码。准备为READY_FOR_MANUAL_FORWARD_NOT_STARTED／普通attempt0，实际启动才增1；不创建执行Goal/native或自动派发。
+
+- **attempt001现在完成：**安装、scalar无渲染、GeoPhys Rasterizer优先的有头相机、device并行三provider、环境/资产/Robot、独立Controller章节及API详细教程；归并当前文档与导航，按真实caller修正文档漂移及相关现有Skills。逐节内容、命令/字段、输出/排错与验收见[详细填充蓝图](../planning/stage7-7c-tutorial-blueprint.md)和[完整包索引](../maintenance/work-packages/20261117_g07c_attempt001_goal.md)。不交付只有目录、链接或TODO的教程。
+- **attempt002等待7b：**以独立主审实际接收的7b HEAD重新对账，更新BodyWrench新公共调用/准入/IPC/记录、最终九格与其他门的单一能力矩阵、7Goal/22子阶段摘要、恢复身份和Skills，处理两分支文档冲突后完成7c。不能提前写7b已接收或7c已完成。
+- **源码约束：**7c以说明、归并和普通示例为主，不改运行代码/算法、依赖、source/provider、Recorder或tests来让教程通过；继续遵守[post-5c总账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)与唯一owner，不增加API/factory/validator或诊断耦合。新BodyWrench公共typed方向可解释，未稳定签名标WAIT_7B_ACCEPTANCE。
+- **实际缺口：**准备输入的Nut仅准入source-bound ExpertAction，普通随机数组被明确拒绝；保留维护者要求的随机动作章节、预期拒绝例子和T-NUT-RANDOM未满足项，不伪造Solution身份或放松guard。最终仍无普通随机能力时交维护者裁定必要task-local接线，不以负例充作随机控制成功。
+- **隔离与验证：**两个活跃G07 checkout及原locked历史worktree保留；7b writer与其原证据/共享锁不受本包改写。attempt001不启动native/安装/下载，只做源码/caller、教学语义、AST/JSON/链接核对并准确引用既有运行。没有新运行则不称教程已native验证；不为文档绿灯复制保护日志或修改旧证据。
+
+本工作树中的7b状态是分叉输入快照；其实时结果由主实施树维护。7c最终正常整合须等待7b返包/接收并作diff影响复核，不在其活跃窗口合并或覆盖其orchestration。
+
+<a id="g07c-attempt002"></a>
+### 2026-11-17 attempt002 范围更新
+
+维护者已接收attempt001文档，实际docs HEAD为`1e9081c4`；7b也已按[最终主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)接收。现正常[整合docs树及保全](../maintenance/reviews/20261117_g07c_attempt001_integration.md)，使用阶段7主分支准备002，普通attempt仍1，实际执行002才增2。此前“7c不改源码”和Nut仅留负例是001的边界；维护者本次明确授权002修复Nut普通随机动作拒绝，以及直接影响教程的declared-marker示例漂移。
+
+002沿Nut Task binding／既有动作Controller和共同生命周期最小接通普通action，仍保留原ExpertAction的source／Solution身份、native反馈、reset／混用／fault检查；不复制Solution或Runtime，不放宽原Task成功/完成门。只补实际受影响代表运行，原7b九格与其他已通过矩阵按身份复用。完整包须包含实现、正式随机教程、定向负例、同运行H5独立读回和关闭，不能以设置一个flag或AST通过作为能力接收。
+
+同时收口7b BodyWrench最终公共API／provider准入／记录与组合规则、7Goal/22子阶段摘要、单一矩阵、恢复入口、指南／API／Skills、版本变更／限制和发布准备。维护者授权在002独立验收后将**本地develop**快进到最终阶段7 HEAD；不得覆盖非祖先develop、同步main或操作远端，源码身份变化按影响复核，不机械重跑完整历史矩阵。详见后续002完整工作包索引。
+
 ## 发布边界
 
-当前文档与阶段接收不自动授权发布操作。2026-11-17维护者授权上述旧资产冻结分支及7b指定PR #3冻结head合入G07的本地merge；不授权合并回develop/main、push／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。
+当前文档与阶段接收不自动授权发布操作。2026-11-17维护者授权上述旧资产冻结分支及7b指定PR #3冻结head合入G07的本地merge；此前不授权回合develop/main；本次002验收后本地develop快进以本节新增授权为准，仍不授权main同步、push／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。

@@ -1,0 +1,11 @@
+# G07／7c attempt001 文档接收与主树整合
+
+2026-11-17。维护者已接收[attempt001的有界文档交付](20261117_g07c_attempt001_docs.md)，本次整合不接收尚未实施的Nut普通随机能力，也不关闭7c。实际docs HEAD为`1e9081c48ec28854055928f1ef361dffc8d5f6a3`（在报告所列`da9277f3`之后补记维护者接收）；主树输入为`8e228906e5445e53806280613c9e09e76565ae03`，共同基点`4fdf9379482af6bb913eb1a6587316e64b6a0fed`。
+
+通过正常双亲merge整合教程／导航／既有Skill；唯一文本冲突为orchestration，按主树保留7b最终接收和九格原输入，按docs树接入7c001历史、attempt_count=1和原限制。没有选旧7b快照覆盖新状态，没有生产Python、依赖或gitlink变更。当前Nut仍拒绝普通动作；其最小Task接线、declared-marker教程示例修复及7b API资料收口进入002，准备不增加attempt计数。
+
+独立重新提取当前教程和examples README的71个Python/bash代码块，0语法错误；其中2个remote/ref占位骨架明确跳过执行式语法验收。原静态清单个别行号已随末次内容修订漂移，本次从当前正文重新定位，不沿用旧行号。此结果只证明语法；native、子步、GPU、安装均0。主树文档validator只有原保护日志基准差异，实际日志SHA仍`3b08b858f62dcbaa6521802455c76126f9876a3d6727c7586db90c94296ed6a8`；docs树原4项环境缺失错误仍保存在原报告，不覆盖。
+
+原`workspace/maintenance/v211_g07c_attempt001/`四份文件已逐字节核验后复制到主树同路径，故相对证据入口继续可达。删除docs工作树前，136项ignored文件（含原workspace和缓存）全部归档并验证成员哈希；保存于主树ignored `workspace/maintenance/v211_g07c_attempt001_integration_20261117/preserved-ignored.tar.gz`，清单为`preservation.json`。独立语法、文档检查和最终merge／清理收据同目录保留。归档不是完整SDK/native可移植环境；tracked内容从merge双亲恢复。
+
+维护者授权合并后删除该已释放工作树；只使用Git正常remove及已合并分支的`-d`清理，不移除locked历史树、stash、共享锁或原source。7c002仍由维护者手动转发；本地develop在002完成并经独立主审通过后快进，当前不先移动。没有push、main同步、tag、Release或第三方资产分发。

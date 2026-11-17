@@ -2,6 +2,8 @@
 
 更新时间：2026-11-17。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
+**7c 当前状态（2026-11-17）：**维护者已有界接收[attempt001文档](reviews/20261117_g07c_attempt001_docs.md)，普通attempt数1；实际文档HEAD为`1e9081c4`，现从隔离树正常整合到阶段7主树。其原7b快照不覆盖本树已接收结论，正文静态交付不冒充native验证。`T-NUT-RANDOM`及declared-marker教程示例缺口进入attempt002；维护者授权最小修复、最终文档/API/恢复资料与本地develop收口。本轮仅准备002、不启动Goal/native；版本尚未发布。
+
 ## 当前停门
 
 G07／7a已按[attempt002独立主审](reviews/20261117_g07a_attempt002_acceptance.md)有界收尾，普通attempt数2，生产HEAD `0a6213c040e06e6385b6d1f5509af34a8d5b8372`，旧资产冻结来支本地merge `94e865e3`，分支`codex/v211-stage7-integration`。此前维护者[部分接收](reviews/20261117_g07a_attempt001_partial_acceptance.md)的原/装配Panda四个MuJoCo完整交集及空载/本体补偿继续保留；当前GeoPhys源码未按限定重跑，Nut释放MuJoCo1mm/GeoPhys8mm不变。LIBERO默认七轴真实effort/ACK/reset与同run H5/关闭、显式pose空载相对同保持输入历史OSC四项不退步已复核；64步正式caller仍task_success=false、Solution completion未评估。主审仅新增1600子步历史参考补证，未改生产源码，不重开原attempt002窗口。

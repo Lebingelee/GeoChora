@@ -1,16 +1,8 @@
 # GeoChora developer workflows
 
-These commands use the current TaskEnv APIs and selected task routes. The
-some examples apply Linux-oriented per-process bounds; the scalar launcher,
-existing TaskEnv CLIs and interactive probes do not all apply those bounds.
-All results here are smoke checks, not new provider, task, learner, or renderer
-qualifications. Run them from the repository root in the GeoChora environment;
-the repository has no editable-install metadata, so set `PYTHONPATH` explicitly.
+These commands use the current TaskEnv APIs and selected task routes. Some examples apply Linux-oriented per-process bounds; the scalar launcher, existing TaskEnv CLIs and interactive probes do not all apply those bounds. All results here are smoke checks, not new provider, task, learner, or renderer qualifications. Run them from the repository root in the GeoChora environment; the repository has no editable-install metadata, so set `PYTHONPATH` explicitly.
 
-For a scalar first step with explicit Python and GeoPhys paths, see the
-[installation and launch guide](../docs/module/task_env/v2.1.1/guides/installation-and-start.md)
-and `examples/start.py`. Its argument routing has been checked offline; the
-new launcher has not yet been validated with a native run in this maintenance.
+For the guided sequence (install → state-only → rendering → device batch → authoring → controllers → API), start at the [v2.1.1 learning guides](../docs/module/task_env/v2.1.1/guides/README.md). For a scalar first step with explicit Python and GeoPhys paths, see the [installation and launch guide](../docs/module/task_env/v2.1.1/guides/installation-and-start.md) and `examples/start.py`. Its argument routing has been checked offline; the launcher has not been validated with a new native run in this maintenance.
 
 ```bash
 PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --execution direct --seed 31
@@ -61,13 +53,20 @@ The current public entry points are:
 | Inline or YAML scalar config | `python -m task_env.script.env.single_inline` or `single_from_file` | Formal configuration and `make_env`; mapping/YAML equivalence is shown in the installation guide. |
 | Recording and trajectory | `examples/recording/record_expert.py` and `task_env.script.trajectory.planning` | Selected task Solution and recorder; successful storage and task completion are separate. |
 | Scalar camera/render example | `examples/rendering/pendulum_single_rgb.py` | Existing bounded Pendulum rasterizer example; retired `task_env.script.camera.static` and `.bound` are historical and report retirement. |
+| Device batch, Pendulum | `examples/parallel/pendulum_device.py` | G06 canonical CUDA device route for `pendulum-v1` with `--provider mujoco_warp\|geophys\|isaacsim`; see the [device guide](../docs/module/task_env/v2.1.1/guides/quickstart-device-batch.md). |
+| Device batch, PickCube | `examples/parallel/pick_cube_device.py` | G06 canonical CUDA device route with explicit `panda-direct-effort-v1`; GeoPhys requires `--geophys-contact-mode discrete --geophys-contact-iterations 32`. |
+| Device whole-batch switch | `examples/parallel/reconfigure_device.py` | Accepted representative edge Isaac ↔ MuJoCo Warp for both tasks; GeoPhys cross-provider switching is not admitted. |
 
 For a small new-task declaration, see [`declared_marker.py`](tasks/declared_marker.py).
 It supplies a distinct task/Entity identity, reset sampler and evaluator while
 reusing Core's shared Panda/table/box construction. Import the example to register
-it, then use `task_env.make_env('marker-height-example-v1', config=...)`. The
-[current guide](../docs/module/task_env/v2.1.1/guides/installation-and-start.md)
-describes the setup; the modified Marker route has synthetic checks only.
+it; note that at this source baseline its selected configuration has no declared
+`selected_robot_uids`/`default_robot_source_uid`, so `make_env` rejects it at
+Robot selection (`selected robot uid must be a nonempty trimmed string`). Treat
+the file as a declaration/binding example, not a runnable new-task route; the
+[current guide](../docs/module/task_env/v2.1.1/guides/authoring-scenes-assets-robots.md)
+records this drift and the fields a real task must declare. The modified Marker
+route has synthetic checks only.
 
 ## Workflow matrix
 
@@ -82,11 +81,11 @@ describes the setup; the modified Marker route has synthetic checks only.
 | Guarded task rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19` | Caller-owned `act → step(action) → observe`; incomplete route exits nonzero. Nut MuJoCo/GeoPhys seed19 complete runs have [bounded same-run evidence](../docs/module/task_env/v2.1.1/maintenance/reviews/20261113_e11_e16_u4_joint_completion.md), each at its frozen source/configuration; this is not a full run at every later HEAD or general provider qualification. |
 | Canonical expert recording | `PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py --env-id pick-cube-p16-reference-v1 --provider mujoco --seed 31 --output workspace/examples/pickcube-mujoco.h5` | Requires a fresh output path; finalizes the existing canonical H5 recorder and checks transitions, T+1 boundaries, provenance, and storage roundtrip. |
 | Offline H5 inspection | `PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspace/examples/pickcube-mujoco.h5` | Reads the existing canonical schema and validates logical/numeric integrity and T+1 boundaries. It does not replay the task or claim D0. |
-| Generic batch environment | `task_env.make_parallel_env` with an explicitly registered compatible component task | The four current formal tasks have no batch adapter and are rejected before worker startup. The previous Pendulum batch command is historical, not a current runnable route. |
-| SB3 learning example | `examples/learning/pendulum_sb3.py` | Its historical Pendulum batch dependency is unavailable for the current formal Pendulum task. This does not establish training support. |
-| Parallel rendering example | `examples/rendering/pendulum_parallel_rgb.py` | The historical Pendulum batch dependency is unavailable for the current formal Pendulum task; no current batch-render claim follows. |
+| Generic batch environment | `task_env.make_parallel_env(..., execution='device')` | G06 has bounded acceptance for Pendulum/PickCube × `mujoco_warp`/`geophys`/`isaacsim`; the generic SB3 `remote`/`local` wrappers are a different contract. Nut batch, R3 batch, heterogeneous rows and arbitrary sources are not admitted. |
+| SB3 learning example | `examples/learning/pendulum_sb3.py` | Its historical Pendulum batch dependency is not the accepted device contract. This does not establish training support. |
+| Parallel rendering example | `examples/rendering/pendulum_parallel_rgb.py` | Historical batch-render smoke; current device windows/cameras are shown by the `examples/parallel/*_device.py` `--window`/`--sensor` flags. No general batch-render qualification follows. |
 | Scalar observer example | `PYTHONPATH=GeoPhys/src:. python examples/rendering/pendulum_single_rgb.py` | Declares GeoPhys CPU and an observer CameraSpec through the formal scalar factory. The migrated caller has guarded configuration/fake-loop checks; native RGB was not rerun for this migration. Running the command requests one real frame and step; no Flora or cross-renderer claim follows. |
-| Advanced parallel render CLI | `python -m task_env.script.render_parallel --help` | Requires a compatible registered component batch; the current formal Pendulum UID has no batch adapter. |
+| Advanced parallel render CLI | `python -m task_env.script.render_parallel --help` | Component-batch render CLI; it is not the accepted G06 device route. Use the `examples/parallel/*_device.py` flags for the tested device windows/cameras. |
 | Standalone window-input probe | `PYTHONPATH=GeoPhys/src:. python -m task_env.script.render_input_probe --arch cpu` | Taichi Forge keyboard/window probe only; it does not construct a TaskEnv or test a physics-renderer intersection. |
 | Generic RSL-RL entry point | `PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.rsl_ppo --help` | `--env-id` is required. Admission also requires a registered homogeneous task and compatible learner contracts; no Go2 replacement is selected. |
 
@@ -99,7 +98,9 @@ through the existing recorder.
 The scalar observer example requests Pendulum × GeoPhys CPU × scalar TaskEnv
 × rasterizer RGB. Its current caller/configuration checks do not establish new
 pixel evidence. The historical Pendulum batch-render smoke predates the
-formal task migration and does not establish current batch support. The Renderer Registry, Flora, Camera, and rasterizer contracts remain
+formal task migration and does not establish the G06 device render result;
+current device windows/cameras are exercised by `examples/parallel/*_device.py`.
+The Renderer Registry, Flora, Camera, and rasterizer contracts remain
 available within their declared boundaries. No selected manipulation task ×
 Flora route has been established. The historical `render_single` CLI and
 PickCube camera-observation/lighting probes fail explicitly; the scalar
@@ -110,7 +111,7 @@ reexecution, parallel environment, SB3, and RSL-RL APIs remain separate routes.
 Do not map retired task IDs to current task behavior. The S4.5-B source-recovery
 manifest records retired script identities and their exact recovery blobs.
 
-**F06 current result (2026-11-01; runtime portion partially accepted):**
+**Historical F06 result (2026-11-01; runtime portion partially accepted):** This section records the frozen 2026-11-01 F06 run and is not the current capability summary. Later Phase C/7b PickCube runs with their own source identities are recorded in the [current state](../docs/module/task_env/v2.1.1/maintenance/current-state.md) and [G06 summary](../docs/module/task_env/v2.1.1/maintenance/g06/implementation-summary.md); they do not rewrite this failure.
 MuJoCo CPU, GeoPhys CPU and Isaac Sim 6.2 CUDA PhysX each completed seeds31/32/33
 at source `017392e86eb754749fc692263e08a1b33c3c5543`. All 9/9 runs are
 runtime-valid with planned actions, finite recorded numeric data, H5 T+1 and

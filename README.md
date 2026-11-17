@@ -7,11 +7,11 @@ GeoChora provides public task/environment APIs and supporting tools for embodied
 - **v1.1.0** is the published release, sourced from `7ed9e78a60d407fa1150c99209e06c70bfa0ed87`. Its bounded approvals and limitations remain frozen in the [release record](docs/releases/v1.1/README.md).
 - **v2.0.0** is a frozen source tag at `3759f917b80adb0b7df361c0928d6aff2e4cf1ec`. This repository does not assert a publication date or a separate release acceptance for it; see the [tag snapshot notes](docs/releases/v2.0.0/README.md).
 - **v2.1.0** is a local draft candidate, not a published release or new Qualification. Its current contracts and bounded evidence are in the [v2.1.0 TaskEnv docs](docs/module/task_env/v2.1.0/README.md) and [release candidate notes](docs/releases/v2.1.0/README.md).
-- **v2.1.1** is under development. G01–G06 canonical scopes have bounded acceptance and closeout; G07 and version closeout remain pending, with batch R3 in a separate future package. Start with the [current state](docs/module/task_env/v2.1.1/maintenance/current-state.md) and [G06 implementation summary](docs/module/task_env/v2.1.1/maintenance/g06/implementation-summary.md) for tested routes, limitations and evidence.
+- **v2.1.1** is under development. G01–G06 canonical scopes have bounded acceptance and closeout; G07 and version closeout remain pending, with batch R3 in a separate future package. Start with the [learning guides](docs/module/task_env/v2.1.1/guides/README.md), then the [current state](docs/module/task_env/v2.1.1/maintenance/current-state.md) and [G06 implementation summary](docs/module/task_env/v2.1.1/maintenance/g06/implementation-summary.md) for tested routes, limitations and evidence.
 
 ## Start with the public API
 
-The repository has no root packaging metadata; do not use `pip install -e .`. Start with the [installation and launch guide](docs/module/task_env/v2.1.1/guides/installation-and-start.md) to select an existing Python, provider and source paths. The following is an API illustration for an already prepared environment; it has not been rerun as part of the ongoing maintenance:
+The repository has no root packaging metadata; do not use `pip install -e .`. Start with the [installation and launch guide](docs/module/task_env/v2.1.1/guides/installation-and-start.md) to select an existing Python, provider and source paths. The [v2.1.1 learning guides](docs/module/task_env/v2.1.1/guides/README.md) continue with state-only tasks, rendering, device batches, authoring and controllers. The following is an API illustration for an already prepared environment; it has not been rerun as part of the ongoing maintenance:
 
 ```bash
 export PYTHONPATH=GeoPhys/src:.
