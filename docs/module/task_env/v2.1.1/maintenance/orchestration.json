@@ -2226,8 +2226,8 @@
                 "authorized_by": "user",
                 "new_epoch_limit": 200000,
                 "prior_known": 71875,
-                "new_epoch_used": 750,
-                "known_aggregate": 72625
+                "new_epoch_used": 900,
+                "known_aggregate": 72775
               }
             }
           ],
@@ -2260,7 +2260,7 @@
           },
           "last_observation": {
             "at": "2026-11-17T13:12:23.984153+08:00",
-            "state": "Nine final cells passed with independent H5 and close; current BodyWrench selection/native chain remains unverified; partial return pending independent review."
+            "state": "Nine cells plus current MJWarp staggered independent readback pass; current BodyWrench selection/native chain remains unverified; partial return pending independent review."
           },
           "evidence_refs": [
             "reviews/20261117_g07b_attempt001_execution.md"
