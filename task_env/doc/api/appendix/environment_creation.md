@@ -27,7 +27,7 @@
 ```python
 from task_env import make_env
 
-env = make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})
+env = make_env("pendulum-v1", config={"execution": {"physics_provider": "mujoco", "physics_backend": "cpu", "deployment": "in_process"}})
 try:
     observation, info = env.reset(seed=73)
     observation, reward, terminated, truncated, info = env.step(

@@ -4,6 +4,8 @@
 
 **7c 当前状态（2026-11-17）：**维护者已有界接收[attempt001文档](reviews/20261117_g07c_attempt001_docs.md)，普通attempt001 已接收；实际文档HEAD为`1e9081c4`，已在`c0aeef75`整合到阶段7主树并保全原始证据，旧docs工作树和已合并本地分支已移除。其原7b快照不覆盖本树已接收结论，正文静态交付不冒充native验证。`T-NUT-RANDOM`及declared-marker教程示例缺口进入 attempt002；维护者授权最小修复、最终文档/API/恢复资料与本地develop收口。[attempt002工作包](work-packages/20261117_g07c_attempt002_goal.md)已准备，另明确按原结构细化`task_env/doc`34篇current模块教程，覆盖职责/API/生命周期/完整用法；本轮 attempt002 已返包，普通计数为2；代表运行与文档候选见[执行摘要](reviews/20261117_g07c_attempt002_execution.md)，历史 CPU 运行的整卡 GPU 监控缺口保留为 PARTIAL，独立主审尚未进行。实施者返包独立接收后再快进本地develop；版本尚未发布。
 
+**7c 跟进：**维护者对历史 CPU 整卡 GPU 采样缺口作有界过程偏差处理；独立审阅确认六条代表运行关联，并提出的文档问题已修订复核。GeoPhys Nut 渲染仍未闭环；已有 source/Scene 身份和投影分析见[跟进记录](reviews/20261117_g07c_render_review_followup.md)，未据此接收 7c 或移动 develop。
+
 ## 七个 Goal／二十二个子阶段当前索引
 
 | Goal | 当前子阶段状态（各项均限其原证据范围） |
@@ -26,7 +28,7 @@ G07／7b 已按维护者“仅处理直接影响主线、检查通过后验收�
 
 公共typed贡献／分别适配的joint effort与body wrench、受测MuJoCo／Isaac／MJWarp代表及GeoPhys公开可达FREE交集有界接收。[主线小修与补证](reviews/20261117_g07b_attempt002_priority_review.md)已修正真实Robot配置测试、通过7项既有合同／清理检查，补齐MJWarp无producer两次reset／step、两份H5独立读回与关闭；未改生产代码。MuJoCo原FREE角向armature／implicitfast交集保留写入前拒绝并交后续专题，独立零armature夹具只证明自身source。原115／3、退休注入入口及其他失败原样保留，不声明全suite全绿；原[attempt001](reviews/20261117_g07b_attempt001_execution.md)／[attempt002](reviews/20261117_g07b_attempt002_execution.md)PARTIAL是历史返包，最终裁决见上述主审。
 
-**G01～G06 canonical范围、G07／7a与7b有界关闭；7c001文档已接收并合并，7c002 已返包，历史 GPU 监控缺口和独立主审尚待处理。** 普通 attempt 数为 2；执行回执见 `workspace/maintenance/v211_g07c_attempt002/`。G06[总结](g06/implementation-summary.md)和[证据索引](g06/evidence-index.json)保留原abc成果／性能／未覆盖项，生产结案`4332844f`不是最新HEAD；GeoPhys pin`198d30ac`、Menagerie`b846dd12`未变。后继[scalar/batch render修复](20261116_scalar_render_followup.md)保持，不自动纳入新R3 batch独立包。
+**G01～G06 canonical范围、G07／7a与7b有界关闭；7c001文档已接收并合并，7c002 已返包，历史 GPU 监控缺口已有维护者有界过程决定；渲染闭环与最终独立主审尚待完成。** 普通 attempt 数为 2；执行回执见 `workspace/maintenance/v211_g07c_attempt002/`。G06[总结](g06/implementation-summary.md)和[证据索引](g06/evidence-index.json)保留原abc成果／性能／未覆盖项，生产结案`4332844f`不是最新HEAD；GeoPhys pin`198d30ac`、Menagerie`b846dd12`未变。后继[scalar/batch render修复](20261116_scalar_render_followup.md)保持，不自动纳入新R3 batch独立包。
 
 6a、6b、6c独立主审分别为[6a](reviews/20261115_g06a_attempt002_acceptance.md)、[6b](reviews/20261116_g06b_attempt003_acceptance.md)、[6c](reviews/20261116_g06c_attempt001_acceptance.md)，普通attempt计数2/3/1。三后端×两任务CUDA native batch、canonical action、设备Task/state、相机/窗口独立、same-step终止帧、部分reset及两个任务固定Rasterizer的Isaac→MJWarp→Isaac已成立。GeoPhys限显式discrete/contact32/coupled32配置，跨provider未准入；shared scene不承诺视觉隔离。R3、旧scalar SHA迁移、AOT/上游反向合并等后续或暂缓边界不记通过。
 

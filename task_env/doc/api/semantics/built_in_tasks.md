@@ -73,8 +73,7 @@ not as interchangeable environment constructors.
 `EmptyTaskEnv`, `PendulumEnv` and `TwoWheelBalanceEnv` have their own task
 semantics. Empty has no task action dimensions; Pendulum and TwoWheel use one
 and two torque inputs respectively. Pendulum and TwoWheel use their declared
-Robot and Controller in the formal scalar environment. Their obsolete parallel
-registrations have been retired; unified batch construction is deferred to G06.
+Robot and Controller in the formal scalar environment. Their obsolete component-parallel registrations have been retired. G06 boundedly accepts the separately declared Pendulum device batch; that evidence does not extend to TwoWheel.
 
 ## `PendulumEnv` and `PendulumTaskDefinition`
 
@@ -101,7 +100,7 @@ cost 和 success term 组成。固定 action sequence 的物理语义由同一 i
 ### Batch capability
 
 Pendulum 与 TwoWheel 的旧 parallel 注册及 component 工厂已退出；这两项目前不通过旧
-`make_parallel_env` 路线创建。G06 将基于正式 Task／Robot／Controller 构建合同实现并验证并行能力。
+`make_parallel_env` 路线创建。G06 已有界接收声明式 Pendulum device batch；该证据不外推到 TwoWheel 或退休的 component 注册。
 
 ## `TwoWheelBalanceEnv` and `TwoWheelBalanceTaskDefinition`
 

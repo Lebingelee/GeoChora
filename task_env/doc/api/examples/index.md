@@ -42,7 +42,7 @@ The selected public manipulation UIDs are `pick-cube-p16-reference-v1` and
 ```python
 from task_env import make_env
 
-env = make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})
+env = make_env("pendulum-v1", config={"execution": {"physics_provider": "mujoco", "physics_backend": "cpu", "deployment": "in_process"}})
 try:
     observation, info = env.reset(seed=73)
     action = env.action_space.sample()

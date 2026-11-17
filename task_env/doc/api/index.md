@@ -78,7 +78,7 @@ pick-cube-p16-reference-v1
 two-wheel-balance-v1
 ~~~
 
-Pendulum 和 TwoWheel 的旧并行能力有登记；G06 已独立接收 Pendulum/PickCube × MuJoCo Warp/GeoPhys/Isaac 的 canonical device batch 交集，但 Nut batch、R3 batch、任意异构组合和旧 SB3/RSL wrapper 兼容仍是未支持/独立项。四个正式任务使用同一单环境构建入口；旧 `pick-cube-v1`、`nut-assembly-square-v1` 及 Go2 UID 在当前 factory 明确退休，不映射到其他 task。
+Pendulum 和 TwoWheel 的旧 component 并行注册已退出；G06 已独立接收 Pendulum/PickCube × MuJoCo Warp/GeoPhys/Isaac 的 canonical device batch 交集，但 Nut batch、R3 batch、任意异构组合和旧 SB3/RSL wrapper 兼容仍是未支持/独立项。四个正式任务使用同一单环境构建入口；旧 `pick-cube-v1`、`nut-assembly-square-v1` 及 Go2 UID 在当前 factory 明确退休，不映射到其他 task。
 
 ## Appendix
 

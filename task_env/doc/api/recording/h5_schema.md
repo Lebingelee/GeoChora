@@ -27,7 +27,15 @@ print(summary['expert_identity_role'], summary['action_origins'])
 assert summary['t_plus_one_valid']
 ```
 
-此 reader 对旧 canonical 文件的缺失来源返回 `None`，不补造历史事实；v3 有独立字段合同，按具体 reader 使用。文件不存在、schema 或内容不匹配时读取会抛出异常。上面的来源字段是本次 7c002 正在验证的改动，独立主审前不作为全 provider 的接收声明。
+此 reader 对旧 canonical 文件的缺失来源返回 `None`，不补造历史事实；v3 有独立字段合同，按具体 reader 使用。文件不存在、schema 或内容不匹配时读取会抛出异常。上面的来源字段已在 7c002 同运行 reader 中验证，独立主审前不作为全 provider 的接收声明。
+
+## 结构化数据位置与核验
+
+canonical execution v2 使用一维 `logical_json_utf8` 的 `uint8` 字节流，以及 T+1 长的 `control_step`、`native_step_index` 整数索引；它并非按每个字段建立独立 H5 dataset。使用 `task_env.trajectory.canonical.execution.load` 解码后，`transitions[i].record.applied_control` 是控制提交，`interval.substeps[j].applied` 与 `native_feedback_sample_v1` 是各原生子步的应用和反馈。不要把 ACK 解释成独立力传感。
+
+structured v3 的 `meta/structured_controls_v1_json`、`meta/boundary_events_v1_json`、`meta/episode_outcome_v1_json` 是 UTF-8 JSON scalar：首项解码为 T 个 typed control，事件和结果分别遵循自己的合同。它们不是固定宽度的 float 数组；joint effort 和 body wrench 的资源、writer、单位、frame 与 6 分量值按记录的 schema 解释。device scene 的 boundary context 若存在，其 `scene_physical_v1` 中记录 producer、body key、binding、6 个有限数值和 `native_ack`；它只表明指定 worker 接收并完成对应推进。通用数值轨迹中的 `reward` 是 `(T,) float32`，success/terminated/truncated 为 `(T,) bool`；observation/action 的 shape 与 dtype 以各自 metadata 为准。
+
+writer 对缺失 structured control、缺 EpisodeOutcome 或边界不一致抛 `ValueError`；`load_structured_control_records_h5` 检查 structured 结构、T/T+1、事件与 outcome；对具备相应 physical 记录的文件，`load_physical_recording_h5` 另行核验 source/boundary、资源绑定和 scene native ACK。RGB 字节没有独立内容 digest；不能把这些检查概括为对任意 H5 内容的完整防篡改。v2 generic、canonical execution 和 v3 的字段不得互相套用。
 
 ## `RecorderConfig`
 

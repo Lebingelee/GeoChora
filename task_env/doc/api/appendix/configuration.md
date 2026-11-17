@@ -55,7 +55,7 @@ episode
 | enable_ground_contact | null | 是否启用地面接触 |
 | enable_domain_boundary_contact | false | 是否启用边界接触 |
 
-batch_physics_layout 与 make_parallel_env 的 execution 参数相互独立：当前并行物理布局只支持 `merged_scene`，execution 选择当前进程 local 或独立 worker remote。scalar 与 device batch 的布局须按各自已声明路线验证，不能仅由该字段推断批量支持。请求已退休的 `static_template` 会明确失败，不会改走其他布局。
+batch_physics_layout 与 make_parallel_env 的 execution 参数相互独立：当前并行物理布局只支持 `merged_scene`，旧 component 并行入口的 execution 选择当前进程 local 或独立 worker remote；声明式 device 路线使用明确的 `execution="device"`，其 provider 和 Task 适用范围另行限定。scalar 与 device batch 的布局须按各自已声明路线验证，不能仅由该字段推断批量支持。请求已退休的 `static_template` 会明确失败，不会改走其他布局。
 
 ## 已退休的 static-template runtime 配置
 
