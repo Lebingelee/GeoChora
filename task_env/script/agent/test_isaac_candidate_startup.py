@@ -19,7 +19,8 @@ def test_candidate_opens_app_before_usd_compile_and_closes_on_failure(tmp_path, 
     events = []
 
     class AppOwner:
-        def open(self):
+        def open(self, *, f06_compatibility=False):
+            assert f06_compatibility is True
             events.append('app_open')
             if startup_fails:
                 raise RuntimeError('startup sentinel')

@@ -369,9 +369,18 @@ def _compile_isaac_candidate(spec,catalog,route):
         episode=replace(default_config.episode,horizon=spec.horizon))
     manifest_path=isaac_route['delivery_manifest']
     try:
+        import types
+        from task_env.registry import make_agent
         from task_env.tasks.pick_cube.specialization import make_reference_binding
+        robot=make_agent('panda-v1')
         binding=make_reference_binding(controller_profile=ISAAC_CONTROLLER_PROFILE,source_delivery_manifest=manifest_path,
-            resolved_config=resolved_config,task_config=task_config,interval_provider='isaacsim')
+            resolved_config=resolved_config,task_config=task_config,interval_provider='isaacsim',
+            robot_uid=robot.uid,robot=robot)
+        # Same step make_env performs for formal tasks: the binding carries the Robot
+        # declaration (observation spaces read it) and the provider's source composer.
+        binding=PickCubeReferenceEnv._bind_robot_source_composer(replace(binding,robot=robot),
+            types.SimpleNamespace(controller_profile=ISAAC_CONTROLLER_PROFILE,physics_provider='isaacsim',
+                environment=resolved_config,robot_uid=robot.uid))
         # develop retired build_isaac_reference; the binding's own source builder
         # is now the single Isaac construction owner.
         initial=binding.build_for_request('isaacsim',route['backend'],ISAAC_CONSTRUCTION_SEED,spec.horizon)

@@ -76,7 +76,9 @@ def run_worker(*, mode, spec, catalog, provider, seed, horizon, output, h5=None,
         app_owner = _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
         # Kit must register its USD libraries and schemas before source construction.
         phase = 'app_open'
-        app_owner.open()
+        # The candidate route is Core's F06 PickCube cell: its native IO only reuses an
+        # already-open App whose SDK version was verified at launch.
+        app_owner.open(f06_compatibility=True)
         receipt['app'] = {'launch_profile': app_owner.launch_profile_receipt()}
         phase = 'compile'
         compiled = compile_candidate(spec, catalog, provider=provider)
