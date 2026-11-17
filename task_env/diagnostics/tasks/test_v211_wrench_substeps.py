@@ -151,6 +151,9 @@ def test_reset_and_close_clear_owned_force_without_erasing_foreign_force():
     port.pending, port.pending_values = 'boundary-2', np.array([.4])
     data.qfrc_applied[0] = .4
     session._closed, session._source = False, SimpleNamespace(fixed_attachment_plan=None)
+    # A real physical port always owns its declared execution.
+    port.execution = SimpleNamespace(controllers=())
+    session._source_bound_reset_clock = False
     session.close()
     assert data.qfrc_applied[0] == 0. and port.pending is None and session._closed
 
