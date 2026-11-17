@@ -1,5 +1,7 @@
 # G05：统一渲染前端与同步 RGB
 
+发布后导航（2026-11-17）：G01～G07／22个子阶段均按各自范围有界接收，v2.1.1已发布。本页早期“当前／未启动”描述保留对应交付时点；最终状态见[当前摘要](../maintenance/current-state.md)，明确后移项见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)。
+
 规划标识：`V211_G05_RENDERING`。3 个子阶段；以[render 协议](../contracts/render-provider.md)和[生命周期／数据](../contracts/lifecycle-and-data.md)为权威，原生适配优先。Flora、Depth、分割的新增验收不在本 Goal。
 
 ## Owner 与当前缺口

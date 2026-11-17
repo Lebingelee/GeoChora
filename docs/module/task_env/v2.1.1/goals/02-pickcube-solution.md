@@ -1,5 +1,7 @@
 # G02：PickCube 归因与成功参考
 
+发布后导航（2026-11-17）：G01～G07／22个子阶段均按各自范围有界接收，v2.1.1已发布。本页早期“当前／未启动”描述保留对应交付时点；最终状态见[当前摘要](../maintenance/current-state.md)，明确后移项见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)。
+
 规划标识：`V211_G02_PICKCUBE_REFERENCE`。3 个子阶段；具体依赖和出口见[执行表](../planning/execution-and-acceptance.md)。本阶段先修复现有控制链，不以新 effort 架构假定替代根因分析。采用[已确认协议基线](../maintenance/20261103_protocol_baseline_confirmation.md)，不在2a提前实施7＋2 effort／BodyWrench／后端与渲染重建。
 
 当前决定（2026-11-04）：Sol以 `ACCEPTED_BOUNDED_STAGE2_REFERENCE` 接收2a归因、2b MuJoCo代表实现与2c参考冻结，详见[2c及阶段2主审](../maintenance/reviews/20261104_2c_sol_review.md)。原attempt002 G2/G3/G5未过门历史保留；下列早期结果按各自时点理解。当前停在阶段2，阶段3未授权。

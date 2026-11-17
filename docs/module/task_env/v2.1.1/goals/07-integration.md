@@ -127,8 +127,12 @@ MuJoCo3.8.1 FREE角向armature／implicitfast的原生数值边界保留写入�
 
 执行进展（2026-11-17）：attempt002 已实际启动，普通计数为2；MuJoCo 原／装配 Nut 完整 Solution 及三条随机 action、marker 已有同运行记录、独立读回与 close，结果已按实际身份和范围获独立主审有界接收。GeoPhys Nut Rasterizer 原首帧因缺 Scene 拒绝；授权 v1 Artifact 后，原 Panda／GeoPhys CPU 的指定 128×96 observer 一步、再 reset 和 close 在新 source 下通过，已按所测范围获独立主审接收；先前结果按原身份保留。维护者在原 50,000 显式子步上限追加30,000，保留原有消耗；native 3,600秒和连续 wall 240分钟不变。逐页文档和正式返包已获有界主审，本地收口以外部回执为准，见[单一矩阵](../capabilities/capability-matrix.json)及 ignored 输出 `workspace/maintenance/v211_g07c_attempt002/`。
 
-同时收口7b BodyWrench最终公共API／provider准入／记录与组合规则、7Goal/22子阶段摘要、单一矩阵、恢复入口、指南／API／Skills、版本变更／限制和发布准备。维护者补充：`task_env/doc`必须作为更细致的模块教程，按原`api/composition`、`semantics`、`planning`、`recording`、`appendix`及中文指南结构，逐页深化34篇current文档，覆盖21顶层目录及facade的实际职责、上下游、接口/输入输出/异常、生命周期/资源和完整核心例子；8篇历史更新日志原字节保留。不准只加导航或笼统“补全文档”，逐页owner/要求见完整包module-doc-map。维护者授权在002独立验收后将**本地develop**快进到最终阶段7 HEAD；不得覆盖非祖先develop、同步main或操作远端，源码身份变化按影响复核，不机械重跑完整历史矩阵。详见[002完整工作包与Goal提示](../maintenance/work-packages/20261117_g07c_attempt002_goal.md)。准备为READY_FOR_MANUAL_FORWARD_NOT_STARTED，计数仍1。
+同时收口7b BodyWrench最终公共API／provider准入／记录与组合规则、7Goal/22子阶段摘要、单一矩阵、恢复入口、指南／API／Skills、版本变更／限制和发布准备。维护者补充：`task_env/doc`必须作为更细致的模块教程，按原`api/composition`、`semantics`、`planning`、`recording`、`appendix`及中文指南结构，逐页深化34篇current文档，覆盖21顶层目录及facade的实际职责、上下游、接口/输入输出/异常、生命周期/资源和完整核心例子；8篇历史更新日志原字节保留。不准只加导航或笼统“补全文档”，逐页owner/要求见完整包module-doc-map。维护者授权在002独立验收后将**本地develop**快进到最终阶段7 HEAD；不得覆盖非祖先develop、同步main或操作远端，源码身份变化按影响复核，不机械重跑完整历史矩阵。详见[002完整工作包与Goal提示](../maintenance/work-packages/20261117_g07c_attempt002_goal.md)。该句原准备状态已被实际执行及独立接收取代，普通attempt最终为2。
 
 ## 发布边界
 
 当前文档与阶段接收不自动授权发布操作。2026-11-17维护者授权上述旧资产冻结分支及7b指定PR #3冻结head合入G07的本地merge；此前不授权回合develop/main；本次002验收后本地develop快进以本节新增授权为准，仍不授权main同步、push／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。
+
+## 发布后的当前出口（2026-11-17）
+
+7a／7b／7c均已按最终主审有界接收，G07关闭。维护者其后授权并已完成main／develop／v2.1.1同步、冻结工作树、annotated tag和GitHub Release；tag固定于`15f85f35`。GeoPhys私有origin的`geochora/v2.1.1`已保存精确pin `198d30ac`。上节发布授权限制保留其形成时点，实际发布见[版本记录](../../../../releases/v2.1.1/README.md)。明确后移与未测项见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)，不恢复退休入口或重开已接收矩阵；后续版本尚未派包。

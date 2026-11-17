@@ -6,7 +6,7 @@ Recorder 旧叶节点格式的只读入口为 `task_env.recorders.load_legacy_le
 
 v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会立即失败。当前 Isaac SDK 默认解释器路径没有公开该依赖；验证使用其 episode-recorder 扩展自带的 `h5py`，实际部署须将兼容的 H5 依赖配置到运行解释器。
 
-当前（2026-11-16）：G01～G06 canonical范围已有界接收并按维护者要求收尾；G07与版本整体尚未完成，R3另包。G06的[实施总结](../maintenance/g06/implementation-summary.md)及[当前摘要](../maintenance/current-state.md)记录三后端六格、部分reset、固定Rasterizer整批切换、测试和未覆盖项；以下API仍限各自实测交集，不授予任意资产/backend/renderer资格。
+当前（2026-11-17）：G01～G07已有界接收，v2.1.1已发布；R3 batch仍为独立后续包。G06的[实施总结](../maintenance/g06/implementation-summary.md)及[当前摘要](../maintenance/current-state.md)记录三后端六格、部分reset、固定Rasterizer整批切换、测试和未覆盖项；以下API仍限各自实测交集，不授予任意资产/backend/renderer资格。
 
 <a id="render-contract"></a>
 
@@ -222,7 +222,7 @@ attempt003 修正持续 BodyWrench：Controller 在 outer boundary 提交一次�
 
 用户只配置backend／renderer／controller／camera等，不需构造receipt hash、lease ID或generation。
 
-权威语义见[协议索引](../README.md)；语义按已确认五协议，生产字段／方法在所属后续包冻结，阶段 3–6 随实现补齐 API 页面。`ExecutionSpec` 等现有类型与兼容解码须显式处置，不因本表新增平行 facade。
+权威语义见[协议索引](../README.md)；语义按已确认五协议，生产字段／方法按当前各节及相应冻结运行解释，阶段3–7接收不扩张未测交集。`ExecutionSpec` 等现有类型与兼容解码须显式处置，不因本表新增平行 facade。
 
 ## 兼容和迁移记录要求
 
@@ -290,4 +290,4 @@ G05 5c attempt003 的实现与验证仍待 Sol 独立主审。selected 非 Posit
 
 PickCube 的 GeoPhys CPU joint-effort 候选也可请求 observer，使用具名的 GeoPhys `rasterizer` compute 路线。它检查材质和灯光资源报告，缺失必需特性或使用默认太阳光时拒绝采集；PickCube 的 authored `top` trackcom 聚光灯和默认头灯使用同一公开状态边界更新；源零位质量中心由编译模型计算，实时质量中心由公开 body pose 和质量计算。投影能力未覆盖或其他 authored 灯光设置未准入时拒绝采集。相机有限 near/far 使用光轴距离，当前只准入无粒子、TAA、overlay 和 native graphics 的 CPU mesh／analytic 组合。若材质和灯光检查通过，RGB 从 renderer 的 ACES 后 gamma 2.2 值转换到 sRGB 传递函数；原色及源素材色域未校准。此前使用默认灯光的 CPU 离屏试验仅为探索证据；后续使用源灯光的所选 rasterizer 真实窗口/RGB 和 5b 相机隔离已按限定范围接收，这不代表同步 task observation 已接通。
 
-5b attempt001 的未接收历史见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；三路线 5b 当前接收范围与限制见[最终主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)。同步 task observation、renderer 切换和 cross 组合仍属 5c，尚未完成。
+5b attempt001 的未接收历史见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；三路线 5b 当前接收范围与限制见[最终主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)。该页保留5b历史时点；后续5c同步task observation与GeoPhys physics×MuJoCo renderer跨组合已有界接收。同Env动态renderer切换明确延期，创建时固定至close。

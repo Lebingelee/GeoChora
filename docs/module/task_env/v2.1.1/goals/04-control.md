@@ -1,5 +1,7 @@
 # G04：统一物理命令与 Controller reset 切换
 
+发布后导航（2026-11-17）：G01～G07／22个子阶段均按各自范围有界接收，v2.1.1已发布。本页早期“当前／未启动”描述保留对应交付时点；最终状态见[当前摘要](../maintenance/current-state.md)，明确后移项见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)。
+
 规划标识：`V211_G04_CONTROL`。3 个子阶段，依据[控制协议](../contracts/control-and-feedback.md)及[已确认基线](../maintenance/20261103_protocol_baseline_confirmation.md)，扩展既有 Robot／Scene／ControlGroup、canonical contracts、ControlBinding、R3 和 session。2c 成功参考不自动成为迁移后成功。
 
 2026-11-06编排修订安排（维护者已采纳）：本Goal继续以原4a／4b／4c主线和出口为准。[装配Panda](../planning/stage4-assembled-panda.md)是v2.1.1附加集成用例，不再逐项追加为4a–4c的接收条件。建议在4b主能力稳定后取得空载／夹爪／补偿的首次代表证据，4c可提供已匹配的PickCube成功参考，两个任务完整复用由7a收口；未完成的附加项单列状态，不掩盖共享控制能力缺陷，也不取代原三后端effort、BodyWrench或Controller reset门。4a已执行两次且未接收；维护者采纳[主审与第三次前重评](../maintenance/reviews/20261106_4a_attempt002_sol_reassessment.md)，要求先进行002授权续作，再视结果决定003。续作已返包，经[独立主审](../maintenance/reviews/20261106_4a_attempt002_recovery_sol_review.md)仍不接收4a。维护者已手动转发最后普通attempt003；其原4a出口经[独立主审](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)有界接收，count=3。4b attempt001/002 的三后端 effort 与 MuJoCo 代表外力经[Sol 独立主审](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)有界接收，普通 count=2；原失败和覆盖范围保留。4c attempt001 经[Sol 独立主审](../maintenance/reviews/20261106_4c_attempt001_sol_review.md)有界接收，count=1；三子阶段的各自边界和未覆盖项保留。

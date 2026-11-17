@@ -1064,7 +1064,7 @@
     }
   },
   "current_support": {
-    "status": "MAINTAINER_ACCEPTED_BOUNDED_THROUGH_G07_7B",
+    "status": "MAINTAINER_ACCEPTED_BOUNDED_THROUGH_G07_7C",
     "accepted_scope": "G01–G05 and E00–E16 retain maintainer bounded acceptance, with the original evidence identities and approved exceptions. U3 and later Isaac solution-002 use the accepted same-run joint completion evidence; they are not pending a new U3 decision. Subsequent C1–C5 implementation at 7f8796b4 has bounded review and impact verification recorded in ../maintenance/reviews/20261114_post_optimization_c5_final.md and ../maintenance/reviews/20261114_g05_pre_g06_readiness_7f8796b4.md; this does not expand supported intersections or Qualification. G06 canonical and G07/7a plus7b are subsequently bounded accepted; see their named closeout reports. G07/7b final report: ../maintenance/reviews/20261117_g07b_final_acceptance.md. New BodyWrench scope excludes the deferred native MuJoCo intersection; no full regression or Qualification claim.",
     "source_of_history": "../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md",
     "configuration_and_formal_tasks": [
@@ -1074,14 +1074,14 @@
       "two-wheel-balance-v1"
     ],
     "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped. Isaac 6.2 PhysX CUDA × Isaac RTX also supports a qualified frame-mounted task camera in the measured PickCube seed31 controlled-lift diagnostic (430 transitions, 431 RGB observations); MuJoCo/GeoPhys moving task cameras remain unsupported. This diagnostic is not the state-only full Solution run or a general renderer qualification. Post-optimization C4 separately exercised reset, one nonzero step, two same-boundary captures, second reset and close on that Isaac wrist RGB route; its seven listed frozen source hashes match 7f8796b4, and the closed H5 was independently reread. See ../maintenance/reviews/20261114_post_optimization_c4_task_rgb.md. C5 full Solutions remain state-only; other native/cross/window evidence is reused at its original source identity, not claimed as a final-HEAD rerun.",
-    "batch_scope": "G06a/b/c canonical goals have bounded independent acceptance; see ../maintenance/reviews/20261116_g06c_attempt001_acceptance.md and the linked 6a/6b reviews. Three providers × Pendulum/PickCube native CUDA batch, source-bound canonical actions, device Task/state, same-step terminal observations/images, independent sensor/window paths and device Recorder have bounded evidence. G06c B3 partial reset and staggered truncation cover all six cells; whole-batch same-Env switching is limited to Isaac ↔ MJWarp with fixed shared Rasterizer on both tasks. Geometry from other rows can enter a camera view; cross-row visual isolation is not promised. GeoPhys PickCube acceptance requires explicit discrete mode and contact/coupled 32 iterations under the tested configuration; default-budget penetration and continuous mesh/constraint limitations are not resolved by that acceptance. GeoPhys cross-provider switching is not admitted. R3 is separate; G07 and version closeout remain pending. GeoPhys main merge/AOT remain maintainer-deferred, not PASS.",
+    "batch_scope": "G06a/b/c canonical goals have bounded independent acceptance; see ../maintenance/reviews/20261116_g06c_attempt001_acceptance.md and the linked 6a/6b reviews. Three providers × Pendulum/PickCube native CUDA batch, source-bound canonical actions, device Task/state, same-step terminal observations/images, independent sensor/window paths and device Recorder have bounded evidence. G06c B3 partial reset and staggered truncation cover all six cells; whole-batch same-Env switching is limited to Isaac ↔ MJWarp with fixed shared Rasterizer on both tasks. Geometry from other rows can enter a camera view; cross-row visual isolation is not promised. GeoPhys PickCube acceptance requires explicit discrete mode and contact/coupled 32 iterations under the tested configuration; default-budget penetration and continuous mesh/constraint limitations are not resolved by that acceptance. GeoPhys cross-provider switching is not admitted. R3 is separate; G07 and version closeout subsequently completed; original G06 evidence identities remain unchanged. GeoPhys main merge/AOT remain maintainer-deferred, not PASS.",
     "g07_scope": {
       "7a": "ACCEPTED_BOUNDED_7A",
       "7b": "ACCEPTED_BOUNDED_7B",
       "ordinary_7b_attempt_count": 2,
       "final_nine_task_success": "9/9 at original78349184 input; no current native rerun",
       "report_ref": "../maintenance/reviews/20261117_g07b_final_acceptance.md",
-      "7c": "Attempt001 bounded docs accepted and integrated atc0aeef75; old docs worktree removed after preservation. Attempt002 ready for manual forwarding; no execution or final7c acceptance."
+      "7c": "ACCEPTED_BOUNDED_7C; docs integrated, ordinary Nut actions/marker and GeoPhys Nut Scene-bound rendering accepted at their recorded inputs; version published at15f85f35."
     },
     "record_completion_scope": "Post-5c historical five-route joint evidence: Five routes use same-run joint evidence: independent H5 readback and caller completion with verified identities. Four canonical H5 files lack completion field; Isaac v3 field is null. No H5-only completion claim; independent review supports bounded maintainer-authorized acceptance. G07 final nine similarly require each same-run caller completion, independent H5 and close; see final_pickcube_cells for actual original input identities.",
     "complete_solution_intersections": [
@@ -1356,7 +1356,7 @@
       ],
       "geophys_mode": "explicit discrete contact32/coupled32 tested configuration",
       "R3_status": "SEPARATE_FUTURE_PACKAGE",
-      "g07_status": "NOT_RUN"
+      "g07_status": "SUBSEQUENTLY_ACCEPTED_BOUNDED_G07"
     },
     "scalar_render_followup": {
       "date": "2026-11-16",
@@ -1663,5 +1663,6 @@
       "import_comparison": "workspace/maintenance/v211_g07c_attempt002/review-import-equivalence-003/stdout.log"
     },
     "review_ref": "../maintenance/reviews/20261117_g07c_attempt002_acceptance.md"
-  }
+  },
+  "publication_status_ref": "../../../../releases/v2.1.1/release-manifest.json"
 }

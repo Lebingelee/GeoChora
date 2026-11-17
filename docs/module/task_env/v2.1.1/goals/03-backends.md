@@ -1,5 +1,7 @@
 # G03：复杂后端路由、翻译与 reset 重建
 
+发布后导航（2026-11-17）：G01～G07／22个子阶段均按各自范围有界接收，v2.1.1已发布。本页早期“当前／未启动”描述保留对应交付时点；最终状态见[当前摘要](../maintenance/current-state.md)，明确后移项见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)。
+
 规划标识：`V211_G03_BACKENDS`。3 个子阶段，默认在阶段 2 后推进。依据[physics 协议](../contracts/physics-provider.md)、[统一表示](../contracts/unified-task-representation.md)和[生命周期](../contracts/lifecycle-and-data.md)，扩展现有 RuntimeSession／adapter。
 
 ## Owner 与边界

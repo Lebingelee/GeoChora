@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7C_ACCEPTED_BOUNDED_LOCAL_CLOSEOUT",
+  "status": "V211_PUBLISHED_BOUNDED_CLOSED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -21,7 +21,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Complete authorized local develop fast-forward after identity, ancestor, worktree and protection checks; no remote release.",
+  "next_action": "No active execution package. Discuss remaining-work scope before preparing v2.1.2; preserve historical attempts, evidence and frozen release tag.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -3262,5 +3262,18 @@
     "ignored_archive_files": 136,
     "production_code_changed": false,
     "native_runs": 0
+  },
+  "publication": {
+    "status": "PUBLISHED",
+    "url": "https://github.com/Lebingelee/GeoChora/releases/tag/v2.1.1",
+    "tag": "v2.1.1",
+    "tag_commit": "15f85f35fc5488d01540db3ff3f7215241aa8abb",
+    "published_at": "2026-11-17T12:05:42Z",
+    "release_id": 448575236,
+    "draft": false,
+    "prerelease": false,
+    "documentation_policy": "Post-release documentation commits may advance branches; the published annotated tag and original execution identities remain frozen.",
+    "geophys_version_ref": "refs/heads/geochora/v2.1.1",
+    "geophys_repository_access": "private; authorized access required"
   }
 }

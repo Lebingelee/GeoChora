@@ -1,6 +1,6 @@
 # v2.1.1 当前状态
 
-更新时间：2026-11-17。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
+更新时间：2026-11-17。**v2.1.1已发布，tag固定于`15f85f35`；G01～G07／22子阶段均已有界接收，当前没有活动执行包。** 发布与源码恢复见[版本记录](../../../../releases/v2.1.1/README.md)，后续讨论见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
 **7c 当前状态（2026-11-17）：**维护者已有界接收[attempt001文档](reviews/20261117_g07c_attempt001_docs.md)，普通attempt001 已接收；实际文档HEAD为`1e9081c4`，已在`c0aeef75`整合到阶段7主树并保全原始证据，旧docs工作树和已合并本地分支已移除。其原7b快照不覆盖本树已接收结论，正文静态交付不冒充native验证。`T-NUT-RANDOM`及declared-marker教程示例缺口进入 attempt002；维护者授权最小修复、最终文档/API/恢复资料与本地develop收口。[attempt002工作包](work-packages/20261117_g07c_attempt002_goal.md)已准备，另明确按原结构细化`task_env/doc`34篇current模块教程，覆盖职责/API/生命周期/完整用法；本轮 attempt002 已返包，普通计数为2；代表运行与文档候选见[执行摘要](reviews/20261117_g07c_attempt002_execution.md)，历史 CPU 运行的整卡 GPU 监控缺口保留为 PARTIAL，后续独立主审已[有界接收](reviews/20261117_g07c_attempt002_acceptance.md)；本地 develop 收口以外部回执为准，版本尚未发布。
 

@@ -1,5 +1,7 @@
 # G01：统一任务表示与三方协议
 
+发布后导航（2026-11-17）：G01～G07／22个子阶段均按各自范围有界接收，v2.1.1已发布。本页早期“当前／未启动”描述保留对应交付时点；最终状态见[当前摘要](../maintenance/current-state.md)，明确后移项见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)。
+
 规划标识：`V211_G01_PROTOCOLS`。当前：四个设计子阶段已审阅并获维护者确认；五协议为 APPROVED_IMPLEMENTATION_BASELINE，未实现生产接口。4 个子阶段，默认顺序 1a→1b→1c→1d；依赖及接收统一见[执行表](../planning/execution-and-acceptance.md)。本阶段以现有 owner 的契约收敛为主，具体 API 与协议经讨论后冻结。
 
 以下 attempt 摘要保留各次交付时点状态；其中 draft、7＋1 closure effort、未进入后继等历史措辞由[当前确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)及权威协议修订取代，不作为当前派包要求。

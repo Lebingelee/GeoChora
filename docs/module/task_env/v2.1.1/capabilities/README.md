@@ -1,11 +1,11 @@
 # v2.1.1 能力与验收矩阵
 
-当前接收状态统一见[当前摘要](../maintenance/current-state.md)与[G06实施总结](../maintenance/g06/implementation-summary.md)：G01～G06 canonical范围有界结案，G07仍需独立主审和版本收口。JSON的`current_support.g06_closeout`记录G06；`g07a_attempt002_libero`记录MuJoCo task1 的有界 Controller／reader 证据和未迁路线。旧`targets`/`target_resolution`保留初建规划，其NOT_RUN不能否定当前受测结果，也不能因有界结果把G07最终九格升格。
+G01～G07 已按各自冻结范围有界接收，v2.1.1 已发布。最终九格在原 `78349184` 输入为9/9任务成功，原／装配Panda四个MuJoCo任务交集、Nut普通动作及指定GeoPhys Nut渲染已有接收。见[当前摘要](../maintenance/current-state.md)、[7b主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)、[7c主审](../maintenance/reviews/20261117_g07c_attempt002_acceptance.md)及[发布记录](../../../../releases/v2.1.1/README.md)。初建 targets/target_resolution 是历史规划，不能按其中 NOT_RUN 重开已接收工作，也不能声称所有组合在发布HEAD重跑。
 
 
 3b attempt003 经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)接收为 **ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION**：冻结三路线的实际模型／reset／执行／同次记录读回，以及Panda MuJoCo CPU开启补偿的最终350步保持与两任务方向检查已闭合。新N08-v2通过，原N08三路线FAIL保留；不外推全任务或跨后端重力补偿。3c的[ACCEPTED_BOUNDED_3C_RESET_REBUILD](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)限于显式PickCube profile、四条声明边、固定观测、随机流和故障处置。G03有界收尾。6.1辅助App状态为VERSION_VERIFIED_CLOSE_TIMEOUT，仅启动／版本有真实证据，完整运行和正常关闭未通过；不提升最终能力格或Qualification。
 
-[capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。`current_support` 分列各时点的受测路线、source／Controller、记录与限制；`g06_closeout`是本次canonical并行结案入口。初建`targets`/`target_resolution`和G07最终九格保留原规划语义，不能将G06短程运行、旧单seed Solution或历史completion证据填成G07九格通过。不同历史运行的任务/Solution结果以各自证据为准，不以旧“本轮失败”叙述覆盖后来的有界成功。阶段状态由[编排索引](../maintenance/orchestration.json)维护，资格和发布仍各自独立。
+[capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。`current_support` 分列各时点的受测路线、source／Controller、记录与限制；`g06_closeout`是本次canonical并行结案入口。初建`targets`/`target_resolution`保留原规划语义；`final_pickcube_cells`是已核对的实际九格，初建NOT_RUN另存历史快照。九格通过依据原同运行任务／Solution／独立读回／关闭，不能用G06短程或其他单seed结果替代。不同历史运行的任务/Solution结果以各自证据为准，不以旧“本轮失败”叙述覆盖后来的有界成功。阶段状态由[编排索引](../maintenance/orchestration.json)维护，资格和发布仍各自独立。
 
 v2.1.0 的历史实现和有界结果继续查询 [v2.1.0 matrix](../../v2.1.0/capabilities/capability-matrix.json)。新目标 NOT_RUN 不否认那些历史结果，也不把历史 native 结果升级为当前 renderer／控制／并行证据。
 

@@ -1,7 +1,7 @@
 {
   "schema": "geochora-local-release-candidate-v1",
   "version": "2.1.1",
-  "status": "DRAFT_LOCAL_CANDIDATE_7C_ACCEPTED_BOUNDED",
+  "status": "PUBLISHED_BOUNDED_V211",
   "input_core_commit": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
   "input_core_tree": "b0ea38723d2e14ab9d3f0c30c0b8c1c57dfd219c",
   "accepted_7b_production_commit": "81d1138d54f9397fe1bd3569871fdf8beb05dcb8",
@@ -18,8 +18,22 @@
     "task_env/tasks/nut_assembly/task.py": "115e3216f38600cc77af7cb6b9500a62a3bb01effb0b738ee7a9400d0b88a4fc"
   },
   "capability_matrix": "../../module/task_env/v2.1.1/capabilities/capability-matrix.json",
-  "final_candidate_commit": "EXTERNAL_CLOSEOUT_RECEIPT_AFTER_INDEPENDENT_REVIEW",
-  "tag_or_publication": false,
+  "final_candidate_commit": "15f85f35fc5488d01540db3ff3f7215241aa8abb",
+  "tag_or_publication": true,
   "asset_distribution_license": "HUMAN_DECISION_PENDING",
-  "7c_independent_review": "../../module/task_env/v2.1.1/maintenance/reviews/20261117_g07c_attempt002_acceptance.md"
+  "7c_independent_review": "../../module/task_env/v2.1.1/maintenance/reviews/20261117_g07c_attempt002_acceptance.md",
+  "historical_candidate_status": "DRAFT_LOCAL_CANDIDATE_7C_ACCEPTED_BOUNDED",
+  "publication": {
+    "status": "PUBLISHED",
+    "url": "https://github.com/Lebingelee/GeoChora/releases/tag/v2.1.1",
+    "tag": "v2.1.1",
+    "tag_commit": "15f85f35fc5488d01540db3ff3f7215241aa8abb",
+    "published_at": "2026-11-17T12:05:42Z",
+    "release_id": 448575236,
+    "draft": false,
+    "prerelease": false,
+    "documentation_policy": "Post-release documentation commits may advance branches; the published annotated tag and original execution identities remain frozen.",
+    "geophys_version_ref": "refs/heads/geochora/v2.1.1",
+    "geophys_repository_access": "private; authorized access required"
+  }
 }

@@ -1,10 +1,10 @@
 # TaskEnv v2.1.1 — 协议与实施
 
-更新时间：2026-11-16。**G01～G06 canonical范围已有界接收并按维护者要求收尾；G07与v2.1.1版本收口尚未完成，R3另包。** G06的[开发实施总结](maintenance/g06/implementation-summary.md)集中记录abc成果、测试、性能、限制、submodule变更及证据索引。
+更新时间：2026-11-17。**v2.1.1 已发布，tag 固定于 `15f85f35`；G01～G07／22个子阶段均按各自范围有界接收。** [发布记录](../../../releases/v2.1.1/README.md)区分冻结源码与发布后文档同步；[遗留事项](../../../releases/v2.1.1/remaining-work.md)集中记录明确后移和未测范围，尚未授权 v2.1.2 实施。
 
 从[唯一当前摘要](maintenance/current-state.md)恢复接收范围、启动输入、正式入口及下一停门；工作包状态在[编排索引](maintenance/orchestration.json)，实施顺序见[优化执行安排](planning/post-5c-optimization-execution.md)及[60 项台账](planning/post-5c-code-project-optimization-diagnostic-ledger.md)。[单元 9 综合主审](maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)保留原 5a／5b、四主体、同步 RGB 及跨组合的受测边界，维护者已确认功能接收。E00～E10已获维护者按各自范围接收；当前使用[E11～E16细化账本](planning/post-5c-e11-e16-remaining-ledger.md)。U4代码范围与U5有界证据归并已接收，五条完整运行采用同次联合completion口径；H5单文件不自含完整completion，旧Isaac失败保留。E15 历史输出及快照补集已按[最终清单执行并独立复核](maintenance/reviews/20261114_e15_final_disposition_execution.md)，维护者已[有界接收交付 `86921c62` 及其限制](maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)。
 
-优化及人工接收已完成；G06 canonical的有界范围和当前限制见 [API](api/README.md)，G07 的最终三 provider × 三 seed 门保留。renderer 创建时固定至 close；COM 原判据 FAIL、原 N08 FAIL、R05c NOT_REQUALIFIED、6.1 close 及历史执行偏差不改写。完整两任务 Solution 在本次优化按各自支持 provider 单 seed 验证，G07 仍保留其最终集成范围。
+优化及人工接收已完成；G06 canonical的有界范围和当前限制见 [API](api/README.md)，G07 最终三 provider × 三 seed 已有原冻结输入的9/9任务成功、同运行Solution完成和独立读回；不称最终HEAD全部重跑。renderer 创建时固定至 close；COM 原判据 FAIL、原 N08 FAIL、R05c NOT_REQUALIFIED、6.1 close 及历史执行偏差不改写。完整两任务 Solution 在本次优化按各自支持 provider 单 seed 验证，后续G07最终集成已按自己的输入与证据有界接收。
 
 ## 版本目标
 
@@ -14,7 +14,7 @@
 
 ## 阅读入口
 
-进入G07先读[交接文档](maintenance/20261116_g07_agent_handoff.md)，从已存在装配Robot和成功参考接续；本交接不等于启动7a或最终九格。
+从[当前摘要](maintenance/current-state.md)和[发布记录](../../../releases/v2.1.1/README.md)恢复最终状态；[G07交接](maintenance/20261116_g07_agent_handoff.md)保留为实施前历史，不作为新的启动指令。
 
 - [范围与七阶段路线](planning/roadmap.md)：7 个阶段、22 个 a/b/c/d 子阶段及延期事项。
 - [执行顺序与验收](planning/execution-and-acceptance.md)：依赖、阶段出口、工作包、证据及分支约束。

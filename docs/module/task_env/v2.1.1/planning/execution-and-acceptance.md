@@ -1,8 +1,8 @@
 # v2.1.1 执行顺序与验收
 
-当前状态（2026-11-11）：G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口。维护者已确认进入[5c 后代码与项目优化](post-5c-optimization-execution.md)，范围及逐项退出条件由[优化台账](post-5c-code-project-optimization-diagnostic-ledger.md)冻结。当前摘要、工作包及历史分别见[当前状态](../maintenance/current-state.md)、[编排索引](../maintenance/orchestration.json)和[恢复页](../maintenance/recovery.md)。
+当前状态（2026-11-17）：G01～G07／22个子阶段均已有界接收，E00～E16及后续C1～C5优化已收口，v2.1.1已发布。实际运行身份见[当前摘要](../maintenance/current-state.md)和[编排索引](../maintenance/orchestration.json)；后续候选见[遗留清单](../../../../releases/v2.1.1/remaining-work.md)。以下阶段前置和带日期编排保留原实施时点，不是新的执行队列。
 
-**G05 功能接收 → 本次代码优化／完整单 seed Solution 复验／人工接收 → 项目证据与 refs/worktree 整理及接收 → 决定进入 G06。** 本次优化是进入 6a 的必需前置，不增加第 23 个子阶段。G07 保留后续并行调用者和最终版本收口，7b 三 provider × 三 seed 目标不变；不得再以旧 7a 清理排期跳过本次优化。
+**历史优化顺序：G05 功能接收 → 本次代码优化／完整单 seed Solution 复验／人工接收 → 项目证据与 refs/worktree 整理及接收 → 决定进入 G06。** 本次优化是进入 6a 的必需前置，不增加第 23 个子阶段。G07 保留后续并行调用者和最终版本收口，7b 三 provider × 三 seed 目标不变；不得再以旧 7a 清理排期跳过本次优化。
 
 同一 Env 的 renderer 创建时固定至 close。原 N08、COM 严格判据、R05c 资格和其他历史限制按原主审保留，不新增全矩阵／像素／轨迹一致门。装配 Panda 完整版本用例与各原 G04/G05 出口分列；本次优化两任务单 seed 调用验证和 G07 最终集成分别验收。
 

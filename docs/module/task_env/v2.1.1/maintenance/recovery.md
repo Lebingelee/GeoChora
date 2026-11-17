@@ -4,11 +4,11 @@
 
 | 当前恢复项 | 事实 |
 | --- | --- |
-| 写入位置 | `codex/v211-stage7-integration`，输入 `2c697908d7e7948c4b33e65fabdd6ec88e3dda1b` |
+| 历史7c002写入位置 | `codex/v211-stage7-integration`，输入 `2c697908d7e7948c4b33e65fabdd6ec88e3dda1b` |
 | 已有验证 | 三条 Nut 普通动作、两条 MuJoCo 完整 Solution 和 marker 有同运行记录与独立读回，已按各自输入身份有界接收 |
 | 保留限制 | GeoPhys Nut 初次首帧失败保留；新 source 指定 observer 的一步/重置/关闭通过，其他相机和几何细节未验；7b MuJoCo FREE angular-armature 力矩边界仍拒绝 |
-| 预算 | 7c002 wall 截止 21:45 CST；用户追加 30,000 显式子步，上限 80,000，连续计费 73,315；native 949.92/3,600 秒 |
-| 后续 | 核验本地 develop 祖先和占用后执行授权的 fast-forward 并写外部收据；未接收前不移动 develop，不 push/tag/Release |
+| 历史7c002预算（已结束，不续用） | 7c002 wall 截止 21:45 CST；用户追加 30,000 显式子步，上限 80,000，连续计费 73,315；native 949.92/3,600 秒 |
+| 当前恢复 | v2.1.1已发布，tag commit为`15f85f35`；main/develop/v2.1.1已同步，后续文档提交不移动tag。GeoPhys私有origin的`geochora/v2.1.1`指向`198d30ac`，克隆需要访问权限。见[发布记录](../../../../releases/v2.1.1/README.md)。 |
 
 以下是各历史窗口的恢复记录，保留当时的待审、失败、授权及暂停状态；其中的“当前”“尚未开始”只指该记录时点，不覆盖上方唯一当前摘要。最新综合主审见[单元 9](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)。
 

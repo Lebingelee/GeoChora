@@ -20,9 +20,9 @@
 
 - 本教程的代码块按源码/现有 caller 静态核对；**没有在本轮运行 native**。示例能 import 不等于 reset/step 成功。
 - 复用历史证据时必须同时给出 task、provider、backend、source/pin、seed/horizon、renderer/Controller 交集；不要用单格成功外推整矩阵。
-- Nut 普通随机 pose 在 7c002 已有有界真实运行；同运行来源、完成与关闭分开，等待独立主审。Solution proposal 保留严格来源和控制请求检查。
+- Nut 普通随机 pose 在 7c002 已有有界真实运行；同运行来源、完成与关闭分开，已获独立有界接收。Solution proposal 保留严格来源和控制请求检查。
 - 7b BodyWrench 已有有界接收；实际 source/provider、拒绝和记录边界见[主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)与唯一能力矩阵。
-- G06 canonical device 能力有界接收；G07 最终九格/版本收口仍待 7b 接收与 attempt002。R3 batch 仍为独立后续项。
+- G06 canonical device 能力有界接收；G07最终九格、7c总结和发布已完成；精确范围见当前摘要和发布记录。R3 batch 仍为独立后续项。
 
 ## 旧页面归并与导航
 

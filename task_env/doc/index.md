@@ -1,6 +1,6 @@
 # TaskEnv 文档入口
 
-当前（2026-11-17）：G01～G06 及 G07 7a/7b 已按各自范围有界接收；7c002 的 GeoPhys Nut 渲染修复与文档补正已通过独立主审的有界接收。5c 和 E00～E16 的旧结案不重开。先读[当前摘要](../../docs/module/task_env/v2.1.1/maintenance/current-state.md)和[优化安排](../../docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md)。旧 attempt 的失败／待审文字保留所属历史时点。
+当前（2026-11-17）：v2.1.1已发布，tag固定于`15f85f35`；[发布记录](../../docs/releases/v2.1.1/README.md)和[遗留清单](../../docs/releases/v2.1.1/remaining-work.md)区分已完成范围与后续候选。G01～G06 及 G07 7a/7b 已按各自范围有界接收；7c002 的 GeoPhys Nut 渲染修复与文档补正已通过独立主审的有界接收。5c 和 E00～E16 的旧结案不重开。先读[当前摘要](../../docs/module/task_env/v2.1.1/maintenance/current-state.md)和[优化安排](../../docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md)。旧 attempt 的失败／待审文字保留所属历史时点。
 
 ## v2.1.1 新手入口与当前范围
 
