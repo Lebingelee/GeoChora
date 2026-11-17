@@ -20,6 +20,7 @@
 - LIBERO task1 的 MuJoCo CPU 代表路线已在正式 CLI／公共 builder 中实测默认七轴 effort 和显式 world-TCP pose Controller；后者的 source 模型要求、TCP 状态和 typed effort ACK 须绑定同一实际 source 与边界，scratch 模型计算不得推进物理。64/65 空载轨迹在冻结窗口内相对历史 500Hz OSC 的位置及姿态最大误差不退步；该证据不证明任务成功、任意模型、其他 provider、独立夹爪writer或切换矩阵。旧 mixed 记录继续可读，未迁移的 LIBERO 路线明确拒绝而不恢复退休生命周期。
 - 复用仍匹配的强证据，只跑会揭示实际错误的受影响检查。完整案例覆盖的smoke/开闭/抓放不重复运行，不加完整训练、全A123/G06矩阵、性能门或额外笛卡尔积。不按行数、文件数、删行数、PASS数或搬到新大文件评价架构。
 - 普通owner/可读性问题在同一窗口修正，不留给7c、不为每个小问题重新派包。超出原门的能力只登记，不自动开发；若原门确需超出最小适配的新能力，保全具体阻断供维护者决定，不自行删门或扩大范围。
+- 2026-11-17维护者确认BodyWrench方向：公共typed表达与场景提交统一，`joint_efforts`和`body_wrenches`保留不同物理语义，由adapter分别降低至合法actuation／外载接口；joint effort不强制走native `ctrl`。一个正常动作Controller与独立Task/caller场景载荷共同准入、提交、记录及清理，不将普通物体伪装Robot、将wrench伪装joint channel或通过清空subject/selection绕过检查。保留producer/body/source权限、frame/作用点/矩参考、单位、显式sum/effect去重、逐子步持续语义和唯一推进。原post-5c总账CTRL-01/02/05、SRC、RUN、REC约束继续适用。
 
 <a id="7a"></a>
 ## 7a：NutAssembly 复用与调用者兼容
@@ -69,6 +70,15 @@ A3默认Controller必须按声明通道真实绑定并执行非零canonical acti
 已在本地合入指定 PR #3 冻结 head；最终生产输入 `78349184d0600e2fb804e6461930c475bfcc67c1`。维护者明确允许在原 PickCube Solution 内压缩前段固定等待，保留实际 TCP gate、下降／闭合／抬升、原任务与完成判据及 1000 步上限；这是一项特定时序授权，不扩展到改变其他任务策略。最终三 provider × 三 seed 均有同运行任务成功、原事件驱动 Solution 完成、独立记录读回和关闭；计划轨迹完成字段为 null，不补造。原失败与截断记录仍保留。
 
 7b实施返包为 PARTIAL，待独立主审：其他独立门必须单独核验，不能从九格成功推定全部通过。当前 BodyWrench 真实 source 下的组合选择被一致性 guard 拒绝，当前链路尚未验证；历史 4b 与当前 COM 力证据不能替代。维护者随后授权将显式子步预算重新设为 200000，以新周期计数并保留此前实际消耗；其他预算不变。7c仍为 PLANNED／0。
+
+<a id="g07b-attempt002"></a>
+### 7b attempt002准备：公共贡献与provider分别适配（2026-11-17）
+
+维护者已停止attempt001并要求准备[attempt002完整工作包与Goal提示](../maintenance/work-packages/20261117_g07b_attempt002_goal.md)，状态为READY_FOR_MANUAL_FORWARD_NOT_STARTED；本次准备不启动Goal/native、不增加计数，7b普通attempt仍为1，7c为PLANNED／0。attempt001的PARTIAL及原始失败/拒绝继续保留，不视为7b已接收。
+
+维护者明确选择公共链＋MuJoCo、Isaac、MJWarp的BodyWrench代表接通，GeoPhys按冻结公共API可达范围处理；这是本次新增明确授权，不倒写成历史4b的三后端要求。MuJoCo保留hand／自由体、偏置矩、effort组合和hold/reapply/clear原门；Isaac6.2 scalar隔离worker接通真实body/link载荷与传输；MJWarp4.0.1走正式device B1／step及原same-step生命周期；GeoPhys限具名显式FREE的公开qfrc交集，任意link/device与无DOF body不足的能力明确拒绝，默认不改pin。SDK接口存在、typed类型存在和ACK均不代替本机物理响应、同运行独立H5读回及关闭证据。
+
+已通过的九格及其他代表矩阵不要求重跑。按`78349184`族的`freeze-final.json`、`results-final.json`及原H5复用，保留输入身份、PickCube事件驱动完成/null字段及旧限制，只补实际受影响的最短定向检查。attempt002负责最终diff影响表和7b完整独立主审输入；不自动开始7c。240分钟新执行窗口仍受7b原native累计余额约3249秒和新子步周期余额约198825约束，本包另收紧新增显式子步至20000，不重置历史消耗；精确资源与状态见完整包。
 
 <a id="7c"></a>
 ## 7c：版本文档与能力记录

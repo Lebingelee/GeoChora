@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7B_RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+  "status": "G07_7B_ATTEMPT002_READY_NOT_STARTED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -20,8 +20,13 @@
     "reason": "Maintainer approved revision003 7a dispatch: case-driven code review and minimal necessary integration; preserve original gates and one stage branch."
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "Maintainer and Sol determine BodyWrench admission design; retain 7b partial result and independent evidence, 7c remains PLANNED.",
+  "next_candidate": {
+    "substage": "7b",
+    "attempt": 2,
+    "package_id": "V211_G07_7B_ATTEMPT002",
+    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED"
+  },
+  "next_action": "Maintainer manually forwards frozen attempt002; executor increments 7b attempt_count to 2 only at actual start. Reuse passed matrices by impact; 7c remains PLANNED.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2210,7 +2215,7 @@
           "dependencies": [
             "7a"
           ],
-          "status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+          "status": "RETURNED_PARTIAL_ATTEMPT002_READY",
           "attempt_count": 1,
           "attempts": [
             {
@@ -2228,43 +2233,67 @@
                 "prior_known": 71875,
                 "new_epoch_used": 1175,
                 "known_aggregate": 73050
-              }
+              },
+              "end_reason": "Maintainer stopped attempt001 for BodyWrench interface research and design; returned PARTIAL, not accepted.",
+              "output_head": "f89c50a3f7f47fa3b06584e5a2e422eb3b35077d"
             }
           ],
           "assigned_agent": null,
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/work-package.md",
-          "package_sha256": "4e32c85def7d260a4742c3c4bd161c5035a077306233d8a6ddd9d5fce876d785",
-          "input_head": "0a6213c040e06e6385b6d1f5509af34a8d5b8372",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/work-package.md",
+          "package_sha256": "037e2fe8a4b37a94d4f1141d54d6496b00441369a1245fc5ceb5aa8d263826e8",
+          "input_head": "f89c50a3f7f47fa3b06584e5a2e422eb3b35077d",
           "output_head": null,
           "expected_duration_minutes": [
-            180,
-            225
+            150,
+            210
           ],
           "execution_budget": {
             "wall_minutes": 240,
-            "native_wall_minutes": 120,
-            "explicit_substeps": 200000,
+            "expected_duration_minutes": [
+              150,
+              210
+            ],
+            "wall_includes_implementation_validation_waiting_questions_reporting_commits": true,
+            "native_cumulative_limit_seconds": 7200,
+            "native_seconds_charged_before_attempt002": "3950.3989457390270828",
+            "native_seconds_remaining_exact": "3249.6010542609729172",
+            "attempt002_native_seconds_ceiling": 3249,
+            "substep_epoch_limit": 200000,
+            "substep_epoch_used": 1175,
+            "substep_epoch_remaining": 198825,
+            "attempt002_new_explicit_substeps_ceiling": 20000,
+            "prior_epoch_known_explicit_substeps": 71875,
+            "historical_known_explicit_substeps": 73050,
+            "isaac_implicit_startup_reset_substeps": "UNKNOWN",
             "per_run_wall_seconds": {
               "mujoco": 480,
               "geophys": 660,
-              "isaacsim": 1260
+              "isaacsim": 1260,
+              "mjwarp": 660
             },
             "cpu_tree_rss_bytes": 6442450944,
             "image_cuda_tree_rss_bytes": 10737418240,
             "gpu_card_mib": 6144,
+            "minimum_gpu_free_mib": 512,
+            "minimum_start_available_ram_bytes": 5368709120,
+            "minimum_start_disk_free_bytes": 21474836480,
             "per_run_output_bytes": 1073741824,
-            "total_evidence_target_bytes": 4294967296,
-            "native_threads": 1,
-            "explicit_substeps_original": 100000,
-            "substeps_reset_policy": "User authorized reset; prior known 71875 preserved, new epoch starts at zero."
+            "attempt002_output_target_bytes": 2147483648,
+            "g07b_combined_output_ceiling_bytes": 4294967296,
+            "attempt001_output_bytes_at_prepare": 526504983,
+            "omp_openblas_mkl_threads_requested": 1,
+            "cpu_affinity_max_cpus": 4,
+            "one_native_window": true,
+            "all_sdk_solver_threads_measured": false
           },
           "last_observation": {
-            "at": "2026-11-17T13:12:23.984153+08:00",
-            "state": "Nine cells, G03 five-route five-step independent H5, current 7+2 ACK and G06 representative checks complete; BodyWrench admission gap awaits maintainer and Sol design."
+            "date": "2026-11-17",
+            "state": "Maintainer approved typed contribution split and selected three-provider positive representatives plus GeoPhys public-reachable FREE scope; attempt002 prepared, not started."
           },
           "evidence_refs": [
             "reviews/20261117_g07b_attempt001_execution.md",
-            "reviews/20261117_g07b_bodywrench_gap.md"
+            "reviews/20261117_g07b_bodywrench_gap.md",
+            "work-packages/20261117_g07b_attempt002_goal.md"
           ],
           "commits": [
             "ab4f9b13c17bcf522ca84bcc8bc94ad527320052",
@@ -2274,13 +2303,13 @@
           ],
           "review_decision": null,
           "blockers": [
-            "BODYWRENCH_CURRENT_CHAIN_NOT_VERIFIED — maintainer coordinating design with Sol"
+            "Current BodyWrench formal chain not implemented/verified; attempt002 addresses this and its authorized provider representatives."
           ],
-          "input_head_role": "Reviewed production parent; actual document-successor start HEAD in dispatch-input.json",
-          "package_status": "EXECUTED_RETURNED_PARTIAL",
-          "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/goal-prompt.md",
-          "goal_prompt_sha256": "bd4128f757fea60bf485e759959efa87ac1d5fe1af33f3924938caf6cf1bab18",
-          "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/dispatch-input.json",
+          "input_head_role": "Preparation baseline; actual documentation-successor start is frozen in dispatch-input.json",
+          "package_status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+          "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/goal-prompt.md",
+          "goal_prompt_sha256": "b4d5ae6544a62dde8a096e47288654eb90d906e9d07ec505a6aab9b894d0d2cf",
+          "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/dispatch-input.json",
           "merge_input": {
             "url": "https://github.com/Lebingelee/GeoChora/pull/3",
             "remote": "public",
@@ -2289,7 +2318,42 @@
             "into": "codex/v211-stage7-integration",
             "actual_merge_started": true,
             "actual_merge_commit": "ab4f9b13c17bcf522ca84bcc8bc94ad527320052"
-          }
+          },
+          "historical_attempt001_package": {
+            "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/work-package.md",
+            "package_sha256": "4e32c85def7d260a4742c3c4bd161c5035a077306233d8a6ddd9d5fce876d785",
+            "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/goal-prompt.md",
+            "goal_prompt_sha256": "bd4128f757fea60bf485e759959efa87ac1d5fe1af33f3924938caf6cf1bab18",
+            "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/dispatch-input.json",
+            "execution_budget": {
+              "wall_minutes": 240,
+              "native_wall_minutes": 120,
+              "explicit_substeps": 200000,
+              "per_run_wall_seconds": {
+                "mujoco": 480,
+                "geophys": 660,
+                "isaacsim": 1260
+              },
+              "cpu_tree_rss_bytes": 6442450944,
+              "image_cuda_tree_rss_bytes": 10737418240,
+              "gpu_card_mib": 6144,
+              "per_run_output_bytes": 1073741824,
+              "total_evidence_target_bytes": 4294967296,
+              "native_threads": 1,
+              "explicit_substeps_original": 100000,
+              "substeps_reset_policy": "User authorized reset; prior known 71875 preserved, new epoch starts at zero."
+            },
+            "merge_input": {
+              "url": "https://github.com/Lebingelee/GeoChora/pull/3",
+              "remote": "public",
+              "branch": "v2.1.1-asset-skills-develop",
+              "head": "23387a9cffd82fe02fb69fb5d2993141fdd54ae9",
+              "into": "codex/v211-stage7-integration",
+              "actual_merge_started": true,
+              "actual_merge_commit": "ab4f9b13c17bcf522ca84bcc8bc94ad527320052"
+            }
+          },
+          "prepared_attempt": 2
         },
         {
           "id": "7c",
@@ -2872,5 +2936,78 @@
     "execution_goal_started": true,
     "native_started": true,
     "actual_merge_started": true
+  },
+  "g07b_attempt002_preparation": {
+    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "package_ref": "work-packages/20261117_g07b_attempt002_goal.md",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/work-package.md",
+    "package_sha256": "037e2fe8a4b37a94d4f1141d54d6496b00441369a1245fc5ceb5aa8d263826e8",
+    "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/goal-prompt.md",
+    "goal_prompt_sha256": "b4d5ae6544a62dde8a096e47288654eb90d906e9d07ec505a6aab9b894d0d2cf",
+    "manifest_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/manifest.json",
+    "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/dispatch-input.json",
+    "preparation_input_head": "f89c50a3f7f47fa3b06584e5a2e422eb3b35077d",
+    "proposed_attempt": 2,
+    "attempt_count_before_start": 1,
+    "assigned_executor": null,
+    "budget": {
+      "wall_minutes": 240,
+      "expected_duration_minutes": [
+        150,
+        210
+      ],
+      "wall_includes_implementation_validation_waiting_questions_reporting_commits": true,
+      "native_cumulative_limit_seconds": 7200,
+      "native_seconds_charged_before_attempt002": "3950.3989457390270828",
+      "native_seconds_remaining_exact": "3249.6010542609729172",
+      "attempt002_native_seconds_ceiling": 3249,
+      "substep_epoch_limit": 200000,
+      "substep_epoch_used": 1175,
+      "substep_epoch_remaining": 198825,
+      "attempt002_new_explicit_substeps_ceiling": 20000,
+      "prior_epoch_known_explicit_substeps": 71875,
+      "historical_known_explicit_substeps": 73050,
+      "isaac_implicit_startup_reset_substeps": "UNKNOWN",
+      "per_run_wall_seconds": {
+        "mujoco": 480,
+        "geophys": 660,
+        "isaacsim": 1260,
+        "mjwarp": 660
+      },
+      "cpu_tree_rss_bytes": 6442450944,
+      "image_cuda_tree_rss_bytes": 10737418240,
+      "gpu_card_mib": 6144,
+      "minimum_gpu_free_mib": 512,
+      "minimum_start_available_ram_bytes": 5368709120,
+      "minimum_start_disk_free_bytes": 21474836480,
+      "per_run_output_bytes": 1073741824,
+      "attempt002_output_target_bytes": 2147483648,
+      "g07b_combined_output_ceiling_bytes": 4294967296,
+      "attempt001_output_bytes_at_prepare": 526504983,
+      "omp_openblas_mkl_threads_requested": 1,
+      "cpu_affinity_max_cpus": 4,
+      "one_native_window": true,
+      "all_sdk_solver_threads_measured": false
+    },
+    "scope_authority": "User selected 公共链＋MuJoCo、Isaac、MJWarp的BodyWrench代表接通；GeoPhys按公共API可达范围处理. User does not require rerunning passed 7b matrices.",
+    "provider_scope": {
+      "common": "One normal action Controller plus separately declared typed Task/caller body loads in the existing scene submission owner",
+      "mujoco": "scalar CPU in-process hand and free-body, original bounded gate",
+      "isaacsim": "6.2 scalar isolated-worker body/link representative and typed transport",
+      "mjwarp": "4.0.1 device CUDA B1 combined effort/body-wrench and same-step lifecycle representative",
+      "geophys": "198d30ac scalar named explicit FREE joint positive force/torque and clear; other public-unreachable combinations reject"
+    },
+    "reuse_original_nine_cells": true,
+    "output_root": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_g07b_attempt002",
+    "question_target": {
+      "thread_id": "01a1e460-6b8d-7c32-9c11-2d6739f1ba33",
+      "host_id": "local",
+      "title": "准备G07 7a工作包",
+      "share_url": "https://chatgpt.com/s/cx_6afbcae03558819185bd591836e39ecc",
+      "authorized_purpose": "Actual blockers within the frozen package; planning thread may answer in scope without concurrent source writing."
+    },
+    "execution_goal_started": false,
+    "native_started": false,
+    "attempt_count_increments_on_actual_start": true
   }
 }

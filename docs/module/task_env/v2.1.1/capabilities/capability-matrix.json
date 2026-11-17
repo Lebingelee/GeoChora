@@ -543,7 +543,7 @@
     ],
     "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped. Isaac 6.2 PhysX CUDA × Isaac RTX also supports a qualified frame-mounted task camera in the measured PickCube seed31 controlled-lift diagnostic (430 transitions, 431 RGB observations); MuJoCo/GeoPhys moving task cameras remain unsupported. This diagnostic is not the state-only full Solution run or a general renderer qualification. Post-optimization C4 separately exercised reset, one nonzero step, two same-boundary captures, second reset and close on that Isaac wrist RGB route; its seven listed frozen source hashes match 7f8796b4, and the closed H5 was independently reread. See ../maintenance/reviews/20261114_post_optimization_c4_task_rgb.md. C5 full Solutions remain state-only; other native/cross/window evidence is reused at its original source identity, not claimed as a final-HEAD rerun.",
     "batch_scope": "G06a/b/c canonical goals have bounded independent acceptance; see ../maintenance/reviews/20261116_g06c_attempt001_acceptance.md and the linked 6a/6b reviews. Three providers × Pendulum/PickCube native CUDA batch, source-bound canonical actions, device Task/state, same-step terminal observations/images, independent sensor/window paths and device Recorder have bounded evidence. G06c B3 partial reset and staggered truncation cover all six cells; whole-batch same-Env switching is limited to Isaac ↔ MJWarp with fixed shared Rasterizer on both tasks. Geometry from other rows can enter a camera view; cross-row visual isolation is not promised. GeoPhys PickCube acceptance requires explicit discrete mode and contact/coupled 32 iterations under the tested configuration; default-budget penetration and continuous mesh/constraint limitations are not resolved by that acceptance. GeoPhys cross-provider switching is not admitted. R3 is separate; G07 and version closeout remain pending. GeoPhys main merge/AOT remain maintainer-deferred, not PASS.",
-    "g07_scope": "7a independently closed bounded; 7b PR #3 integration and final three-provider × three-seed gate prepared, not started. Final cells remain NOT_RUN with null input identity.",
+    "g07_scope": "7a independently closed bounded. 7b attempt001 returned PARTIAL: final 78349184 family reports 9/9 task and event-driven Solution success with same-run H5/readback/close and seed31 RGB; independent review remains. Attempt002 READY, not started, for shared typed joint/body scene contributions and authorized MuJoCo/Isaac/MJWarp positive BodyWrench representatives plus GeoPhys public-reachable named FREE scope. Passed matrices reused by actual impact, not automatically rerun. Historical final_pickcube_cells retain planning values pending reconciliation; they do not mean these recorded runs never happened.",
     "record_completion_scope": "Five routes use same-run joint evidence: independent H5 readback and caller completion with verified identities. Four canonical H5 files lack completion field; Isaac v3 field is null. No H5-only completion claim; independent review supports bounded maintainer-authorized acceptance.",
     "complete_solution_intersections": [
       {
@@ -921,5 +921,23 @@
     "body_wrench_current_chain": "NOT_VERIFIED: real subject/profile combination rejected before native stepping",
     "limits": "No current-source GeoPhys Nut claim, no generalized controller switching or independent grasp force/hold claim.",
     "evidence_ref": "../maintenance/reviews/20261117_g07b_attempt001_execution.md"
+  },
+  "g07b_attempt002_preparation": {
+    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "attempt_count_before_start": 1,
+    "proposed_attempt": 2,
+    "package_ref": "../maintenance/work-packages/20261117_g07b_attempt002_goal.md",
+    "public_expression": "Separate joint_efforts/body_wrenches in common source-bound scene contribution/interval; provider-specific lowering",
+    "provider_scope": {
+      "common": "One normal action Controller plus separately declared typed Task/caller body loads in the existing scene submission owner",
+      "mujoco": "scalar CPU in-process hand and free-body, original bounded gate",
+      "isaacsim": "6.2 scalar isolated-worker body/link representative and typed transport",
+      "mjwarp": "4.0.1 device CUDA B1 combined effort/body-wrench and same-step lifecycle representative",
+      "geophys": "198d30ac scalar named explicit FREE joint positive force/torque and clear; other public-unreachable combinations reject"
+    },
+    "new_body_wrench_support_claim": false,
+    "passed_matrices_policy": "Reuse actual 78349184 family and other bounded evidence by impact; no full matrix rerun requirement. Preserve exact old identities and independent-review status.",
+    "goal_or_native_started": false,
+    "7c_started": false
   }
 }
