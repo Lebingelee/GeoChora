@@ -35,7 +35,7 @@
     "substage": "7c",
     "attempt": 1,
     "package_id": "V211_G07_7C_ATTEMPT001",
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "status": "ATTEMPT001_RETURNED_PARTIAL_PENDING_REVIEW",
     "scope": "independent docs only; finalclose awaits accepted7b"
   },
   "next_action": "Independent review of returned7c attempt001 docs (PARTIAL, T-NUT-RANDOM unmet, WAIT_7B_ACCEPTANCE). Keep7b records as fork snapshots; do not merge active7b. Attempt002 final reconciliation waits for accepted7b and maintainer authorization.",
