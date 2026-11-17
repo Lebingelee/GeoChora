@@ -76,6 +76,19 @@ class MockUpstreamConsistencyTest(unittest.TestCase):
         self.assertEqual(first.artifact_hash, first.artifact.identity_hash)
         self.assertIn(first.spec_sha256, json.dumps(first.artifact.to_mapping(), default=str))
 
+    def test_compiler_preserves_core_source_inventory_and_robot_binding(self):
+        before = copy.deepcopy(self.catalog)
+        first = compile_candidate(self.spec, self.catalog, provider='mujoco')
+        value = first.binding.build_for_request('mujoco', 'cpu', 31, self.spec.horizon)
+        self.assertIsNotNone(first.binding.robot)
+        self.assertIsNotNone(first.binding.compose_robot_source)
+        sources = value['source_sha256']
+        self.assertIn('task_env/script/agent/harness_compiler.py', sources)
+        self.assertIn('task_env/tasks/pick_cube/specialization.py', sources)
+        self.assertEqual(value['resolved_configuration']['source_sha256'], sources)
+        self.assertFalse(value['resolved_configuration']['external_asset_visual_materialized'])
+        self.assertEqual(self.catalog, before)
+
     def test_tampered_upstream_asset_is_reported_missing(self):
         with tempfile.TemporaryDirectory() as directory:
             copy_dir = Path(directory) / 'mock_upstream'
