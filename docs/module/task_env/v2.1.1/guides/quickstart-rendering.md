@@ -329,6 +329,8 @@ finally:
 
 device 具名相机（`base`/`hand`）的声明来自 `examples/parallel/pick_cube_device.py --sensor`：`render.camera_obs=True`、`render.cameras=[{...rgb_dtype:'uint8'...}]`，返回 `observation["cameras"][name]["rgb"]`，形状 `[B,H,W,3]`，dtype 为 CUDA uint8。它属于 [device batch](quickstart-device-batch.md)，不是本节的 scalar task RGB。
 
+任务 sensor 记录：物理 v3 记录可在每个边界保存 `task_rgb` 与 capture identity；独立读回用 `load_physical_recording_h5` 校验图像边界与 capture identity，但图像字节没有独立内容摘要，记录成功不等于像素任务成功。本页不把 UI 导出图当训练观测。
+
 **明确不支持/未验证**：
 
 - scalar `render.camera_obs/cameras` 具名多相机：明确拒绝。

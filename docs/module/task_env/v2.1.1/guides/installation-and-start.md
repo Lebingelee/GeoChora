@@ -178,9 +178,11 @@ python3.12 -m venv .venv-mjwarp
 这只说明清单本身在冻结环境中解析成功，**不说明全新环境已完整可运行**。安装后还须：
 
 1. 选择 worker 解释器（`execution.interpreter` 或 `GEOCHORA_MJWARP_PYTHON`）；
-2. 在设备上检查 GPU/驱动可用性；
+2. 在设备上检查 GPU/驱动可用性（`nvidia-smi`；不初始化 CUDA）；
 3. 接受首次 kernel 编译/缓存较慢；
 4. 用有界 Pendulum 或 Quickstart 的 device 章节做小 batch 验证。
+
+该清单不含 Torch，也不是完整 Core 替代：worker 通过 `PYTHONPATH` 导入本 checkout 的 `task_env`，其自身环境若在 preflight 报缺 Core 侧导入依赖，应按实际错误补齐；不要把 Core 的整份 requirements 覆盖安装进 worker。
 
 ```bash
 .venv-mjwarp/bin/python --version
@@ -199,6 +201,13 @@ nvidia-smi   # 只读检查；本教程不启动 CUDA 初始化
 - app 安装：<https://docs.isaacsim.omniverse.nvidia.com/6.2.0/installation/install_workstation.html>
 
 页面上需要自行核对：Linux GLIBC 要求（6.2 页面给出 ≥2.35 的口径）、Python 3.12、GPU/驱动要求。本页不把厂商步骤称为 GeoChora 实测。
+
+```bash
+# 只读平台核对；不启动 SDK
+ldd --version | head -1          # 核对 GLIBC
+nvidia-smi                       # 核对驱动/GPU 可见性
+python3.12 --version
+```
 
 使用**单独 venv**，不要复制 Core requirements：
 

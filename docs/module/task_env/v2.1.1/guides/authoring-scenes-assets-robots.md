@@ -86,6 +86,7 @@ print(first.asset_id == second.asset_id)             # True：同一个 asset
 要点：
 
 - `source_reference` 必须是稳定 URI，不接受 `file:` 或本地绝对路径；本地路径应属于 runtime asset root，而不是资产身份。
+- 本 pin 的 Panda/Menagerie 资产根是 `asset/external/mujoco_menagerie/franka_emika_panda/`；mesh 在 `assets/` 下（obj/stl），MJCF 通过 include/mesh 引用。closure 检查要覆盖这些文件，缺 mesh 时先核对 gitlink 和 asset root。
 - `source_revision` 是 pin（本例 Menagerie gitlink），不是分支名。
 - 两个 `EntityInstance` 共享同一资产版本，但 `entity_id` 不同，因此是不同场景实例；**不能混用 asset ID 与 entity ID**。
 - `PoseWorld(position, quaternion_wxyz)` 的 quaternion 必须已归一化；初始位姿/速度属于 episode/实例，不属于 asset 定义。
