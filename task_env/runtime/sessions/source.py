@@ -869,7 +869,7 @@ def scalar_joint_source_bindings(scene, artifact):
 
 def bind_declared_usd_paths(scene, artifact, *, robot_uid, geometry_root, entry_prim,
                             base_semantic, robot_frames, world_bodies, world_frames,
-                            free_body_semantics):
+                            free_body_semantics, robot_bodies=None):
     """Resolve Task and Robot declarations to one USD source binding."""
     articulations = [item for item in scene.articulations if item.entity_id == robot_uid]
     if len(articulations) != 1:
@@ -878,6 +878,10 @@ def bind_declared_usd_paths(scene, artifact, *, robot_uid, geometry_root, entry_
     paths = usd_articulation_paths(articulation, geometry_root=geometry_root)
     bodies = {base_semantic: paths[articulation.root_frame_id],
               **{name: f'{entry_prim}/{path}' for name, path in world_bodies.items()}}
+    for semantic, frame_id in (robot_bodies or {}).items():
+        if semantic in bodies or frame_id not in paths:
+            raise ValueError('USD Robot body must be a distinct declared articulation frame')
+        bodies[semantic] = paths[frame_id]
     frames = {name: f'{paths[parent]}/{local}'
               for name, (parent, local) in robot_frames.items()}
     if set(frames) & set(world_frames):

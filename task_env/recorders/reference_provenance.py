@@ -60,6 +60,8 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
               'episode': {'horizon': episode.horizon, 'seed': episode.seed,
                           'ignore_done': episode.ignore_done},
               'task': dict(resolved.task_parameters)}
+    if resolved.scene_body_producers_json != '[]':
+        result['scene_body_producers'] = json.loads(resolved.scene_body_producers_json)
     if resolved.environment.runtime.body_contact_solver_iterations is not None:
         result['runtime'] = {'body_contact_solver_iterations':
                              resolved.environment.runtime.body_contact_solver_iterations}

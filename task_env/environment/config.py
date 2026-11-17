@@ -593,6 +593,7 @@ class ResolvedSelectedConfig:
     robot_uid: str | None = None
     native_drive: str | None = None
     controller_parameters_json: str = '{}'
+    scene_body_producers_json: str = '[]'
     geophys_contact_mode: Literal['provider_default', 'discrete', 'continuous'] = 'provider_default'
 
     @property
@@ -622,6 +623,9 @@ class ResolvedSelectedConfig:
         if (type(self.controller_parameters_json) is not str
                 or not isinstance(json.loads(self.controller_parameters_json), dict)):
             raise TypeError('Controller parameters must be a JSON object')
+        if (type(self.scene_body_producers_json) is not str
+                or not isinstance(json.loads(self.scene_body_producers_json), list)):
+            raise TypeError('scene body producers must be a JSON array')
         if self.robot_uid is not None and (type(self.robot_uid) is not str or not self.robot_uid.strip() or self.robot_uid != self.robot_uid.strip()):
             raise ValueError("selected robot_uid must be a nonempty trimmed string")
         if self.reset_profile is not None and (

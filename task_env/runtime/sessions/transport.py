@@ -32,6 +32,7 @@ _METHODS = frozenset({
     'capture_observer', 'bind_task_camera', 'capture_task_camera',
     'task_camera_binding', 'task_camera_completion',
     'physical_control_build_facts', 'assess_physical_control', 'physical_joint_build_receipt',
+    'physical_body_build_receipt',
     'physical_buffer_policy', 'apply_physical_command_batch', 'abort_physical_control',
     'bind_physical_source_dynamics', 'evaluate_physical_source_dynamics',
 })
@@ -46,7 +47,7 @@ _PROPERTIES = frozenset({
 def _types():
     from ...controllers.canonical.physical_commands import (
         PhysicalControlBindingV1, PhysicalCommandBatchV1, PhysicalControlReceiptV1,
-        PhysicalJointBuildReceiptV1, PhysicalBufferPolicyV1)
+        PhysicalJointBuildReceiptV1, PhysicalBodyBuildReceiptV1, PhysicalBufferPolicyV1)
     from ...artifacts.contracts import CapabilityAssessmentV1
     from ...observations.canonical_camera import CameraGeometry, ResolvedCameraMetadata
     from ...render.camera.source import CameraCaptureIdentityV1
@@ -70,7 +71,7 @@ def _types():
         AppliedMixedActuatorCommandV1, PositionControlTargetV1, CanonicalControlFeedback,
         NativeControlFeedbackSampleV1, CameraGeometry, ResolvedCameraMetadata,
         CameraCaptureIdentityV1, PhysicalControlBindingV1, PhysicalCommandBatchV1,
-        PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1, PhysicalBufferPolicyV1,
+        PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1, PhysicalBodyBuildReceiptV1, PhysicalBufferPolicyV1,
         CapabilityAssessmentV1)
     return {item.__name__: item for item in values}
 
@@ -101,11 +102,12 @@ def _encode(value):
     from .physical_control import ResolvedPhysicalBatchV1
     if type(value) is ResolvedPhysicalBatchV1:
         from dataclasses import asdict
-        if value.body_wrenches or value.extensions:
-            raise ValueError('physical worker transport admits joint effort only')
+        if value.extensions:
+            raise ValueError('physical worker transport does not admit load extensions')
         return {'$type': 'ResolvedPhysicalBatchV1', 'value': {
             'input_batch': _encode(value.input_batch), 'binding_sha256': value.binding_sha256,
             'joints': _encode(tuple(asdict(joint) for joint in value.joints)),
+            'body_wrenches': _encode(tuple(asdict(body) for body in value.body_wrenches)),
             'accepted_receipt': _encode(value.accepted_receipt),
             'mapping_provenance': _encode(value.mapping_provenance)}}
     known = _types()
@@ -132,13 +134,14 @@ def _decode(value):
             return tuple(_decode(item) for item in value['$tuple'])
         if '$type' in value:
             if value['$type'] == 'ResolvedPhysicalBatchV1':
-                from .physical_control import ResolvedPhysicalBatchV1, ResolvedJointEffortV1
-                fields = {'input_batch', 'binding_sha256', 'joints', 'accepted_receipt', 'mapping_provenance'}
+                from .physical_control import ResolvedPhysicalBatchV1, ResolvedJointEffortV1, ResolvedBodyWrenchV1
+                fields = {'input_batch', 'binding_sha256', 'joints', 'body_wrenches', 'accepted_receipt', 'mapping_provenance'}
                 if set(value) != {'$type', 'value'} or set(value['value']) != fields:
                     raise ValueError('invalid physical batch transport fields')
                 payload = _decode(value['value'])
                 return ResolvedPhysicalBatchV1(payload['input_batch'], payload['binding_sha256'],
-                    tuple(ResolvedJointEffortV1(**joint) for joint in payload['joints']), (), (),
+                    tuple(ResolvedJointEffortV1(**joint) for joint in payload['joints']),
+                    tuple(ResolvedBodyWrenchV1(**body) for body in payload['body_wrenches']), (),
                     payload['accepted_receipt'], payload['mapping_provenance'])
             if value['$type'] == 'CanonicalCameraObservation':
                 return _decode_camera_frame(value)
@@ -667,7 +670,7 @@ def source_execution_facts(artifact, execution, source, controller):
 
 
 _WORKER_BOOTSTRAP = r'''
-import os, pathlib, runpy, sys, sysconfig
+import hashlib, json, os, pathlib, runpy, sys, sysconfig
 if os.environ.get('GEOCHORA_SUPERVISED_NATIVE_LOCK_FD') is not None:
     import ctypes, signal
     expected_parent = int(os.environ['GEOCHORA_SUPERVISED_PARENT_PID'])
@@ -681,6 +684,28 @@ paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
 launcher_paths = ([str(pathlib.Path(item).resolve()) for item in os.environ.get('PYTHONPATH', '').split(os.pathsep) if item]
                   if launcher_mode == 'launcher' else [])
 sys.path[:0] = [core, geophys, *launcher_paths, paths['purelib'], paths['platlib']]
+overlay_name = os.environ.get('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY')
+if overlay_name:
+    overlay = pathlib.Path(overlay_name).resolve(strict=True)
+    receipt_path = overlay.parent / 'isaac_dependency_overlay.json'
+    receipt_bytes = receipt_path.read_bytes()
+    if hashlib.sha256(receipt_bytes).hexdigest() != os.environ.get('GEOCHORA_ISAAC_OVERLAY_RECEIPT_SHA256'):
+        raise ValueError('Isaac dependency overlay receipt differs from parent validation')
+    receipt = json.loads(receipt_bytes)
+    if receipt.get('python_version') != list(sys.version_info[:2]):
+        raise ValueError('Isaac dependency overlay Python ABI differs')
+    allowed = ('gymnasium', 'farama_notifications', 'h5py', 'h5py.libs')
+    names = set(receipt.get('entries', ()))
+    if not {'gymnasium', 'h5py'} <= names or set(p.name for p in overlay.iterdir()) != names:
+        raise ValueError('Isaac dependency overlay contents differ from its receipt')
+    for name in names:
+        if name not in allowed and not (name.endswith('.dist-info') and name.startswith(
+                ('gymnasium-', 'farama_notifications-', 'h5py-'))):
+            raise ValueError('Isaac dependency overlay contains an unapproved package')
+        path = overlay / name
+        if not path.is_symlink() or not path.resolve(strict=True).is_relative_to(pathlib.Path(receipt['core_site']).resolve(strict=True)):
+            raise ValueError('Isaac dependency overlay entry is not the verified Core package')
+    sys.path.append(str(overlay))
 receipt_path = os.environ.get('GEOCHORA_RUNTIME_SCOPE_PRE_IMPORT')
 if receipt_path:
     cgroup = '/sys/fs/cgroup' + next(
@@ -727,6 +752,15 @@ def start_selected_worker(interpreter, payload, *, timeout=30.0):
     try:
         env = dict(os.environ, GEOCHORA_GEOPHYS_SRC=str(geophys),
                    GEOCHORA_CORE_PYTHON=str(executable), PYTHONDONTWRITEBYTECODE='1')
+        overlay = env.get('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY')
+        if overlay:
+            if payload['selection']['physics_provider'] != 'isaacsim':
+                raise ValueError('Isaac dependency overlay requires the Isaac provider')
+            import hashlib
+            overlay_path = Path(overlay).resolve(strict=True)
+            receipt = overlay_path.parent / 'isaac_dependency_overlay.json'
+            env['GEOCHORA_ISAAC_DEPENDENCY_OVERLAY'] = str(overlay_path)
+            env['GEOCHORA_ISAAC_OVERLAY_RECEIPT_SHA256'] = hashlib.sha256(receipt.read_bytes()).hexdigest()
         inherited_fds = [child.fileno()]
         supervised_lock = env.get('GEOCHORA_SUPERVISED_NATIVE_LOCK_FD')
         if supervised_lock is not None:

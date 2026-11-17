@@ -163,8 +163,6 @@ def _validate_scene_contributions(interval, *, verified_body_sums=frozenset()):
             or not math.isfinite(interval.physics_dt_s) or interval.physics_dt_s <= 0
             or type(interval.contributions) is not tuple or not interval.contributions):
         raise ValueError('scene interval requires a finite timebase and typed contributions')
-    claims = {}
-    effects = {}
     for item in interval.contributions:
         if type(item) is not SceneCommandContributionV1:
             raise TypeError('scene interval contains an untyped contribution')
@@ -184,6 +182,14 @@ def _validate_scene_contributions(interval, *, verified_body_sums=frozenset()):
             _token(item.physical_effect_id, 'scene physical effect')
         if item.composition == 'sum' and item.physical_effect_id is None:
             raise ValueError('summed scene contributions require physical effect identities')
+    validate_scene_resource_conflicts(interval.contributions, verified_body_sums=verified_body_sums)
+
+
+def validate_scene_resource_conflicts(contributions, *, verified_body_sums=frozenset()):
+    """Apply the same interval resource/effect conflict rules to scalar and device claims."""
+    claims = {}
+    effects = {}
+    for item in contributions:
         if item.physical_effect_id is not None:
             for prior in effects.setdefault(item.physical_effect_id, []):
                 if (item.start_substep < prior.end_substep and prior.start_substep < item.end_substep
@@ -314,6 +320,7 @@ def prepare_physical_scene_interval(*, session, execution, resolved):
     if batch.extensions:
         raise ValueError('scene physical interval does not yet admit load extensions')
     controllers = {item.writer_id: item for item in execution.controllers}
+    scene_producers = {item.writer_id: item for item in execution.scene_body_producers}
     versions = execution.controller_versions()
     if getattr(session, '_physical_controller_versions', None) != versions:
         raise ValueError('scene physical Controller versions differ from materialization')
@@ -325,8 +332,10 @@ def prepare_physical_scene_interval(*, session, execution, resolved):
         for item in items:
             writer = item.contribution.owner_id
             controller = controllers.get(writer)
-            if controller is None:
-                raise ValueError('scene physical writer is not an admitted Controller')
+            producer = scene_producers.get(writer)
+            if controller is None and (kind != 'body-wrench' or producer is None
+                    or (item.entity_id, item.body_id) not in producer.body_keys):
+                raise ValueError('scene physical writer is not an admitted Controller or body producer')
             if kind == 'joint-effort':
                 bound = channels.get(item.target_key)
                 resource = f'joint:{item.entity_id}/{item.joint_id}/{item.dof_id}'
@@ -351,9 +360,11 @@ def prepare_physical_scene_interval(*, session, execution, resolved):
                         and bound.native_drive not in {'disabled', 'passive'})):
                 raise ValueError('scene physical joint differs from its bound channel')
             groups.setdefault(resource, []).append((item, basis))
-            contributions.append(SceneCommandContributionV1('robot-controller', kind, units,
+            contributions.append(SceneCommandContributionV1(
+                'robot-controller' if controller is not None else producer.producer_kind, kind, units,
                 item.contribution.composition, item.contribution.physical_effect_id,
-                writer, controller.identity, generations[writer], item.identity_hash,
+                writer, controller.identity if controller is not None else None,
+                generations[writer] if controller is not None else None, item.identity_hash,
                 (resource,), 0, count))
     for resource, members in groups.items():
         if len(members) > 1:

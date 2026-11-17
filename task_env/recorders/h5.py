@@ -295,6 +295,8 @@ def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, A
         "conversion_capabilities": raw.get("conversion_capabilities", {}),
         "trajectory": {"observation_count_semantics": "T+1", "transition_count_semantics": "T"},
     }
+    if 'scene_physical_declaration_v1' in raw:
+        result['scene_physical_declaration_v1'] = raw['scene_physical_declaration_v1']
     task_context = metadata.get("task_context")
     if task_context is not None:
         if not isinstance(task_context, Mapping):
@@ -937,6 +939,75 @@ def _read_text(root, path: str) -> str:
     return value.decode("utf-8") if isinstance(value, bytes) else str(value)
 
 
+def _validate_device_scene_record(contexts, declaration):
+    """Check recorded device loads against their actual binding and prior boundary."""
+    from ..controllers.canonical.physical_commands import PhysicalControlBindingV1
+
+    if not isinstance(declaration, Mapping):
+        raise ValueError('device scene loads require their recorded physical declaration')
+    binding = PhysicalControlBindingV1.from_mapping(declaration['binding'])
+    if binding.identity_hash != declaration.get('binding_sha256'):
+        raise ValueError('device scene binding identity differs from its declaration')
+    producers = {row['writer_id']: row for row in declaration.get('producers', ())}
+    if len(producers) != len(declaration.get('producers', ())):
+        raise ValueError('device scene declaration repeats a producer')
+    bodies = {(body.entity_id, body.body_id): body for body in binding.bodies}
+    native = declaration.get('native_build')
+    if (not isinstance(native, Mapping) or native.get('provenance') != 'native_build'
+            or native.get('binding_sha256') != binding.identity_hash
+            or native.get('source_closure_sha256') != binding.source_closure_sha256
+            or not isinstance(native.get('bodies'), list)
+            or len(native['bodies']) != len(binding.bodies)):
+        raise ValueError('device scene record lacks its native body build facts')
+    native_ids = set()
+    for body, row in zip(binding.bodies, native['bodies'], strict=True):
+        if (not isinstance(row, Mapping) or row.get('entity_id') != body.entity_id
+                or row.get('body_id') != body.body_id or row.get('native_body') != body.native_body
+                or type(row.get('native_id')) is not int or row['native_id'] <= 0
+                or row['native_id'] in native_ids):
+            raise ValueError('device native body build differs from the source binding')
+        native_ids.add(row['native_id'])
+    identity_keys = ('source_id', 'source_closure_sha256', 'artifact_sha256', 'materialization_id',
+                     'generation', 'revision', 'native_step', 'native_time_s', 'control_dt_s')
+    for index, current in enumerate(contexts):
+        loads = current.get('scene_physical_v1', ())
+        if not isinstance(loads, (list, tuple)) or (loads and index == 0):
+            raise ValueError('device scene loads must belong to a transition')
+        seen = set()
+        for load in loads:
+            prior = contexts[index - 1]
+            if not isinstance(load, Mapping) or not isinstance(load.get('boundary'), Mapping):
+                raise ValueError('device scene load receipt is malformed')
+            key = tuple(load.get('body_key', ()))
+            producer = producers.get(load.get('writer_id'))
+            body = bodies.get(key)
+            values = load.get('values')
+            if (producer is None or body is None or list(key) not in producer.get('body_keys', ())
+                    or load['writer_id'] not in body.owner_ids
+                    or load.get('producer_kind') != producer.get('producer_kind')
+                    or load.get('controller_writer_id') != declaration.get('controller_writer_id')
+                    or load.get('binding_sha256') != binding.identity_hash
+                    or load.get('scene_admission') != 'common_resource_conflict_rules'
+                    or load.get('native_ack') != 'worker_step_completed'
+                    or load.get('frame') != 'world' or load.get('moment_reference') != 'body_com'
+                    or load.get('units') != ['N', 'N*m']
+                    or load.get('composition') not in ('exclusive', 'sum')
+                    or not isinstance(values, list) or len(values) != 6
+                    or any(type(value) not in (int, float) or not math.isfinite(value) for value in values)
+                    or load.get('episode_ids') != prior.get('episode_id')
+                    or load.get('episode_steps') != prior.get('episode_step')
+                    or native.get('materialization_id') != prior.get('materialization_id')
+                    or current.get('episode_id') != prior.get('episode_id')
+                    or current.get('episode_step') != prior.get('episode_step') + 1
+                    or any(load['boundary'].get(k) != prior.get(k) for k in identity_keys)
+                    or current.get('native_step', -1) <= prior.get('native_step', -1)):
+                raise ValueError('device scene load differs from its binding, writer or boundary')
+            effect = load.get('physical_effect_id')
+            if not isinstance(effect, str) or not effect or effect in seen:
+                raise ValueError('device scene load repeats or omits an effect')
+            seen.add(effect)
+
+
 def _inspect_v2_group(group) -> dict[str, Any]:
     result = {
         "schema_id": str(group.attrs.get("schema_id", "")),
@@ -952,6 +1023,8 @@ def _inspect_v2_group(group) -> dict[str, Any]:
         contexts = json.loads(_read_text(group, 'meta/boundary_context_v1_json'))
         if len(contexts) != result['observation_count'] or not all(isinstance(v, dict) for v in contexts):
             raise ValueError('boundary contexts must match the recorded observation count')
+        if any(context.get('scene_physical_v1') for context in contexts):
+            _validate_device_scene_record(contexts, result['env_meta'].get('scene_physical_declaration_v1'))
         result['boundary_contexts'] = contexts
     return result
 
@@ -1133,6 +1206,51 @@ def load_physical_recording_h5(path: Path | str) -> dict[str, Any]:
                     or command['clock'] != clocks[index].to_mapping()
                     or command['source_closure_sha256'] != result['env_meta']['reference_profile']['source_closure_digest']):
                 raise ValueError('physical command was not submitted at its recorded boundary')
+            scene = writer['applied_control']['payload'].get('scene_physical_batch_v1')
+            declared = result['env_meta']['reference_profile'].get('scene_body_producers', [])
+            if bool(scene) != bool(declared):
+                raise ValueError('physical scene batch and producer declaration differ')
+            if scene:
+                from task_env.trajectory.canonical.episode import _mapping_hash
+                batch = scene['batch']
+                accepted = writer['applied_control']['payload']['accepted']
+                ack = writer['applied_control']['payload']['native_write_ack']
+                if (_mapping_hash(batch) != scene['batch_sha256']
+                        or scene['binding_sha256'] != result['env_meta']['reference_profile']['physical_binding_sha256']
+                        or batch['context'] != command
+                        or accepted['batch_sha256'] != scene['batch_sha256']
+                        or ack['batch_sha256'] != scene['batch_sha256']
+                        or accepted['stage'] != 'accepted' or ack['stage'] != 'native_write_ack'
+                        or accepted['contribution_ids'] != ack['contribution_ids']):
+                    raise ValueError('physical scene batch, context or receipts differ')
+                allowed = {p['writer_id']: {tuple(key) for key in p['body_keys']} for p in declared}
+                controller_id = writer['writer_id']
+                for item in batch['body_wrenches']:
+                    owner = item['contribution']['owner_id']
+                    if owner != controller_id and (item['entity_id'], item['body_id']) not in allowed.get(owner, set()):
+                        raise ValueError('recorded scene body wrench lacks declared authority')
+                submission = scene['scene_submission']
+                if (not isinstance(submission, Mapping) or 'interval' not in submission
+                        or _mapping_hash(submission['interval']) != submission['interval_sha256']
+                        or submission.get('status') != 'acknowledged'
+                        or submission.get('inner_command_sha256') != scene['batch_sha256']):
+                    raise ValueError('recorded scene submission identity differs')
+                interval = submission['interval']
+                contributions = interval['contributions']
+                items = (*batch['joint_efforts'], *batch['body_wrenches'])
+                producer_kinds = {p['writer_id']: p['producer_kind'] for p in declared}
+                if (interval['binding_sha256'] != scene['binding_sha256']
+                        or interval['boundary'] != command['boundary']
+                        or interval['sample_clock'] != command['clock']
+                        or len(contributions) != len(items)):
+                    raise ValueError('recorded scene interval differs from batch binding or boundary')
+                for entry, item in zip(contributions, items, strict=True):
+                    owner = item['contribution']['owner_id']
+                    expected_kind = 'robot-controller' if owner == controller_id else producer_kinds.get(owner)
+                    if (entry['writer_id'] != owner or entry['producer_kind'] != expected_kind
+                            or entry['command_sha256'] != _mapping_hash(item)
+                            or entry['physical_effect_id'] != item['contribution']['physical_effect_id']):
+                        raise ValueError('recorded scene contribution differs from its producer or command')
     with h5py.File(Path(path), 'r') as root:
         schema = result['env_meta'].get('observation_schema')
         if not isinstance(schema, Mapping) or not isinstance(schema.get('order'), list):

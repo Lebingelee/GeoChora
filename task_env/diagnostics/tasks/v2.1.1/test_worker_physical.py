@@ -21,8 +21,38 @@ def test_resolved_effort_roundtrip_keeps_context_and_rejects_extra_fields():
     encoded['value']['unowned'] = 'port'
     with pytest.raises(ValueError, match='transport fields'):
         _decode(encoded)
-    with pytest.raises(ValueError, match='joint effort only'):
-        _encode(replace(resolved, body_wrenches=(object(),)))
+    with pytest.raises(ValueError, match='load extensions'):
+        _encode(replace(resolved, extensions=(object(),)))
+
+
+def test_resolved_body_wrench_and_build_receipt_roundtrip():
+    from task_env.artifacts import FrameReference
+    from task_env.controllers.canonical.physical_commands import (
+        BodyWrenchV1, ContributionPolicyV1, PhysicalBodyBindingV1,
+        PhysicalBodyBuildReceiptV1, PhysicalControlReceiptV1)
+    from task_env.runtime.sessions.physical_control import ResolvedBodyWrenchV1, ResolvedPhysicalBatchV1
+    plan, context, effort, _ = _case()
+    frame = FrameReference('arm', 'base')
+    body = PhysicalBodyBindingV1('physical-body-binding-v1', 'arm', 'body-a', frame, 'native-body', ('caller-a',))
+    receipt = PhysicalBodyBuildReceiptV1('physical-body-build-receipt-v1', plan.binding.identity_hash,
+        context.source_closure_sha256, context.boundary.provider_materialization_id, (body,), 'native_build')
+    policy = ContributionPolicyV1('physical-contribution-policy-v1', 'load-a', 'effect-a', 'caller-a',
+                                  'exclusive', 'reject_outside', 'one_interval')
+    wrench = BodyWrenchV1('body-wrench-v1', context, policy, 'arm', 'body-a', frame,
+        (0., 0., 0.), frame, (0., 0., 0.), frame, (1., 0., 0.), (0., 0., 1.))
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context, (effort('joint-a', 1.),), (wrench,), ())
+    accepted = PhysicalControlReceiptV1('physical-control-receipt-v1', context, batch.identity_hash,
+        'accepted', ('joint-a', 'load-a'), 'core-admission', 'per-channel')
+    resolved_body = ResolvedBodyWrenchV1('arm', 'body-a', (1., 0., 0.), (0., 0., 1.),
+                                         (0., 0., 0.), ('load-a',))
+    resolved = ResolvedPhysicalBatchV1(batch, plan.binding.identity_hash, (), (resolved_body,), (),
+                                       accepted, ('native_build',))
+    assert _decode(_encode(receipt)) == receipt
+    encoded = _encode(resolved)
+    assert _decode(encoded) == resolved
+    del encoded['value']['body_wrenches']
+    with pytest.raises(ValueError, match='transport fields'):
+        _decode(encoded)
 
 
 def test_remote_binding_is_published_only_after_child_confirmation(monkeypatch):

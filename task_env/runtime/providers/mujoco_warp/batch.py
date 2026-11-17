@@ -67,6 +67,26 @@ class MuJoCoWarpNativeBatch:
                     for native in request.get('source_bodies', {}).values()]
         if any(body_id < 0 for body_id in body_ids):
             raise ValueError('MJWarp source body mapping contains an unknown native body')
+        load_ids = []
+        for body in binding.bodies:
+            semantic = f'{body.entity_id}/{body.body_id}'
+            sources = request['source_bodies']
+            if semantic not in sources and sources.get(body.entity_id) == body.native_body:
+                semantic = body.entity_id
+            if sources.get(semantic) != body.native_body:
+                raise ValueError('MJWarp body load differs from its source mapping')
+            body_id = int(mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body.native_body))
+            if body_id <= 0 or int(model.body_jntnum[body_id]) != 1:
+                raise ValueError('MJWarp body load requires one explicit FREE joint')
+            joint_id = int(model.body_jntadr[body_id])
+            if int(model.jnt_type[joint_id]) != int(mujoco.mjtJoint.mjJNT_FREE):
+                raise ValueError('MJWarp body load requires one explicit FREE joint')
+            if body_id in load_ids:
+                raise ValueError('MJWarp body load bindings alias the same native body')
+            load_ids.append(body_id)
+        if load_ids and count != 1:
+            raise ValueError('MJWarp body loads are currently admitted only for batch size one')
+        self._load_body_native_ids = tuple(load_ids)
         self._frame_names = tuple(request.get('source_frames', {}))
         frame_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, native)
                      for native in request.get('source_frames', {}).values()]
@@ -100,10 +120,13 @@ class MuJoCoWarpNativeBatch:
             if frame_ids:
                 self._buffers['frame_position'] = wp.zeros((count, len(frame_ids), 3), dtype=wp.float32, device=device)
                 self._buffers['frame_orientation'] = wp.zeros((count, len(frame_ids), 4), dtype=wp.float32, device=device)
+            if load_ids:
+                self._buffers['body_wrench'] = wp.zeros((count, len(load_ids), 6), dtype=wp.float32, device=device)
         self._dofs = wp.array(dofs, dtype=wp.int32, device=device)
         self._signs = wp.array(signs, dtype=wp.float32, device=device)
         self._body_ids = wp.array(body_ids, dtype=wp.int32, device=device) if body_ids else None
         self._frame_ids = wp.array(frame_ids, dtype=wp.int32, device=device) if frame_ids else None
+        self._load_body_ids = wp.array(load_ids, dtype=wp.int32, device=device) if load_ids else None
         self._ready = wp.Event(device=device, interprocess=True)
         self._written = None
         self._closed = False
@@ -112,6 +135,13 @@ class MuJoCoWarpNativeBatch:
                          direction: wp.array(dtype=wp.float32), force: wp.array2d(dtype=wp.float32)):
             row, column = wp.tid()
             force[row, ids[column]] = values[row, column] * direction[column]
+
+        @wp.kernel
+        def apply_body_wrench(values: wp.array3d(dtype=wp.float32), ids: wp.array(dtype=wp.int32),
+                              native: wp.array2d(dtype=wp.spatial_vector)):
+            row, column = wp.tid()
+            native[row, ids[column]] = wp.spatial_vector(values[row, column, 0], values[row, column, 1],
+                values[row, column, 2], values[row, column, 3], values[row, column, 4], values[row, column, 5])
 
         @wp.kernel
         def apply_reset(mask: wp.array(dtype=wp.bool), q: wp.array2d(dtype=wp.float32),
@@ -151,6 +181,7 @@ class MuJoCoWarpNativeBatch:
             out_orientations[row, frame, 0] = quat[3]
 
         self._apply_effort, self._apply_reset, self._copy_body_pose = apply_effort, apply_reset, copy_body_pose
+        self._apply_body_wrench = apply_body_wrench
         self._copy_frame_pose = copy_frame_pose
         self._publish()
 
@@ -168,6 +199,7 @@ class MuJoCoWarpNativeBatch:
                                  'warp': self._wp.__file__},
                 'nq': self._model.nq, 'nv': self._model.nv, 'body_names': list(self._body_names),
                 'frame_names': list(self._frame_names), 'physical_layout_facts': self._layout_facts,
+                'load_body_ids': list(self._load_body_native_ids),
                 'native_capacities': self._capacities,
                 'joint_qpos_indices': self._joint_qpos, 'free_joint_qpos_indices': self._free_qpos}
 
@@ -214,12 +246,18 @@ class MuJoCoWarpNativeBatch:
         self._wait_input()
         self._data.overflow.zero_()
         self._data.qfrc_applied.zero_()
+        self._data.xfrc_applied.zero_()
         self._wp.launch(self._apply_effort, dim=(self.num_envs, len(self._dofs)),
             inputs=[self._buffers['effort'], self._dofs, self._signs, self._data.qfrc_applied],
             device=self._device)
+        if self._load_body_ids is not None:
+            self._wp.launch(self._apply_body_wrench, dim=(self.num_envs, len(self._load_body_ids)),
+                inputs=[self._buffers['body_wrench'], self._load_body_ids, self._data.xfrc_applied],
+                device=self._device)
         for _ in range(self.substeps):
             self._mjw.step(self._model_device, self._data)
         self._data.qfrc_applied.zero_()
+        self._data.xfrc_applied.zero_()
         # MJWarp's step integrates qpos after its derived-pose computation.
         # Refresh kinematics at the published boundary without advancing time.
         self._mjw.forward(self._model_device, self._data)
@@ -239,7 +277,7 @@ class MuJoCoWarpNativeBatch:
         self._written = None
         self._buffers.clear()
         self._ready = self._data = self._model_device = None
-        self._dofs = self._signs = self._body_ids = self._frame_ids = None
+        self._dofs = self._signs = self._body_ids = self._frame_ids = self._load_body_ids = None
         self._closed = True
 
 
@@ -272,7 +310,7 @@ class MuJoCoWarpBatchSession(DevicePhysicalBatchSession):
         controller = execution.controllers[0]
         binding = execution.compiled.binding
         channels = binding.channels
-        if (binding.bodies or controller.channel_keys != tuple(channel.target_key for channel in channels)
+        if (controller.channel_keys != tuple(channel.target_key for channel in channels)
                 or any(channel.owner_ids != (controller.writer_id,) or channel.native_drive != 'disabled'
                        for channel in channels)):
             raise ValueError('MJWarp requires exclusive declared source joint-effort channels')
@@ -333,6 +371,21 @@ class MuJoCoWarpBatchSession(DevicePhysicalBatchSession):
             self._joint_qpos = dict(description['joint_qpos_indices'])
             self._free_qpos = dict(description['free_joint_qpos_indices'])
             self._layout_facts = dict(description['physical_layout_facts'])
+            native_body_ids = description['load_body_ids']
+            if (len(native_body_ids) != len(binding.bodies)
+                    or any(type(value) is not int or value <= 0 for value in native_body_ids)
+                    or len(set(native_body_ids)) != len(native_body_ids)):
+                raise ValueError('MJWarp native body build facts differ from the declared binding')
+            if binding.bodies:
+                self._layout_facts['scene_body_build_v1'] = {
+                    'binding_sha256': binding.identity_hash,
+                    'source_closure_sha256': source.source_closure_digest,
+                    'materialization_id': self._materialization_id,
+                    'bodies': [{'entity_id': body.entity_id, 'body_id': body.body_id,
+                                'native_body': body.native_body, 'native_id': native_id}
+                               for body, native_id in zip(binding.bodies, native_body_ids, strict=True)],
+                    'provenance': 'native_build',
+                }
             self._capacities = dict(description['native_capacities'])
             self._state_shapes = {'qpos': (int(description['nq']),), 'qvel': (int(description['nv']),)}
             self._state_shapes['native_world_time'] = ()

@@ -253,7 +253,12 @@ class MuJoCoPhysicalPort:
         bodies = {}
         body_frames = {}
         for body in binding.bodies:
-            if source.bodies.get(f'{body.entity_id}/{body.body_id}') != body.native_body:
+            source_key = f'{body.entity_id}/{body.body_id}'
+            if (source_key not in source.bodies and body.entity_id in source.bodies
+                    and execution.frame_bindings.get(body.entity_id) == body.body_frame
+                    and (body.body_frame.entity_id, body.body_frame.frame_id) == (body.entity_id, body.body_id)):
+                source_key = body.entity_id
+            if source.bodies.get(source_key) != body.native_body:
                 raise ValueError('physical body differs from source mapping')
             body_id = int(model.body(body.native_body).id)
             if body_id <= 0:
@@ -362,6 +367,15 @@ class MuJoCoPhysicalPort:
             needed = (item.expressed_in, item.point_frame, item.moment_reference_frame, self.body_frames[key])
             if any(frame not in self.frame_handles for frame in needed):
                 raise ValueError('physical wrench frame has no native mapping')
+            body_id = self.bodies[key]
+            if int(s._model.body_jntnum[body_id]) == 1:
+                joint_id = int(s._model.body_jntadr[body_id])
+                if int(s._model.jnt_type[joint_id]) == int(s._mj.mjtJoint.mjJNT_FREE):
+                    dof = int(s._model.jnt_dofadr[joint_id])
+                    if (np.any(s._model.dof_armature[dof + 3:dof + 6] != 0)
+                            and (item.moment_reference_frame != self.body_frames[key]
+                                 or any(item.moment_reference) or any(item.torque_Nm))):
+                        raise ValueError('MuJoCo implicitfast FREE body angular armature has no admitted wrench moment')
         projected = self._project_current(values, raw_wrenches)
         if not np.isfinite(projected).all():
             raise ValueError('physical projection produced nonfinite generalized force')

@@ -107,9 +107,11 @@ class DevicePhysicalBatchSession:
             self._faulted = True
             raise
 
-    def step_device(self, command):
+    def step_device(self, command, *, scene_body_wrenches=()):
         import torch
-        from ...controllers.canonical.physical_commands import DeviceJointEffortCommand
+        from types import SimpleNamespace
+        from ...controllers.canonical.physical_commands import DeviceJointEffortCommand, DeviceBodyWrenchCommand
+        from ..sessions.control_submission import validate_scene_resource_conflicts
         self._require_live()
         if self._last_state is None:
             raise RuntimeError(f'{self._provider_label} batch must be reset before step')
@@ -140,12 +142,65 @@ class DevicePhysicalBatchSession:
             groups = self._device_coupled_effort_groups = _coupled_effort_groups(self._binding.channels)
         if groups:
             _validate_coupled_efforts(values, groups)
+        if type(scene_body_wrenches) is not tuple:
+            raise TypeError('device scene body wrenches must be an immutable tuple')
+        producers = {item.writer_id: item for item in self._execution.scene_body_producers}
+        bodies = {(item.entity_id, item.body_id): i for i, item in enumerate(self._binding.bodies)}
+        if scene_body_wrenches and (self._provider_label != 'MJWarp' or self.num_envs != 1):
+            raise ValueError('device scene body wrench requires the admitted MJWarp B=1 route')
+        combined = (torch.zeros((self.num_envs, len(bodies), 6), dtype=torch.float32, device=values.device)
+                    if bodies else None)
+        effects, claimed = set(), {}
+        joint_effects = {f'{command.writer_id}/effect-{i}' for i in range(len(command.channel_keys))}
+        claims = [SimpleNamespace(command_kind='joint-effort', units=(channel.unit,),
+                    composition='exclusive', physical_effect_id=f'{command.writer_id}/effect-{i}',
+                    resources=(f'joint:{channel.entity_id}/{channel.joint_id}/{channel.dof_id}',),
+                    start_substep=0, end_substep=self._control_substeps)
+                  for i, channel in enumerate(self._binding.channels)]
+        for load in scene_body_wrenches:
+            if type(load) is not DeviceBodyWrenchCommand:
+                raise TypeError('device scene loads require typed body wrench commands')
+            producer = producers.get(load.writer_id)
+            if (load.boundary != command.boundary or load.binding_sha256 != command.binding_sha256
+                    or producer is None or load.body_key not in producer.body_keys or load.body_key not in bodies
+                    or not torch.equal(load.episode_ids, command.episode_ids)
+                    or not torch.equal(load.episode_steps, command.episode_steps)):
+                raise ValueError('device scene body wrench is stale or not source-authorized')
+            if (not isinstance(load.values, torch.Tensor) or load.values.device != values.device
+                    or load.values.dtype != torch.float32 or tuple(load.values.shape) != (self.num_envs, 6)
+                    or not bool(torch.isfinite(load.values).all())):
+                raise ValueError('device scene body wrench requires finite CUDA float32 world COM values')
+            if load.physical_effect_id in effects or load.physical_effect_id in joint_effects:
+                raise ValueError('device scene interval repeats a physical effect')
+            effects.add(load.physical_effect_id)
+            prior = claimed.setdefault(load.body_key, [])
+            if prior and (load.composition != 'sum' or any(item != 'sum' for item in prior)):
+                raise ValueError('overlapping device body wrenches require explicit sum')
+            prior.append(load.composition)
+            claims.append(SimpleNamespace(command_kind='body-wrench', units=('N', 'N*m'),
+                composition=load.composition, physical_effect_id=load.physical_effect_id,
+                resources=(f'body:{load.body_key[0]}/{load.body_key[1]}',),
+                start_substep=0, end_substep=self._control_substeps))
+            combined[:, bodies[load.body_key], :] += load.values
+        validate_scene_resource_conflicts(tuple(claims))
         try:
             self._ipc.write('effort', values.contiguous())
+            if combined is not None:
+                self._ipc.write('body_wrench', combined.contiguous())
             self._ipc.record_written()
             self._worker.call('step')
             self._native_steps += self._control_substeps
             self._revision += 1
+            self._last_scene_body_receipt = tuple({
+                'writer_id': item.writer_id, 'producer_kind': producers[item.writer_id].producer_kind,
+                'physical_effect_id': item.physical_effect_id, 'body_key': item.body_key,
+                'composition': item.composition, 'frame': 'world', 'moment_reference': 'body_com',
+                'units': ('N', 'N*m'), 'values': item.values.clone(),
+                'binding_sha256': item.binding_sha256, 'boundary': item.boundary,
+                'episode_ids': item.episode_ids.clone(), 'episode_steps': item.episode_steps.clone(),
+                'controller_writer_id': command.writer_id,
+                'scene_admission': 'common_resource_conflict_rules',
+                'native_ack': 'worker_step_completed'} for item in scene_body_wrenches)
             return self._read_publication()
         except BaseException:
             self._faulted = True

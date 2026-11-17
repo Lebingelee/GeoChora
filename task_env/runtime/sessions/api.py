@@ -824,7 +824,8 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                         and (selection.physics_provider, selection.physics_backend) != ('mujoco', 'cpu')):
                     raise ValueError('physical worker source dynamics requires MuJoCo CPU')
                 if physical.compiled.binding.bodies:
-                    raise ValueError('physical worker currently admits joint effort only')
+                    physical.preflight(provider=selection.physics_provider,
+                        backend=selection.physics_backend, artifact=artifact, source=source)
             physical.validate_source(
                 scene=source.scene_definition, artifact_sha256=artifact.identity_hash,
                 source_id=source.source_id, source_closure_sha256=source.source_closure_digest,

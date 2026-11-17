@@ -8,7 +8,7 @@ G07／7a已按[attempt002独立主审](reviews/20261117_g07a_attempt002_acceptan
 
 [7b attempt001工作包与Goal提示](work-packages/20261117_g07b_attempt001_goal.md)已执行并部分返包，attempt_count=1，指定 PR #3 冻结 head 已本地合入。冻结生产输入 `78349184d0600e2fb804e6461930c475bfcc67c1` 的原 Panda PickCube 三 provider × seeds31/32/33 任务成功及同运行 Solution、独立 H5 和关闭均已验证；其他独立门须分别核验，特别是当前 BodyWrench 组合选择被 guard 拒绝，不可用九格替代。维护者已授权显式子步预算重置为200000，历史消耗保留；其他资源边界不变。[实施返包与证据边界](reviews/20261117_g07b_attempt001_execution.md)待独立主审。7c仍PLANNED/0，实时状态见[编排索引](orchestration.json)和[Goal约束](../goals/07-integration.md#g07-code-constraints)。
 
-维护者现已停止attempt001，并确认公共typed贡献统一、joint effort／body wrench分别由adapter接入合法原生接口；已选择MuJoCo／Isaac／MJWarp代表接通及GeoPhys公开可达交集，见[attempt002工作包](work-packages/20261117_g07b_attempt002_goal.md)与[新增Goal范围](../goals/07-integration.md#g07b-attempt002)。该包READY待维护者转发，未启动Goal/native，7b计数仍1。九格及已通过矩阵按最终冻结身份和实际diff影响复用，不机械重跑；新载荷的独立物理/记录/关闭门仍待实施。7b整体保持PARTIAL待独立主审，7c未启动。
+维护者现已停止attempt001，并确认公共typed贡献统一、joint effort／body wrench分别由adapter接入合法原生接口；已选择MuJoCo／Isaac／MJWarp代表接通及GeoPhys公开可达交集，见[attempt002工作包](work-packages/20261117_g07b_attempt002_goal.md)与[新增Goal范围](../goals/07-integration.md#g07b-attempt002)。attempt002已启动，7b计数2，仍在实施与证据核对；九格及已通过矩阵按最终冻结身份和实际diff影响复用，不机械重跑。已取得若干有界共同提交、独立物理响应、H5读回和关闭证据；MuJoCo原source的implicitfast自由体角运动失稳及其对验收的影响仍需处理，具体状态以同包报告和编排索引为准。7b尚未交付完成候选，7c未启动。
 
 **G01～G06 canonical范围及G07／7a有界关闭；7b部分返包待独立主审，7c与版本收口待实施。** G06[开发实施总结](g06/implementation-summary.md)和[证据索引](g06/evidence-index.json)保留基本要求、abc成果、测试/性能、submodule及未覆盖项；G06生产结案`4332844f`，GeoPhys pin`198d30ac`，Menagerie`b846dd12`。其后scalar/batch render授权修复见[渲染收尾](20261116_scalar_render_followup.md)，不把旧生产pin当最新HEAD，不自动纳入新R3独立包。
 
@@ -80,3 +80,6 @@ E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务�
 E15 项目停门时：[E15 最终清理与独立复核](reviews/20261114_e15_final_disposition_execution.md)已完成维护者批准清单；同序含 U5 和分类日志的范围下降 29,109,616,640 B，保留两项原位例外。U4/U5 不重开；维护者已接收 [项目接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)所列边界及交付 `86921c62`。旧 Git 管理元数据损失、历史精确净额 UNKNOWN、同次 completion 及不可见进程限制保留；其时 G06 尚未启动。
 
 2026-11-16后续公共控制修复：默认GeoPhys canonical worker、共享物理端口和MuJoCo受约束source dynamics／physical reset切换已完成定向实施与验证，见[worker记录](20261116_worker_physical_followup.md)。本项不启动G07，不改变原G06 abc接收范围。
+
+
+2026-11-17 G07 7b attempt002 已按用户要求停止扩展诊断并[部分返包](reviews/20261117_g07b_attempt002_execution.md)，等待独立审阅；MuJoCo 原 source FREE 角向力矩限制、替代夹具资格及旧回归失败仍未解决，7b 未接收，7c 未启动。

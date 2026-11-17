@@ -550,7 +550,7 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
             infos=infos,
         )
 
-    def step_device(self, actions: Any) -> DeviceBatchTransition:
+    def step_device(self, actions: Any, *, scene_body_wrenches=()) -> DeviceBatchTransition:
         """Run one public tick through an explicitly implemented device path.
 
         This method is intentionally capability-gated.  It never converts a
@@ -590,7 +590,8 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
             if profile is not None:
                 profile.end("bridge_input")
         try:
-            return self._advance_device_transition(actions, device_before, control, profile)
+            return self._advance_device_transition(actions, device_before, control, profile,
+                                                   scene_body_wrenches=scene_body_wrenches)
         except BaseException as error:
             if self.metadata.get('execution') == 'device_worker':
                 self._device_fault = error
@@ -639,12 +640,15 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                 raise ValueError(f'camera {camera.name!r} must return device uint8 [B,H,W,3] RGB')
         return {**observation, 'cameras': cameras}
 
-    def _advance_device_transition(self, actions, device_before, control, profile):
+    def _advance_device_transition(self, actions, device_before, control, profile, *, scene_body_wrenches=()):
         """Advance and publish after the action has passed boundary validation."""
         if profile is not None:
             profile.begin("runtime_transition")
         try:
-            device_state = self._device_runtime_step(control)
+            if scene_body_wrenches:
+                device_state = self._device_runtime_step(control, scene_body_wrenches=scene_body_wrenches)
+            else:
+                device_state = self._device_runtime_step(control)
         finally:
             if profile is not None:
                 profile.end("runtime_transition")
@@ -728,6 +732,11 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
                     "metrics": evaluation.get("metrics", {}),
                     "reward_terms": evaluation.get("reward_terms", {}),
                 }
+            if scene_body_wrenches:
+                transition_infos = dict(transition_infos)
+                if 'scene_physical_v1' in transition_infos:
+                    raise ValueError('task infos conflict with the scene physical receipt')
+                transition_infos['scene_physical_v1'] = self.runtime._last_scene_body_receipt
             return DeviceBatchTransition(
                 observation=observation,
                 reward=reward,

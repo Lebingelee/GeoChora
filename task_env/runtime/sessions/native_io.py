@@ -609,6 +609,9 @@ class UsdCoreRuntimeSession(_SessionValues):
     def physical_joint_build_receipt(self, binding):
         return self._physical_port.joints(binding)
 
+    def physical_body_build_receipt(self, binding):
+        return self._physical_port.bodies(binding)
+
     def physical_buffer_policy(self, binding):
         return self._physical_port.policy(binding)
 
@@ -900,7 +903,10 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._last_interval_advances = ()
         self._last_interval_advance_attempts = 0
         accepted_advances = []
-        for _ in range(self._artifact.timebase.control_substeps):
+        for substep in range(self._artifact.timebase.control_substeps):
+            port = getattr(self, '_physical_port', None)
+            if substep and port is not None and getattr(port, 'pending_wrenches', ()):
+                port.reapply_body_wrenches()
             expected_index = self._native_step_count + 1
             expected_time = expected_index * dt
             self._last_interval_advance_attempts += 1

@@ -398,6 +398,18 @@ def make_selected_device_spec(*, uid, num_env, env_config, backend, worker_direc
                     'runtime_resource_summary': runtime.resource_summary(),
                     'action_schema': action_schema,
                     'observation_schema': asdict(schema), 'render_modes': []}
+        if built['physical_execution'].scene_body_producers:
+            physical = built['physical_execution']
+            metadata['scene_physical_declaration_v1'] = {
+                'binding': physical.compiled.binding.to_mapping(),
+                'binding_sha256': physical.compiled.binding.identity_hash,
+                'controller_writer_id': controller.writer_id,
+                'native_build': metadata['runtime_resource_summary']['device_transition']
+                    .get('physical_layout_facts', {}).get('scene_body_build_v1'),
+                'producers': [{'writer_id': item.writer_id, 'producer_kind': item.producer_kind,
+                               'body_keys': [list(key) for key in item.body_keys]}
+                              for item in physical.scene_body_producers],
+            }
         adapter = BatchTaskLifecycleAdapter(uid=uid, num_envs=num_env, backend=backend,
             base_seed=seed, runtime=runtime, reset_sampler=binding.task_reset_sampler,
             compiled_scene=None, initial_state=None, task_definition=definition,

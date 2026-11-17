@@ -21,6 +21,7 @@
 - 复用仍匹配的强证据，只跑会揭示实际错误的受影响检查。完整案例覆盖的smoke/开闭/抓放不重复运行，不加完整训练、全A123/G06矩阵、性能门或额外笛卡尔积。不按行数、文件数、删行数、PASS数或搬到新大文件评价架构。
 - 普通owner/可读性问题在同一窗口修正，不留给7c、不为每个小问题重新派包。超出原门的能力只登记，不自动开发；若原门确需超出最小适配的新能力，保全具体阻断供维护者决定，不自行删门或扩大范围。
 - 2026-11-17维护者确认BodyWrench方向：公共typed表达与场景提交统一，`joint_efforts`和`body_wrenches`保留不同物理语义，由adapter分别降低至合法actuation／外载接口；joint effort不强制走native `ctrl`。一个正常动作Controller与独立Task/caller场景载荷共同准入、提交、记录及清理，不将普通物体伪装Robot、将wrench伪装joint channel或通过清空subject/selection绕过检查。保留producer/body/source权限、frame/作用点/矩参考、单位、显式sum/effect去重、逐子步持续语义和唯一推进。原post-5c总账CTRL-01/02/05、SRC、RUN、REC约束继续适用。
+- attempt002实施中：独立producer经source/body声明和共同interval准入，scalar worker与MJWarp设备路径各保留原有唯一推进和记录owner；设备world COM代表仅限B=1。MuJoCo原PickCube source的implicitfast FREE角运动出现原生数值失稳；带角向armature的显式FREE body力矩／非body原点矩参考在写入前拒绝，单独零阻尼／零armature诊断source的物理通过不覆盖该原source，也不改变pin。新的真实运行须记录source、作用点／Frame、时钟、独立oracle、同run H5和close，完成与接收仍按工作包逐门判定。
 
 <a id="7a"></a>
 ## 7a：NutAssembly 复用与调用者兼容

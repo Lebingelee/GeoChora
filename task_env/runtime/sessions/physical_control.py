@@ -127,7 +127,7 @@ def uniform_native_drive_mode(binding):
 
 def compile_existing_subject_assembly(*, scene, artifact_sha256, source_id,
                                       source_closure_sha256, subject, declarations,
-                                      assembly_id, nested_component_id=None):
+                                      assembly_id, nested_component_id=None, bodies=()):
     """Compile one existing Robot's declared joints, including optional nested parts."""
     from ...artifacts.logical_assembly import (LogicalAssemblyV1, LogicalAssemblyScenePinV1,
         LogicalAssemblyNestedMemberV1)
@@ -151,12 +151,13 @@ def compile_existing_subject_assembly(*, scene, artifact_sha256, source_id,
         children = {(child.assembly_id, child.revision): child}
     assembly = LogicalAssemblyV1('logical-assembly-v1', assembly_id, 'v1', pin, members)
     return compile_declared_subject_binding(scene, artifact_sha256, source_id,
-        source_closure_sha256, assembly, children, (subject,), declarations)
+        source_closure_sha256, assembly, children, (subject,), declarations, bodies=bodies)
 
 
 def build_declared_effort_execution(*, scene, artifact, source, subject, declarations,
                                     assembly_id, controller_factory, state_joint_names,
-                                    joint_bindings, frame_bindings, nested_component_id=None):
+                                    joint_bindings, frame_bindings, nested_component_id=None,
+                                    bodies=(), scene_body_producers=(), scene_action_resources=()):
     """Compile one declared subject and bind its Controller to the Runtime execution."""
     from ...artifacts.state import StateFieldRequirement, StateRequirements
 
@@ -166,14 +167,15 @@ def build_declared_effort_execution(*, scene, artifact, source, subject, declara
     compiled = compile_existing_subject_assembly(scene=scene, artifact_sha256=artifact.identity_hash,
         source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
         subject=subject, declarations=declarations, assembly_id=assembly_id,
-        nested_component_id=nested_component_id)
+        nested_component_id=nested_component_id, bodies=bodies)
     controller = controller_factory(compiled.binding, writer)
     requirements = StateRequirements('state-requirements-v1', 'controller', writer, tuple(
         StateFieldRequirement('state-field-requirement-v1', field, 'joint', subject.entity_id,
             name, 'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
         for name in state_joint_names for field in ('joint_position', 'joint_velocity')))
     execution = PhysicalControlExecutionV1(compiled, (controller,), scene,
-        joint_bindings, frame_bindings, requirements, 1, (subject,))
+        joint_bindings, frame_bindings, requirements, 1, (subject,),
+        scene_body_producers=scene_body_producers, scene_action_resources=scene_action_resources)
     execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
         source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
     return execution
@@ -348,6 +350,28 @@ class CompiledPhysicalBindingV1:
 
 
 @dataclass(frozen=True)
+class SceneBodyProducerV1:
+    """A caller or Task writer explicitly authorized for source-bound bodies."""
+    writer_id: str
+    producer_kind: str
+    body_keys: tuple[tuple[str, str], ...]
+
+    def __post_init__(self):
+        from ...artifacts.contracts import _name
+        _name(self.writer_id)
+        if self.producer_kind not in {'caller', 'task'}:
+            raise ValueError('scene body producer must be caller or task')
+        if (type(self.body_keys) is not tuple or not self.body_keys
+                or len(set(self.body_keys)) != len(self.body_keys)):
+            raise ValueError('scene body producer requires unique body keys')
+        for key in self.body_keys:
+            if type(key) is not tuple or len(key) != 2:
+                raise TypeError('scene body key must be an entity and body pair')
+            for name in key:
+                _name(name)
+
+
+@dataclass(frozen=True)
 class PhysicalControlExecutionV1:
     """Selected task's immutable control wiring, consumed by its existing Env."""
     compiled: CompiledPhysicalBindingV1
@@ -359,6 +383,8 @@ class PhysicalControlExecutionV1:
     generation: int
     subjects: tuple[ControlledSubjectV1, ...] = ()
     selection_profile_id: str | None = None
+    scene_body_producers: tuple[SceneBodyProducerV1, ...] = ()
+    scene_action_resources: tuple[tuple[str, str], ...] = ()
 
     def selected_runtime_builder(self, selected):
         from .selected_materialization import PhysicalRuntimeBuilder
@@ -392,6 +418,23 @@ class PhysicalControlExecutionV1:
             raise ValueError('physical execution Controller identities must be unique')
         if len({controller.writer_id for controller in self.controllers}) != len(self.controllers):
             raise ValueError('physical execution Controller writers must be unique')
+        if (type(self.scene_body_producers) is not tuple
+                or any(type(item) is not SceneBodyProducerV1 for item in self.scene_body_producers)
+                or len({item.writer_id for item in self.scene_body_producers}) != len(self.scene_body_producers)):
+            raise ValueError('scene body producers must have unique declared writers')
+        if {item.writer_id for item in self.scene_body_producers} & {item.writer_id for item in self.controllers}:
+            raise ValueError('scene producer and Controller writers must be distinct')
+        body_map = {(item.entity_id, item.body_id): item for item in self.compiled.binding.bodies}
+        for producer in self.scene_body_producers:
+            if any(key not in body_map or producer.writer_id not in body_map[key].owner_ids
+                   for key in producer.body_keys):
+                raise ValueError('scene producer body is not authorized by the physical binding')
+        if self.scene_action_resources:
+            resources = {(item.entity_id, item.actuator_id) for item in self.scene.actuator_resources or ()}
+            if (len(self.scene_action_resources) != len(self.compiled.binding.channels)
+                    or any(type(item) is not tuple or len(item) != 2 or item not in resources
+                           for item in self.scene_action_resources)):
+                raise ValueError('scene action resources differ from declared physical channels')
         if not isinstance(self.joint_bindings, Mapping) or not isinstance(self.frame_bindings, Mapping):
             raise TypeError('physical execution state bindings must be mappings')
         if type(self.requirements) is not StateRequirements:
@@ -437,6 +480,25 @@ class PhysicalControlExecutionV1:
             tuple(item for part in parts for item in part.joint_efforts),
             tuple(item for part in parts for item in part.body_wrenches),
             tuple(item for part in parts for item in part.extensions))
+
+    def compose_scene_body_wrenches(self, batch, wrenches):
+        """Combine declared independent body loads with the real Controller batch."""
+        from ...controllers.canonical.physical_commands import BodyWrenchV1
+        if type(batch) is not PhysicalCommandBatchV1 or type(wrenches) is not tuple:
+            raise TypeError('scene loads require a physical batch and a tuple of wrenches')
+        producers = {item.writer_id: item for item in self.scene_body_producers}
+        for item in wrenches:
+            if type(item) is not BodyWrenchV1:
+                raise TypeError('scene loads require typed body wrenches')
+            item.validate()
+            item.contribution.validate()
+            producer = producers.get(item.contribution.owner_id)
+            if producer is None or (item.entity_id, item.body_id) not in producer.body_keys:
+                raise ValueError('body wrench is not authorized by a scene producer')
+        result = PhysicalCommandBatchV1('physical-command-batch-v1', batch.context,
+            batch.joint_efforts, (*batch.body_wrenches, *wrenches), batch.extensions)
+        result.validate()
+        return result
 
     def controller_versions(self):
         """Capture actual Controller identities and optional individual generations."""
@@ -542,6 +604,17 @@ class PhysicalControlExecutionV1:
         if source is not None:
             joint_names = set(source.joints) | set(source.free_joints)
             frame_names = set(source.bodies) | set(source.frames)
+            for producer in self.scene_body_producers:
+                bodies = {(item.entity_id, item.body_id): item for item in binding.bodies}
+                for key in producer.body_keys:
+                    body = bodies[key]
+                    source_key = f'{key[0]}/{key[1]}'
+                    if (source_key not in source.bodies and key[0] in source.bodies
+                            and self.frame_bindings.get(key[0]) == body.body_frame
+                            and body.body_frame == FrameReference(*key)):
+                        source_key = key[0]
+                    if source.bodies.get(source_key) != body.native_body:
+                        raise ValueError('scene producer body differs from the selected source mapping')
             if (set(source.joints) & set(source.free_joints)
                     or set(source.bodies) & set(source.frames)
                     or set(self.joint_bindings) != joint_names

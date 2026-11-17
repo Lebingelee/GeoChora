@@ -324,6 +324,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
         })
         config["task"] = dict(supplied.task_parameters)
         config['controller'] = {'parameters': json.loads(supplied.controller_parameters_json)}
+        if supplied.scene_body_producers_json != '[]':
+            config['scene_body_producers'] = json.loads(supplied.scene_body_producers_json)
         if supplied.gravity_compensation:
             config['controller']['gravity_compensation'] = True
         if supplied.native_drive is not None:
@@ -347,10 +349,27 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
     if not isinstance(config, Mapping):
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
-    allowed = {"execution", "episode", "task", "controller", "robot", "runtime", "render"}
+    allowed = {"execution", "episode", "task", "controller", "robot", "runtime", "render", "scene_body_producers"}
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
+    producers = values.get('scene_body_producers', [])
+    if type(producers) is not list:
+        raise TypeError('scene_body_producers must be a list')
+    if producers and not getattr(environment_type, 'selected_scene_body_producers', False):
+        raise ValueError('selected task does not admit scene body producers')
+    from ..runtime.sessions.physical_control import SceneBodyProducerV1
+    parsed_producers = []
+    for producer in producers:
+        if not isinstance(producer, Mapping) or set(producer) != {'writer_id', 'producer_kind', 'body_keys'}:
+            raise ValueError('scene body producer requires writer_id, producer_kind and body_keys')
+        if type(producer['body_keys']) is not list or any(type(key) is not list for key in producer['body_keys']):
+            raise TypeError('scene body producer body_keys must be a list of pairs')
+        parsed_producers.append(SceneBodyProducerV1(producer['writer_id'], producer['producer_kind'],
+                                                    tuple(tuple(key) for key in producer['body_keys'])))
+    if len({item.writer_id for item in parsed_producers}) != len(parsed_producers):
+        raise ValueError('scene body producer writers must be unique')
+    producers_json = json.dumps(producers, sort_keys=True, separators=(',', ':'), allow_nan=False)
     robot_selection = values.get('robot')
     robot_uid = None
     native_drive = None
@@ -585,6 +604,7 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
         reset_profile=reset_profile,
         robot_uid=robot_uid,
         native_drive=native_drive, controller_parameters_json=controller_parameters_json,
+        scene_body_producers_json=producers_json,
         geophys_contact_mode=contact_mode,
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
@@ -605,6 +625,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
                                    result.environment.runtime.body_contact_solver_iterations}
         if result.robot_uid is not None:
             original["robot"] = {"uid": result.robot_uid}
+        if result.scene_body_producers_json != '[]':
+            original['scene_body_producers'] = json.loads(result.scene_body_producers_json)
         original['controller'] = {'parameters': json.loads(result.controller_parameters_json)}
         if result.gravity_compensation:
             original['controller']['gravity_compensation'] = True

@@ -463,12 +463,16 @@ class VectorTransitionRecorder:
             raise
         return observation, info
 
-    def step(self, actions):
+    def step(self, actions, *, scene_body_wrenches=()):
         if not self._device_mode:
+            if scene_body_wrenches:
+                raise ValueError('scene body wrenches require the device batch route')
             self.step_async(actions)
             return self.step_wait()
         self._require_device_recording_ready()
-        observation, reward, terminated, truncated, info = self.venv.step(actions)
+        observation, reward, terminated, truncated, info = (
+            self.venv.step(actions, scene_body_wrenches=scene_body_wrenches)
+            if scene_body_wrenches else self.venv.step(actions))
         self._current_observation, self._device_last_info = observation, info
         if not self.record_enabled:
             return observation, reward, terminated, truncated, info
@@ -493,11 +497,18 @@ class VectorTransitionRecorder:
                 flat = np.asarray(flatten(self.venv.single_action_space, action), dtype=np.float32).reshape(-1)
                 metrics = self._device_row(info.get('metrics', {}), slot)
                 terms = self._device_row(info.get('reward_terms', {}), slot)
+                scene = previous.get('task', {}).get('scene_physical_v1', ()) if ended else info.get('scene_physical_v1', ())
+                scene_rows = [{key: self._device_row(value, slot) for key, value in entry.items()}
+                              for entry in scene]
+                if scene_rows:
+                    from ..trajectory.metadata import plain_metadata
+                    boundary = {**boundary, 'scene_physical_v1': plain_metadata(scene_rows)}
                 self._device_recorders[slot].append_transition(flat, flat,
                     self._device_observation_row(next_observation, slot),
                     float(reward[slot].item()), False, bool(terminated[slot].item()),
                     bool(truncated[slot].item()), {'boundary_context_v1': boundary,
-                    'task_metrics': metrics, 'reward_terms': terms})
+                    'task_metrics': metrics, 'reward_terms': terms,
+                    'scene_physical_v1': scene_rows})
                 if ended:
                     reason = 'terminated' if bool(terminated[slot].item()) else 'truncated'
                     self._finish_device_row(slot, reason)

@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7B_ATTEMPT002_READY_NOT_STARTED",
+  "status": "G07_7B_ATTEMPT002_IN_PROGRESS",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -19,14 +19,11 @@
     "base_head": "bb2692d86aaf8eb20e424a4c0ea9f9108f966e24",
     "reason": "Maintainer approved revision003 7a dispatch: case-driven code review and minimal necessary integration; preserve original gates and one stage branch."
   },
-  "active_packages": [],
-  "next_candidate": {
-    "substage": "7b",
-    "attempt": 2,
-    "package_id": "V211_G07_7B_ATTEMPT002",
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED"
-  },
-  "next_action": "Maintainer manually forwards frozen attempt002; executor increments 7b attempt_count to 2 only at actual start. Reuse passed matrices by impact; 7c remains PLANNED.",
+  "active_packages": [
+    "V211_G07_7B_ATTEMPT002"
+  ],
+  "next_candidate": null,
+  "next_action": "Execute attempt002 under its frozen scope and budgets; 7c remains planned.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2215,8 +2212,8 @@
           "dependencies": [
             "7a"
           ],
-          "status": "RETURNED_PARTIAL_ATTEMPT002_READY",
-          "attempt_count": 1,
+          "status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+          "attempt_count": 2,
           "attempts": [
             {
               "id": "attempt001",
@@ -2236,12 +2233,27 @@
               },
               "end_reason": "Maintainer stopped attempt001 for BodyWrench interface research and design; returned PARTIAL, not accepted.",
               "output_head": "f89c50a3f7f47fa3b06584e5a2e422eb3b35077d"
+            },
+            {
+              "id": "attempt002",
+              "started_at": "2026-11-17T14:13:07.554376+08:00",
+              "deadline": "2026-11-17T18:13:07.554376+08:00",
+              "input_head": "4fdf9379482af6bb913eb1a6587316e64b6a0fed",
+              "status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+              "output_root": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_g07b_attempt002",
+              "native_seconds_carried": "3950.3989457390270828",
+              "epoch_explicit_substeps_carried": 1175,
+              "result": "PARTIAL",
+              "ended_at": "2026-11-17T16:24:39.847822+08:00",
+              "report_ref": "reviews/20261117_g07b_attempt002_execution.md",
+              "native_seconds": 2024.1520105634117,
+              "explicit_substeps_conservative_upper_bound": 1750
             }
           ],
-          "assigned_agent": null,
+          "assigned_agent": "Codex primary agent, sole writer",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/work-package.md",
           "package_sha256": "037e2fe8a4b37a94d4f1141d54d6496b00441369a1245fc5ceb5aa8d263826e8",
-          "input_head": "f89c50a3f7f47fa3b06584e5a2e422eb3b35077d",
+          "input_head": "4fdf9379482af6bb913eb1a6587316e64b6a0fed",
           "output_head": null,
           "expected_duration_minutes": [
             150,
@@ -2288,7 +2300,7 @@
           },
           "last_observation": {
             "date": "2026-11-17",
-            "state": "Maintainer approved typed contribution split and selected three-provider positive representatives plus GeoPhys public-reachable FREE scope; attempt002 prepared, not started."
+            "state": "Attempt002 returned PARTIAL; B2-2 production FREE angular-armature moment and alternate fixture eligibility remain unresolved; B2-5 legacy failures retained."
           },
           "evidence_refs": [
             "reviews/20261117_g07b_attempt001_execution.md",
@@ -2303,10 +2315,11 @@
           ],
           "review_decision": null,
           "blockers": [
-            "Current BodyWrench formal chain not implemented/verified; attempt002 addresses this and its authorized provider representatives."
+            "MuJoCo production FREE angular-armature moment guard and diagnostic fixture eligibility require disposition.",
+            "Affected regression has three stale fixture/retired-owner failures; broader old suite also fails."
           ],
-          "input_head_role": "Preparation baseline; actual documentation-successor start is frozen in dispatch-input.json",
-          "package_status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+          "input_head_role": "Actual dispatch input",
+          "package_status": "IN_PROGRESS",
           "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/goal-prompt.md",
           "goal_prompt_sha256": "b4d5ae6544a62dde8a096e47288654eb90d906e9d07ec505a6aab9b894d0d2cf",
           "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/dispatch-input.json",
@@ -2938,7 +2951,7 @@
     "actual_merge_started": true
   },
   "g07b_attempt002_preparation": {
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "status": "EXECUTED_RETURNED_PARTIAL",
     "package_ref": "work-packages/20261117_g07b_attempt002_goal.md",
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/work-package.md",
     "package_sha256": "037e2fe8a4b37a94d4f1141d54d6496b00441369a1245fc5ceb5aa8d263826e8",

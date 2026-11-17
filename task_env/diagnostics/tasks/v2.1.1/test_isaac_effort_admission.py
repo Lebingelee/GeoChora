@@ -135,7 +135,7 @@ def test_usd_effort_binding_uses_physical_observation_and_no_position_compositio
 
     binding = PickCubeReferenceEnv._build_selected_binding(_formal_isaac_joint_config())
     assert binding.scalar_control_binding is None
-    assert binding.observation_projection.func is physical_observation
+    assert binding.observation_projection is physical_observation
     assert binding.observation_space_factory.func is selected_reference_observation_spaces
     assert binding.compose_robot_source is None
 

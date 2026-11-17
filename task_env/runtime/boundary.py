@@ -163,7 +163,16 @@ class GeoPhysRuntimeBoundary:
         This is a commanded input, not a measured force. The owning session must
         serialize this operation with stepping, reset, and any other force writer.
         """
-        if self._generalized_effort_fault or self._generalized_effort_pending:
+        self._write_generalized_effort(values, replace_owned=False)
+
+    def replace_owned_generalized_effort(self, values) -> None:
+        """Refresh the already-owned interval before its next native step."""
+        self._write_generalized_effort(values, replace_owned=True)
+
+    def _write_generalized_effort(self, values, *, replace_owned):
+        if self._generalized_effort_fault or self._generalized_effort_pending != replace_owned:
+            if replace_owned:
+                raise RuntimeError('generalized effort boundary is faulted or not owned')
             raise RuntimeError('generalized effort boundary is faulted or already occupied')
         raw = np.asarray(values)
         count = int(getattr(self._physics, 'n_dof', 0))

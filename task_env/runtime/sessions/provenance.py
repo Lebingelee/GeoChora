@@ -182,7 +182,7 @@ def provider_module_origins(provider, module_names=('control', 'geophys', 'scene
 _ENVIRONMENT_METADATA_PROBE = r'''
 import importlib.metadata as metadata
 import importlib.util as util
-import json, os, pathlib, sys, sysconfig
+import hashlib, json, os, pathlib, sys, sysconfig
 from importlib.abc import MetaPathFinder
 from importlib.machinery import PathFinder
 
@@ -199,6 +199,27 @@ paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
 launcher_paths = ([str(pathlib.Path(item).resolve()) for item in os.environ.get('PYTHONPATH', '').split(os.pathsep) if item]
                   if launcher_mode == 'launcher' else [])
 sys.path[:0] = [core, geophys, *launcher_paths, paths['purelib'], paths['platlib']]
+overlay_name = os.environ.get('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY')
+if overlay_name:
+    overlay = pathlib.Path(overlay_name).resolve(strict=True)
+    receipt_bytes = (overlay.parent / 'isaac_dependency_overlay.json').read_bytes()
+    if hashlib.sha256(receipt_bytes).hexdigest() != os.environ.get('GEOCHORA_ISAAC_OVERLAY_RECEIPT_SHA256'):
+        raise ValueError('Isaac dependency overlay receipt differs from parent validation')
+    receipt = json.loads(receipt_bytes)
+    if receipt.get('python_version') != list(sys.version_info[:2]):
+        raise ValueError('Isaac dependency overlay Python ABI differs')
+    allowed = ('gymnasium', 'farama_notifications', 'h5py', 'h5py.libs')
+    names = set(receipt.get('entries', ()))
+    if not {'gymnasium', 'h5py'} <= names or set(p.name for p in overlay.iterdir()) != names:
+        raise ValueError('Isaac dependency overlay contents differ from its receipt')
+    for name in names:
+        if name not in allowed and not (name.endswith('.dist-info') and name.startswith(
+                ('gymnasium-', 'farama_notifications-', 'h5py-'))):
+            raise ValueError('Isaac dependency overlay contains an unapproved package')
+        path = overlay / name
+        if not path.is_symlink() or not path.resolve(strict=True).is_relative_to(pathlib.Path(receipt['core_site']).resolve(strict=True)):
+            raise ValueError('Isaac dependency overlay entry is not the verified Core package')
+    sys.path.append(str(overlay))
 origins = {}
 for name in ('task_env', 'geophys', 'scene', 'control', 'simulation', 'solvers'):
     spec = PathFinder.find_spec(name, sys.path)
@@ -287,10 +308,16 @@ def probe_interpreter_environment(python, *, core_root=None, geophys_src=None):
     if not (geophys / 'geophys' / '__init__.py').is_file() or not (geophys / 'scene' / '__init__.py').is_file():
         raise ValueError(f'current GeoPhys source unavailable: {geophys}')
     try:
+        env = os.environ.copy()
+        overlay = env.get('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY')
+        if overlay:
+            overlay_path = Path(overlay).resolve(strict=True)
+            receipt_path = overlay_path.parent / 'isaac_dependency_overlay.json'
+            env['GEOCHORA_ISAAC_OVERLAY_RECEIPT_SHA256'] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
         process = subprocess.Popen(
             [str(interpreter), '-I', '-S', '-B', '-c', _ENVIRONMENT_METADATA_PROBE, str(core), str(geophys),
              'launcher' if interpreter.name == 'python.sh' else 'python'],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True, env=env,
         )
         try:
             stdout, stderr = process.communicate(timeout=30)

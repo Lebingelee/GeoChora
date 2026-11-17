@@ -58,7 +58,7 @@ def validate_effort_source_route(*, provider, backend, deployment, source_delive
 def build_panda_direct_effort_execution(robot, scene, artifact, source, *, entity_id,
                                         native_drive, native_ranges, layout=None,
                                         joint_bindings=None, frame_bindings=None,
-                                        gripper_force_limit_N=None):
+                                        gripper_force_limit_N=None, scene_body_producers=()):
     """Compile a source-admitted Panda declaration and bind its effort Controller."""
     import math
     from ...artifacts import FrameReference
@@ -103,14 +103,31 @@ def build_panda_direct_effort_execution(robot, scene, artifact, source, *, entit
                                  if name in artifact.legacy_frame_bindings
                                  else FrameReference(*name.split('/', 1)))
                           for name in (*source.bodies, *source.frames)}
+    from ...controllers.canonical.physical_commands import PhysicalBodyBindingV1
+    body_owners = {}
+    for producer in scene_body_producers:
+        for key in producer.body_keys:
+            body_owners.setdefault(key, []).append(producer.writer_id)
+    bodies = []
+    for (body_entity, body_id), owners in sorted(body_owners.items()):
+        key = f'{body_entity}/{body_id}'
+        if (key not in source.bodies and body_entity in source.bodies
+                and frame_bindings.get(body_entity) == FrameReference(body_entity, body_id)):
+            key = body_entity
+        if key not in source.bodies or key not in frame_bindings:
+            raise ValueError('scene producer requires an actual source-bound body and frame')
+        bodies.append(PhysicalBodyBindingV1('physical-body-binding-v1', body_entity, body_id,
+            frame_bindings[key], source.bodies[key], tuple(sorted(owners))))
     return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
         subject=subject, declarations=declarations, assembly_id=layout.assembly_id,
         nested_component_id=layout.nested_component_id, controller_factory=make_controller,
-        state_joint_names=names, joint_bindings=joint_bindings, frame_bindings=frame_bindings)
+        state_joint_names=names, joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+        bodies=tuple(bodies), scene_body_producers=scene_body_producers,
+        scene_action_resources=tuple((entity_id, native) for native in robot.effort_source_layout().native_actuators))
 
 
 def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive,
-                                 gripper_force_limit_N=None):
+                                 gripper_force_limit_N=None, scene_body_producers=()):
     """Bind a Robot's effort channels using the source format's native facts."""
     from .source import RuntimeSource, UsdRuntimeSourceV1
 
@@ -119,25 +136,28 @@ def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive
         limits = checked_panda_effort_source_limits(source, scene)
         return build_panda_direct_effort_execution(
             robot, scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
-            native_ranges=tuple(limits), gripper_force_limit_N=gripper_force_limit_N)
+            native_ranges=tuple(limits), gripper_force_limit_N=gripper_force_limit_N,
+            scene_body_producers=scene_body_producers)
     if isinstance(source, UsdRuntimeSourceV1):
         if gripper_force_limit_N is not None:
             raise ValueError('USD effort source does not admit a gripper force override')
         from .isaac_physical import build_isaac_panda_effort_execution
         return build_isaac_panda_effort_execution(robot, scene, artifact, source,
-                                                  native_drive=native_drive)
+            native_drive=native_drive, scene_body_producers=scene_body_producers)
     raise TypeError('Robot effort construction requires an admitted RuntimeSource')
 
 
 def prepare_panda_source_effort_factory(robot, scene, artifact, source, *, native_drive,
                                         config, source_xml, end_frame_id, task_settings,
-                                        dynamic_parameters=False, gripper_force_limit_N=None):
+                                        dynamic_parameters=False, gripper_force_limit_N=None,
+                                        scene_body_producers=()):
     """Compile one source-bound Robot and prepare fresh Controller selections."""
     from ...controllers.canonical.r3_effort import PandaEffortProfileFactory
     from .source import RuntimeSource, source_resource_receipt
 
     physical = build_panda_effort_execution(robot, scene, artifact, source,
-        native_drive=native_drive, gripper_force_limit_N=gripper_force_limit_N)
+        native_drive=native_drive, gripper_force_limit_N=gripper_force_limit_N,
+        scene_body_producers=scene_body_producers)
 
     def validate_source():
         receipt = source_resource_receipt(source)
@@ -160,12 +180,12 @@ def prepare_panda_source_effort_factory(robot, scene, artifact, source, *, nativ
 def build_panda_source_effort_profile(robot, scene, artifact, source, *, native_drive,
                                       kind, config, source_xml, end_frame_id,
                                       task_settings, dynamic_parameters=None,
-                                      gripper_force_limit_N=None):
+                                      gripper_force_limit_N=None, scene_body_producers=()):
     """Build one Controller through the same source-bound factory."""
     factory = prepare_panda_source_effort_factory(robot, scene, artifact, source,
         native_drive=native_drive, config=config, source_xml=source_xml, end_frame_id=end_frame_id,
         task_settings=lambda _kind: task_settings, dynamic_parameters=dynamic_parameters is not None,
-        gripper_force_limit_N=gripper_force_limit_N)
+        gripper_force_limit_N=gripper_force_limit_N, scene_body_producers=scene_body_producers)
     return factory(kind, **(dynamic_parameters or {}))
 
 
@@ -192,7 +212,8 @@ def compile_panda_effort_selection(artifact, source, *, robot, composition,
 
 def build_usd_panda_control(artifact, source, *, runtime_input, robot, controller_profile, action_config,
                             dynamic_profile, velocity_limit, tcp_profile,
-                            physical_kind=None, native_drive=None, effort_settings=None):
+                            physical_kind=None, native_drive=None, effort_settings=None,
+                            scene_body_producers=()):
     """Bind the selected Position or effort capability to the admitted USD source."""
     if runtime_input.runtime_source is not source or runtime_input.artifact is not artifact:
         raise ValueError('USD Controller input differs from the compiled Artifact or source')
@@ -220,7 +241,8 @@ def build_usd_panda_control(artifact, source, *, runtime_input, robot, controlle
         raise ValueError('effort capability requires its drive and task settings')
     physical = build_panda_source_effort_profile(robot, source.scene_definition, artifact, source,
         native_drive=native_drive, kind=physical_kind, config=action_config,
-        source_xml=source.scene_source.xml, end_frame_id=end_frame_id, task_settings=effort_settings)
+        source_xml=source.scene_source.xml, end_frame_id=end_frame_id, task_settings=effort_settings,
+        scene_body_producers=scene_body_producers)
     from .physical_control import PhysicalControlExecutionV1
     if type(physical) is not PhysicalControlExecutionV1 or len(physical.controllers) != 1:
         raise TypeError('USD effort capability must return one physical execution')
@@ -392,7 +414,8 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                                  native_drive=None, reset_selection=False, task_settings=None,
                                  existing_robot_entity=None, task_body_names=(),
                                  task_site_transfers=(), scene_compiler=None,
-                                 force_limit_N=None, velocity_limit=None, tcp_profile=None):
+                                 force_limit_N=None, velocity_limit=None, tcp_profile=None,
+                                 scene_body_producers=()):
     """Build one declared Panda route using the shared source-bound stages.
 
     Task callbacks produce task facts; this adapter owns source composition,
@@ -433,7 +456,8 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                 task_config=plan.task_config, build_task_scene=build_task_scene,
                 compile_task_artifact=compile_task_artifact,
                 task_scene_recipe_sha256=plan.scene_recipe_sha256,
-                seed=request.seed, horizon=request.horizon, physical_drive=native_drive)
+                seed=request.seed, horizon=request.horizon, physical_drive=native_drive,
+                scene_body_producers=scene_body_producers)
             compiled = CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source)
             with close_execution_source_on_failure(compiled.source):
                 if compiled.artifact.timebase != plan.artifact.timebase:
@@ -556,6 +580,7 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                 controller_profile=controller_profile, action_config=context.action_config,
                 dynamic_profile=context.dynamic_profile, velocity_limit=velocity_limit,
                 tcp_profile=tcp_profile, physical_kind=physical_kind, native_drive=native_drive,
+                scene_body_producers=scene_body_producers,
                 effort_settings=task_settings(physical_kind) if physical_kind is not None else None),
             compile_control=finish_control)
     if source_format != 'mjcf':
@@ -584,6 +609,7 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                 robot=context.robot, composition=context.composition,
                 controller_profile=controller_profile, native_drive=native_drive,
                 kind=physical_kind, task_settings=task_settings, dynamic_parameters=reset_selection,
+                scene_body_producers=scene_body_producers,
                 gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
                                        if reset_selection else None)),
             compile_control=finish_control)

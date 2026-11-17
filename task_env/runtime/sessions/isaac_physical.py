@@ -4,12 +4,13 @@ import math
 
 from ...artifacts.contracts import CapabilityAssessmentRowV1, CapabilityAssessmentV1
 from ...controllers.canonical.physical_commands import (
-    PhysicalBufferPolicyV1, PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1,
+    PhysicalBufferPolicyV1, PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1, PhysicalBodyBuildReceiptV1,
 )
-from .physical_control import PhysicalControlExecutionV1, ResolvedPhysicalBatchV1, prepare_physical_command_batch, _rotate
+from .physical_control import (PhysicalControlExecutionV1, ResolvedPhysicalBatchV1,
+    prepare_physical_command_batch, resolve_body_wrench_at_poses, _rotate)
 
 
-def build_isaac_panda_effort_execution(robot, scene, artifact, source, *, native_drive):
+def build_isaac_panda_effort_execution(robot, scene, artifact, source, *, native_drive, scene_body_producers=()):
     """Bind the admitted USD Panda transmissions to the Robot's effort Controller."""
     from ...robots.panda import PandaEffortSourceLayout
     from .source import (UsdRuntimeSourceV1, position_joint_bindings_from_artifact,
@@ -37,7 +38,8 @@ def build_isaac_panda_effort_execution(robot, scene, artifact, source, *, native
         robot, scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
         native_ranges=((-250., 250.),) * 7 + ((-5., 5.),), layout=layout,
         joint_bindings=position_joint_bindings_from_artifact(scene, artifact, source),
-        frame_bindings=position_frame_bindings_from_artifact(artifact, source))
+        frame_bindings=position_frame_bindings_from_artifact(artifact, source),
+        scene_body_producers=scene_body_producers)
 
 
 def preflight_physical_isaac(execution, artifact, source):
@@ -48,8 +50,9 @@ def preflight_physical_isaac(execution, artifact, source):
     if execution.requires_source_dynamics:
         from ...environment.types import StageUnavailableError
         raise StageUnavailableError('Isaac physical adapter has no source dynamics model')
-    if execution.compiled.binding.bodies:
-        raise ValueError('F06 Isaac direct-effort port does not admit body wrench')
+    if execution.compiled.binding.bodies and artifact.artifact_id not in {
+            'pickcube-f06-physical-effort-fixture-v1', 'pickcube-f06-physical-effort-no-drive-v1'}:
+        raise ValueError('Isaac body wrench requires an admitted source-bound physical fixture')
 
 
 class IsaacF06PhysicalPort:
@@ -113,6 +116,11 @@ class IsaacF06PhysicalPort:
         if any(not callable(getattr(io, method, None)) for method in
                ('write_physical_effort', 'clear_physical_effort')):
             raise ValueError('F06 public effort I/O owner is unavailable')
+        if binding.bodies:
+            if any(not callable(getattr(io, method, None)) for method in
+                   ('bind_physical_body_wrenches', 'apply_physical_body_wrenches', 'clear_physical_body_wrenches')):
+                raise ValueError('F06 public body wrench I/O owner is unavailable')
+            session._build_layout_facts['physical_body_wrench_build'] = io.bind_physical_body_wrenches(binding.bodies)
         if drive_mode == 'disabled':
             disable = getattr(io, 'disable_f06_physical_drives', None)
             if not callable(disable):
@@ -120,6 +128,7 @@ class IsaacF06PhysicalPort:
             session._build_layout_facts['physical_drive_override'] = disable()
         self.session, self.execution, self.binding = session, execution, binding
         self.pending = None
+        self.pending_wrenches = ()
         self.consumed = set()
 
     def _binding(self, binding):
@@ -129,16 +138,24 @@ class IsaacF06PhysicalPort:
 
     def assessment(self, binding):
         self._binding(binding)
+        names = ('sum', 'joint_effort', 'transmission', 'native_drive_state')
+        if binding.bodies:
+            names += ('body_force', 'body_torque', 'body_frame', 'body_offset_point')
         rows = tuple(CapabilityAssessmentRowV1('capability-assessment-row-v1', name,
             f'binding:{binding.identity_hash}', 'required', 'supported', 'implemented', 'available',
             'none', 'native_build', 'F06 public articulation and native mimic/drive witness', None, None)
-            for name in ('sum', 'joint_effort', 'transmission', 'native_drive_state'))
+            for name in names)
         return CapabilityAssessmentV1('capability-assessment-v1', binding.identity_hash, 'native_build', rows)
 
     def joints(self, binding):
         self._binding(binding)
         return PhysicalJointBuildReceiptV1('physical-joint-build-receipt-v1', binding.identity_hash,
             binding.source_closure_sha256, self.session.provider_materialization_id, binding.channels, 'native_build')
+
+    def bodies(self, binding):
+        self._binding(binding)
+        return PhysicalBodyBuildReceiptV1('physical-body-build-receipt-v1', binding.identity_hash,
+            binding.source_closure_sha256, self.session.provider_materialization_id, binding.bodies, 'native_build')
 
     def policy(self, binding):
         self._binding(binding)
@@ -161,10 +178,12 @@ class IsaacF06PhysicalPort:
             raise ValueError('physical batch clock differs from the current F06 state')
         admitted = prepare_physical_command_batch(self.execution.compiled, resolved.input_batch,
             expected_context=context, assessment=self.assessment(self.binding), state=view,
-            joint_build_receipt=self.joints(self.binding), buffer_policy=self.policy(self.binding) if any(
-                item.contribution.persistence == 'hold_reapply' for item in resolved.input_batch.joint_efforts) else None)
-        if admitted != resolved or resolved.body_wrenches or resolved.extensions:
-            raise ValueError('physical batch differs from the admitted F06 effort-only route')
+            joint_build_receipt=self.joints(self.binding),
+            body_build_receipt=self.bodies(self.binding) if resolved.input_batch.body_wrenches else None,
+            buffer_policy=self.policy(self.binding) if any(item.contribution.persistence == 'hold_reapply'
+                for item in (*resolved.input_batch.joint_efforts, *resolved.input_batch.body_wrenches)) else None)
+        if admitted != resolved or resolved.extensions:
+            raise ValueError('physical batch differs from the admitted F06 route')
         values = {item.joint_id: float(item.value) for item in resolved.joints}
         if set(values) != {c.joint_id for c in self.binding.channels}:
             raise ValueError('F06 direct effort requires the complete named channel set')
@@ -173,17 +192,53 @@ class IsaacF06PhysicalPort:
         native = {f'joint{i}': values[f'joint{i}'] for i in range(1, 8)}
         native['finger_joint1'] = values['finger_joint1'] + values['finger_joint2']
         s._native_io.write_physical_effort(native)
+        self.pending_wrenches = resolved.input_batch.body_wrenches
+        if self.pending_wrenches:
+            self.reapply_body_wrenches(view=view)
         self.pending = context.identity_hash
         self.consumed.add(context.identity_hash)
         return PhysicalControlReceiptV1('physical-control-receipt-v1', context,
             resolved.input_batch.identity_hash, 'native_write_ack', resolved.accepted_receipt.contribution_ids,
             'isaac-f06-articulation-effort', 'generalized-force')
 
+    def reapply_body_wrenches(self, *, view=None):
+        if not self.pending_wrenches:
+            return
+        s = self.session
+        if view is None:
+            from .native_io import NativeRuntimeReadbackV1
+            readback = s._native_io.read_state()
+            expected = s._native_step_count * s._artifact.timebase.physics_dt
+            if (type(readback) is not NativeRuntimeReadbackV1
+                    or abs(readback.simulation_time_s - expected) > 1e-12
+                    or set(readback.frame_pose_world) != set(self.execution.frame_bindings)):
+                raise ValueError('Isaac substep frame readback differs from its source or native clock')
+            poses = {reference: readback.frame_pose_world[name]
+                     for name, reference in self.execution.frame_bindings.items()}
+        else:
+            poses = {entry.frame: entry.pose_world for entry in view.frames}
+        bodies = {(body.entity_id, body.body_id): body for body in self.binding.bodies}
+        totals = {}
+        for item in self.pending_wrenches:
+            key = (item.entity_id, item.body_id)
+            origin, force, torque = resolve_body_wrench_at_poses(item, bodies[key].body_frame, poses)
+            if key not in totals:
+                totals[key] = [origin, [0., 0., 0.], [0., 0., 0.]]
+            for index in range(3):
+                totals[key][1][index] += force[index]
+                totals[key][2][index] += torque[index]
+        s._native_io.apply_physical_body_wrenches(totals)
+
     def finish_interval(self):
         try:
-            self.session._native_io.clear_physical_effort()
+            try:
+                if self.pending_wrenches:
+                    self.session._native_io.clear_physical_body_wrenches()
+            finally:
+                self.session._native_io.clear_physical_effort()
         finally:
             self.pending = None
+            self.pending_wrenches = ()
 
 
 class IsaacSimpleEffortPhysicalPort:

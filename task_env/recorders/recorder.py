@@ -323,14 +323,19 @@ def begin_structured_recording(path, *, horizon, observation, reset_info, metada
 def begin_selected_recording(env, path, *, adapter_path):
     """Choose the existing writer and prepare its metadata for one reset boundary."""
     if env.value.get('physical_execution') is not None or getattr(env, '_physical_reset_selection', None) is not None:
-        from .physical_metadata import physical_action_group, physical_boundary_info, physical_record_metadata
+        from .physical_metadata import (physical_action_group, named_effort_action_groups,
+                                        physical_boundary_info, physical_record_metadata)
         execution = env._physical_execution()
         if getattr(env, '_physical_reset_selection', None) is None:
-            if (len(execution.controllers) != 1
-                    or not all(key in env.binding.action_schema
-                               for key in ('schema_id', 'mode', 'components'))):
+            if len(execution.controllers) != 1:
                 raise ValueError('physical recording requires one declared controller and action group')
-            physical_action_group(execution)
+            if (env.binding.action_schema is None
+                    or env.binding.action_schema.get('schema_version') == 'physical-control-actions-v1'):
+                named_effort_action_groups(execution)
+            elif all(key in env.binding.action_schema for key in ('schema_id', 'mode', 'components')):
+                physical_action_group(execution)
+            else:
+                raise ValueError('physical recording requires one declared controller and action group')
         return begin_structured_recording(
             path, horizon=env.horizon, observation=env.obs,
             reset_info=physical_boundary_info(env, env.info),

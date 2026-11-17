@@ -12,6 +12,7 @@ _F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
 _F06_ASSET_OBJECT_MANIFEST_SHA256_V1 = '40b0dd2226d49e22d8d4ad03de5440ea454bbb7d4b4e2eabea3abbe732565d3e'
 _F06_ASSET_OBJECT_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-asset-object-v1'
 _F06_TASK_POLICY_SHA256_V1 = '153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb'
+_F06_HAND_TASK_POLICY_SHA256_V1 = '4d8090cc834fe0c64a2e31b07371367ee7f3b5f942d98fdccd65ecbebcbc7720'
 
 
 def f06_delivery_identity():
@@ -109,6 +110,8 @@ def f06_construction_facts(runtime_input, declared_sources, *, task_path, physic
     # F06's frozen configuration identity predates this disabled option.
     if resolved_config is not None and not getattr(resolved_config, 'gravity_compensation', False):
         config.pop('gravity_compensation', None)
+    if resolved_config is not None and config.get('scene_body_producers_json') == '[]':
+        config.pop('scene_body_producers_json', None)
     config_sha = hashlib.sha256(json.dumps(
         config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     return {
@@ -129,7 +132,8 @@ def _validate_usd_task_policy(input_v1, expected_sha256):
     if type(policy) is not dict:
         raise ValueError('USD task admission policy is missing or malformed')
     try:
-        valid_identity = digest(policy) == expected_sha256
+        valid_identity = digest(policy) in ((expected_sha256,) if isinstance(expected_sha256, str)
+                                             else expected_sha256)
     except (TypeError, ValueError):
         valid_identity = False
     if not valid_identity:
@@ -161,7 +165,8 @@ def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) ->
         raise ValueError('unsupported PickCube Isaac RuntimeInput schema')
     delivery = input_v1.runtime_source.scene_source.loaded_delivery
     _validate_f06_isaac_delivery(delivery, input_v1.delivery_manifest_sha256)
-    _validate_usd_task_policy(input_v1, _F06_TASK_POLICY_SHA256_V1)
+    _validate_usd_task_policy(input_v1, (_F06_TASK_POLICY_SHA256_V1,
+                                         _F06_HAND_TASK_POLICY_SHA256_V1))
     if (input_v1.execution.physics_provider, input_v1.execution.physics_backend,
             input_v1.execution.physics_profile, input_v1.execution.physics_device,
             input_v1.execution.provider_seed, input_v1.execution.determinism_mode) != (
@@ -277,7 +282,7 @@ def prepare_f06_task_delivery(delivery_manifest, *, seed, horizon, physical_driv
 
 def compile_f06_task_input(*, delivery_manifest, task_config, legacy_artifact, robot,
                            build_task_scene, compile_task_artifact, task_scene_recipe_sha256,
-                           seed, horizon, physical_drive):
+                           seed, horizon, physical_drive, scene_body_producers=()):
     """Admit the delivery and lower Task/Robot declarations to the exact USD input."""
     from dataclasses import replace
     from ...artifacts import FrameReference
@@ -288,9 +293,15 @@ def compile_f06_task_input(*, delivery_manifest, task_config, legacy_artifact, r
     if variant is not None:
         legacy_artifact = replace(legacy_artifact, artifact_id=variant)
     scene = build_f06_task_scene(task_config, robot=robot, build_task_scene=build_task_scene)
+    hand = robot.reference_frame_parents()['ee'][0]
+    body_key = (robot.uid, hand)
+    requested = any(body_key in producer.body_keys for producer in scene_body_producers)
+    robot_bodies = {f'{robot.uid}/{hand}': hand} if requested else {}
     task_source, artifact = compile_task_artifact(task_config, scene, legacy_artifact,
         frame_bindings={'panda-v1/base': FrameReference('panda-v1', 'link0'),
-                        'panda-v1/ee': FrameReference('panda-v1', 'ee')}, cube_frame='cube')
+                        'panda-v1/ee': FrameReference('panda-v1', 'ee')}, cube_frame='cube',
+        additional_frames={name: FrameReference(robot.uid, frame)
+                           for name, frame in robot_bodies.items()})
     options = {'f06_goal': 'PickCube-Harness-three-backend-example',
                'lowering': 'pickcube-desktop-physx-native-mimic-v1',
                'delivery_manifest_sha256': loaded.manifest_bytes_sha256,
@@ -303,7 +314,7 @@ def compile_f06_task_input(*, delivery_manifest, task_config, legacy_artifact, r
         robot_frames={'panda-v1/ee': robot.reference_frame_parents()['ee']},
         world_bodies={'cube-v1': 'cube_v1'},
         world_frames={'tabletop-v1/top': 'tabletop_v1/top'},
-        free_body_semantics=('cube-v1',))
+        free_body_semantics=('cube-v1',), robot_bodies=robot_bodies)
     result = compile_usd_task_runtime_input(
         loaded=loaded, task_source=task_source, artifact=artifact, scene=scene,
         options=options, joints=joints, bodies=bodies, frames=frames, free_joints=free_joints,

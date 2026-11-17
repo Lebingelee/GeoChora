@@ -375,13 +375,15 @@ class HomogeneousVectorTaskEnv:
             self.render()
         return result.observation, result.infos
 
-    def step(self, actions: Any):
+    def step(self, actions: Any, *, scene_body_wrenches=()):
         if self._execution_mode == 'device':
             if self._scalar_device:
                 actions = _scalar_device_tree(actions, add_batch_axis=True)
-                result = self._step_device_with_autoreset(actions)
+                result = self._step_device_with_autoreset(actions, scene_body_wrenches=scene_body_wrenches)
                 return _scalar_device_tree(result, add_batch_axis=False)
-            return self._step_device_with_autoreset(actions)
+            return self._step_device_with_autoreset(actions, scene_body_wrenches=scene_body_wrenches)
+        if scene_body_wrenches:
+            raise ValueError('scene body wrenches require the device batch route')
         if not self._has_reset:
             raise RuntimeError("reset() must be called before vector step()")
         if np.any(self._terminal):
@@ -410,11 +412,12 @@ class HomogeneousVectorTaskEnv:
             tree_copy(result.infos),
         )
 
-    def _step_device_with_autoreset(self, actions):
+    def _step_device_with_autoreset(self, actions, *, scene_body_wrenches=()):
         self._require_device_operational()
         if not self._has_reset:
             raise RuntimeError('reset() must be called before vector step()')
-        transition = self._task_spec.step_device(actions)
+        transition = (self._task_spec.step_device(actions, scene_body_wrenches=scene_body_wrenches)
+                      if scene_body_wrenches else self._task_spec.step_device(actions))
         try:
             return self._finish_device_autoreset(transition)
         except BaseException as error:

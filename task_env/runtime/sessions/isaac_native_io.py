@@ -868,6 +868,9 @@ class IsaacSimNativeRuntimeIOV1:
         self._physics_scene = None
         self._articulation = None
         self._body_views: dict[str, Any] = {}
+        self._physical_body_views = {}
+        self._physical_body_pending = None
+        self._physical_body_fault = False
         self._frame_views: dict[str, Any] = {}
         self._frame_local_poses: dict[str, PoseWorld] = {}
         self._frame_pose_readback_receipts: dict[str, dict[str, object]] = {}
@@ -2401,6 +2404,66 @@ class IsaacSimNativeRuntimeIOV1:
         if self._counter() != before:
             raise RuntimeError('F06 gain readback advanced physics')
         return result
+
+    def bind_physical_body_wrenches(self, bodies):
+        """Bind exact source body names to live public rigid-body tensor views."""
+        if self._physical_body_views:
+            raise ValueError('physical body views are already bound')
+        entry_prim = self._source.scene_source.loaded_delivery.delivery.entry_prim
+        result = []
+        for body in bodies:
+            key = (body.entity_id, body.body_id)
+            path = _native_prim_path(body.native_body, entry_prim)
+            view = self._body_views.get(path)
+            if (key in self._physical_body_views or view is None or len(view) != 1
+                    or not view.is_physics_tensor_entity_valid()
+                    or not callable(getattr(view, 'apply_forces_and_torques_at_pos', None))):
+                raise ValueError('physical body requires one live source-bound public rigid body view')
+            self._physical_body_views[key] = view
+            result.append({'entity_id': key[0], 'body_id': key[1], 'native_path': path,
+                           'api': 'RigidPrim.apply_forces_and_torques_at_pos',
+                           'is_articulation_link': path.startswith(self._articulation_path.rstrip('/') + '/')})
+        return {'schema_version': 'isaac-public-body-wrench-build-v1', 'bodies': result}
+
+    def apply_physical_body_wrenches(self, values):
+        """Apply one world-space force and total moment at each body origin."""
+        if self._closed or self._episode_origin_step is None or self._physical_body_fault:
+            raise RuntimeError('physical body wrench requires a healthy reset interval')
+        if not isinstance(values, dict) or not values or set(values) - set(self._physical_body_views):
+            raise ValueError('physical body wrench targets differ from the source binding')
+        checked = {}
+        for key, row in values.items():
+            if len(row) != 3 or any(len(part) != 3 for part in row):
+                raise ValueError('physical body wrench requires origin, force and torque vectors')
+            vectors = tuple(tuple(float(value) for value in part) for part in row)
+            if not all(math.isfinite(value) for part in vectors for value in part):
+                raise ValueError('physical body wrench vectors must be finite')
+            checked[key] = vectors
+        self._physical_body_pending = checked
+        try:
+            for key, (origin, force, torque) in checked.items():
+                self._physical_body_views[key].apply_forces_and_torques_at_pos(
+                    forces=[force], torques=[torque], positions=[origin], local_frame=False)
+            self._sync()
+        except BaseException:
+            self._physical_body_fault = True
+            raise
+
+    def clear_physical_body_wrenches(self):
+        """Clear only the bodies owned by the current physical interval."""
+        pending = self._physical_body_pending
+        if pending is None:
+            return
+        try:
+            for key, (origin, _force, _torque) in pending.items():
+                self._physical_body_views[key].apply_forces_and_torques_at_pos(
+                    forces=[[0., 0., 0.]], torques=[[0., 0., 0.]], positions=[origin], local_frame=False)
+            self._sync()
+        except BaseException:
+            self._physical_body_fault = True
+            raise
+        finally:
+            self._physical_body_pending = None
 
     def write_physical_effort(self, values):
         """Apply one F06 source-bound effort interval through the public API."""

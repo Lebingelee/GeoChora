@@ -368,7 +368,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                            interval_provider=None,
                            cube_force_z_N=None, robot_uid="panda-v1", robot=None,
                            physical_kind=None, physical_drive=None, physical_profile_id=None, reset_switch=False,
-                           space_policy='dynamic'):
+                           space_policy='dynamic', scene_body_producers=()):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     physical = physical_kind is not None
@@ -427,7 +427,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
         scene_compiler=partial(compile_panda_box_mjcf_task,
             build_task_scene=build_pickcube_scene, compile_task_artifact=compile_pickcube_task_artifact),
-        force_limit_N=10.0, velocity_limit=velocity_limit, tcp_profile=tcp_profile)
+        force_limit_N=10.0, velocity_limit=velocity_limit, tcp_profile=tcp_profile,
+        scene_body_producers=scene_body_producers)
 
     def build(request):
         allowed = ({selected_provider} if selected_provider is not None else {'mujoco', 'geophys'})
@@ -495,6 +496,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     uid = REFERENCE_ENV_ID
 
     uses_selected_public_config = True
+    selected_scene_body_producers = True
     panda_effort_profiles = PandaAgent.effort_controller_profiles()
     selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES) | frozenset(panda_effort_profiles)
     selected_controller_parameters = frozenset(('reset_selection', 'action_space_policy'))
@@ -555,6 +557,12 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @classmethod
     def selected_binding(cls, config, *, robot=None):
         profile = config.controller_profile
+        from ...runtime.sessions.physical_control import SceneBodyProducerV1
+        producers = tuple(SceneBodyProducerV1(row['writer_id'], row['producer_kind'],
+            tuple(tuple(key) for key in row['body_keys']))
+            for row in json.loads(config.scene_body_producers_json))
+        if producers and profile not in cls.panda_effort_profiles:
+            raise ValueError('scene body producers require a selected physical Controller')
         if profile in cls.panda_effort_profiles:
             from ...controllers.canonical.r3_effort import resolve_panda_effort_options
             kind, drive, switch, policy = resolve_panda_effort_options(
@@ -564,7 +572,8 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                 lift_height_m=dict(config.task_parameters).get('lift_height_m'),
                 cube_force_z_N=dict(config.task_parameters).get('cube_force_z_N'), robot=robot,
                 interval_provider=config.physics_provider, physical_kind=kind, physical_drive=drive,
-                physical_profile_id=profile, reset_switch=switch, space_policy=policy)
+                physical_profile_id=profile, reset_switch=switch, space_policy=policy,
+                scene_body_producers=producers)
         cube_force_z_N = dict(getattr(config, 'task_parameters', ())).get('cube_force_z_N')
         if cube_force_z_N is not None and (config.physics_provider != 'mujoco'
                 or config.environment.runtime.backend != 'cpu' or profile != 'r1'):

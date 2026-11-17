@@ -41,6 +41,38 @@ class DeviceJointEffortCommand:
             raise ValueError('device effort episode identity and clock require shape (B,)')
 
 
+@dataclass(frozen=True)
+class DeviceBodyWrenchCommand:
+    """One scene-writer world-space COM wrench per device row and interval."""
+    boundary: object
+    binding_sha256: str
+    writer_id: str
+    physical_effect_id: str
+    body_key: tuple[str, str]
+    composition: str
+    values: object
+    episode_ids: object
+    episode_steps: object
+
+    def __post_init__(self):
+        from ...runtime.contracts import DeviceStateIdentity
+        if not isinstance(self.boundary, DeviceStateIdentity):
+            raise TypeError('device body wrench requires a typed state boundary')
+        _sha(self.binding_sha256, 'binding')
+        _name(self.writer_id)
+        _name(self.physical_effect_id)
+        if type(self.body_key) is not tuple or len(self.body_key) != 2:
+            raise TypeError('device body wrench requires an entity/body key')
+        for name in self.body_key:
+            _name(name)
+        _choice(self.composition, {'exclusive', 'sum'}, 'composition')
+        if len(tuple(self.values.shape)) != 2 or self.values.shape[1] != 6:
+            raise ValueError('device body wrench requires (B, 6) world COM values')
+        if (tuple(self.episode_ids.shape) != (self.values.shape[0],)
+                or tuple(self.episode_steps.shape) != (self.values.shape[0],)):
+            raise ValueError('device body wrench requires row episode identity and clock')
+
+
 def _sha(value, label):
     if not _SHA256.fullmatch(value):
         raise ValueError(f'{label} must be lowercase SHA-256')
@@ -422,8 +454,16 @@ class PhysicalBodyBindingV1(Contract):
 
     def validate(self):
         _choice(self.schema_version, {'physical-body-binding-v1'}, 'body binding schema')
-        for value in (self.entity_id, self.body_id, self.native_body):
+        for value in (self.entity_id, self.body_id):
             _name(value)
+        if type(self.native_body) is not str:
+            raise TypeError('native body must be a name or absolute USD prim path')
+        if self.native_body.startswith('/'):
+            import re
+            if not re.fullmatch(r'/(?:[A-Za-z_][A-Za-z0-9_]*)(?:/[A-Za-z_][A-Za-z0-9_]*)*', self.native_body):
+                raise ValueError('native body must be an absolute USD prim path')
+        else:
+            _name(self.native_body)
         if not self.owner_ids or len(self.owner_ids) != len(set(self.owner_ids)):
             raise ValueError('body owners must be nonempty and unique')
         for value in self.owner_ids:

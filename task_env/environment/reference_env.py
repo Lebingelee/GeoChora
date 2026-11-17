@@ -1684,6 +1684,33 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from ..runtime.sessions.physical_sequence import describe_physical_sequence_capability
         return describe_physical_sequence_capability(self, profile)
 
+    def physical_scene_context(self):
+        """Return the current scalar load context and source-bound body declarations.
+
+        The returned context belongs to this boundary only; callers construct
+        their typed contributions with it and submit them through ``step``.
+        """
+        self._require_execution_healthy()
+        if self.session is None or self._stopped:
+            raise RuntimeError('reset required before querying a physical scene context')
+        from ..runtime.sessions.physical_control import PhysicalControlExecutionV1
+        from ..controllers.canonical.physical_commands import PhysicalCommandContextV1
+        profile = self._physical_execution()
+        if type(profile) is not PhysicalControlExecutionV1 or not profile.scene_body_producers:
+            raise StageUnavailableError('this route has no declared scene body producer')
+        plan = profile.compiled.binding
+        publication = self.session.snapshot_v2(scene=profile.scene,
+            joint_bindings=profile.joint_bindings, frame_bindings=profile.frame_bindings,
+            requirements=profile.requirements)
+        view = publication.view
+        if (not publication.lifetime.may_be_retained
+                or view.boundary != self.session.state_boundary_identity()):
+            raise ValueError('physical scene context requires a current owned state')
+        context = PhysicalCommandContextV1('physical-command-context-v1', plan.source_id,
+            plan.source_closure_sha256, plan.artifact_sha256, view.boundary, view.sample_clock,
+            0, profile.generation, self.artifact.timebase.control_dt, self.artifact.timebase.control_dt)
+        return context, plan.bodies
+
     def bind_physical_action(self, values):
         """Bind scalar action values to the current physical spec and generation."""
         selection = getattr(self, '_physical_reset_selection', None)
@@ -2805,7 +2832,24 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if external is not None:
                 external.finish()
 
-    def step(self, action, *, external_com_wrenches=None):
+    @contextmanager
+    def _scene_body_wrench_scope(self, requests):
+        if requests is None:
+            yield
+            return
+        if type(requests) is not tuple:
+            raise TypeError('scene body wrenches must be an immutable tuple')
+        if self._physical_execution() is None:
+            raise StageUnavailableError('scene body wrenches require a selected physical execution')
+        if getattr(self, '_scene_body_wrenches', None) is not None:
+            raise RuntimeError('scene body wrench interval is already active')
+        self._scene_body_wrenches = requests
+        try:
+            yield
+        finally:
+            self._scene_body_wrenches = None
+
+    def step(self, action, *, external_com_wrenches=None, scene_body_wrenches=None):
         """Advance one interval, optionally with caller COM wrenches on MuJoCo CPU.
 
         Wrenches are an immutable tuple of ``ExternalComWrenchV1`` or
@@ -2817,7 +2861,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         before a force is staged. Ordinary ``step(action)`` is unchanged.
         """
         self._require_execution_healthy()
-        with self._selected_com_wrench_scope(external_com_wrenches):
+        if external_com_wrenches is not None and scene_body_wrenches is not None:
+            raise ValueError('COM and physical scene body loads cannot share this interval')
+        with self._scene_body_wrench_scope(scene_body_wrenches), self._selected_com_wrench_scope(external_com_wrenches):
             component_lifecycle = None
             if self._has_component_assembly():
                 self._episode_execution_state().require_open("environment is closed")
@@ -2955,6 +3001,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         # fault if preparation fails from this point onward.
         self._physical_controller_preparation_started = True
         batch = profile.controller_batch(action, view, context)
+        scene_wrenches = getattr(self, '_scene_body_wrenches', None)
+        if scene_wrenches is not None:
+            batch = profile.compose_scene_body_wrenches(batch, scene_wrenches)
         submitted = PhysicalControlReceiptV1('physical-control-receipt-v1', context,
             batch.identity_hash, 'submitted', tuple(item.contribution.contribution_id
             for item in (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)),

@@ -71,13 +71,19 @@ def materialize_selected_session(artifact, execution, *, value, binding, selecte
 
 def physical_execution_facts(execution):
     """Immutable build-boundary values; no Controller/SDK objects cross IPC."""
-    return dict(binding=execution.compiled.binding.to_mapping(),
+    facts = dict(binding=execution.compiled.binding.to_mapping(),
         controller_versions=execution.controller_versions(), generation=execution.generation,
         joint_bindings={key: value.to_mapping() for key, value in execution.joint_bindings.items()},
         frame_bindings={key: value.to_mapping() for key, value in execution.frame_bindings.items()},
         requirements=execution.requirements.to_mapping(),
         subjects=tuple(subject.identity_hash for subject in execution.subjects),
         selection_profile_id=execution.selection_profile_id)
+    if execution.scene_body_producers:
+        from dataclasses import asdict
+        facts['scene_body_producers'] = tuple(asdict(item) for item in execution.scene_body_producers)
+    if execution.scene_action_resources:
+        facts['scene_action_resources'] = execution.scene_action_resources
+    return facts
 
 
 @dataclass(frozen=True)

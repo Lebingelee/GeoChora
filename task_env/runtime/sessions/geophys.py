@@ -421,6 +421,9 @@ class _GeoPhysSession(_SessionValues):
     def physical_joint_build_receipt(self, binding):
         return self._physical_port.joints(binding)
 
+    def physical_body_build_receipt(self, binding):
+        return self._physical_port.bodies(binding)
+
     def physical_buffer_policy(self, binding):
         return self._physical_port.policy(binding)
 
@@ -1471,8 +1474,15 @@ class _GeoPhysSession(_SessionValues):
                 raise RuntimeError('physical interval requires exactly one fresh batch')
             try:
                 count = int(self._artifact.timebase.control_substeps)
-                self._boundary.step(substeps=count)
-                self._native_steps += count
+                if physical_port.pending_wrenches:
+                    for index in range(count):
+                        if index:
+                            physical_port.reapply_body_wrenches()
+                        self._boundary.step(substeps=1)
+                        self._native_steps += 1
+                else:
+                    self._boundary.step(substeps=count)
+                    self._native_steps += count
                 self._control_step += 1
                 self._state_revision += 1
                 return self.snapshot()

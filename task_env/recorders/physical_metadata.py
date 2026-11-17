@@ -15,6 +15,35 @@ def physical_action_group(execution):
     return groups[0]
 
 
+def named_effort_action_groups(execution):
+    """Project each named linear-effort input to its real Scene control group."""
+    if len(execution.controllers) != 1:
+        raise ValueError('named effort recording requires one Controller')
+    controller = execution.controllers[0]
+    profile = controller.profile
+    channels = execution.compiled.binding.channels
+    if len(profile.action_to_effort) != len(channels):
+        raise ValueError('effort projection differs from the bound channels')
+    groups = execution.scene.control_groups or ()
+    channel_resources = (execution.scene_action_resources or tuple(
+        (channel.entity_id, channel.native_actuator) for channel in channels))
+    result, used = [], set()
+    for group in groups:
+        resources = {(ref.entity_id, ref.actuator_id) for ref in group.actuator_refs}
+        rows = [i for i, resource in enumerate(channel_resources) if resource in resources]
+        if not rows:
+            continue
+        columns = tuple(j for j in range(len(profile.action_names))
+                        if any(profile.action_to_effort[i][j] != 0 for i in rows))
+        if not columns or used.intersection(columns):
+            raise ValueError('effort actions cannot be projected uniquely to Scene groups')
+        used.update(columns)
+        result.append((group.entity_id, group.group_id, columns))
+    if used != set(range(len(profile.action_names))):
+        raise ValueError('Scene groups do not cover all effort action components')
+    return tuple(result)
+
+
 def physical_record_metadata(env):
     """Describe the committed physical Controller and its source-bound state."""
     from ..observations.selected_reference import selected_reference_observation_schema
@@ -23,10 +52,15 @@ def physical_record_metadata(env):
     selection_owner = getattr(env, '_physical_reset_selection', None)
     execution = env._physical_execution()
     spec = env.physical_action_spec() if selection_owner is not None else None
-    kind = spec['kind'] if spec is not None else env.binding.action_schema['mode']
+    named_effort = spec is None and (env.binding.action_schema is None
+        or env.binding.action_schema.get('schema_version') == 'physical-control-actions-v1')
+    kind = spec['kind'] if spec is not None else ('direct_effort' if named_effort else env.binding.action_schema['mode'])
     components = ((('x', 'y', 'z', 'qw', 'qx', 'qy', 'qz', 'gripper') if kind == 'r3-pose'
                    else tuple(f'joint{i}' for i in range(1, 8)) + ('opening',))
-                  if spec is not None else tuple(env.binding.action_schema['components']))
+                  if spec is not None else tuple(execution.controllers[0].profile.action_names)
+                  if named_effort else tuple(env.binding.action_schema['components']))
+    action_schema = ({'schema_id': 'physical-named-effort-v1', 'schema_version': 1}
+                     if named_effort else env.binding.action_schema)
     schema = selected_reference_observation_schema(env, env.obs,
         base_schema=getattr(env.binding, 'task_observation_schema', None))
     leaf_specs = [dict(path=item.name, shape=item.shape, dtype=item.dtype,
@@ -35,6 +69,8 @@ def physical_record_metadata(env):
     source = env.value['source']
     reset_plan = env.value['reset_plan']
     artifact = env.artifact
+    build_identity = (env.session.build_layout_facts['native_runtime_metadata']['provider_build_identity']
+                      if env.provider == 'isaacsim' else provider_build_identity(env.provider))
     env_metadata = {
         'env_name': 'SelectedReferenceEnv.PhysicalControlV1',
         'task_name': artifact.task_id, 'task_version': artifact.artifact_version,
@@ -44,9 +80,9 @@ def physical_record_metadata(env):
         'control_substeps': artifact.timebase.control_substeps,
         'control_frequency': 1.0 / artifact.timebase.control_dt,
         'action_schema': {'schema_id': ('physical-' + spec['spec_id'] if spec is not None
-                                         else env.binding.action_schema['schema_id']),
+                                         else action_schema['schema_id']),
                           'schema_version': ('physical-reset-action-spec-v1' if spec is not None
-                                             else env.binding.action_schema['schema_version']),
+                                             else action_schema['schema_version']),
                           'controller_kind': kind, 'components': components},
         'observation_schema': {'leaf_specs': leaf_specs},
         'reference_profile': {
@@ -59,13 +95,18 @@ def physical_record_metadata(env):
             'reset_plan_identity_hash': reset_plan.identity_hash,
             'reset_sample_id': reset_plan.reset_sample.sample_id,
             'provider': env.provider, 'backend': env.backend,
-            'provider_build_identity': provider_build_identity(env.provider),
+            'provider_build_identity': build_identity,
             'controller_identity': execution.controllers[0].identity if len(execution.controllers) == 1 else None,
             'solution_identity': env.value.get('solution_identity'),
             'physical_binding_sha256': execution.compiled.binding.identity_hash,
             'feedback': 'independent force measurement unavailable',
         },
     }
+    if execution.scene_body_producers:
+        env_metadata['reference_profile']['scene_body_producers'] = [
+            {'writer_id': item.writer_id, 'producer_kind': item.producer_kind,
+             'body_keys': [list(key) for key in item.body_keys]}
+            for item in execution.scene_body_producers]
     result = {
         'env_metadata': env_metadata,
         'universal_action_schema': {'version': 'physical-reset-action-v1',
@@ -117,6 +158,18 @@ def record_physical_transition(env, action, batch, resolved, ack, *, terminated,
                       else tuple(f'joint{i}' for i in range(1, 8)) + ('opening',))
         schema_id = 'physical-' + spec['spec_id']
         projections = (('arm', components[:7], values[:7]), ('gripper', components[7:], values[7:]))
+    elif (env.binding.action_schema is None
+          or env.binding.action_schema.get('schema_version') == 'physical-control-actions-v1'):
+        components = tuple(execution.controllers[0].profile.action_names)
+        if len(values) != len(components):
+            raise ValueError('physical action does not match the declared named effort components')
+        schema_id = 'physical-named-effort-v1'
+        projections = tuple((group, tuple(components[i] for i in indices),
+                             tuple(values[i] for i in indices))
+                            for group_entity, group, indices in named_effort_action_groups(execution)
+                            if group_entity == entity)
+        if sum(len(names) for _, names, _ in projections) != len(components):
+            raise ValueError('named effort group entity differs from the action entity')
     else:
         components = tuple(env.binding.action_schema['components'])
         if len(values) != len(components):
@@ -130,10 +183,28 @@ def record_physical_transition(env, action, batch, resolved, ack, *, terminated,
                    for group, _names, part in projections)
     request = StructuredActionRequestV1('structured-action-request-v1', batch.context.boundary.scene_identity_hash,
                                         execution.compiled.binding.identity_hash, groups)
-    payload = batch.to_mapping()
+    from dataclasses import replace
+    controller_writer = execution.controllers[0].writer_id
+    controller_batch = replace(batch,
+        joint_efforts=tuple(x for x in batch.joint_efforts if x.contribution.owner_id == controller_writer),
+        body_wrenches=tuple(x for x in batch.body_wrenches if x.contribution.owner_id == controller_writer),
+        extensions=tuple(x for x in batch.extensions if x.contribution.owner_id == controller_writer))
+    controller_batch.validate()
+    payload = controller_batch.to_mapping()
     target_hash = digest(payload)
-    if target_hash != batch.identity_hash or ack.batch_sha256 != target_hash:
+    if target_hash != controller_batch.identity_hash or ack.batch_sha256 != batch.identity_hash:
         raise ValueError('physical record batch and acknowledgement identities differ')
+    applied_payload = {'native_write_ack': ack.to_mapping(),
+                       'accepted': resolved.accepted_receipt.to_mapping(),
+                       'admitted_joint_efforts': [asdict(item) for item in resolved.joints],
+                       'independent_measurement': 'unavailable'}
+    if execution.scene_body_producers:
+        applied_payload['scene_physical_batch_v1'] = {
+            'batch': batch.to_mapping(), 'batch_sha256': batch.identity_hash,
+            'binding_sha256': resolved.binding_sha256,
+            'admitted_body_wrenches': [asdict(item) for item in resolved.body_wrenches],
+            'scene_submission': env.session._last_scene_control_submission,
+        }
     control = StructuredControlTransitionV1('structured-control-transition-v1', request, ({
         'writer_id': execution.controllers[0].writer_id,
         'action_schema_id': schema_id, 'components': components,
@@ -144,10 +215,7 @@ def record_physical_transition(env, action, batch, resolved, ack, *, terminated,
                              'meaning': 'requested input; internal target interpretation unavailable'},
         'controller_target': {'schema_version': batch.schema_version, 'payload': payload, 'identity_hash': target_hash},
         'applied_control': {'schema_version': ack.schema_version,
-                            'payload': {'native_write_ack': ack.to_mapping(),
-                                        'accepted': resolved.accepted_receipt.to_mapping(),
-                                        'admitted_joint_efforts': [asdict(item) for item in resolved.joints],
-                                        'independent_measurement': 'unavailable'}, 'target_hash': target_hash},
+                            'payload': applied_payload, 'target_hash': target_hash},
     },))
     control.validate()
     info = physical_boundary_info(env, env.info)

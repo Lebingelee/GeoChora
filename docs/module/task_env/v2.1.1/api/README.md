@@ -54,7 +54,7 @@ finally:
 - 原有G05提交owner继续检查资源、时钟和重复提交；RemoteSession仅在worker实际绑定确认后发布本地执行声明供它消费。现有typed状态、reset、相机、ACK、fault和close继续复用，通信不确定时不自动重发。
 - 模型能力目前限**MuJoCo CPU既有source dynamics的mass_matrix／bias、纯查询、physics_steps=0**。worker持有原scratch model，主进程的受约束值代理只传joint state／boundary与数值结果；外来episode拒绝，重建后旧代理不可再调用旧worker。它不是任意SDK远程调用，不扩大GeoPhys／Isaac的source-model能力，也不证明任意Robot的模型实现。
 - MuJoCo CPU physical reset选择已测`joint → 参数化r3-pose → joint`；kind／参数／generation的声明编码和恢复属于Controller reset capability。旧动作失效，worker按最终选择建立端口，主进程基于实际初态初始化。未新增运行中热切换。
-- 新Controller若使用上述已有端口和模型能力，只需在Robot／Controller与共同绑定流程声明／匹配；不新增worker profile分派或provider构造分支。BodyWrench、physical sequence和任意扩展载荷尚未接入本次scalar物理IPC，不因方法名存在获得准入。
+- 新Controller若使用上述已有端口和模型能力，只需在Robot／Controller与共同绑定流程声明／匹配；不新增worker profile分派或provider构造分支。scalar worker现可在GeoPhys具名显式FREE及Isaac F06声明body/link交集传输typed BodyWrench；physical sequence、任意扩展载荷和其他未验证组合仍不得由方法名推断准入。
 - 这条scalar路径显式传输CPU值，并有逐次RPC成本；没有将它描述成CUDA训练热路径或零复制。G06 device batch合同不变。
 
 普通GeoPhys Pendulum已可直接使用默认worker：
@@ -81,6 +81,12 @@ G06b 已通过普通设备入口接通三后端的 Pendulum 与 PickCube native 
 GeoPhys 标量和设备批量入口的碰撞模式可在既有 `execution.geophys_contact_mode` 中设为 `provider_default`、`discrete` 或 `continuous`；缺省保持 provider 原有行为。显式 `discrete` 只选择关闭时间连续 CCD，显式值进入运行身份并报告解析结果；未支持的组合会拒绝，不会自动回退。设备批量的当前源 mesh 与约束组合尚未支持连续模式，离散模式与连续模式不声明物理等价。GeoPhys 的 source implicitfast 仅对适配器实际验证的平滑动力学条件接受，不能据此推断通用积分器等价。
 
 已有 `runtime.body_contact_solver_iterations` 可为 GeoPhys 显式指定正整数接触迭代预算；省略或设为 `None` 保持原有的场景导出预算。设备批量的 resource summary 同时报告请求值、实际接触预算与耦合约束预算；标量记录的执行配置保留显式模式和预算以供重放。该选项不会按任务或资产自动选择，也不改变其他碰撞参数。G06b attempt002 中，使用同一冻结动作文件的三组 PickCube 输入，在显式离散模式、32 次迭代和所测 B=3/B=16 下逐子步读回的最大桌面穿透约 1.72 mm；64 次迭代的对应 B=3 最大值约 0.77 mm。上述结果只适用于各次测量的源、初态和动作，不构成通用接触保证，求解残差、速度成本和渲染停滞仍需独立主审。
+
+### 有界场景载荷
+
+`scene_body_producers` 在配置中声明 caller／Task writer 及其实际 source body；不声明的 writer 或 body 不可提交。scalar reset 后 `env.physical_scene_context()` 返回当前边界的 typed context 和已绑定 body；使用它构造 `BodyWrenchV1`，通过 `env.step(action, scene_body_wrenches=(wrench,))` 与实际 Controller 动作共同提交。context 只属于当前边界，不能在 step/reset 后重用。完整的有限示例见 [scene_body_wrench.py](../../../../../examples/tasks/scene_body_wrench.py)。记录中 Controller 动作与场景载荷分别归属，ACK 表示提交成功而非独立测力。
+
+当前证据限 MuJoCo CPU 的实际 Panda hand／自由体、GeoPhys CPU 的具名显式 FREE 自由体、Isaac 6.2 F06 isolated worker 的声明 hand/link 与 cube、以及 MJWarp CUDA B=1 的 world COM 载荷。MJWarp 使用 `DeviceBodyWrenchCommand`，每行需匹配当前 binding、device boundary、episode 与 step；设备记录保留载荷和完成回执。Isaac 的示例还需要已验证的 SDK Python、delivery 和依赖 overlay；这些不是自动安装入口。原 PickCube source 在 MuJoCo implicitfast 下的无接触 FREE 角运动对照出现数值失稳；对带角向 armature 的显式 FREE body，当前端口在写入前拒绝力矩或非body原点矩参考。单独零阻尼／零 armature 诊断 source 的通过不消除该限制。其他 tree、批量大小、点／Frame 与 provider 不由以上结果推断。
 
 普通设备批量示例见 [Pendulum](../../../../../examples/parallel/pendulum_device.py) 和 [PickCube](../../../../../examples/parallel/pick_cube_device.py)，默认关闭可选相机与窗口。传感器采集和窗口彼此独立；Recorder 是显式操作。MJWarp 可在 info 提供每行原生 world time；Isaac 提供共享模拟管理器时钟，GeoPhys 提供直接 solver step 计数，不能将后二者当作逐 world 原生时钟。
 

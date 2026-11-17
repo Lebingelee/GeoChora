@@ -32,6 +32,39 @@ def _values():
     return {f'joint{i}': float(i) for i in range(1, 8)} | {'finger_joint1': .4}
 
 
+def test_public_body_wrench_targets_only_bound_bodies_and_clears_owner():
+    from types import SimpleNamespace
+    from task_env.artifacts import FrameReference
+    from task_env.controllers.canonical.physical_commands import PhysicalBodyBindingV1
+    class View:
+        def __init__(self): self.calls = []
+        def __len__(self): return 1
+        def is_physics_tensor_entity_valid(self): return True
+        def apply_forces_and_torques_at_pos(self, **kwargs): self.calls.append(kwargs)
+    io = _io()
+    io._source = SimpleNamespace(scene_source=SimpleNamespace(loaded_delivery=SimpleNamespace(
+        delivery=SimpleNamespace(entry_prim='/World'))))
+    io._articulation_path = '/World/robot'
+    view = View()
+    io._body_views = {'/World/cube': view}
+    io._physical_body_views = {}
+    io._physical_body_pending = None
+    io._physical_body_fault = False
+    body = PhysicalBodyBindingV1('physical-body-binding-v1', 'cube-v1', 'cube',
+        FrameReference('cube-v1', 'cube'), '/World/cube', ('caller-a',))
+    facts = io.bind_physical_body_wrenches((body,))
+    assert facts['bodies'][0]['is_articulation_link'] is False
+    with pytest.raises(ValueError, match='targets'):
+        io.apply_physical_body_wrenches({('other', 'body'): ((0, 0, 0), (1, 0, 0), (0, 0, 0))})
+    assert not view.calls
+    io.apply_physical_body_wrenches({('cube-v1', 'cube'): ((.1, .2, .3), (1, 0, 0), (0, 0, 2))})
+    assert view.calls[-1]['positions'] == [(0.1, 0.2, 0.3)]
+    assert view.calls[-1]['local_frame'] is False
+    io.clear_physical_body_wrenches()
+    assert view.calls[-1]['forces'] == [[0., 0., 0.]]
+    assert io._physical_body_pending is None
+
+
 def test_f06_effort_owned_write_clear_and_duplicate_rejection():
     io = _io()
     io.write_physical_effort(_values())

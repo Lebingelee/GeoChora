@@ -37,6 +37,20 @@ def test_effort_boundary_replace_clear_and_reject_duplicate():
     assert len(value._physics.writes) == 4
 
 
+def test_only_owned_interval_can_be_refreshed():
+    value = boundary()
+    with pytest.raises(RuntimeError, match='not owned'):
+        value.replace_owned_generalized_effort([1., 0., 0.])
+    value.write_generalized_effort([1., 0., 0.])
+    value.replace_owned_generalized_effort([2., 0., 0.])
+    np.testing.assert_array_equal(value._physics.writes[-1], [2., 0., 0.])
+    with pytest.raises(RuntimeError, match='occupied'):
+        value.write_generalized_effort([0., 0., 0.])
+    value.clear_generalized_effort()
+    with pytest.raises(RuntimeError, match='not owned'):
+        value.replace_owned_generalized_effort([1., 0., 0.])
+
+
 @pytest.mark.parametrize('bad', [[1., 2.], [1., float('nan'), 2.], [True, False, True], [1e100, 0., 0.]])
 def test_effort_boundary_rejects_invalid_before_write(bad):
     value = boundary()

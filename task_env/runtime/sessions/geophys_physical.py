@@ -5,10 +5,11 @@ import numpy as np
 
 from ...artifacts.contracts import CapabilityAssessmentRowV1, CapabilityAssessmentV1
 from ...controllers.canonical.physical_commands import (
-    PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1,
+    PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1, PhysicalBodyBuildReceiptV1,
 )
 from .physical_control import (PhysicalControlExecutionV1, ResolvedPhysicalBatchV1,
-                               prepare_physical_command_batch, uniform_native_drive_mode)
+                               prepare_physical_command_batch, uniform_native_drive_mode,
+                               resolve_body_wrench_at_poses)
 
 
 def preflight_physical_geophys(execution, artifact, source):
@@ -20,8 +21,9 @@ def preflight_physical_geophys(execution, artifact, source):
     if execution.requires_source_dynamics:
         from ...environment.types import StageUnavailableError
         raise StageUnavailableError('GeoPhys physical adapter has no source dynamics model')
-    if execution.compiled.binding.bodies:
-        raise ValueError('GeoPhys physical port does not admit body wrench')
+    for body in execution.compiled.binding.bodies:
+        if body.entity_id not in source.free_joints:
+            raise ValueError('GeoPhys body wrench requires a named explicit FREE joint')
 
 
 class GeoPhysPhysicalPort:
@@ -33,8 +35,6 @@ class GeoPhysPhysicalPort:
         execution.validate_source(scene=session._source.scene_definition,
             artifact_sha256=session._artifact.identity_hash, source_id=session._source.source_id,
             source_closure_sha256=session._source.source_closure_digest, source=session._source)
-        if binding.bodies:
-            raise ValueError('GeoPhys physical port does not admit body wrench')
         if session._mixed_actuator_plan is not None:
             raise ValueError('GeoPhys physical port requires an unshared scalar session')
         model = session._build_layout_facts['effective_physical_model']
@@ -117,7 +117,27 @@ class GeoPhysPhysicalPort:
         if drive_mode == 'disabled':
             session._build_layout_facts['physical_drive_override'] = (
                 session._boundary.isolate_actuator_outputs_for_physical_fixture(tuple(sorted(used))))
+        body_rows = {row['name']: row for row in model['bodies']}
+        body_dofs = {}
+        for body in binding.bodies:
+            joint_name = source.free_joints.get(body.entity_id)
+            joint, native_body = joints.get(joint_name), body_rows.get(body.native_body)
+            if (joint is None or native_body is None or int(joint['type']) != 0
+                    or int(joint['child_body_id']) != int(native_body['id'])
+                    or int(native_body['joint_count']) != 1
+                    or int(native_body['joint_address']) != int(joint['id'])):
+                raise ValueError('GeoPhys body must own its declared explicit FREE joint')
+            address = int(joint['dof_address'])
+            if (address < 0 or address + 6 > len(session._initial.qvel)
+                    or set(range(address, address + 6)) & set(dofs.values())
+                    or any(set(range(address, address + 6)) & set(range(other, other + 6))
+                           for other in body_dofs.values())):
+                raise ValueError('GeoPhys FREE body DOFs are invalid or overlap')
+            body_dofs[(body.entity_id, body.body_id)] = address
         self.session, self.execution, self.binding, self.dofs = session, execution, binding, dofs
+        self.body_dofs = body_dofs
+        self.pending_joints = None
+        self.pending_wrenches = ()
         self.pending = None
         self.consumed = set()
 
@@ -128,16 +148,24 @@ class GeoPhysPhysicalPort:
 
     def assessment(self, binding):
         self._binding(binding)
+        names = ('sum', 'joint_effort', 'transmission', 'native_drive_state')
+        if binding.bodies:
+            names += ('body_force', 'body_torque', 'body_frame', 'body_offset_point')
         rows = tuple(CapabilityAssessmentRowV1('capability-assessment-row-v1', name,
             f'binding:{binding.identity_hash}', 'required', 'supported', 'implemented', 'available',
             'none', 'native_build', 'GeoPhys effective named model and public effort setter', None, None)
-            for name in ('sum', 'joint_effort', 'transmission', 'native_drive_state'))
+            for name in names)
         return CapabilityAssessmentV1('capability-assessment-v1', binding.identity_hash, 'native_build', rows)
 
     def joints(self, binding):
         self._binding(binding)
         return PhysicalJointBuildReceiptV1('physical-joint-build-receipt-v1', binding.identity_hash,
             binding.source_closure_sha256, self.session.provider_materialization_id, binding.channels, 'native_build')
+
+    def bodies(self, binding):
+        self._binding(binding)
+        return PhysicalBodyBuildReceiptV1('physical-body-build-receipt-v1', binding.identity_hash,
+            binding.source_closure_sha256, self.session.provider_materialization_id, binding.bodies, 'native_build')
 
     def policy(self, binding):
         self._binding(binding)
@@ -160,25 +188,55 @@ class GeoPhysPhysicalPort:
             raise ValueError('physical batch clock differs from current state publication')
         admitted = prepare_physical_command_batch(self.execution.compiled, resolved.input_batch,
             expected_context=context, assessment=self.assessment(self.binding), state=view,
-            joint_build_receipt=self.joints(self.binding), buffer_policy=self.policy(self.binding) if any(
-                item.contribution.persistence == 'hold_reapply' for item in resolved.input_batch.joint_efforts) else None)
-        if admitted != resolved or resolved.body_wrenches or resolved.extensions:
-            raise ValueError('physical batch differs from admitted GeoPhys effort-only route')
+            joint_build_receipt=self.joints(self.binding),
+            body_build_receipt=self.bodies(self.binding) if resolved.input_batch.body_wrenches else None,
+            buffer_policy=self.policy(self.binding) if any(
+                item.contribution.persistence == 'hold_reapply' for item in
+                (*resolved.input_batch.joint_efforts, *resolved.input_batch.body_wrenches)) else None)
+        if admitted != resolved or resolved.extensions:
+            raise ValueError('physical batch differs from admitted GeoPhys route')
         n_dof = len(s._initial.qvel)
         values = np.zeros(n_dof, dtype=np.float64)
         signs = {c.target_key: c.sign for c in self.binding.channels}
         for item in resolved.joints:
             key = (item.entity_id, item.joint_id, item.dof_id)
             values[self.dofs[key]] += item.value * signs[key]
-        s._boundary.write_generalized_effort(values)
+        self.pending_joints = values
+        self.pending_wrenches = resolved.input_batch.body_wrenches
+        self.reapply_body_wrenches(view=view)
         self.pending = context.identity_hash
         self.consumed.add(context.identity_hash)
         return PhysicalControlReceiptV1('physical-control-receipt-v1', context,
             resolved.input_batch.identity_hash, 'native_write_ack', resolved.accepted_receipt.contribution_ids,
             'geophys-qfrc-applied', 'generalized-force')
 
+    def reapply_body_wrenches(self, *, view=None):
+        """Refresh source-bound frame transforms before each physical step."""
+        s = self.session
+        if self.pending_joints is None:
+            raise RuntimeError('physical interval has no prepared generalized forces')
+        values = self.pending_joints.copy()
+        if self.pending_wrenches:
+            if view is None:
+                view = s.snapshot_v2(scene=self.execution.scene, joint_bindings=self.execution.joint_bindings,
+                    frame_bindings=self.execution.frame_bindings, requirements=self.execution.requirements).view
+            poses = {entry.frame: entry.pose_world for entry in view.frames}
+            bodies = {(body.entity_id, body.body_id): body for body in self.binding.bodies}
+            for item in self.pending_wrenches:
+                key = (item.entity_id, item.body_id)
+                _, force, torque = resolve_body_wrench_at_poses(item, bodies[key].body_frame, poses)
+                address = self.body_dofs[key]
+                values[address:address+3] += force
+                values[address+3:address+6] += torque
+        if self.pending is None:
+            s._boundary.write_generalized_effort(values)
+        else:
+            s._boundary.replace_owned_generalized_effort(values)
+
     def finish_interval(self):
         try:
             self.session._boundary.clear_generalized_effort()
         finally:
             self.pending = None
+            self.pending_joints = None
+            self.pending_wrenches = ()
