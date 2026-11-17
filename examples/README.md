@@ -60,9 +60,13 @@ The current public entry points are:
 For a small new-task declaration, see [`declared_marker.py`](tasks/declared_marker.py).
 It supplies a distinct task/Entity identity, reset sampler and evaluator while
 reusing Core's shared Panda/table/box construction. Import the example to register
-it, then use `task_env.make_env('marker-height-example-v1', config=...)`. The
-[current guide](../docs/module/task_env/v2.1.1/guides/installation-and-start.md)
-describes the setup; the modified Marker route has synthetic checks only.
+it; note that at this source baseline its selected configuration has no declared
+`selected_robot_uids`/`default_robot_source_uid`, so `make_env` rejects it at
+Robot selection (`selected robot uid must be a nonempty trimmed string`). Treat
+the file as a declaration/binding example, not a runnable new-task route; the
+[current guide](../docs/module/task_env/v2.1.1/guides/authoring-scenes-assets-robots.md)
+records this drift and the fields a real task must declare. The modified Marker
+route has synthetic checks only.
 
 ## Workflow matrix
 

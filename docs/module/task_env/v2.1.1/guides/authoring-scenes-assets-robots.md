@@ -149,7 +149,7 @@ USD 交付的入口：
 2. **只改 success predicate**：改 `SemanticDefinition` 参数与 `evaluate_task` 的判定/返回值；保留 reset/source。
 3. **换已有物体**：先在声明/Scene 中找到对应 object token 和资产 closure；同时更新 `object_poses` 映射与 predicate 的 state 字段。不要直接写一个新的 MJCF 路径绕过 `AssetDefinition`/source compiler。
 
-完整可追踪的现有例子见 `examples/tasks/declared_marker.py` 本身（本页不复制一份会漂移的全文）。运行方式：
+完整可追踪的现有例子见 `examples/tasks/declared_marker.py` 本身（本页不复制一份会漂移的全文）。**调用形状**如下，但请先读下面的当前限制：
 
 ```python
 import examples.tasks.declared_marker   # 触发注册；不要从 diagnostics 导入私有 fixture
@@ -166,6 +166,14 @@ try:
 finally:
     env.close()
 ```
+
+**当前源码限制（2026-11-17 静态解析核对）：**`MarkerHeightEnv` 没有声明 `selected_robot_uids`/`default_robot_source_uid`，而 selected 配置解析会在 Robot 选择处要求非空 UID。用上面的 mapping 调用 `resolve_task_env_config(MarkerHeightEnv, config)` 会得到：
+
+```text
+ValueError: selected robot uid must be a nonempty trimmed string
+```
+
+显式加 `"robot": {"uid": "panda-v1"}` 也只会得到 `ValueError: selected task does not admit the requested robot`。因此本页用该例讲**声明/绑定结构**，**不把它当作可直接运行的新手任务**；真实自定义 Task 必须自己声明 Robot 选择字段（或走该 Task 的既有 owner 路线）。本 7c 文档包不修改生产示例来“让教程通过”，这是一个已记录的当前 drift。
 
 预期/失败：
 
