@@ -42,7 +42,7 @@ finally:
 ## Optional homogeneous parallel factory
 
 `from task_env import make_parallel_env` 的 `make_parallel_env(uid, env_config=None, num_env=1, backend="cuda", execution="remote")` 是可选的并行入口。
-这是旧并行路线，统一 Env 尚未适配；登记本身不是当前多环境运行证据。它只为通过 `@register_parallel_env()` 显式登记 framework batch capability 的任务创建同构 batch；没有 batch backend 的
+`execution='device'` 是 G06 有界接收的正式设备 batch 路线：Pendulum/PickCube × `mujoco_warp`/`geophys`/`isaacsim`，使用 `step()`、same-step autoreset、部分 reset 和具名相机；见 [device 教程](../../../../docs/module/task_env/v2.1.1/guides/quickstart-device-batch.md)。`remote`/`local` 是旧 SB3 并行路线；登记本身不是当前多环境运行证据。组件并行入口只为通过 `@register_parallel_env()` 显式登记 framework batch capability 的任务创建同构 batch；没有 batch backend 的
 task 会明确抛出 `task uid has no homogeneous parallel backend`，不会退化为 `num_env` 个 single env。
 
 `execution="local"` 返回同进程 raw vector/SB3 adapter，适合契约 smoke；`execution="remote"` 使用

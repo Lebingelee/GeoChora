@@ -1,47 +1,49 @@
-# v2.1.1 指南交付要求
+# v2.1.1 学习指南
 
-2026-11-17维护者已要求按[7c详细教程蓝图](../planning/stage7-7c-tutorial-blueprint.md)将本目录扩写为安装、三个scalar任务、窗口/相机、device并行、环境/资产/Robot、独立Controller和API用法的完整教程；[attempt001工作包](../maintenance/work-packages/20261117_g07c_attempt001_goal.md)已在隔离文档工作树准备，未启动执行。下列旧交付文字属于待对账输入，尤其旧“统一Env并行未适配”不能覆盖下方G06已接收能力；当前能力以API/G06证据为准。正文展开与归并归attempt001，7b最终接口/验收回填归attempt002，不在准备稿中宣称教程已完成。
+本目录是 v2.1.1 的**教程入口**；每页只负责教学解释、完整例子、预期结果和失败路径。公共字段/默认值/能力仍以 [API](../api/README.md) 和 `task_env/doc/api/` 为权威。
 
-G06 canonical CUDA并行已结案：普通调用、具名相机、部分reset及整批切换见[API](../api/README.md)与[并行示例](../../../../../examples/parallel/reconfigure_device.py)；开发、测试和能力边界见[G06实施总结](../maintenance/g06/implementation-summary.md)。R3并行支持另包，不能沿用单环境重力补偿指南推断其已支持。
+## 学习顺序
 
-3b 的运行范围与未通过项见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)；不把10步执行等同于方向或整体验收通过。Isaac 解释器可用显式 `--isaac-python` 或 `ISAAC_SIM_PYTHON` 选择，前者优先，Core 解释器默认当前 Python。
+| 顺序 | 页面 | 你会得到什么 | 前置 |
+| --- | --- | --- | --- |
+| 1 | [安装、后端隔离与路径配置](installation-and-start.md) | 选路线、Core/GeoPhys/MJWarp/Isaac 两条安装路径、解释器优先级与排错 | Linux 基础、Python 3.12 |
+| 2 | [单环境无渲染 Quickstart](quickstart-state-only.md) | Pendulum、PickCube、Nut 的原 Solution；Nut 普通随机的**预期拒绝**与 `T-NUT-RANDOM` 缺口 | 第 1 页的 Core 环境 |
+| 3 | [有头窗口、相机参数与图像](quickstart-rendering.md) | CameraSpec 全字段、GeoPhys Rasterizer 优先的 human/rgb_array、task sensor 与 device 相机区别 | 第 2 页的任一任务 |
+| 4 | [device 并行与三后端](quickstart-device-batch.md) | Pendulum/PickCube × MJWarp/GeoPhys/Isaac 六条命令、动作树、same-step/partial reset、整批切换 | CUDA 与对应 worker 环境 |
+| 5 | [环境、资产、Robot 与 canonical action](authoring-scenes-assets-robots.md) | 声明→source→binding→Env→Runtime 链、AssetDefinition/EntityInstance、Robot/source recipe/TCP | 第 2 页 |
+| 5b | [实现自己的 Controller](custom-controllers.md) | Protocol vs typed compute、默认恒等绑定、命名关节 PD、OSC/模型/reset/验收 | 第 5 页 |
+| 6 | [API 详细用法、迁移与排错](api-usage.md) | 签名/类型/单位/返回/异常、记录与独立 reader、Solution、learner 边界、迁移表 | 全部 |
 
-[安装与启动指南](installation-and-start.md)提供已有安装路径、轻量入口与新克隆的依赖边界；已有受限CPU启动与任务回归记录见[当前状态](../maintenance/reviews/20261105_pre_stage3_current_status.md)，不证明完整新安装组合或selected RGB。仓库当前无root packaging metadata，不使用`pip install -e .`。
+旧 [Panda 本体重力补偿](panda-gravity-compensation.md) 保留为有界实现说明；它只支持 MuJoCo CPU 进程内的 selected PickCube/Nut 位置驱动，其他 provider/worker/固定附件路线拒绝，不替代上面的通用教程。
 
-2026-11-05两小时收尾按[规划第2.5节](../planning/pre-stage3-environment-refactor.md#pre-stage3-closeout-120min)执行。本指南和`task_env/doc`是核心交付：依据最终接口补齐“安装或复用路径→启动单环境→修改已有example”的真实操作链，开发者不手写来源SHA或增加专用factory；已正确的段落保留。全新安装全部provider、所有历史文档逐页审计及阶段3–6未实现操作不设为本窗口出口，不用旧的未运行描述覆盖已有受限证据。
+## 能力与证据语言
 
-## 阶段3前必须补齐的新手路线
+- 本教程的代码块按源码/现有 caller 静态核对；**没有在本轮运行 native**。示例能 import 不等于 reset/step 成功。
+- 复用历史证据时必须同时给出 task、provider、backend、source/pin、seed/horizon、renderer/Controller 交集；不要用单格成功外推整矩阵。
+- `T-NUT-RANDOM` 是**未满足的真实需求**：当前 Nut 只准入 source-bound `ExpertAction`，普通随机数组被拒绝。教程保留预期拒绝例子，不以负例替代正向能力。
+- `WAIT_7B_ACCEPTANCE`：7b 正在变化的 BodyWrench 新 producer/transport/API 和最终接收矩阵由 attempt002 回填；正文其余部分已在本轮完成。
+- G06 canonical device 能力有界接收；G07 最终九格/版本收口仍待 7b 接收与 attempt002。R3 batch 仍为独立后续项。
 
-本节属于[阶段3前维护要求](../planning/pre-stage3-environment-refactor.md)，随环境重构交付，不等到阶段7。以下为验收清单；部分入口已实现，尚未运行的组合见安装指南。
+## 旧页面归并与导航
 
-| 路线 | 必须说明与交付 |
+本目录原“交付要求”页已转为当前学习导航。历史要求仍可通过原提交和 [v2.1.0 文档](../../v2.1.0/README.md) 恢复；不把旧页删成一条 `current-state` 链接。
+
+| 旧位置/内容 | 当前处置 |
 | --- | --- |
-| 新克隆后安装 | 从仓库／submodule准备开始，列出所选路线的Python环境、simulator、renderer及资产需求、安装来源与兼容版本；给出最小单环境启动步骤 |
-| 复用已有安装 | 明确解释器、SDK根、renderer根、资产／manifest及Core／GeoPhys源码路径如何传入；支持checkout外安装，不依赖复制ignored目录 |
-| 启动脚本 | 转调既有examples／公开factory，显式选择provider／backend及可选renderer；复用现有bootstrap和路径配置，错误指出缺哪项，不自动安装或换路线 |
-| 基于example开发 | 从已存在的声明式任务example出发，解释UID、资产组合、reset、观测／评价与Solution的修改位置，按规范Env完成reset／step／close与结果检查 |
-| 诊断与边界 | 诊断脚本和说明放专用目录，通过正式接口引用模块；说明当前不支持的组合和Pendulum单环境范围，不教用户向Core添加专用探针 |
+| 本页旧“阶段3前必须补齐的新手路线”清单 | 由上面的 6 部分教程取代；历史要求保留在 git 历史，不再作为当前教程正文 |
+| [安装与启动](installation-and-start.md) 旧“已有安装/三条路线摘要” | 扩写为唯一安装教程；保留已有多环境事实与未验证边界 |
+| 旧 `examples/README.md` 中“四个正式任务无 batch adapter/旧 Pendulum batch 不可用” | 已按 G06 受测 device 路线更正；旧 SB3/RSL/parallel-render 边界继续保留 |
+| `task_env/doc/api` 中“统一 Env 并行未适配” | 当前入口/导航已改；历史 accepted 证据仍按版本保留 |
+| 旧 PickCube/Nut candidate 与 `BaseTaskEnv` 教程 | 不删除旧兼容/历史记录；当前主线明确为 `make_env` + `SelectedReferenceEnv` + typed Controller |
+| 旧 UI `float32`/CUDA 返回说法 | 按当前 render 合同更正为 CPU HWC `uint8`；sensor 自身 dtype/device 单列 |
+| [Panda 重力补偿](panda-gravity-compensation.md) | 保留原页；从学习顺序中作为受限专题链接 |
 
-安装／路径表分别覆盖MuJoCo、GeoPhys、Isaac及rasterizer／Flora；区分所选路线必需项与可选渲染项。其他provider仅标明现有状态与来源，不扩大为本次必须安装的范围。ISAAC解释器不得固定为某一worktree内部路径；Flora复用已有`FLORA_ROOT`／`runtime_root`。Core与GeoPhys的MuJoCo声明区间冲突必须明确说明，不能给出未经核实的混装指令。具体当前缺口见维护方案。
+## 生态入口
 
-交付导航同时落在根README、`task_env/README.md`及`task_env/doc/index.md`，更新新手与自定义任务指南中的旧构造示例。安装细节以本版指南为权威，其他入口链接它。验收同时检查新安装与外部安装路径的说明、脚本参数、错误提示和真实调用入口；未运行的步骤明确标注，不将文档检查算作native成功。当前不宣称统一Env并行已适配，Pendulum首先提供单环境流程。
-
-## 阶段3–6实现后必须提供的操作路线
-
-1. 查询某任务／资产的能力和拒绝原因，选择三个首批 physics 路线之一，查看解析配置。
-2. state-only 构建、reset、step、记录和 close，独立读回同次运行；不要求安装 renderer 才能使用 state-only。
-3. 配置窗口观察相机并 render；另配任务相机，采集离屏 RGB，并证明无需额外 render 即从 reset／step 获取同步图像。
-4. 同一个 public Env 在已支持的配置边界内通过 reset 切换 backend／Controller，按任务初始化新 episode，观察旧数据失效和失败后的恢复操作；renderer 在构建时选择并固定至 close，不通过 reset 切换。
-5. reset 切换 Controller，读取新的 action spec／space；展示Robot／组件binding、关节／末端参考、direct joint effort及有界BodyWrench组合的语义差别。
-6. 在已验证的两个以上后端建立小 batch；展示部分 reset、终止帧、固定动作规格及整批切换。
-7. 用 NutAssembly 复用上述公共配置，明确实际支持的子集。
-
-每条指南附实际版本、task/source、设备、所需依赖、已运行入口和限制。相机标定、数组布局、返回设备、buffer 有效期与关闭行为链接权威协议，不复制第二份定义。
-
-## 故障说明应覆盖
-
-能力未实现、依赖不可用、资产不可表达、数值／reset 检查失败、缺少 Controller feedback、原生构建失败、图像过期／采样失败、固定 obs 不兼容、worker 故障及资源回收。给出失败阶段和下一行动；不能建议读取私有状态或关闭必要检查。
-
-新增后端／切换／控制／render／batch示例随阶段3–6的真实实现添加，7a/7c检查调用者可用性；不据此延期前述新手基础交付。本页当前只有交付要求，没有新增运行示例、训练或仿真结果。
-
-- [Panda 本体重力补偿](panda-gravity-compensation.md)：MuJoCo CPU 进程内默认关闭的有界实现与限制，按 G03 既有范围接收；原严格失败及其他 provider 限制保留。
+- 符号级 API：[`task_env/doc/api/index.md`](../../../../../task_env/doc/api/index.md)
+- 当前跨边界合同：[v2.1.1 API](../api/README.md)
+- 任务/资产/机器人开发：[`declared_marker.py`](../../../../../examples/tasks/declared_marker.py) 与第 5 页
+- 记录与读回：[`examples/recording`](../../../../../examples/recording) 与第 6 页
+- 资产服务/Agent 设置：[agent setup](../../../../global/agent-setup.md)（不会自动下载模型或安装 SDK）
+- 当前状态与证据：[current state](../maintenance/current-state.md)、[能力矩阵](../capabilities/README.md)、[G06 实施总结](../maintenance/g06/implementation-summary.md)
+- 诊断/代码边界：[diagnostics and code boundaries](../../../../global/diagnostics-and-code-boundaries.md)

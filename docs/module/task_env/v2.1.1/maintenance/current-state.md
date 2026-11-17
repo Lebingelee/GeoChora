@@ -2,7 +2,7 @@
 
 更新时间：2026-11-17。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
-**7c文档工作树说明（2026-11-17）：**此分支从`4fdf9379`隔离，下面7b实施状态保留为该输入时点的快照；实时7b由`codex/v211-stage7-integration`及其writer维护。本树不据此声称7b尚未启动或已接收。维护者已允许[7c attempt001](work-packages/20261117_g07c_attempt001_goal.md)提前完善不依赖7b的文档，准备READY待手动转发／普通attempt0，未启动Goal/native。详细[教程填充蓝图](../planning/stage7-7c-tutorial-blueprint.md)覆盖六部分和独立Controller章；最终API/单一矩阵/恢复身份由7b接收后的attempt002收口。Nut普通随机动作当前拒绝的需求缺口保留，不以文档补齐宣布能力已实现。
+**7c文档工作树说明（2026-11-17）：**此分支从`4fdf9379`隔离，下面7b实施状态保留为该输入时点的快照；实时7b由`codex/v211-stage7-integration`及其writer维护。本树不据此声称7b尚未启动或已接收。维护者已允许[7c attempt001](work-packages/20261117_g07c_attempt001_goal.md)提前完善不依赖7b的文档；该 attempt 已在本隔离工作树实际执行并返包（`PARTIAL_DOCS_WITH_KNOWN_CAPABILITY_GAP`，普通attempt_count=1，待独立主审）。详细[教程填充蓝图](../planning/stage7-7c-tutorial-blueprint.md)覆盖六部分和独立Controller章；最终API/单一矩阵/恢复身份由7b接收后的attempt002收口。Nut普通随机动作当前拒绝的需求缺口`T-NUT-RANDOM`保留，不以文档补齐宣布能力已实现。执行报告/输出HEAD见[7c attempt001返包摘要](reviews/20261117_g07c_attempt001_docs.md)与[编排索引](orchestration.json)。
 
 ## 当前停门
 

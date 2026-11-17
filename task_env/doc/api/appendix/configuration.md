@@ -37,7 +37,7 @@ task
 episode
 ~~~
 
-对 legacy classic-control 路线，任务 YAML 可以覆盖这些 section，调用方叠加在其上并经过 dataclass/configuration 校验。此结构与上面的 selected 输入不同；统一 Env 并行尚未适配。
+对 legacy classic-control 路线，任务 YAML 可以覆盖这些 section，调用方叠加在其上并经过 dataclass/configuration 校验。此结构与上面的 selected 输入不同。G06 的 canonical device batch 使用 selected 配置的 `make_parallel_env(..., execution='device')`；旧 classic/component 并行入口仍按其独立合同保留，不能把两者混成同一适配结论。
 
 ## RuntimeConfig
 

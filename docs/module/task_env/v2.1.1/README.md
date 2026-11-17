@@ -22,7 +22,7 @@
 - [源码 owner 与外部参考](planning/source-map-and-references.md)：当前基础、缺口、待讨论事项和官方项目链接。
 - 协议实施基线：[统一任务表示](contracts/unified-task-representation.md)、[physics provider](contracts/physics-provider.md)、[render provider](contracts/render-provider.md)、[控制与反馈](contracts/control-and-feedback.md)、[生命周期与数据](contracts/lifecycle-and-data.md)。
 - 阶段 Goal：[01 协议](goals/01-protocols.md)、[02 Solution](goals/02-pickcube-solution.md)、[03 后端](goals/03-backends.md)、[04 控制](goals/04-control.md)、[05 渲染](goals/05-rendering.md)、[06 并行](goals/06-parallel.md)、[07 集成](goals/07-integration.md)。
-- [API 迁移入口](api/README.md)、[指南交付要求](guides/README.md)、[单一能力矩阵](capabilities/README.md)。
+- [API 迁移入口](api/README.md)、[学习指南](guides/README.md)（安装、无渲染、渲染、device、资产/Robot、Controller、API）、[单一能力矩阵](capabilities/README.md)。
 - [当前摘要](maintenance/current-state.md)、[恢复页及历史](maintenance/recovery.md)、[编排索引](maintenance/orchestration.json)、[规划初建收据](maintenance/20261103_documentation_receipt.md)。
 
 ## 规划来源及历史能力

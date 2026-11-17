@@ -4,28 +4,33 @@
 
 ## v2.1.1 新手入口与当前范围
 
-从[安装与启动指南](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)选择新克隆或已有安装路径，并查看解释器、simulator／renderer、资产与启动脚本的要求。该指南标明尚未验证的新安装和native路线；[实施记录](../../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md)中的单环境生命周期与限定核心收尾已有限接收，更广整理仍有边界。
+从 [v2.1.1 学习指南](../../docs/module/task_env/v2.1.1/guides/README.md) 开始，按“安装 → 无渲染 → 相机/窗口 → device batch → 环境/资产/Robot/Controller → API”学习；[安装与启动](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md) 仍是唯一安装教程。该指南标明未验证的新安装、T-NUT-RANDOM 需求缺口和 WAIT_7B_ACCEPTANCE 项，不把静态核对写成 native 成功。
 
-Empty、Pendulum和TwoWheel已使用统一`SelectedReferenceEnv`及共同episode owner，`BaseTaskEnv`是同对象兼容导出；组件RuntimeBoundary与selected RuntimeSession仍有各自接线。Pendulum范围为单环境；旧并行API、注册和脚本保留，不代表统一路线已适配。并行适配和真实多环境验证留待阶段6，不以单slot或静默降级代替。
+Empty、Pendulum、TwoWheel、PickCube 和 NutAssembly 已使用统一 `SelectedReferenceEnv` 及共同 episode owner，`BaseTaskEnv` 是同对象兼容导出。G06 canonical CUDA batch（Pendulum/PickCube × MuJoCo Warp/GeoPhys/Isaac）已有界接收；device `step()`、same-step autoreset、部分 reset、具名相机和 Isaac↔MJWarp 整批切换见 [device 教程](../../docs/module/task_env/v2.1.1/guides/quickstart-device-batch.md)。旧 SB3/RSL/parallel-render 入口是另一套合同，登记或历史运行不证明其已适配。
 
-TaskEnv现有文档按使用场景导航：
+TaskEnv 现有文档按使用场景导航：
 
 | 读者 | 文档 | 适合解决的问题 |
 | --- | --- | --- |
-| 使用者 | [安装与启动](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md) | 单环境、已有路径和未验证的安装缺口 |
-| 训练/采集使用者 | [训练与采集](新手使用训练与采集.md) | 单环境、Solution、轨迹与 H5 数据；训练限制 |
-| 任务开发者 | [自定义任务构建指南](自定义任务构建指南.md) | 从声明式示例理解任务、reset、评价与 Solution |
+| 新用户 | [学习指南](../../docs/module/task_env/v2.1.1/guides/README.md) | 六部分学习顺序和能力边界 |
+| 安装/部署 | [安装与启动](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md) | 新克隆/已有安装、后端隔离、Isaac pip/app、路径优先级 |
+| 单环境使用者 | [无渲染 Quickstart](../../docs/module/task_env/v2.1.1/guides/quickstart-state-only.md) | Pendulum/PickCube/Nut 的 reset/step/close、Solution、Nut 随机限制 |
+| 训练/采集使用者 | [训练与采集](新手使用训练与采集.md)、[API 用法](../../docs/module/task_env/v2.1.1/guides/api-usage.md) | 单环境、Solution、轨迹与 H5；learner/vector 边界 |
+| 渲染使用者 | [相机与窗口](../../docs/module/task_env/v2.1.1/guides/quickstart-rendering.md) | CameraSpec、human/rgb_array、task sensor、device 相机 |
+| device batch | [device 并行](../../docs/module/task_env/v2.1.1/guides/quickstart-device-batch.md) | 两任务×三 provider、动作树、same-step/partial reset、切换 |
+| 任务/资产开发者 | [环境、资产、Robot](../../docs/module/task_env/v2.1.1/guides/authoring-scenes-assets-robots.md) | 声明、实例、编译、绑定、canonical action |
+| Controller 开发者 | [自定义 Controller](../../docs/module/task_env/v2.1.1/guides/custom-controllers.md) | Protocol vs typed compute、默认绑定、PD/OSC/验证 |
 | 资产开发者 | [资产导入与二次开发指南](资产导入与二次开发指南.md) | 注册 world、robot、object 并接入 assembly |
 | API 使用者 | [API Reference](api/index.md) | 查找公开、扩展、兼容和内部接口的适用范围 |
-| 排查／维护开发者 | [诊断与代码边界规范](../../docs/global/diagnostics-and-code-boundaries.md)、[诊断目录](../diagnostics/README.md) | 外部驱动、包装／继承、局部注入与核心职责；诊断代码如何动工和归位 |
+| 排查／维护开发者 | [诊断与代码边界规范](../../docs/global/diagnostics-and-code-boundaries.md)、[诊断目录](../diagnostics/README.md) | 外部驱动、包装／继承、局部注入与核心职责 |
 
 ## 推荐阅读顺序
 
-1. 先查看[安装与启动](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)的支持范围；已准备依赖时从单环境开始，不把旧并行示例当成统一路线能力。
-2. 需要训练或录制数据时阅读 [训练与采集](新手使用训练与采集.md)。
-3. 需要创建新任务时阅读 [自定义任务构建指南](自定义任务构建指南.md)。
+1. 先查看 [安装](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md) 的支持范围；已准备依赖时从单环境开始，不把旧并行示例当成统一路线能力。
+2. 需要训练或录制数据时阅读 [训练与采集](新手使用训练与采集.md) 与 [API 用法](../../docs/module/task_env/v2.1.1/guides/api-usage.md)。
+3. 需要创建新任务时阅读 [环境、资产、Robot](../../docs/module/task_env/v2.1.1/guides/authoring-scenes-assets-robots.md) 和 [自定义 Controller](../../docs/module/task_env/v2.1.1/guides/custom-controllers.md)。
 4. 需要导入新资产时阅读 [资产导入与二次开发指南](资产导入与二次开发指南.md)。
-5. 需要确认函数签名、返回值或生命周期时查阅 [API Reference](api/index.md)。
+5. 需要确认函数签名、返回值或生命周期时查阅 [API Reference](api/index.md) 与 [v2.1.1 API](../../docs/module/task_env/v2.1.1/api/README.md)。
 
 ## 公开入口
 
