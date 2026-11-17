@@ -2210,9 +2210,18 @@
           "dependencies": [
             "7a"
           ],
-          "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
-          "attempt_count": 0,
-          "attempts": [],
+          "status": "IN_PROGRESS",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "id": "attempt001",
+              "started_at": "2026-11-17T11:42:00.147670+08:00",
+              "deadline": "2026-11-17T15:42:00.147670+08:00",
+              "input_head": "923eb2cdc53585c0eb3c017ca1996e78b9b5ed77",
+              "status": "IN_PROGRESS",
+              "output_root": "/home/lly/Program_Files/Geochora/workspace/maintenance/v211_g07b_attempt001"
+            }
+          ],
           "assigned_agent": null,
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_preparation_20261117/work-package.md",
           "package_sha256": "4e32c85def7d260a4742c3c4bd161c5035a077306233d8a6ddd9d5fce876d785",
@@ -2239,8 +2248,8 @@
             "native_threads": 1
           },
           "last_observation": {
-            "at": "2026-11-17T11:36:47.632899+08:00",
-            "state": "Complete package independently prepared/reviewed; no execution Goal/native or actual PR merge; count remains0."
+            "at": "2026-11-17T11:42:00.147670+08:00",
+            "state": "Frozen package checked; attempt001 started; PR local integration pending."
           },
           "evidence_refs": [],
           "commits": [],
