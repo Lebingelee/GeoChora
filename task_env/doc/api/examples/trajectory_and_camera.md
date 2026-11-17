@@ -83,7 +83,7 @@ substitute that image for a different Nut or provider run.
 Artifacts that declare camera observations. UI rendering remains a separate
 `UiRenderProvider` contract. The old
 `task_env.script.camera.static`/`bound` scripts were tied to historical
-`pick-cube-v1` construction and now fail explicitly. Selected manipulation camera acceptance is bounded by the actual source, provider, renderer and task in the current capability matrix; it is not a blanket claim. The 7c002 GeoPhys Nut Rasterizer attempt failed before its first frame on the canonical Scene/source closure condition.
+`pick-cube-v1` construction and now fail explicitly. Selected manipulation camera acceptance is bounded by the actual source, provider, renderer and task in the current capability matrix; it is not a blanket claim. The initial 7c002 GeoPhys Nut Rasterizer attempt failed before its first frame because the canonical Scene was absent. A subsequent original Panda, GeoPhys CPU isolated-worker 128×96 observer run passed reset, one step, reset and close with the new Scene-bound Artifact; it does not qualify other cameras or visual geometry accuracy.
 
 Historical bounded native renderer examples covered one scalar Pendulum frame through
 public `make_env` and one Pendulum batch frame through `merged_scene`, both on

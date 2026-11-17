@@ -27,7 +27,7 @@
 | scalar task RGB | CPU `float32`，通常 0～1 | Task sensor 与 UI 独立 |
 | device named camera | CUDA `uint8`，带 B 轴 | 与同一步 boundary 对齐，按声明的 lifetime 使用 |
 
-部分 reset/same-step autoreset 的 terminal 帧与新 reset 帧属于不同边界；不能用一次截图推断二者。7c002 的 GeoPhys Nut `rgb_array` 最短尝试在首帧因 canonical Scene/source closure 条件失败并关闭，因此不声明该路线已可显示；state-only 与该失败分开。其他受测 UI 例子和完整相机参数见[渲染指南](../../../../docs/module/task_env/v2.1.1/guides/quickstart-rendering.md)。
+部分 reset/same-step autoreset 的 terminal 帧与新 reset 帧属于不同边界；不能用一次截图推断二者。7c002 的 GeoPhys Nut 最初尝试在首帧因缺少 canonical Scene 失败并关闭；改用 Scene 绑定的新 Artifact 后，原 Panda、GeoPhys CPU isolated worker、seed19 的 128×96 Rasterizer observer 已有首帧、一步、再 reset 和 close 的有界实测。帧主体较小，未证明几何视觉精度或其他相机／provider；旧失败保持历史。其他受测 UI 例子和完整相机参数见[渲染指南](../../../../docs/module/task_env/v2.1.1/guides/quickstart-rendering.md)。
 
 以下是现有 Pendulum GeoPhys CPU observer 的最短用法；它不代表上述 Nut 交集：
 

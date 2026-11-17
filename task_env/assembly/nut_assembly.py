@@ -57,6 +57,74 @@ def compile_nut_assembly_source(*, artifact, artifact_declaration, composition, 
     return source, contact_profile
 
 
+def bind_nut_assembly_scene(source, artifact, task_config, *, robot):
+    """Bind the declared Nut Scene to the same frozen MJCF consumed by GeoPhys."""
+    from dataclasses import replace
+    from scene import SceneSource, import_scene_source
+    from ..artifacts import (ArticulationDefinition, AssetDefinition, EntityInstance,
+        FrameDefinition, FrameReference, JointDefinition, PoseWorld, SceneDefinition)
+    from ..environment.task_source import adapt_legacy_recipe_task_source, compile_task_artifact_v1
+    from ..robots.panda import _panda_scene_from_import
+    from ..runtime.sessions.source import bind_reference_scene_source
+
+    receipt = source.execution_source_receipt
+    if receipt is None:
+        raise ValueError('Nut Scene binding requires its frozen execution source')
+    receipt.validate_snapshot()
+    root = ET.fromstring(receipt.importer_xml)
+    world = root.find('worldbody')
+    if world is None:
+        raise ValueError('Nut source has no worldbody')
+    robot_roots = [body for body in world.findall('body') if body.get('name') == 'link0']
+    if len(robot_roots) != 1:
+        raise ValueError('Nut source must contain exactly one declared Panda root')
+    for body in world.findall('body'):
+        if body is not robot_roots[0]:
+            world.remove(body)
+    imported = import_scene_source(SceneSource.mjcf_string(
+        ET.tostring(root, encoding='unicode'), base_dir=receipt.snapshot_root,
+        label=receipt.source_id), cache=False)
+    receipt.validate_imported_scene(imported)
+    panda = _panda_scene_from_import(imported, robot.asset_manifest(), entity_id=robot.uid,
+        scene_id=task_config['recipe']['scene_uid'], source_content_sha256=receipt.source_closure_digest)
+    assets, entities, frames, articulations = (list(panda.assets), list(panda.entities),
+        list(panda.frames), list(panda.articulations))
+    ee = task_config['recipe']['scene']['ee_site_name']
+    frames.append(FrameDefinition('frame-definition-v1', robot.uid, ee, 'runtime', None, None))
+    for entity_id, native in (('tabletop-v1', 'grasp_table'), ('square-nut-v1', 'SquareNut'),
+                              ('square-peg-v1', 'peg1'), ('round-peg-v1', 'peg2')):
+        asset = AssetDefinition('asset-definition-v1', entity_id + '-source', 'v1',
+            'geochora-task-scene://nut-assembly/' + entity_id, 'nut-snapshot-v1',
+            receipt.source_closure_digest)
+        assets.append(asset)
+        entities.append(EntityInstance('entity-instance-v1', entity_id, asset.asset_id, asset.asset_version))
+        frames.append(FrameDefinition('frame-definition-v1', entity_id, native, 'runtime', None, None))
+    frames.append(FrameDefinition('frame-definition-v1', 'square-nut-v1', 'world', 'runtime', None, None))
+    origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
+    free = JointDefinition('joint-definition-v1', 'SquareNut_joint',
+        FrameReference('square-nut-v1', 'world'), FrameReference('square-nut-v1', 'SquareNut'),
+        origin, origin, 'floating', None, 'xyz_meter_quaternion_wxyz',
+        'linear_xyz_meter_per_second_angular_xyz_radian_per_second', 7, 6)
+    articulations.append(ArticulationDefinition('articulation-definition-v1', 'square-nut-v1',
+        'world', ('world', 'SquareNut'), (free,)))
+    scene = SceneDefinition('scene-definition-v3', panda.scene_id, tuple(assets), tuple(entities),
+        tuple(frames), tuple(articulations), panda.robots, panda.actuator_resources, panda.control_groups)
+    scene.validate()
+    task_source = adapt_legacy_recipe_task_source({
+        'recipe': task_config['recipe'], 'environment': task_config['environment']})
+    typed_artifact = compile_task_artifact_v1(task_source, scene, artifact, frame_bindings={
+        f'{robot.uid}/base': FrameReference(robot.uid, 'link0'),
+        f'{robot.uid}/ee': FrameReference(robot.uid, ee)})
+    bindings = dict(typed_artifact.legacy_frame_bindings)
+    bindings.update({entity: FrameReference(entity, native) for entity, native in (
+        ('square-nut-v1', 'SquareNut'), ('square-peg-v1', 'peg1'), ('round-peg-v1', 'peg2'))})
+    typed_artifact = replace(typed_artifact, legacy_frame_bindings=bindings)
+    typed_artifact.validate_scene(scene)
+    bound, _, _ = bind_reference_scene_source(source, artifact=typed_artifact, scene=scene,
+                                                bodies=source.bodies, frames=source.frames)
+    return typed_artifact, bound
+
+
 def _find_body(root: ET.Element, name: str) -> ET.Element:
     for body in root.iter("body"):
         if body.get("name") == name:

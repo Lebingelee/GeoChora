@@ -13,9 +13,9 @@
 
 ### Signature
 
-`BaseTaskEnv(config: ResolvedEnvConfig | None = None, *, render_mode=None, build_runtime: bool = True)`
+公开用户应通过 `make_env` 构造。`BaseTaskEnv` 是同对象兼容名；其构造入口以 `config=None, *, render_mode=None, build_runtime=True, provider="geophys", backend="cpu", horizon=6000` 开头，并有 `_binding`、`_execution_spec_v1`、`_initial_value` 等内部构造参数以及 `task_rgb_camera`、`task_renderer`，不将内部参数当作普通用户 API。
 
-`reset(*, seed: int | None = None, options: dict[str, Any] | None = None)` 返回 `(observation, info)`；会应用初态、归零 elapsed steps、reset action/render/task definition。`step(action)` 返回 Gym 五元组 `(observation, reward, terminated, truncated, info)`：terminal 后再次 step 在 reset 前抛 `RuntimeError`。
+`reset(*, seed=<省略>, options=None)` 返回 `(observation, info)`；会应用初态、归零 elapsed steps、reset action/render/task definition。`step(action, *, external_com_wrenches=None, scene_body_wrenches=None)` 返回 Gym 五元组 `(observation, reward, terminated, truncated, info)`：terminal 后再次 step 在 reset 前抛 `RuntimeError`。
 
 ### Lifecycle and extension hooks
 

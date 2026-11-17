@@ -125,7 +125,7 @@ MuJoCo3.8.1 FREE角向armature／implicitfast的原生数值边界保留写入�
 
 002沿Nut Task binding／既有动作Controller和共同生命周期最小接通普通action，仍保留原ExpertAction的source／Solution身份、native反馈、reset／混用／fault检查；不复制Solution或Runtime，不放宽原Task成功/完成门。只补实际受影响代表运行，原7b九格与其他已通过矩阵按身份复用。完整包须包含实现、正式随机教程、定向负例、同运行H5独立读回和关闭，不能以设置一个flag或AST通过作为能力接收。
 
-执行进展（2026-11-17）：attempt002 已实际启动，普通计数为2；MuJoCo 原／装配 Nut 完整 Solution 及三条随机 action、marker 已有同运行记录、独立读回与 close，结果尚待独立主审。GeoPhys Nut Rasterizer 首帧因 canonical Scene/source closure 条件拒绝，state-only 结果与其分开。维护者在原 50,000 显式子步上限追加30,000，保留原有消耗；native 3,600秒和连续 wall 240分钟不变。逐页文档、正式返包和候选提交仍在实施中，见[单一矩阵](../capabilities/capability-matrix.json)及 ignored 输出 `workspace/maintenance/v211_g07c_attempt002/`。
+执行进展（2026-11-17）：attempt002 已实际启动，普通计数为2；MuJoCo 原／装配 Nut 完整 Solution 及三条随机 action、marker 已有同运行记录、独立读回与 close，结果已按实际身份和范围获独立主审有界接收。GeoPhys Nut Rasterizer 原首帧因缺 Scene 拒绝；授权 v1 Artifact 后，原 Panda／GeoPhys CPU 的指定 128×96 observer 一步、再 reset 和 close 在新 source 下通过，已按所测范围获独立主审接收；先前结果按原身份保留。维护者在原 50,000 显式子步上限追加30,000，保留原有消耗；native 3,600秒和连续 wall 240分钟不变。逐页文档和正式返包已获有界主审，本地收口以外部回执为准，见[单一矩阵](../capabilities/capability-matrix.json)及 ignored 输出 `workspace/maintenance/v211_g07c_attempt002/`。
 
 同时收口7b BodyWrench最终公共API／provider准入／记录与组合规则、7Goal/22子阶段摘要、单一矩阵、恢复入口、指南／API／Skills、版本变更／限制和发布准备。维护者补充：`task_env/doc`必须作为更细致的模块教程，按原`api/composition`、`semantics`、`planning`、`recording`、`appendix`及中文指南结构，逐页深化34篇current文档，覆盖21顶层目录及facade的实际职责、上下游、接口/输入输出/异常、生命周期/资源和完整核心例子；8篇历史更新日志原字节保留。不准只加导航或笼统“补全文档”，逐页owner/要求见完整包module-doc-map。维护者授权在002独立验收后将**本地develop**快进到最终阶段7 HEAD；不得覆盖非祖先develop、同步main或操作远端，源码身份变化按影响复核，不机械重跑完整历史矩阵。详见[002完整工作包与Goal提示](../maintenance/work-packages/20261117_g07c_attempt002_goal.md)。准备为READY_FOR_MANUAL_FORWARD_NOT_STARTED，计数仍1。
 

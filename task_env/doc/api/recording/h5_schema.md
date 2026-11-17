@@ -31,7 +31,7 @@ assert summary['t_plus_one_valid']
 
 ## 结构化数据位置与核验
 
-canonical execution v2 使用一维 `logical_json_utf8` 的 `uint8` 字节流，以及 T+1 长的 `control_step`、`native_step_index` 整数索引；它并非按每个字段建立独立 H5 dataset。使用 `task_env.trajectory.canonical.execution.load` 解码后，`transitions[i].record.applied_control` 是控制提交，`interval.substeps[j].applied` 与 `native_feedback_sample_v1` 是各原生子步的应用和反馈。不要把 ACK 解释成独立力传感。
+canonical execution v2 使用一维 `logical_json_utf8` 的 `uint8` 字节流，以及 T+1 长的 `control_step`、`native_step_index` 整数索引；它并非按每个字段建立独立 H5 dataset。使用 `task_env.trajectory.canonical.execution.load` 解码后，`transitions[i].record.applied_control` 是控制提交，`interval.substeps[j].applied` 与 `feedback` 是各原生子步的应用和反馈；只有声明并实际产生 native sample 的 Solution 路线才包含 `native_feedback_sample_v1`。不要把 ACK 解释成独立力传感。
 
 structured v3 的 `meta/structured_controls_v1_json`、`meta/boundary_events_v1_json`、`meta/episode_outcome_v1_json` 是 UTF-8 JSON scalar：首项解码为 T 个 typed control，事件和结果分别遵循自己的合同。它们不是固定宽度的 float 数组；joint effort 和 body wrench 的资源、writer、单位、frame 与 6 分量值按记录的 schema 解释。device scene 的 boundary context 若存在，其 `scene_physical_v1` 中记录 producer、body key、binding、6 个有限数值和 `native_ack`；它只表明指定 worker 接收并完成对应推进。通用数值轨迹中的 `reward` 是 `(T,) float32`，success/terminated/truncated 为 `(T,) bool`；observation/action 的 shape 与 dtype 以各自 metadata 为准。
 

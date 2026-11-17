@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import math
 import numpy as np
 
-from ...artifacts import CanonicalStateView, SemanticDefinition, TaskArtifact
+from ...artifacts import CanonicalStateView, SemanticDefinition, TaskArtifact, TaskArtifactV1
 from ...artifacts.execution import ResetSample
 from ...environment.task_definition import CanonicalTaskStateView, TaskDefinitionBase, as_task_state_view
 from ...objects.nut_assembly import NUT_HALF_HEIGHT, NUT_HANDLE_LOCAL_X
@@ -94,6 +94,7 @@ def sample_reset(artifact: TaskArtifact, task_seed: int = 19, *, lift_height_m=N
     expected = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
     if not isinstance(artifact, TaskArtifact) or artifact.to_mapping() != expected.to_mapping():
         raise ValueError("selected NA-S0 TaskArtifact required")
+    artifact.validate()
     if type(task_seed) is not int or task_seed != 19:
         raise ValueError("selected NA-S0 uses fixed provenance seed19")
     initialization = artifact.initialization
@@ -122,8 +123,9 @@ class NutAssemblyTaskDefinition(TaskDefinitionBase):
 
     @classmethod
     def from_artifact(cls, artifact: TaskArtifact, reset: dict):
-        if not isinstance(artifact, TaskArtifact) or artifact.semantics.evaluator != 'nut_assembly_state_v0':
+        if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)) or artifact.semantics.evaluator != 'nut_assembly_state_v0':
             raise ValueError('NutAssembly task definition requires its semantic Artifact')
+        artifact.validate()
         return cls(artifact.identity_hash, artifact.semantics, reset['sampler_id'],
                    reset['sampler_version'], reset['inherited_state_policy'],
                    reset['control_policy'], int(reset['settle_steps']))
@@ -141,8 +143,12 @@ class NutAssemblyTaskDefinition(TaskDefinitionBase):
         return _evaluate_bound(view.canonical_state, semantics)
 
     def sample_reset(self, artifact, task_seed):
-        if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != self.artifact_hash:
+        if not (isinstance(artifact, (TaskArtifact, TaskArtifactV1))
+                and artifact.identity_hash == self.artifact_hash):
             raise ValueError('selected NA-S0 TaskArtifact required')
+        artifact.validate()
+        if artifact.semantics != self.semantics:
+            raise ValueError('NutAssembly Artifact semantics differ from its task definition')
         if type(task_seed) is not int or task_seed != 19:
             raise ValueError('selected NA-S0 uses fixed provenance seed19')
         initial = artifact.initialization

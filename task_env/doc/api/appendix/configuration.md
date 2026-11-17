@@ -1,6 +1,6 @@
 # Configuration
 
-用户通常将 mapping、YAML 路径或该路线接受的 resolved config 交给 `task_env.make_env(uid, *, config=None, render_mode=None, **kwargs)`。`task_env.resolve_env_config` 是关键字构造函数，必填 `task_uid`、`scene_uid`，并可传 `agent_uids`、`object_uids`、`success_definition` 及各 section；它不是接受任意字典的统一解析器。factory 内部 `resolve_task_env_config(environment_type, config)` 按实际 task 选择解析路径。未知字段、错误类型和不满足 capability 的组合会在相应构造／准入阶段报错。
+用户通常将 mapping、YAML 路径或该路线接受的 resolved config 交给 `task_env.make_env(uid, *, config=None, render_mode=None, execution=None, **kwargs)`。`task_env.resolve_env_config` 是关键字构造函数，必填 `task_uid`、`scene_uid`，并可传 `agent_uids`、`object_uids`、`success_definition` 及各 section；它不是接受任意字典的统一解析器。factory 内部 `resolve_task_env_config(environment_type, config)` 按实际 task 选择解析路径。未知字段、错误类型和不满足 capability 的组合会在相应构造／准入阶段报错。
 
 ## Selected 配置
 
@@ -18,6 +18,28 @@ env.close()
 ```
 
 该片段本维护版本未单独运行。解析顺序是Core → task class → task YAML → caller；旧顶层provider/backend/horizon/controller等alias已退休，不能继续用于正式配置。`task`可用字段由任务声明。`execution.render_default`当前仍限none/cpu/none/null，但这不禁止独立的observer与task RGB。scalar与device batch均接受顶层`render`及resolved往返；实际native observer backend、显式CameraSpec、CPU uint8导出和未支持sensor字段见[当前渲染合同](../../../../docs/module/task_env/v2.1.1/api/README.md#render-contract)。精确类型和准入以[`configuration.py`](../../../environment/configuration.py)为准。
+
+## mapping、YAML 与 resolved 配置
+
+下例只解析配置，不初始化物理引擎。YAML 文件和 mapping 给出相同输入；第二次传入 resolved 对象验证该入口的往返。该配置解析的等价断言由 `review-config-roundtrip-001` 验证；它不证明 provider 依赖可用或任意配置被支持。
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import yaml
+from task_env.tasks.pendulum import PendulumEnv
+from task_env.environment.configuration import resolve_task_env_config
+
+settings = {"execution": {"physics_provider": "mujoco", "physics_backend": "cpu",
+                          "deployment": "in_process"}}
+with TemporaryDirectory() as directory:
+    path = Path(directory) / "env.yaml"
+    path.write_text(yaml.safe_dump(settings), encoding="utf-8")
+    from_mapping = resolve_task_env_config(PendulumEnv, settings)
+    from_yaml = resolve_task_env_config(PendulumEnv, path)
+    roundtrip = resolve_task_env_config(PendulumEnv, from_mapping)
+    assert from_mapping == from_yaml == roundtrip
+```
 
 ## 配置层次
 

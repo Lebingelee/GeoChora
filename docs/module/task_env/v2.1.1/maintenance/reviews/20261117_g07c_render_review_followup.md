@@ -13,3 +13,18 @@
 随后 `review-scene-prototype-001` 在 ignored 工作区用同一冻结快照和现有绑定器构造了包含 Nut/peg/table 的静态 Scene 原型：源 Artifact `99e374bd…` 变为 `a1baeddf…`，closure 从 `bf086196…` 变为 `82f5ebf4…`。原型未验证 GeoPhys 物化、状态同步或任务闭环，不是生产 Scene，也不是通过证据。
 
 当前没有落生产渲染补丁，也没有声明 GeoPhys Nut 渲染通过。需要在现有 owner 确定可验证的同快照 Scene/Artifact 绑定和物理导入影响后，才能执行 reset→首帧→动作→后续帧→reset→close，检查同一边界及 render 不推进。guard 没有删除，旧 H5 和失败未改。该缺口未关闭，7c002 不作完整接收，develop 未移动；历史过程偏差的维护者有界决定不等于渲染通过。
+
+## 后续：维护者授权 canonical Artifact 后的修复与证据
+
+以上未闭环记录保留为当时事实。维护者随后明确允许 Nut 使用与 PickCube 对齐的 v1 Artifact，并要求以实质物理输入与新旧轨迹比较评估影响。GeoPhys Nut 现从真实 execution receipt 的 importer XML 和同一快照资产构建 Panda/Task Scene，经现有 `bind_reference_scene_source` 构造 source 和 TaskArtifactV1；reset 使用现有 `sample_episode_reset_plan`，校验实际 TaskSource、Scene 和 Artifact。v0 helper 仍精确匹配；v1 TaskDefinition 的 reset 要求其确切 Artifact identity。共同 source、Controller 绑定和现有身份 guard 保留。此更改影响所有 GeoPhys Nut 构建，不仅开启渲染时；MuJoCo 仍使用原 v0 route。
+
+| 证据 | 结果和范围 |
+| --- | --- |
+| `render-geophys-003` | 原 Panda、GeoPhys CPU isolated worker、seed19、128×96 Rasterizer observer；首帧、非零一步后帧、再次 reset 后帧均为 HWC uint8、非空，render 前后公开状态与时钟不变，close；同 run H5 独立读回 1/2、ordinary。三张 PNG 保存于运行目录；主体较小，不据此判断细节几何准确性。 |
+| `random-geophys-006` | 同新 source 的 32 步普通 action、真实关节与夹爪响应、逐区间 ACK 和 5×2 ms，close；同 run H5 独立 32/33，ordinary。worker 子步按 160 保守计入。 |
+| `solution-guard-geophys-001` | 新 source 下 foreign identity、缺 request、stale 与 reset 后旧 proposal 被拒绝；合法 proposal 一步成功，普通动作混用被拒绝，close，H5 独立 1/2。非完整 Solution 回归。 |
+| `review-followup/trajectory-comparison.json` | 新旧 GeoPhys 相同 seed、32 条相同动作、33 边界，state 1,815、task metrics 759、feedback 132、requested action 256 个数值的最大绝对差均为 0；非数值字段也相等。这是用户认可的该输入轨迹强证据，不外推所有动作。 |
+| `review-import-equivalence-003` | 以 source name 对应比较原始和投影导入的 15 body 质量属性、10 joint 的轴/frames/limits/dynamics、106 shape 的资源/变换/角色/缩放及 physics，所列字段相等；两次 importer 均有一条 retained/rejected semantics 警告，不概括为所有 MJCF 语义等价。前两次比较按 hash 派生 ID 的顺序配对失败，其日志保留。 |
+| `review-reset-guard-001` | 不同 Artifact、错误 Scene 和 v0 helper 接收 v1 的负例均拒绝。 |
+
+最终三个生产文件 hash 及运行预留见 ignored `review-followup/final-run-plan.json`；独立审阅已核对 hash、渲染与随机 H5、guard 和上述比较，未发现受测交集的具体阻断。旧 source 和旧 H5 不改、不冒充新身份。完整新版 GeoPhys Solution、其他相机和其他 provider 未因本次变更重跑；维护者明确要求不重跑完整 Solution 和其他后端。资源和连续子步计费见 `review-followup/run-ledger.json`。

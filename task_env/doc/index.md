@@ -1,6 +1,6 @@
 # TaskEnv 文档入口
 
-当前（2026-11-17）：G01～G06 及 G07 7a/7b 已按各自范围有界接收；7c002 正在实施，完成后须独立主审。5c 和 E00～E16 的旧结案不重开。先读[当前摘要](../../docs/module/task_env/v2.1.1/maintenance/current-state.md)和[优化安排](../../docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md)。旧 attempt 的失败／待审文字保留所属历史时点。
+当前（2026-11-17）：G01～G06 及 G07 7a/7b 已按各自范围有界接收；7c002 的 GeoPhys Nut 渲染修复与文档补正已通过独立主审的有界接收。5c 和 E00～E16 的旧结案不重开。先读[当前摘要](../../docs/module/task_env/v2.1.1/maintenance/current-state.md)和[优化安排](../../docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md)。旧 attempt 的失败／待审文字保留所属历史时点。
 
 ## v2.1.1 新手入口与当前范围
 
@@ -42,3 +42,15 @@ task_env.PARALLEL_ENV_REGISTRY  # 并行能力注册表
 ~~~
 
 TaskEnv 使用者只通过 reset、step、action_space、observation_space、info 和记录器访问环境。solver、Taichi field、runtime private state 和 stage/diagnostic 文件不属于 Quickstart 使用面。
+
+## Diagnostics、文档与 Skill 的边界
+
+[`task_env/diagnostics`](../diagnostics) 保存针对真实入口的验证与证据采集，输入是各脚本声明的配置、已固定 source 与运行预算；输出是对应运行的结果和失败，不能由一次导入或 mock 推导物理成功。native 验证使用既有共享锁和监督器，临时原始数据写 ignored `workspace/` 并保留失败与关闭结果；诊断代码不接管生产 Runtime。`task_env/doc` 解释当前接口，历史日志保留其时点；[TaskEnv Skill](../../.agents/skills/geochora-task-env/SKILL.md) 为维护者指向已有 owner 和验证入口，并非运行时 API。
+
+从仓库根目录执行文档治理检查：
+
+```bash
+python .agents/skills/geochora-doc-governance/scripts/validate_docs.py --mode current
+```
+
+该命令只检查文档治理，不运行文档中的物理示例；目前已知本地保护日志基准差异见当前状态，新增错误仍须单独处理。

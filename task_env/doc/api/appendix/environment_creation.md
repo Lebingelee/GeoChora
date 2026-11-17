@@ -20,7 +20,7 @@
 
 **Kind**：function / registry object；**Stability**：Public API；**Defined in**：`registry.py`
 
-`make_env(uid: str, *, config=None, render_mode=None, **kwargs) -> TaskEnvironmentComponent`；`make_agent`、`make_object`、`make_scene` 分别创建对应组件。`ENV_REGISTRY`、`AGENT_REGISTRY`、`OBJECT_REGISTRY`、`SCENE_REGISTRY` 是 registry 实例。未知 UID 抛 `KeyError`；已退休的 PickCube、NutAssembly 和 Go2 旧 UID 抛带迁移提示的 `ValueError`。selected 与 classic-control 的 Task binding 不同，但使用共同环境 owner；详见 [API 入口](../index.md)。
+`make_env(uid: str, *, config=None, render_mode=None, execution=None, **kwargs) -> TaskEnvironmentComponent`；`make_agent`、`make_object`、`make_scene` 分别创建对应组件。`ENV_REGISTRY`、`AGENT_REGISTRY`、`OBJECT_REGISTRY`、`SCENE_REGISTRY` 是 registry 实例。未知 UID 抛 `KeyError`；已退休的 PickCube、NutAssembly 和 Go2 旧 UID 抛带迁移提示的 `ValueError`。selected 与 classic-control 的 Task binding 不同，但使用共同环境 owner；详见 [API 入口](../index.md)。
 
 最小用户调用顺序如下；配置只使用声明的公共 section，task topology 与 task-owned reward 不从脚本侧重写：
 
@@ -41,8 +41,8 @@ finally:
 
 ## Optional homogeneous parallel factory
 
-`from task_env import make_parallel_env` 的 `make_parallel_env(uid, env_config=None, num_env=1, backend="cuda", execution="remote")` 是可选的并行入口。
-`execution='device'` 是 G06 有界接收的正式设备 batch 路线：Pendulum/PickCube × `mujoco_warp`/`geophys`/`isaacsim`，使用 `step()`、same-step autoreset、部分 reset 和具名相机；见 [device 教程](../../../../docs/module/task_env/v2.1.1/guides/quickstart-device-batch.md)。`remote`/`local` 是旧 SB3 并行路线；登记本身不是当前多环境运行证据。组件并行入口只为通过 `@register_parallel_env()` 显式登记 framework batch capability 的任务创建同构 batch；没有 batch backend 的
+`from task_env import make_parallel_env` 的 `make_parallel_env(uid, env_config=None, num_env=1, backend="cuda", *, execution="remote", start_method="spawn", compile_mode="fastest", **env_kwargs)` 是可选的并行入口。
+device 路线拒绝非默认 worker 选项。`execution='device'` 是 G06 有界接收的正式设备 batch 路线：Pendulum/PickCube × `mujoco_warp`/`geophys`/`isaacsim`，使用 `step()`、same-step autoreset、部分 reset 和具名相机；见 [device 教程](../../../../docs/module/task_env/v2.1.1/guides/quickstart-device-batch.md)。`remote`/`local` 是旧 SB3 并行路线；登记本身不是当前多环境运行证据。组件并行入口只为通过 `@register_parallel_env()` 显式登记 framework batch capability 的任务创建同构 batch；没有 batch backend 的
 task 会明确抛出 `task uid has no homogeneous parallel backend`，不会退化为 `num_env` 个 single env。
 
 `execution="local"` 返回同进程 raw vector/SB3 adapter，适合契约 smoke；`execution="remote"` 使用

@@ -1,14 +1,14 @@
 # v2.1.1 恢复入口
 
-更新时间：2026-11-17。G01～G06、G07 7a/7b 已有界接收；7c001 文档已接收合并，7c002 已返包待独立主审，普通 attempt=2。先读[唯一当前摘要](current-state.md)、[编排索引](orchestration.json)及执行输出 `workspace/maintenance/v211_g07c_attempt002/`；最终状态以实施返包和独立主审为准。
+更新时间：2026-11-17。G01～G06、G07 7a/7b 已有界接收；7c001 文档已接收合并，7c002 已独立主审有界接收，普通 attempt=2。先读[唯一当前摘要](current-state.md)、[编排索引](orchestration.json)及执行输出 `workspace/maintenance/v211_g07c_attempt002/`；范围以[独立主审](reviews/20261117_g07c_attempt002_acceptance.md)和收口回执为准。
 
 | 当前恢复项 | 事实 |
 | --- | --- |
 | 写入位置 | `codex/v211-stage7-integration`，输入 `2c697908d7e7948c4b33e65fabdd6ec88e3dda1b` |
-| 已有验证 | 三条 Nut 普通动作、两条 MuJoCo 完整 Solution 和 marker 有同运行记录与独立读回，等待独立主审 |
-| 保留限制 | GeoPhys Nut Rasterizer 首帧 source/Scene 条件失败；7b MuJoCo FREE angular-armature 力矩边界仍拒绝 |
-| 预算 | 7c002 wall 截止 21:45 CST；用户追加 30,000 显式子步，上限 80,000，连续计费 72,980；native 778.17/3,600 秒 |
-| 后续 | 审阅执行返包与历史 GPU 监控缺口，独立主审；未接收前不移动 develop，不 push/tag/Release |
+| 已有验证 | 三条 Nut 普通动作、两条 MuJoCo 完整 Solution 和 marker 有同运行记录与独立读回，已按各自输入身份有界接收 |
+| 保留限制 | GeoPhys Nut 初次首帧失败保留；新 source 指定 observer 的一步/重置/关闭通过，其他相机和几何细节未验；7b MuJoCo FREE angular-armature 力矩边界仍拒绝 |
+| 预算 | 7c002 wall 截止 21:45 CST；用户追加 30,000 显式子步，上限 80,000，连续计费 73,315；native 949.92/3,600 秒 |
+| 后续 | 核验本地 develop 祖先和占用后执行授权的 fast-forward 并写外部收据；未接收前不移动 develop，不 push/tag/Release |
 
 以下是各历史窗口的恢复记录，保留当时的待审、失败、授权及暂停状态；其中的“当前”“尚未开始”只指该记录时点，不覆盖上方唯一当前摘要。最新综合主审见[单元 9](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)。
 

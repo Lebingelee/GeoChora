@@ -272,6 +272,11 @@ def _compile_reference_source(request, *, resolved_config=None, lift_height_m=No
         composition=composition, scene=recipe['scene'], asset=recipe['asset'],
         physics_dt=recipe['physics_dt'], robot=robot, config=config, provider=request.provider,
         provider_options=recipe['providers'], eef_semantic=EEF)
+    if request.provider == 'geophys':
+        from ...assembly.nut_assembly import bind_nut_assembly_scene
+        from ...runtime.sessions.source import close_execution_source_on_failure
+        with close_execution_source_on_failure(source):
+            artifact, source = bind_nut_assembly_scene(source, artifact, task_config, robot=robot)
     return CompiledReferenceTaskV1(artifact, source), _NutSourceContext(task_config, contact_profile)
 
 
@@ -372,7 +377,7 @@ def _bind_reference_controller(compiled, context, execution_controller, request,
         "source_revision": revision, "source_sha256": source_files,
         "qualification": "NOT_REQUALIFIED",
         }
-    return {"construction_id": construction_id, "artifact": artifact, "source": source,
+    value = {"construction_id": construction_id, "artifact": artifact, "source": source,
         "controller": execution_controller,
         "controller_identity": controller.identity,
         "solution": solution,
@@ -388,6 +393,14 @@ def _bind_reference_controller(compiled, context, execution_controller, request,
         "source_revision": revision, "source_sha256": source_files,
         "_execution_provider": provider,
         "_contact_profile": contact_profile}
+    from ...artifacts import TaskArtifactV1
+    if isinstance(artifact, TaskArtifactV1):
+        from ...environment.task_source import adapt_legacy_recipe_task_source, sample_episode_reset_plan
+        task_source = adapt_legacy_recipe_task_source({
+            'recipe': task_config['recipe'], 'environment': task_config['environment']})
+        value['reset_plan'] = sample_episode_reset_plan(
+            task_source, source.scene_definition, artifact, task_seed=19)
+    return value
 
 
 

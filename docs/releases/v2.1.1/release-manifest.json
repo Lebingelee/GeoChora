@@ -1,7 +1,7 @@
 {
   "schema": "geochora-local-release-candidate-v1",
   "version": "2.1.1",
-  "status": "DRAFT_LOCAL_CANDIDATE_AWAITING_7C_REVIEW",
+  "status": "DRAFT_LOCAL_CANDIDATE_7C_ACCEPTED_BOUNDED",
   "input_core_commit": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
   "input_core_tree": "b0ea38723d2e14ab9d3f0c30c0b8c1c57dfd219c",
   "accepted_7b_production_commit": "81d1138d54f9397fe1bd3569871fdf8beb05dcb8",
@@ -11,12 +11,15 @@
   "7c_runtime_source_files_sha256": {
     "task_env/environment/reference_env.py": "8ca9ba31428582e838271c9ef8f7af5bc1fc3b226c8738ae5a9720bdaef5c8a3",
     "task_env/controllers/canonical/contracts.py": "027904d4274b099d190194292fb0d4c9b52143000b6f06809c626d6af242967e",
-    "task_env/tasks/nut_assembly/specialization.py": "4efd6fad06f8a1367583268cf3f61f5bff191998917f9bcc12dc5ce3823b594e",
+    "task_env/tasks/nut_assembly/specialization.py": "879744d158db5dabeb3ac5b7fc4deaa3528676425e8f058142cc5940319d8a6a",
     "examples/_common.py": "ce7e8f38f3d11a465a08d48ad12c64edf6d1281c18264fc6050a06b1d9b1fb44",
-    "examples/tasks/declared_marker.py": "1e6e59cfb9744a9e7810606520a9029fdce504454d013c7f2f96e692ed5e321f"
+    "examples/tasks/declared_marker.py": "1e6e59cfb9744a9e7810606520a9029fdce504454d013c7f2f96e692ed5e321f",
+    "task_env/assembly/nut_assembly.py": "67c24041a9fc95a7a0de839fbb217f982214cc2c5e7868f1501648fa84f5175b",
+    "task_env/tasks/nut_assembly/task.py": "115e3216f38600cc77af7cb6b9500a62a3bb01effb0b738ee7a9400d0b88a4fc"
   },
   "capability_matrix": "../../module/task_env/v2.1.1/capabilities/capability-matrix.json",
   "final_candidate_commit": "EXTERNAL_CLOSEOUT_RECEIPT_AFTER_INDEPENDENT_REVIEW",
   "tag_or_publication": false,
-  "asset_distribution_license": "HUMAN_DECISION_PENDING"
+  "asset_distribution_license": "HUMAN_DECISION_PENDING",
+  "7c_independent_review": "../../module/task_env/v2.1.1/maintenance/reviews/20261117_g07c_attempt002_acceptance.md"
 }
