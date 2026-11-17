@@ -169,3 +169,30 @@ def test_r3_readiness_holds_vertical_action_until_public_tcp_clearance_is_measur
     descent = solution.act()
     assert descent.diagnostics.get("measured_tcp_clearance_gate_hold") is False
     assert np.array_equal(descent.action, plan.actions[lateral_gate.after_actions])
+
+
+def test_r3_approach_omits_fixed_settles_but_keeps_waypoint_gates():
+    from task_env.tasks.pick_cube.specialization import build_readiness_solution
+
+    solution = build_readiness_solution(backend='cpu', controller_profile='r3_continuous_v1')
+    start = np.asarray([.5465, -.0938, .5661, 0., .7646, .6445, 0.], dtype=np.float32)
+    cube = np.asarray([.6351, -.0865, .488], dtype=np.float32)
+    observation = {'state': {'ee_pose': start},
+        'privileged_state': {'cube_v1_body_pose': np.asarray([[*cube, 1., 0., 0., 0.]])}}
+    plan = solution._plan_move_above(observation, {})
+    gates = plan.measured_tcp_gates
+    assert [g.name for g in gates] == ['vertical_clearance', 'over_cube_before_descent']
+    assert 0 < gates[0].after_actions < gates[1].after_actions < len(plan.actions)
+    # All three cubic moves retain the planner's configured speed/acceleration,
+    # endpoint and gripper while no longer repeating their fixed settle tails.
+    points = [start[:3], plan.actions[gates[0].after_actions - 1, :3],
+              plan.actions[gates[1].after_actions - 1, :3], plan.target_pose[:3]]
+    rebuilt = []
+    for before, after in zip(points, points[1:]):
+        pose = start.copy(); pose[:3] = before
+        rebuilt.append(solution._planner.plan_translation_only(
+            current_pose=pose, target_position=after, gripper=1., settle_steps=0))
+    assert sum(map(len, rebuilt)) == len(plan.actions)
+    assert solution.config.planner.settle_steps > 0
+    assert np.allclose(plan.actions[-1, :3], plan.target_pose[:3])
+    assert np.all(plan.actions[:, 7] == 1.)

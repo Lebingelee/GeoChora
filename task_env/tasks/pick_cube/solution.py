@@ -431,20 +431,27 @@ class PickCubeSolution:
         clear[2] = max(float(start[2]), commanded_clearance_z)
         transit = clear.copy()
         transit[:2] = target[:2]
+        # R3 already waits for measured TCP clearance at both approach
+        # waypoints and for pose readiness at the final point. Avoid adding
+        # fixed duplicate settle tails before those measured checks.
+        approach_settle_steps = 0 if r3_clearance_profile else None
         vertical_actions = self._planner.plan_translation_only(
             current_pose=start,
             target_position=clear[:3],
             gripper=1.0,
+            settle_steps=approach_settle_steps,
         )
         lateral_actions = self._planner.plan_translation_only(
             current_pose=clear,
             target_position=transit[:3],
             gripper=1.0,
+            settle_steps=approach_settle_steps,
         )
         descend_actions = self._planner.plan_translation_only(
             current_pose=transit,
             target_position=target[:3],
             gripper=1.0,
+            settle_steps=approach_settle_steps,
         )
         action_segments = (vertical_actions, lateral_actions, descend_actions)
         actions = np.concatenate([segment for segment in action_segments if len(segment)], axis=0)
