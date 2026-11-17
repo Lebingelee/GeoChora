@@ -21,7 +21,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Independent review of the partial 7b return and current BodyWrench admission gap; 7c remains PLANNED.",
+  "next_action": "Maintainer and Sol determine BodyWrench admission design; retain 7b partial result and independent evidence, 7c remains PLANNED.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2226,8 +2226,8 @@
                 "authorized_by": "user",
                 "new_epoch_limit": 200000,
                 "prior_known": 71875,
-                "new_epoch_used": 900,
-                "known_aggregate": 72775
+                "new_epoch_used": 1175,
+                "known_aggregate": 73050
               }
             }
           ],
@@ -2260,10 +2260,11 @@
           },
           "last_observation": {
             "at": "2026-11-17T13:12:23.984153+08:00",
-            "state": "Nine cells plus current MJWarp staggered independent readback pass; current BodyWrench selection/native chain remains unverified; partial return pending independent review."
+            "state": "Nine cells, G03 five-route five-step independent H5, current 7+2 ACK and G06 representative checks complete; BodyWrench admission gap awaits maintainer and Sol design."
           },
           "evidence_refs": [
-            "reviews/20261117_g07b_attempt001_execution.md"
+            "reviews/20261117_g07b_attempt001_execution.md",
+            "reviews/20261117_g07b_bodywrench_gap.md"
           ],
           "commits": [
             "ab4f9b13c17bcf522ca84bcc8bc94ad527320052",
@@ -2273,7 +2274,7 @@
           ],
           "review_decision": null,
           "blockers": [
-            "BODYWRENCH_CURRENT_CHAIN_NOT_VERIFIED"
+            "BODYWRENCH_CURRENT_CHAIN_NOT_VERIFIED — maintainer coordinating design with Sol"
           ],
           "input_head_role": "Reviewed production parent; actual document-successor start HEAD in dispatch-input.json",
           "package_status": "EXECUTED_RETURNED_PARTIAL",

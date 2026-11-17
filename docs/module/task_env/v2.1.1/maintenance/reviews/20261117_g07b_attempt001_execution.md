@@ -17,7 +17,7 @@
 | 规范或独立门 | 调用链与依据 | 本次结论及限制 |
 | --- | --- | --- |
 | 7a 正式共同构建／装配与原 Panda | 正式 Task config → `make_env` → 共同 builder/source composition → Robot recipe 与 Controller binding；详见 7a 两份独立主审 | 按对应输入复用原共同构建、默认／显式选择与 reset 有界证据；新 PickCube Solution 已对装配 Panda 正式 caller 补跑，870 transitions、任务及 Solution 成功、独立 H5 和 close。四个 MuJoCo 交集原结论不推广为任意装配树或任意 Controller 切换。Nut 的当前 GeoPhys 源码未复验。 |
-| G03 provider 切换 | 当前同 Env MuJoCo→GeoPhys→MuJoCo→Isaac→MuJoCo，5 条独立 H5 | 当前短程及关闭通过；旧更强证据只按原输入引用，GeoPhys↔Isaac 直接切换未准入。 |
+| G03 provider 切换 | 当前同 Env MuJoCo→GeoPhys→MuJoCo→Isaac→MuJoCo，每段五步，5 条独立 H5 | 当前五段及关闭通过；旧更强证据只按原输入引用，GeoPhys↔Isaac 直接切换未准入。 |
 | G04 Controller/reset | 同 Env joint→R3→joint，generation 1/2/3，返回参数 kp=100，3 条独立 v3 H5 | 当前短程与关闭通过；旧故障／stale 条件只按原输入引用，不扩成任意装配切换。 |
 | G04 7＋2 effort | 当前 MuJoCo 同 Env joint→R3→joint 的 3 条独立 H5 与 native ACK | 三段各有七个具名 N·m 臂关节及两个具名 N 手指关节准入项，9 个 contribution ID 与写入 ACK 对应；非独立测力或逐输入方向验证。GeoPhys／Isaac 原 4b 有界证据保留原输入。 |
 | G04 BodyWrench | 真实 Panda source、subject、Controller 和公共选择 | 原 subject 仅声明 effort writer，WrenchController 未声明同一 selection profile；真实组合在零步被 guard 拒绝。历史 4b 的数学及原生记录与本次 COM +2 N ACK 均不能证明当前 BodyWrench 链。缺少合法 composite authority 的最小路线，未伪造声明或放宽 guard。`BODYWRENCH_CURRENT_CHAIN_NOT_VERIFIED`。 |
@@ -27,8 +27,10 @@
 
 定向回归包括旧监督和 binding 检查、Solution／时钟／信号检查及最终 70 项通过。此前一项 fake fixture 不满足真实 port close 合同导致 69 通过／1 失败，修正 fixture 后通过；历史测试导入已退役 `build_reference` 的收集失败也保留。未运行 setup、doctor、完整训练、全部 provider 或任意装配树。
 
-维护者授权显式子步预算重置到新周期 200000：旧周期已知 71875，之后两次部分 reset 各保守计 375，MJWarp stagger 保守计 150，新周期已用 900、全历史已知 72775；Isaac 隐式启动／reset 步数未知。其他 wall／native／内存／显存／输出限制仍按原包。OMP、OpenBLAS、MKL 请求均为1，初始 affinity 最多4 CPU，Taichi/Forge 编译日志4线程，solver 线程池未实测；不称全 SDK 为单线程。先前运行使用 canonical 锁与继承 FD，但未逐次核 legacy inode／blocker；事后 inode 一致，后续监督器已在获取锁后核 alias 和 blocker，不倒填旧运行检查。澄清005与006及其 SHA、原始 receipts 在工作包证据中。
+维护者授权显式子步预算重置到新周期 200000：旧周期已知 71875，之后两次部分 reset 各保守计 375，MJWarp stagger 保守计 150，另计 CLI 25、G03 首次强制终止保守 125 与重试 125，新周期已用 1175、全历史已知 73050；Isaac 隐式启动／reset 步数未知。其他 wall／native／内存／显存／输出限制仍按原包。OMP、OpenBLAS、MKL 请求均为1，初始 affinity 最多4 CPU，Taichi/Forge 编译日志4线程，solver 线程池未实测；不称全 SDK 为单线程。先前运行使用 canonical 锁与继承 FD，但未逐次核 legacy inode／blocker；事后 inode 一致，后续监督器已在获取锁后核 alias 和 blocker，不倒填旧运行检查。澄清005与006及其 SHA、原始 receipts 在工作包证据中。
 
-最终检查：`git diff --check` 与更新 JSON 解析通过；文档 current 校验退出 1，唯一错误为保护输入 `MUJOCO_LOG.TXT` 与文档基准不一致，其实际 SHA256 仍为启动前的 `3b08b858f62dcbaa6521802455c76126f9876a3d6727c7586db90c94296ed6a8`，未修改该保护文件。44 个监督回执 wall 合计约 3790.347 秒（包含受监督测试，保守计），最大进程树 RSS 约 8.14 GiB（图像／CUDA 类），最大整卡 3128 MiB。
+最终检查：`git diff --check` 与更新 JSON 解析通过；文档 current 校验退出 1，唯一错误为保护输入 `MUJOCO_LOG.TXT` 与文档基准不一致，其实际 SHA256 仍为启动前的 `3b08b858f62dcbaa6521802455c76126f9876a3d6727c7586db90c94296ed6a8`，未修改该保护文件。50 个监督回执 wall 合计约 3950.399 秒（包含受监督测试，保守计），最大进程树 RSS 约 8.14 GiB（图像／CUDA 类），最大整卡 3128 MiB。
 
 后续 MJWarp 交错终止代表补证：69 项检查通过、正常关闭；独立读回 7 条 H5、27 个边界与 10 组终止／重置相机对通过。首次读者因新旧监督回执字段名不同而失败；独立保存映射及原回执 SHA 后重试，原 H5 未改动。该结果不推广至全部 provider／任务。
+
+维护者要求先完成其余内容并自行与 Sol 确定 BodyWrench 方案；[缺口说明](20261117_g07b_bodywrench_gap.md)列明实际准入拒绝、所需权限和验证边界。正式 CLI 的 `--help`、MuJoCo 五步短程及其独立 H5 读回已补齐；短 horizon 的 task/Solution 实际失败，不能当任务成功。G03 五段五步首次在 Isaac 启动时因误用 CPU 6 GiB 监督类别被强制结束，前三段 75 子步可见、未正常 close，保守计 125；按 CUDA 10 GiB 类别重试并取得五条同运行 H5 独立读回和正常关闭。冻结源码及九格 H5 哈希、三个 seed31 图像关联事后完整性对账通过。
