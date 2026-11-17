@@ -2,6 +2,8 @@
 
 更新时间：2026-11-17。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
+**7c文档工作树说明（2026-11-17）：**此分支从`4fdf9379`隔离，下面7b实施状态保留为该输入时点的快照；实时7b由`codex/v211-stage7-integration`及其writer维护。本树不据此声称7b尚未启动或已接收。维护者已允许[7c attempt001](work-packages/20261117_g07c_attempt001_goal.md)提前完善不依赖7b的文档，准备READY待手动转发／普通attempt0，未启动Goal/native。详细[教程填充蓝图](../planning/stage7-7c-tutorial-blueprint.md)覆盖六部分和独立Controller章；最终API/单一矩阵/恢复身份由7b接收后的attempt002收口。Nut普通随机动作当前拒绝的需求缺口保留，不以文档补齐宣布能力已实现。
+
 ## 当前停门
 
 G07／7a已按[attempt002独立主审](reviews/20261117_g07a_attempt002_acceptance.md)有界收尾，普通attempt数2，生产HEAD `0a6213c040e06e6385b6d1f5509af34a8d5b8372`，旧资产冻结来支本地merge `94e865e3`，分支`codex/v211-stage7-integration`。此前维护者[部分接收](reviews/20261117_g07a_attempt001_partial_acceptance.md)的原/装配Panda四个MuJoCo完整交集及空载/本体补偿继续保留；当前GeoPhys源码未按限定重跑，Nut释放MuJoCo1mm/GeoPhys8mm不变。LIBERO默认七轴真实effort/ACK/reset与同run H5/关闭、显式pose空载相对同保持输入历史OSC四项不退步已复核；64步正式caller仍task_success=false、Solution completion未评估。主审仅新增1600子步历史参考补证，未改生产源码，不重开原attempt002窗口。

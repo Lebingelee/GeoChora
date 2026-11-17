@@ -1,5 +1,7 @@
 # v2.1.1 指南交付要求
 
+2026-11-17维护者已要求按[7c详细教程蓝图](../planning/stage7-7c-tutorial-blueprint.md)将本目录扩写为安装、三个scalar任务、窗口/相机、device并行、环境/资产/Robot、独立Controller和API用法的完整教程；[attempt001工作包](../maintenance/work-packages/20261117_g07c_attempt001_goal.md)已在隔离文档工作树准备，未启动执行。下列旧交付文字属于待对账输入，尤其旧“统一Env并行未适配”不能覆盖下方G06已接收能力；当前能力以API/G06证据为准。正文展开与归并归attempt001，7b最终接口/验收回填归attempt002，不在准备稿中宣称教程已完成。
+
 G06 canonical CUDA并行已结案：普通调用、具名相机、部分reset及整批切换见[API](../api/README.md)与[并行示例](../../../../../examples/parallel/reconfigure_device.py)；开发、测试和能力边界见[G06实施总结](../maintenance/g06/implementation-summary.md)。R3并行支持另包，不能沿用单环境重力补偿指南推断其已支持。
 
 3b 的运行范围与未通过项见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)；不把10步执行等同于方向或整体验收通过。Isaac 解释器可用显式 `--isaac-python` 或 `ISAAC_SIM_PYTHON` 选择，前者优先，Core 解释器默认当前 Python。

@@ -88,6 +88,20 @@ A3默认Controller必须按声明通道真实绑定并执行非零canonical acti
 - **检查：**文档结构／链接／JSON、公开例子与真实 caller、能力语言和证据身份、dirty／gitlink／refs；Skills 按源码和调用者刷新，不只做文字同步。记录检查运行与未运行项。
 - **交付／出口：**版本文档准确描述实现与未支持组合，7 个 Goal 的摘要和编排索引可恢复，原始日志／图片／H5 不入库。必要本地提交与审阅意见完整。
 
+<a id="g07c-split-doc-worktree"></a>
+### 2026-11-17维护者调整：独立工作树提前完善文档
+
+维护者明确允许在7b尚待接收时，先完成与其最终结果无关的文档工作；这是本节依赖的**有界提前执行例外**，不取消7c整体收口对7b接收的依赖。
+7c attempt001使用独立`codex/v211-stage7-docs`工作树，源码基线`4fdf9379482af6bb913eb1a6587316e64b6a0fed`，不复制主实施树正在变化的7b源码。准备为READY_FOR_MANUAL_FORWARD_NOT_STARTED／普通attempt0，实际启动才增1；不创建执行Goal/native或自动派发。
+
+- **attempt001现在完成：**安装、scalar无渲染、GeoPhys Rasterizer优先的有头相机、device并行三provider、环境/资产/Robot、独立Controller章节及API详细教程；归并当前文档与导航，按真实caller修正文档漂移及相关现有Skills。逐节内容、命令/字段、输出/排错与验收见[详细填充蓝图](../planning/stage7-7c-tutorial-blueprint.md)和[完整包索引](../maintenance/work-packages/20261117_g07c_attempt001_goal.md)。不交付只有目录、链接或TODO的教程。
+- **attempt002等待7b：**以独立主审实际接收的7b HEAD重新对账，更新BodyWrench新公共调用/准入/IPC/记录、最终九格与其他门的单一能力矩阵、7Goal/22子阶段摘要、恢复身份和Skills，处理两分支文档冲突后完成7c。不能提前写7b已接收或7c已完成。
+- **源码约束：**7c以说明、归并和普通示例为主，不改运行代码/算法、依赖、source/provider、Recorder或tests来让教程通过；继续遵守[post-5c总账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)与唯一owner，不增加API/factory/validator或诊断耦合。新BodyWrench公共typed方向可解释，未稳定签名标WAIT_7B_ACCEPTANCE。
+- **实际缺口：**准备输入的Nut仅准入source-bound ExpertAction，普通随机数组被明确拒绝；保留维护者要求的随机动作章节、预期拒绝例子和T-NUT-RANDOM未满足项，不伪造Solution身份或放松guard。最终仍无普通随机能力时交维护者裁定必要task-local接线，不以负例充作随机控制成功。
+- **隔离与验证：**两个活跃G07 checkout及原locked历史worktree保留；7b writer与其原证据/共享锁不受本包改写。attempt001不启动native/安装/下载，只做源码/caller、教学语义、AST/JSON/链接核对并准确引用既有运行。没有新运行则不称教程已native验证；不为文档绿灯复制保护日志或修改旧证据。
+
+本工作树中的7b状态是分叉输入快照；其实时结果由主实施树维护。7c最终正常整合须等待7b返包/接收并作diff影响复核，不在其活跃窗口合并或覆盖其orchestration。
+
 ## 发布边界
 
 当前文档与阶段接收不自动授权发布操作。2026-11-17维护者授权上述旧资产冻结分支及7b指定PR #3冻结head合入G07的本地merge；不授权合并回develop/main、push／tag／GitHub Release，也不自动选许可证。第三方资产来源／分发未决项保持原状态，不因技术接通被改为获准分发。若维护者后续要求发布，单独冻结发布范围、许可和版本材料。
