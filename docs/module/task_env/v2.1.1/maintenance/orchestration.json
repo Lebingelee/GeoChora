@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7C_ATTEMPT001_RETURNED_PARTIAL_PENDING_REVIEW",
+  "status": "G07_7C_ATTEMPT001_ACCEPTED_BOUNDED_PENDING_7B_ATTEMPT002",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -35,10 +35,10 @@
     "substage": "7c",
     "attempt": 1,
     "package_id": "V211_G07_7C_ATTEMPT001",
-    "status": "ATTEMPT001_RETURNED_PARTIAL_PENDING_REVIEW",
+    "status": "ATTEMPT001_ACCEPTED_BOUNDED_PENDING_7B_ATTEMPT002",
     "scope": "independent docs only; finalclose awaits accepted7b"
   },
-  "next_action": "Independent review of returned7c attempt001 docs (PARTIAL, T-NUT-RANDOM unmet, WAIT_7B_ACCEPTANCE). Keep7b records as fork snapshots; do not merge active7b. Attempt002 final reconciliation waits for accepted7b and maintainer authorization.",
+  "next_action": "Attempt001 docs accepted within bounded scope. Do not close7c/version or start attempt002 until7b is independently accepted and the maintainer authorizes it. T-NUT-RANDOM remains unmet; WAIT_7B_ACCEPTANCE remains open. Keep7b records as fork snapshots.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2373,16 +2373,17 @@
           "dependencies": [
             "7b"
           ],
-          "status": "ATTEMPT001_RETURNED_PARTIAL_DOCS_PENDING_REVIEW",
+          "status": "ATTEMPT001_ACCEPTED_BOUNDED_DOCS_PENDING_7B_ATTEMPT002",
           "attempt_count": 1,
           "attempts": [
             {
               "attempt": 1,
               "revision": "revision001",
               "package_id": "V211_G07_7C_ATTEMPT001",
-              "status": "RETURNED_PARTIAL_DOCS_WITH_KNOWN_CAPABILITY_GAP",
+              "status": "ACCEPTED_BOUNDED_DOCS_WITH_KNOWN_CAPABILITY_GAP",
               "started_date": "2026-11-17",
               "returned_date": "2026-11-17",
+              "accepted_date": "2026-11-17",
               "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
               "output_head": "f0b7f5de",
               "native_starts": 0,
@@ -2390,8 +2391,9 @@
               "gpu_usage": 0,
               "report_path": "workspace/maintenance/v211_g07c_attempt001/report.md",
               "tracked_summary": "reviews/20261117_g07c_attempt001_docs.md",
-              "result": "PARTIAL_DOCS_WITH_KNOWN_CAPABILITY_GAP",
-              "known_gaps": ["T-NUT-RANDOM", "WAIT_7B_ACCEPTANCE"]
+              "result": "ACCEPTED_BOUNDED_DOCS_WITH_KNOWN_CAPABILITY_GAP",
+              "known_gaps": ["T-NUT-RANDOM", "WAIT_7B_ACCEPTANCE"],
+              "review_decision": "Maintainer accepted attempt001 documentation scope; this is not 7b acceptance, 7c close, or version release."
             }
           ],
           "assigned_agent": null,
@@ -2416,14 +2418,19 @@
           },
           "last_observation": {
             "date": "2026-11-17",
-            "state": "Attempt001 returned PARTIAL docs with T-NUT-RANDOM unmet and WAIT_7B_ACCEPTANCE; no native/SDK/CUDA. Await independent review; attempt002 owns final 7b reconciliation."
+            "state": "Maintainer accepted attempt001 docs within the bounded scope; T-NUT-RANDOM remains unmet and WAIT_7B_ACCEPTANCE remains open. 7c/version still await accepted7b and attempt002; no native/SDK/CUDA."
           },
           "evidence_refs": [
             "work-packages/20261117_g07c_attempt001_goal.md",
             "../planning/stage7-7c-tutorial-blueprint.md"
           ],
-          "commits": ["f943e193", "83f8031a", "287ca1cf", "f4343330", "f0b7f5de"],
-          "review_decision": null,
+          "commits": ["f943e193", "83f8031a", "287ca1cf", "f4343330", "f0b7f5de", "d35e7f4d", "da9277f3"],
+          "review_decision": {
+            "date": "2026-11-17",
+            "decision": "ACCEPTED_BOUNDED_ATTEMPT001_DOCS",
+            "scope": "Six-part tutorials, dedicated Controller chapter, navigation/doc corrections, Skills and static checks; T-NUT-RANDOM remains unmet and WAIT_7B_ACCEPTANCE remains open.",
+            "not_inferred": ["7b acceptance", "7c close", "version release", "attempt002 start"]
+          },
           "blockers": [
             "Final7c close waits for accepted7b; independent001 is explicitly allowed.",
             "T-NUT-RANDOM remains an unmet positive capability requirement, not silently waived."
@@ -2432,7 +2439,7 @@
           "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt001_20261117/goal-prompt.md",
           "goal_prompt_sha256": "8e706f546ee007794b36433a0b090c1fbee36f448d5677acee768752f0864fc2",
           "input_head_role": "Actual documentation-successor HEAD in external dispatch-input.json; source base4fdf9379",
-          "package_status": "ATTEMPT001_RETURNED_PARTIAL_PENDING_REVIEW",
+          "package_status": "ATTEMPT001_ACCEPTED_BOUNDED",
           "dependency_exception": "Maintainer authorized independent documentation work before 7b acceptance; full7c close still requires accepted7b and attempt002.",
           "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt001_20261117/dispatch-input.json"
         }
