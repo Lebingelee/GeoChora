@@ -88,6 +88,13 @@ attempt002生产返包`81d1138d`保持原PARTIAL。维护者要求只优先处�
 
 MuJoCo3.8.1 FREE角向armature／implicitfast的原生数值边界保留写入前拒绝，问题G07B-MJC-FREE-ARMATURE移交专门后续，不要求G07修引擎、换source/积分器或升级依赖。独立预声明的零阻尼/零armature夹具证据限其自身source，可证明公共载荷响应，不证明原组合修复；原失败与原B2-2状态保留。当前重点缺口已补证，7b进入最终独立主审，不以退休suite未全绿或上游数值研究自动开启attempt003；ordinary attempt_count仍2，版本接收另作判断。
 
+<a id="g07b-final-acceptance"></a>
+### 2026-11-17 最终独立主审与7b收尾
+
+维护者同意仅处理直接影响主线的部分，并授权检查通过后接收及主 agent 小修。按[最终独立主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)，生产`81d1138d`及测试／文档后继`c392b259`已 **ACCEPTED_BOUNDED_7B**，普通attempt数2，不新开attempt003。九格在原`78349184`输入9／9任务成功、同运行Solution完成、图像／记录／关闭分别成立；本轮重新离线读回九份H5并核对图像及原caller，未重跑native矩阵。B2-1～B2-6在实际source/body/provider范围接收；MuJoCo原生数值交集保留guard并交后续专题，旧退休入口与原115／3等失败保留，不声明原失败全绿。
+
+[单一能力矩阵](../capabilities/capability-matrix.json)现登记实际九格及原冻结身份，初始NOT_RUN规划快照另存。原两次PARTIAL返包与主线优先审阅仍按原时点保留；本次最终审阅新增0子步、不改生产代码。7c最终总结可消费本页接收结论，独立文档工作树仍以其自身状态为准，本轮未启动7c attempt002，也不授权发布或回合develop/main。
+
 <a id="7c"></a>
 ## 7c：版本文档与能力记录
 
