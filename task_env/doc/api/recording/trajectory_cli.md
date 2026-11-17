@@ -47,3 +47,22 @@ and hashes must match the currently constructed task inventory exactly.
 Legacy Nut recordings made through `step_expert()`
 have a different diagnostic contract and are rejected by this reexecution
 route; their original files remain historical evidence.
+
+## Ownership and limits
+
+Run these commands from the repository root with the existing Core interpreter,
+matching `GeoPhys/src`, installed assets, and a fresh output path. `record`
+owns the explicit caller loop and the output file; `inspect` is offline and
+does not contact a provider. Exit status and the printed task outcome, Solution
+completion and storage result must be read separately. Parameters above are
+the actual CLI options; provider support is limited to its declared route.
+
+D0 asks whether the full state can be reconstructed, D1 replays frozen native
+controls, and D2 replays requested actions while recomputing control. A valid H5
+or an ordinary `inspect` is none of those by itself. The selected source-bound
+reexecution checks identities and runs a current caller; it does not silently
+upgrade historical evidence. Unsupported/retired inputs remain errors rather
+than aliases to a new task. See [trajectory contract](trajectory_contract.md)
+and [H5 schema](h5_schema.md) before choosing an output or reader.
+
+[Trajectory command modules](../../../script/trajectory) provide these CLI entry points; the [trajectory package](../../../trajectory) owns their data contracts.

@@ -1,0 +1,14 @@
+# v2.1.1 local release candidate
+
+**State: `DRAFT_LOCAL_CANDIDATE`**. This is preparation for review, not a published package, Git tag, Release, new Qualification, or permission to distribute assets. G07/7c attempt002 is in progress and requires its independent review before the local develop fast-forward described in the handoff.
+
+The stage7 input to this attempt is Core `2c697908d7e7948c4b33e65fabdd6ec88e3dda1b`, tree `b0ea38723d2e14ab9d3f0c30c0b8c1c57dfd219c`; the accepted 7b production implementation is `81d1138d54f9397fe1bd3569871fdf8beb05dcb8`. GeoPhys is pinned at `198d30ac64ce873a1467f55d2adfc471db18fbc5`, MuJoCo Menagerie at `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`. The final candidate commit/tree must be recorded in the external closeout receipt after commits and independent acceptance; this tracked page does not self-reference its own commit.
+
+The candidate combines the accepted TaskEnv G01–G06 and bounded G07 7a/7b work with the in-progress 7c ordinary Nut action, recording provenance, marker and tutorial updates. The original 7b nine PickCube runs retain their actual Core input `78349184d0600e2fb804e6461930c475bfcc67c1`; they are not described as reruns at this candidate. Exact capability intersections, source identities and evidence remain in the [single capability matrix](../../module/task_env/v2.1.1/capabilities/capability-matrix.json), [current state](../../module/task_env/v2.1.1/maintenance/current-state.md) and [7b acceptance](../../module/task_env/v2.1.1/maintenance/reviews/20261117_g07b_final_acceptance.md).
+
+- [Installation and setup](../../module/task_env/v2.1.1/guides/installation-and-start.md), [API and migration](../../module/task_env/v2.1.1/guides/api-usage.md), [module reference](../../../task_env/doc/index.md).
+- [Recovery and execution status](../../module/task_env/v2.1.1/maintenance/recovery.md); retain raw attempt failures and close receipts.
+- MuJoCo FREE angular armature/implicitfast wrench rejection remains; GeoPhys Nut Rasterizer 7c002 first-frame Scene/source closure failure is not a state-only action failure. R3 batch model, full learner training, Nut batch, and unmeasured provider/source intersections remain outside the accepted scope. See the matrix and execution report for precise facts.
+- Menagerie and other third-party assets are sourced from their pinned repositories and task asset records. License selection, attribution review, which assets may be redistributed, package format, version tag and publication destination require later human decisions; this draft selects none of them.
+
+No push, remote release, tag or `main` synchronization is implied. After independent 7c002 acceptance only, the authorized closeout checks that local `develop` is an unoccupied ancestor and fast-forwards it without force, recording before/after refs in an external receipt.

@@ -125,7 +125,9 @@ PickCube 环境通过 `task_env.make_env` 和正式配置构造；调用方需�
 
 阶段3历史实现：阶段3前限定核心收尾及G03的3a–3c均已按各自范围接收，详见[3c独立主审及阶段收尾](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)；生命周期R1已获[Sol有限接收](../maintenance/reviews/20261105_lifecycle_unification_sol_review.md)。当前可调用入口以 [TaskEnv 当前 API](../../../../../task_env/doc/api/index.md)和源码为准；selected 环境实现已迁至 `task_env.environment.reference_env`，旧导入保留兼容。`BaseTaskEnv` 已是 `SelectedReferenceEnv` 同对象兼容出口，三个组件任务使用共同 episode owner；源码与无引擎契约已复核，后续的[CPU 代表回归](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)按实际源码提交和路线记录，不扩展到其他组合。本页下表是阶段3–6的设计目标，并非当前能力；已有行为及证据不因本页或导入成功而扩展。
 
-Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，由调用方交给 `env.step(action)`；现存 `step_expert()` 是受限兼容，不是新标准 Env API。部分 `step_with_solution()` 路线由 Env 调用调用方持有的 Solution，属于受限过渡；NutAssembly 现支持调用方直接传入含来源边界和控制请求的 `ExpertAction`，并在 `observe` 校验五个 native 样本；裸数组仍拒绝。PickCube seed31 与 NutAssembly seed19 已在 MuJoCo CPU 上完成有界物理回归和独立读回，证据及源码身份见[验证记录](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。详见[当前 Solution 说明](../../../../../task_env/doc/api/planning/task_owned_solutions.md)。
+Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，由调用方交给 `env.step(action)`；现存 `step_expert()` 是受限兼容，不是新标准 Env API。部分 `step_with_solution()` 路线由 Env 调用调用方持有的 Solution，属于受限过渡；NutAssembly 现支持调用方直接传入含来源边界和控制请求的 `ExpertAction`，并在 `observe` 校验五个 native 样本；7c002 将合法普通 world-pose 数组接入相同 Controller/interval，实际运行等待独立主审。普通 action 的 Solution completion 未评估，proposal 仍须核对来源、边界、身份和 control request，二者不能同 episode 混用。PickCube seed31 与 NutAssembly seed19 已在 MuJoCo CPU 上完成有界物理回归和独立读回，证据及源码身份见[验证记录](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。详见[当前 Solution 说明](../../../../../task_env/doc/api/planning/task_owned_solutions.md)。
+
+selected canonical 记录的兼容 `expert_identity` 是构建时声明身份；7c002 在成功提交的 transition diagnostics 中记录 `action_origin_v1`，区分普通 action（实际 Solution identity 为 null、完成未评估）与已校验的 Solution proposal。旧 H5 缺少该字段时来源未知，不能由 metadata 或 `planned_action` 推断完成。见[H5 说明](../../../../../task_env/doc/api/recording/h5_schema.md)。
 
 ## 5c 后优化：当前正式构造增量
 
@@ -181,7 +183,7 @@ PickCube 当前公开 info 中的 Position 就绪读回为 `pickcube_position_ex
 
 维护者可以使用 `python -m task_env.assembly.usd_cache --provider isaacsim --robot <robot-uid> --manifest <已验证交付清单>` 预装本地 delivery。安装复制并重新验证完整闭包，不覆盖同位置的不同资产；默认位置为用户缓存，也可通过 `GEOCHORA_USD_ASSET_ROOT` 选择位置。此维护命令当前仍需要清单路径，不代表资产分发已经完成。
 
-正式 PickCube（含物理配置）、NutAssembly、Pendulum、双轮车现在共用 TaskDefinition 构造与语义 lifecycle；reset 会绑定本次重建 Artifact。`CanonicalTaskStateView` 引用原具名 canonical state；组件数组格式保留，不制造 native 索引。公共 Gym info 仍包含 typed ObservationSchema／只读评价 mapping；框架在 Solution reset／act／observe 的输入边界生成值 payload，原数值、身份和时钟检查不变。普通已准入 native 路线使用现有 live source／Controller scene interval binding。本轮有五条 MuJoCo CPU 短程证据，其中 Nut 仅一个 Solution interval；不是完整 Solution、任务成功或新 GeoPhys／Isaac 能力结论。详见[TaskDefinition API](../../../../../task_env/doc/api/semantics/task_definition.md)与[实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
+正式 PickCube（含物理配置）、NutAssembly、Pendulum、双轮车现在共用 TaskDefinition 构造与语义 lifecycle；reset 会绑定本次重建 Artifact。`CanonicalTaskStateView` 引用原具名 canonical state；组件数组格式保留，不制造 native 索引。公共 Gym info 仍包含 typed ObservationSchema／只读评价 mapping；框架在 Solution reset／act／observe 的输入边界生成值 payload，原数值、身份和时钟检查不变。普通已准入 native 路线使用现有 live source／Controller scene interval binding。E00～E04 原记录有五条 MuJoCo CPU 短程证据，其中当时 Nut 仅一个 Solution interval；后续 7c002 的原／装配 MuJoCo 完整 Nut 和普通动作结果按其本次输入与独立主审状态另记，不外推任意 GeoPhys／Isaac 能力。详见[TaskDefinition API](../../../../../task_env/doc/api/semantics/task_definition.md)与[实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
 
 ## 5c 共同主体与场景控制接口（按实际交集有界接收）
 

@@ -14,6 +14,7 @@
 - 装配替换的R3模型须来自同一source组合及实际装配后的具名本体，并与session核对来源；位置驱动重力补偿须核对实际施加与ACK。任务原有驱动参数须随具名执行器保留，不能仅开放profile就声称装配行为等同。
 - 既有装配`r1_split`的MuJoCo CPU进程内控制可用；隔离worker首个提交会因远端缺少同一存活Controller的分路输出而拒绝。保留该边界，不以本包装配接线声称多Position writer的worker支持。
 - 原／装配Robot的正式Task必须沿共同构建、source和Controller绑定；默认Controller只在已声明的canonical通道、writer、单位和传动下绑定，Task显式选择不得被替换。普通reset验证选择、参数、绑定和状态重建；显式切换仍遵循已有能力范围，不由此扩充装配切换矩阵。
+- 7c002 普通 Nut pose 与 Solution proposal 沿共同 Controller/interval；普通 action 不伪造 proposal，带 proposal 继续检查来源、边界、身份与 control request。canonical 元数据的兼容 `expert_identity` 仅表声明身份，实际来源由成功提交的 transition `action_origin_v1` 记录，普通动作的 Solution 完成未评估；旧字段 `planned_action` 不能单独证明专家完成。marker 沿 source snapshot→Robot composition/subject→Controller→RobotRuntime，保留共同构造 guard。
 - 保留正式source/provider能力、单位/三层映射、组合/冲突、generation/stale、partial-write fault、ACK与close检查。不为fixture恢复私有兼容桥、宽泛kwargs、getattr兜底链、吞异常、重复状态/hash或过严token保护；临时诊断与故障注入留外部。
 - 配置和普通caller只补案例实际需要的入口；现有入口足够则不新增CLI或SDK层。SB3/RSL保留固定空间与autoreset边界；LIBERO保留原source、Task predicate与reset语义。2026-11-17维护者revision002改为canonical action／默认恒等Controller真实链优先，再配置合适Controller；允许复用、扩展或必要新Controller，不要求新路线完整复刻OSC或旧500Hz/gripper cadence，但须声明新算法/profile/时钟并以可信可比OSC参考证明空载精度不退步，不能冒称旧OSC/A123等价。共享算法/模型/servo/记录归TaskEnv对应模块，bench仅留来源、任务语义、配置/薄binding及任务oracle。无受影响缺口可按调用/diff与匹配证据结案。
 - LIBERO已确认含七个扭矩电机及两个独立位置夹爪执行器：source声明、单位与native映射须分别核验，静态保持不等于夹爪writer或其ACK。迁入共同Scene时须保留原初始化行的自由物体位姿、速度与fixture语义，并使Artifact和source的关节身份一致；非零原生reset时刻与episode相对时钟不可混用。接触查询须经真实source和provider准入，不能删掉Task要求来促成构造。
@@ -123,6 +124,8 @@ MuJoCo3.8.1 FREE角向armature／implicitfast的原生数值边界保留写入�
 维护者已接收attempt001文档，实际docs HEAD为`1e9081c4`；7b也已按[最终主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)接收。现正常[整合docs树及保全](../maintenance/reviews/20261117_g07c_attempt001_integration.md)，使用阶段7主分支准备002，普通attempt仍1，实际执行002才增2。此前“7c不改源码”和Nut仅留负例是001的边界；维护者本次明确授权002修复Nut普通随机动作拒绝，以及直接影响教程的declared-marker示例漂移。
 
 002沿Nut Task binding／既有动作Controller和共同生命周期最小接通普通action，仍保留原ExpertAction的source／Solution身份、native反馈、reset／混用／fault检查；不复制Solution或Runtime，不放宽原Task成功/完成门。只补实际受影响代表运行，原7b九格与其他已通过矩阵按身份复用。完整包须包含实现、正式随机教程、定向负例、同运行H5独立读回和关闭，不能以设置一个flag或AST通过作为能力接收。
+
+执行进展（2026-11-17）：attempt002 已实际启动，普通计数为2；MuJoCo 原／装配 Nut 完整 Solution 及三条随机 action、marker 已有同运行记录、独立读回与 close，结果尚待独立主审。GeoPhys Nut Rasterizer 首帧因 canonical Scene/source closure 条件拒绝，state-only 结果与其分开。维护者在原 50,000 显式子步上限追加30,000，保留原有消耗；native 3,600秒和连续 wall 240分钟不变。逐页文档、正式返包和候选提交仍在实施中，见[单一矩阵](../capabilities/capability-matrix.json)及 ignored 输出 `workspace/maintenance/v211_g07c_attempt002/`。
 
 同时收口7b BodyWrench最终公共API／provider准入／记录与组合规则、7Goal/22子阶段摘要、单一矩阵、恢复入口、指南／API／Skills、版本变更／限制和发布准备。维护者补充：`task_env/doc`必须作为更细致的模块教程，按原`api/composition`、`semantics`、`planning`、`recording`、`appendix`及中文指南结构，逐页深化34篇current文档，覆盖21顶层目录及facade的实际职责、上下游、接口/输入输出/异常、生命周期/资源和完整核心例子；8篇历史更新日志原字节保留。不准只加导航或笼统“补全文档”，逐页owner/要求见完整包module-doc-map。维护者授权在002独立验收后将**本地develop**快进到最终阶段7 HEAD；不得覆盖非祖先develop、同步main或操作远端，源码身份变化按影响复核，不机械重跑完整历史矩阵。详见[002完整工作包与Goal提示](../maintenance/work-packages/20261117_g07c_attempt002_goal.md)。准备为READY_FOR_MANUAL_FORWARD_NOT_STARTED，计数仍1。
 

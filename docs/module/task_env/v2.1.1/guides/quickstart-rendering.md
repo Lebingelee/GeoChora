@@ -215,7 +215,7 @@ finally:
 
 ## 3.5 NutAssembly：相同配置方式与 Task 差异
 
-复用原 Nut Solution 和同一 renderer/world-camera 合同：
+**当前限制（7c002）**：GeoPhys CPU／isolated worker、Rasterizer 128×96 的 Nut `rgb_array` 实测在首帧因缺少 canonical Scene/source closure 抛出 `ValueError`，环境正常关闭，未推进。state-only 随机动作另有成功证据。下面的 human 配置是静态调用形状，未证明能在该 Nut 路线显示；不要将其他 Task 的渲染成功外推到 Nut。
 
 ```python
 # workspace/tutorial/nut_window.py
@@ -253,7 +253,7 @@ finally:
 说明：
 
 - 不能把 PickCube 的 source 或截图当 Nut 图像；Nut 的相机位置来自同一 tabletop 约定和 Nut 桌面中心，**静态推导，未重采**。
-- 随机输入限制仍在：普通随机数组会在动作准入被拒绝（见 [2.5](quickstart-state-only.md#25-nutassembly随机动作版当前真实缺口t-nut-random)）；**有头显示不等于 strict Solution 完成**。
+- 普通合法随机 pose 已在有界路线准入（见 [2.5](quickstart-state-only.md#25-nutassembly普通随机动作)）；**有头显示不等于 strict Solution 完成**。
 - GeoPhys 当前源码未重跑完整 Nut；本页不把历史完整成功写成“最新 HEAD 已复验”。
 - 正常关闭：`env.close()` 释放窗口、observer 和物理资源；窗口关闭后的行为以 close 回执为准。
 
@@ -264,10 +264,10 @@ finally:
 | 环境 | GeoPhys CPU + Rasterizer；需要 display；Core 解释器与匹配 GeoPhys source |
 | 身份 | `nut-assembly-outcome-reference-v1`；seed 19；Panda + square nut/peg |
 | 前置与启动 | `source scripts/setup/geochora-env.sh`；从仓库根运行；新输出路径 |
-| 输入/输出 | 原 Solution 的 `ExpertAction`；窗口自动更新；`rgb_array` 为 `(480,640,3) uint8` |
+| 输入/输出 | 原 Solution 的 `ExpertAction`；UI 帧合同是 HWC `uint8`，本 Nut 路线当前首帧失败 |
 | 结束 | 完整 Solution 计划走完；horizon 不足会截断；`finally: close()` |
-| 验证 | 相机参数为静态推导；既有 Nut seed19 运行按原身份引用；**本轮未重采/未重跑**；native=0 |
-| 故障 | 普通随机 action → 2.5 拒绝；seed≠19 → reset 拒绝；display/GL 缺失 → `rgb_array` |
+| 验证 | 本轮 128×96 `rgb_array` 首帧失败，close 成功；human 窗口与其观感未测 |
+| 故障 | 非法 pose → 动作准入拒绝；seed≠19 → reset 拒绝；display/GL 缺失 → 使用受支持的离屏配置 |
 
 源帧与任务边界对照：在 `reset` 后保存一帧，在每个 `step` 返回后保存一帧，并同时记录 `info["episode_id"]`、`info.get("state_boundary_identity")`（若该路线提供）和 transition 序号。不要用截图时间戳猜物理时钟。
 

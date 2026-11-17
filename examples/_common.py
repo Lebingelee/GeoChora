@@ -217,6 +217,15 @@ def load_recording_summary(path: Path) -> dict:
         boundaries = len(trajectory["boundaries"])
         metadata = trajectory["metadata"]
         schema = trajectory["schema"]
+    # Older canonical metadata requires an expert identity even before the
+    # first action. It describes the declared Solution, not proof that one
+    # produced a transition; only the per-transition provenance can do that.
+    import json
+    origins = []
+    for item in trajectory.transitions if canonical_outer else trajectory["transitions"]:
+        diagnostics = item.expert_diagnostics if canonical_outer else item["record"]["expert_diagnostics"]
+        raw = diagnostics.get("action_origin_v1")
+        origins.append(None if raw is None else json.loads(raw))
     provenance = metadata.get("source_provenance", {})
     valid_counts = boundaries == transitions + 1
     source_hash_count = sum(str(key).startswith("source_sha256:") for key in provenance)
@@ -228,6 +237,8 @@ def load_recording_summary(path: Path) -> dict:
         "task_artifact_sha256": metadata.get("task_artifact_hash"),
         "controller_identity": metadata.get("controller_identity"),
         "expert_identity": metadata.get("expert_identity"),
+        "expert_identity_role": "declared_solution_identity_not_evidence_of_execution",
+        "action_origins": origins,
         "provider_provenance_present": bool(metadata.get("provider_provenance")),
         "source_provenance_present": bool(provenance),
         "source_revision": provenance.get("geochora_revision"),

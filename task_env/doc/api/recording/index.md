@@ -20,3 +20,9 @@ selected scalar 录制在开始时记录实际动作和观测绑定函数的源�
 - [Wrapper lifecycle](wrapper_lifecycle.md)
 - [Trajectory contract](trajectory_contract.md)
 - [H5 schema](h5_schema.md)
+
+## 如何选择记录路线
+
+单环境 selected 的 `start_recording` 在 reset 边界开始，`finish_recording` 完成后再 close；canonical outer 保存 T 次 transition/T+1 次 boundary，execution stream 还保存已完成的 native 子步。structured v3 和 device recorder 有自己的 typed 控制、事件与边界，旧 Gym wrapper 则使用 generic H5；先看 schema 和来源，不能按文件名猜格式。
+
+Recorder 接收环境已经提交的事实，不是控制或推进 owner。读取时核 T/T+1、时钟、source、实际 action/ACK 和同运行 close；metadata 中的声明 Solution identity、实际 transition 来源、Task outcome 和 Solution completion 分开解释。旧数据没有字段就保留未知，不补造。依次阅读 [wrapper 生命周期](wrapper_lifecycle.md)、[轨迹合同](trajectory_contract.md) 和 [H5 格式](h5_schema.md)；独立 reader 不等于重放或物理成功。

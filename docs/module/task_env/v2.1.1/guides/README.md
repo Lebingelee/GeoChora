@@ -7,7 +7,7 @@
 | 顺序 | 页面 | 你会得到什么 | 前置 |
 | --- | --- | --- | --- |
 | 1 | [安装、后端隔离与路径配置](installation-and-start.md) | 选路线、Core/GeoPhys/MJWarp/Isaac 两条安装路径、解释器优先级与排错 | Linux 基础、Python 3.12 |
-| 2 | [单环境无渲染 Quickstart](quickstart-state-only.md) | Pendulum、PickCube、Nut 的原 Solution；Nut 普通随机的**预期拒绝**与 `T-NUT-RANDOM` 缺口 | 第 1 页的 Core 环境 |
+| 2 | [单环境无渲染 Quickstart](quickstart-state-only.md) | Pendulum、PickCube、Nut 的原 Solution；Nut 普通随机 pose 与原 Solution 的分别使用 | 第 1 页的 Core 环境 |
 | 3 | [有头窗口、相机参数与图像](quickstart-rendering.md) | CameraSpec 全字段、GeoPhys Rasterizer 优先的 human/rgb_array、task sensor 与 device 相机区别 | 第 2 页的任一任务 |
 | 4 | [device 并行与三后端](quickstart-device-batch.md) | Pendulum/PickCube × MJWarp/GeoPhys/Isaac 六条命令、动作树、same-step/partial reset、整批切换 | CUDA 与对应 worker 环境 |
 | 5 | [环境、资产、Robot 与 canonical action](authoring-scenes-assets-robots.md) | 声明→source→binding→Env→Runtime 链、AssetDefinition/EntityInstance、Robot/source recipe/TCP | 第 2 页 |
@@ -20,8 +20,8 @@
 
 - 本教程的代码块按源码/现有 caller 静态核对；**没有在本轮运行 native**。示例能 import 不等于 reset/step 成功。
 - 复用历史证据时必须同时给出 task、provider、backend、source/pin、seed/horizon、renderer/Controller 交集；不要用单格成功外推整矩阵。
-- `T-NUT-RANDOM` 是**未满足的真实需求**：当前 Nut 只准入 source-bound `ExpertAction`，普通随机数组被拒绝。教程保留预期拒绝例子，不以负例替代正向能力。
-- `WAIT_7B_ACCEPTANCE`：7b 正在变化的 BodyWrench 新 producer/transport/API 和最终接收矩阵由 attempt002 回填；正文其余部分已在本轮完成。
+- Nut 普通随机 pose 在 7c002 已有有界真实运行；同运行来源、完成与关闭分开，等待独立主审。Solution proposal 保留严格来源和控制请求检查。
+- 7b BodyWrench 已有有界接收；实际 source/provider、拒绝和记录边界见[主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)与唯一能力矩阵。
 - G06 canonical device 能力有界接收；G07 最终九格/版本收口仍待 7b 接收与 attempt002。R3 batch 仍为独立后续项。
 
 ## 旧页面归并与导航

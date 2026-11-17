@@ -27,9 +27,9 @@ The historical v1.1.0 `single_inline` Pendulum route was reported to fail during
 | Scalar task construction | `examples/tasks/pick_cube.py` or `examples/tasks/nut_assembly.py` | Public `task_env.make_env`; explicit provider; selected task-owned expert. |
 | Canonical recording | `examples/recording/record_expert.py --env-id <selected-uid> --provider <geophys\|mujoco> --output <fresh.h5>` | Existing task-owned recorder and canonical H5. |
 | Offline H5 inspection | `examples/recording/inspect_h5.py --input <recording.h5>` | Canonical schema/hash/projection and T+1 validation; not D0 replay. |
-| Batch environment | `task_env.script.env.parallel_inline` | Four formal task UIDs reject formal batch before resource allocation; component batch retains its own scope. G06 remains open. |
+| Batch environment | `task_env.script.env.parallel_inline` | G06 device Pendulum/PickCube has bounded accepted routes; legacy component batch has a separate scope. |
 | SB3 example | `examples/learning/pendulum_sb3.py --output-dir <fresh-dir>` | Depends on a supported batch route; the formal Pendulum adapter remains unavailable. No training claim. |
-| Rendering examples | `examples/rendering/pendulum_single_rgb.py`, `examples/rendering/pendulum_parallel_rgb.py` | Scalar Pendulum rendering is the current route; the historical parallel example awaits G06 integration. |
+| Rendering examples | `examples/rendering/pendulum_single_rgb.py`, `examples/rendering/pendulum_parallel_rgb.py` | Scalar Pendulum rendering is the current route; the older parallel example retains its original scope. |
 | Offline trajectory conversion | `task_env.script.trajectory.convert` | Existing Panda/controller action conversion contract. |
 | Historical H5 replay | `task_env.script.trajectory.replay --historical ...` | Recovery-only route; not selected-source acceptance or D0 by default. |
 
@@ -53,14 +53,12 @@ finally:
 
 The NutAssembly and PickCube examples use caller-owned
 `act → step(action) → observe`. This public pattern has been run on PickCube Isaac CUDA; runtime and recording were valid while task and Solution failed, as recorded in the [U3 evidence](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md). The generic candidate Harness also requires a caller-driven Solution action
-route; unsupported legacy routes fail explicitly. NutAssembly does not admit arbitrary ordinary external actions. A successful physical task outcome, a completed
+route; unsupported legacy routes fail explicitly. NutAssembly admits valid ordinary world-pose actions in the 7c002 execution; arbitrary inputs remain rejected. A successful physical task outcome, a completed
 expert lifecycle, and a finalized recording are reported separately.
 
 ## Batch and learning boundary
 
-`make_parallel_env` retains supported component paths. The formal `pendulum-v1`,
-`two-wheel-balance-v1`, PickCube and NutAssembly UIDs do not yet have formal
-batch adapters and are rejected before workers or native resources are created.
+`make_parallel_env` retains supported component paths. G06 boundedly accepts device Pendulum/PickCube on its named providers; Nut batch and arbitrary combinations are not inferred.
 The SB3 adapter owns flattening at the learner boundary. RSL-RL remains a
 generic, fail-closed CLI and requires an explicit `--env-id`; neither selected
 manipulation UID is made a default PPO target. Importability does not qualify training.
@@ -77,3 +75,13 @@ and the GeoPhys physics × MuJoCo renderer-only pairing have separately bounded
 evidence in the [current state](../../../../docs/module/task_env/v2.1.1/maintenance/current-state.md).
 See [trajectory and camera notes](trajectory_and_camera.md)
 and the [migration table](../appendix/migration.md).
+
+## Current device command
+
+From the repository root with the validated device dependencies and CUDA available:
+
+```bash
+PYTHONPATH=GeoPhys/src:. python examples/parallel/pendulum_device.py --provider mujoco_warp --num-env 3 --steps 20
+```
+
+The example resets, steps the explicitly selected device environment, reports the observed clock and closes it in `finally`. The command was not rerun in 7c002; consult the [G06 acceptance](../../../../docs/module/task_env/v2.1.1/maintenance/current-state.md) for the original evidence and avoid interpreting it as SB3 training.

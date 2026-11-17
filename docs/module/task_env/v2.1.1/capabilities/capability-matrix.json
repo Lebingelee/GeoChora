@@ -1542,7 +1542,7 @@
     ]
   },
   "g07c_attempt002_preparation": {
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "status": "HISTORICAL_PREPARATION_BEFORE_ATTEMPT_START",
     "ordinary_attempt_count_before_start": 1,
     "work_package_ref": "../maintenance/work-packages/20261117_g07c_attempt002_goal.md",
     "unmet_before_execution": [
@@ -1551,5 +1551,93 @@
       "Final module-doc/API/recovery/release-candidate reconciliation"
     ],
     "no_new_runtime_claim": true
+  },
+  "g07c_attempt002_execution": {
+    "status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+    "runs": [
+      {
+        "intersection": "ordinary Nut original Panda / MuJoCo CPU 32",
+        "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
+        "input_head": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
+        "source_freeze": "workspace/maintenance/v211_g07c_attempt002/final-source-freeze.json",
+        "raw": "workspace/maintenance/v211_g07c_attempt002/random-mujoco-004",
+        "h5_sha256": "22b75356ff31d6f440d41398e7106dcf10d729983b5da21949761d7792b5d5f2",
+        "transitions": 32,
+        "boundaries": 33,
+        "caller_status": "PASS",
+        "close_succeeded": true,
+        "whole_card_gpu_monitor": "sampled in this run"
+      },
+      {
+        "intersection": "ordinary Nut assembled Panda / MuJoCo CPU 8",
+        "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
+        "input_head": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
+        "source_freeze": "workspace/maintenance/v211_g07c_attempt002/final-source-freeze.json",
+        "raw": "workspace/maintenance/v211_g07c_attempt002/random-assembled-004",
+        "h5_sha256": "ec805f89be52c630c619f85d690813ca34a13ea9e2bbf134e196986218b77099",
+        "transitions": 8,
+        "boundaries": 9,
+        "caller_status": "PASS",
+        "close_succeeded": true,
+        "whole_card_gpu_monitor": "sampled in this run"
+      },
+      {
+        "intersection": "ordinary Nut original Panda / GeoPhys CPU 32",
+        "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
+        "input_head": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
+        "source_freeze": "workspace/maintenance/v211_g07c_attempt002/final-source-freeze.json",
+        "raw": "workspace/maintenance/v211_g07c_attempt002/random-geophys-004",
+        "h5_sha256": "b7b95a95b68f10ab47e3672545132e120e79daa3b21369d484a42680dabf4f74",
+        "transitions": 32,
+        "boundaries": 33,
+        "caller_status": "PASS",
+        "close_succeeded": true,
+        "whole_card_gpu_monitor": "sampled in this run"
+      },
+      {
+        "intersection": "Nut original Panda / MuJoCo CPU full Solution",
+        "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
+        "input_head": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
+        "source_freeze": "workspace/maintenance/v211_g07c_attempt002/final-source-freeze.json",
+        "raw": "workspace/maintenance/v211_g07c_attempt002/solution-original-004",
+        "h5_sha256": "f82550092d7de6dacfad7aabf0ed6ad25807296f792ac8503234eee2cd63cfab",
+        "transitions": 2377,
+        "boundaries": 2378,
+        "caller_status": "PASS",
+        "close_succeeded": true,
+        "whole_card_gpu_monitor": "sampled in this run"
+      },
+      {
+        "intersection": "Nut assembled Panda / MuJoCo CPU full Solution",
+        "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
+        "input_head": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
+        "source_freeze": "workspace/maintenance/v211_g07c_attempt002/final-source-freeze.json",
+        "raw": "workspace/maintenance/v211_g07c_attempt002/solution-assembled-002",
+        "h5_sha256": "5646741e429676400d38b28cd353c12a147ae8d4c90220b157d9b8af41bffc74",
+        "transitions": 2378,
+        "boundaries": 2379,
+        "caller_status": "PASS",
+        "close_succeeded": true,
+        "whole_card_gpu_monitor": "sampled in this run"
+      },
+      {
+        "intersection": "declared marker / MuJoCo CPU",
+        "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
+        "input_head": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
+        "source_freeze": "workspace/maintenance/v211_g07c_attempt002/final-source-freeze.json",
+        "raw": "workspace/maintenance/v211_g07c_attempt002/marker-007",
+        "h5_sha256": "059e085ce16c59ebe780cfe203c16f71082996b32c497d23f02f77c60ed83818",
+        "transitions": 1,
+        "boundaries": 2,
+        "caller_status": "PASS",
+        "close_succeeded": true,
+        "whole_card_gpu_monitor": "sampled in this run"
+      }
+    ],
+    "original_nine_cells": "REUSED at 78349184; no native rerun",
+    "render_limit": "GeoPhys Nut Rasterizer 128x96 first frame rejected for canonical Scene/source closure; close succeeded, state-only route separately exercised",
+    "ordinary_action_completion": "not evaluated; declared expert metadata does not establish action origin",
+    "freeze_and_budget": "workspace/maintenance/v211_g07c_attempt002/freeze.json",
+    "historical_monitoring_gap": "Earlier CPU-only supervisors did not sample whole-card GPU; later same-source rechecks do not reconstruct historical GPU data."
   }
 }

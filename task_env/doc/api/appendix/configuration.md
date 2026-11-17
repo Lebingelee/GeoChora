@@ -55,7 +55,7 @@ episode
 | enable_ground_contact | null | 是否启用地面接触 |
 | enable_domain_boundary_contact | false | 是否启用边界接触 |
 
-batch_physics_layout 与 make_parallel_env 的 execution 参数相互独立：当前并行物理布局只支持 `merged_scene`，execution 选择当前进程 local 或独立 worker remote。single make_env 不接受 batch layout。请求已退休的 `static_template` 会明确失败，不会改走其他布局。
+batch_physics_layout 与 make_parallel_env 的 execution 参数相互独立：当前并行物理布局只支持 `merged_scene`，execution 选择当前进程 local 或独立 worker remote。scalar 与 device batch 的布局须按各自已声明路线验证，不能仅由该字段推断批量支持。请求已退休的 `static_template` 会明确失败，不会改走其他布局。
 
 ## 已退休的 static-template runtime 配置
 
@@ -73,3 +73,17 @@ GeoPhys-owned `GeoPhysRigidBatchRuntime` adapter 与通用 Batch/Device contract
 ## 解析与复现
 
 推荐在运行前固定任务 UID、YAML、backend、seed、num_env、execution 和输出目录，并保存 env.get_record_metadata()。resolved config 中会记录 runtime layout、device transition 和 reset policy，便于判断实际是否走到了目标 runtime。
+
+## 七个 selected 输入域
+
+| 输入 section | 负责内容 | 注意 |
+| --- | --- | --- |
+| `execution` | provider/backend/device、部署和解释器 | worker 解释器及依赖须与实际 provider 匹配 |
+| `episode` | horizon、seed 和终止策略 | reset 显式 seed 与省略值按 Task 合同处理 |
+| `task` | Task 声明的有限参数 | 不是任意修改 predicate 的入口 |
+| `controller` | profile、参数及适用补偿 | 明确选择不会被默认 Controller 覆盖 |
+| `robot` | Robot UID 和声明的 drive 选择 | 必须与 Task/source 和 Controller 匹配 |
+| `runtime` | dt、子步及路线准入的物理配置 | 时间单位为秒，不能推断其他 provider 同义 |
+| `render` | backend、尺寸与观察配置 | UI、task sensor、device camera 的数据合同不同 |
+
+YAML 路径和 mapping 均走相同 task parser；实际 resolved config 与 `get_execution_receipt()` 可用于核对请求与解析，但 preflight 不等于 native 读取。旧顶层 alias、未知字段、不可用的解释器和不支持组合应拒绝，不静默回退。安装只按[唯一安装指南](../../../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)，不要将本机路径写成所有部署的默认值。

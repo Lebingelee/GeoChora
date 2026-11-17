@@ -309,7 +309,7 @@ print(record["outcome"])
 | source/mesh/delivery 缺失 | source 预检 | 缺文件、closure/manifest 不符 | asset root、manifest、gitlink | [资产/Robot](authoring-scenes-assets-robots.md) | 是（修正资产后重建） |
 | 未知 profile/UID | 静态配置 | `KeyError: unknown environment uid` / `unsupported ... profile` | 注册 import、profile 拼写 | 6.1 | 否 |
 | Controller shape/单位错误 | 动作计算 | `Controller action shape or finite values are invalid` / bounds | action 树、dtype、单位 | [Controller](custom-controllers.md) | 否 |
-| Nut 普通随机拒绝 | 动作准入 | `selected NutAssembly requires a source-bound ExpertAction; unguarded external actions are not admitted` | 是否用原 Solution | [2.5](quickstart-state-only.md#25-nutassembly随机动作版当前真实缺口t-nut-random) | 否（需原 Solution） |
+| Nut 非法普通 pose | 动作准入 | shape、非有限值或无效四元数被拒绝 | 使用世界坐标合法 pose，固定 seed19 | [2.5](quickstart-state-only.md#25-nutassembly普通随机动作) | 修正输入后重试 |
 | unsupported renderer pair | renderer 构建 | `unsupported ... pair` / `RenderUnavailableError` | physics×renderer 准入 | [渲染](quickstart-rendering.md) | 是（换声明重建） |
 | window 依赖缺失 | UI 构建 | display/GL 失败 | `DISPLAY`、驱动 | 3.7 | 否（改 `rgb_array`） |
 | fault/stale | 运行中 | `selected execution is faulted; reset() is required` / stale context | 是否 reset/切换后继续用旧命令 | 6.2 | 是（显式 reset/重建） |

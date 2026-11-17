@@ -19,6 +19,42 @@
 
 `CameraSensor(*, spec, references)` 从同一次 `RuntimeSnapshot` 解析pose/metadata。`CameraObservationProvider(*, render_source, config, camera_sensors)`实现reset/capture/close，属于env可选传感器采集，与`env.render()`的UI导出分离。
 
+状态 observation 是任务声明的 tree；例如 selected manipulation 的 state 与可选 privileged 字段按实际 schema/space 读取。一个 snapshot 与同一 boundary/sample clock 关联；留存时遵循 publication 的复制与 lifetime 声明，不把后续 reset 的状态当作旧帧。`CameraSpec` 在构造时声明相机名称、宽高和姿态；renderer 及相机绑定不能在同一 Env 中通过 `render(mode=...)` 随意切换。
+
+| 消费者 | 输出合同 | 注意 |
+| --- | --- | --- |
+| scalar UI `rgb_array` | owned CPU NumPy HWC `uint8` | 显式 `render()`，不额外推进 |
+| scalar task RGB | CPU `float32`，通常 0～1 | Task sensor 与 UI 独立 |
+| device named camera | CUDA `uint8`，带 B 轴 | 与同一步 boundary 对齐，按声明的 lifetime 使用 |
+
+部分 reset/same-step autoreset 的 terminal 帧与新 reset 帧属于不同边界；不能用一次截图推断二者。7c002 的 GeoPhys Nut `rgb_array` 最短尝试在首帧因 canonical Scene/source closure 条件失败并关闭，因此不声明该路线已可显示；state-only 与该失败分开。其他受测 UI 例子和完整相机参数见[渲染指南](../../../../docs/module/task_env/v2.1.1/guides/quickstart-rendering.md)。
+
+以下是现有 Pendulum GeoPhys CPU observer 的最短用法；它不代表上述 Nut 交集：
+
+```python
+import sys
+import numpy as np
+from task_env import make_env
+from task_env.environment.config import CameraSpec
+
+env = make_env('pendulum-v1', config={
+    'execution': {'physics_provider': 'geophys', 'physics_backend': 'cpu',
+                  'physics_device': 'cpu', 'deployment': 'in_process', 'interpreter': sys.executable},
+    'episode': {'horizon': 2},
+}, render_mode='rgb_array', observer_camera=CameraSpec(
+    'observer', width=32, height=24, position=(0., 0., 2.),
+    quaternion_wxyz=(2**-.5, 0., 2**-.5, 0.)))
+try:
+    obs, info = env.reset(seed=73)
+    frame = env.render()
+    assert frame.shape == (24, 32, 3) and frame.dtype == np.uint8
+    obs, reward, terminated, truncated, info = env.step({'torque': np.zeros(1, dtype=np.float32)})
+finally:
+    env.close()
+```
+
+该片段按[现有示例](../../../../examples/rendering/pendulum_single_rgb.py)核对，本轮未单独执行；无 renderer 依赖或不支持的相机配置会在构造/捕获时失败，不能用其他任务的帧填充。
+
 ## UI rendering
 
 **Import path**：`task_env.render`。正式scalar／device batch的当前合同以[版本API](../../../../docs/module/task_env/v2.1.1/api/README.md#render-contract)为准；默认scalar R3 observer与worker断线已在2026-11-16收尾中补齐。以下component/merged-scene细节仅保留其原适用范围，不外推任意renderer组合。

@@ -24,3 +24,30 @@
 签名：`TaskEvaluation(reward: float, success: bool, failure: bool = False, metrics: Mapping[str, float | bool] = {}, reward_terms: Mapping[str, float] = {})`。构造时数值/布尔值规范化，两个 mapping 变为只读。classic 的终止还受 task termination policy 与 `ignore_done` 控制；selected 的任务和 Solution 可能分开报告物理成功、失败、Expert 完成与 horizon 截断，不能用单一布尔值替代。
 
 公共 Gym info 继续保留 `ObservationSchema` 与只读 TaskEvaluation mappings。框架在 Solution 的 reset／act／observe callback 边界通过 metadata owner 投影为值 payload；不删除字段，不改变数值或 Solution 的 finite／identity／clock 检查。需要施加 Solution action 时使用正式 `reset_for_solution`／`step_with_solution` 链。
+
+## 以 marker 定义任务
+
+[`MarkerHeightEnv`](../../../../examples/tasks/declared_marker.py) 的声明提供独立 UID、Panda/table/box、reset 采样和 `SemanticDefinition`；`evaluate_task(state, semantics)` 要求所声明的状态，读取 `marker-v1` 高度并返回 `TaskEvaluation`。Task 只定义 reward/metrics/success，不拥有 native step 或全局 Controller 生命周期。`selected_binding` 把 sampler、评价和已有动作／观测 binding 接入共同 builder；Panda 的 source snapshot、具名资源和 Controller 由共同构建匹配。
+
+```python
+import numpy as np
+import examples.tasks.declared_marker
+from task_env import make_env
+
+env = make_env('marker-height-example-v1', config={
+    'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu', 'deployment': 'in_process'},
+    'episode': {'horizon': 10},
+})
+try:
+    obs, info = env.reset(seed=19)
+    pose = env.state.pose_world['panda-v1/ee']
+    action = np.asarray([*pose.position, *pose.quaternion_wxyz, 1.], dtype=np.float64)
+    action[0] += .001
+    obs, reward, terminated, truncated, info = env.step(action)
+    print(info['task_metrics']['marker_height_m'])
+    obs, info = env.reset(seed=19)
+finally:
+    env.close()
+```
+
+marker-005 对应的 MuJoCo CPU 正式入口、非零 step、再次 reset、记录和 close 有真实证据；其他 provider 和用户自定义资产未由该结果证明。UID 不匹配、Artifact 与 sampler 不一致、source 名称缺失均应在构造或 reset 被拒绝。更完整的声明与录制流程见[自定义任务指南](../../自定义任务构建指南.md)。

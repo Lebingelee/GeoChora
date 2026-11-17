@@ -47,9 +47,13 @@ class MarkerHeightEnv(SelectedReferenceEnv):
     """Observe a movable marker and report whether it reaches a height."""
 
     uses_selected_public_config = True
-    selected_controller_profiles = frozenset()
+    selected_controller_profiles = frozenset(('r1',))
     selected_parameter_limits = {}
     selected_supports_isaac = False
+    selected_robot_uids = frozenset(('panda-v1',))
+    default_robot_source_uid = 'panda-v1'
+    robot_source_roots = (('tabletop-v1', 'grasp_table'), ('marker-v1', 'PickCube'))
+    robot_source_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)
 
     @classmethod
     def selected_default_config(cls, task_config=None):
@@ -67,7 +71,7 @@ class MarkerHeightEnv(SelectedReferenceEnv):
 
     @staticmethod
     def selected_default_controller_profile(task_config=None):
-        return None
+        return 'r1'
 
     @classmethod
     def selected_binding(cls, config, *, robot=None):
@@ -76,7 +80,8 @@ class MarkerHeightEnv(SelectedReferenceEnv):
             raise ValueError('registered UID and declared task identity differ')
         return ReferenceTaskBinding.from_provider_free_compiler(
             partial(compile_panda_box_task, declaration, config=config.environment, robot=robot,
-                    controller_factory=ProductionCanonicalPandaController.from_source),
+                    controller_factory=ProductionCanonicalPandaController.from_source,
+                    own_snapshot=True),
             task_id=declaration.task_id,
             construction_schema='declared-panda-box-construction-v1',
             metadata={'object_id': declaration.object_id},

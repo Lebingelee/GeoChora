@@ -8,6 +8,31 @@ Pendulum、双轮平衡车等通用任务环境。
 **调用者/消费者**：`make_env`、Gym 使用者。  
 **源码**：`tasks/pick_cube/`、`tasks/nut_assembly/`、`tasks/pendulum.py`、`tasks/two_wheel_balance.py`
 
+## 从 UID 查询实际输入与结果
+
+下例只构造一个 Nut scalar 环境；metadata 和 spaces 描述该实例，不能用它们代替其他任务的合同。`is_success` 是 Task 判断，`terminated`/`truncated` 是生命周期结果，普通动作不隐含 Solution 完成。
+
+```python
+import numpy as np
+from task_env import make_env
+
+env = make_env('nut-assembly-outcome-reference-v1', config={
+    'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu', 'deployment': 'in_process'},
+    'episode': {'horizon': 10},
+})
+try:
+    obs, info = env.reset(seed=19)
+    print(env.metadata['action_schema'], env.action_space, env.observation_space)
+    pose = env.state.pose_world['panda-v1/ee']
+    action = np.asarray([*pose.position, *pose.quaternion_wxyz, 1.], dtype=np.float64)
+    obs, reward, terminated, truncated, info = env.step(action)
+    print(info['is_success'], terminated, truncated)
+finally:
+    env.close()
+```
+
+7c002 已对该路线的相同动作合同做 MuJoCo CPU 有界运行和关闭；本代码块未单独执行。非法 UID、provider/profile 或 reset seed 按配置与 Task 合同拒绝，不自动替换其他任务。Pendulum/TwoWheel 是不同 action schema，不能套用八维 pose。
+
 ## Selected PickCube reference route
 
 Public construction uses `make_env("pick-cube-p16-reference-v1", config=...)`.
@@ -19,8 +44,7 @@ not a second public environment factory.
 
 This is the selected P1.6 `experimental_100hz` reference: 100 Hz control,
 five 2 ms physics steps per control interval, absolute-pose expert actions,
-and the measured 0.100 m lift predicate. It is a single-environment route;
-no policy-checkpoint inference or new P1.6 qualification is implied.
+and the measured 0.100 m lift predicate. The scalar route and separately declared device batches have bounded evidence; no policy-checkpoint inference or new P1.6 qualification is implied.
 
 ## Selected NutAssembly outcome reference route
 
@@ -29,8 +53,7 @@ config=...)`. The registered class is `NutAssemblyReferenceEnv` in
 `nut_assembly/task.py`; the task owns one selected guarded expert and
 Outcome Completion V1. The ordinary example uses a caller-owned Solution and
 `act → step(action) → observe`, with a source-bound action and five native
-feedback samples. Arbitrary unguarded arrays remain unsupported; full physical
-success on this new route has not yet been verified.
+feedback samples. A legal ordinary world-pose action is admitted by the 7c002 implementation without an ExpertAction; its current evidence remains subject to independent review. Full MuJoCo Solution results for original and assembled Panda are recorded separately from ordinary actions; see the [7a acceptance](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261117_g07a_attempt002_acceptance.md). Arbitrary inputs and untested provider combinations remain unsupported.
 
 Its canonical artifact remains
 `nut-assembly-square-v1/p1_8_e/nominal-v1` with identity
@@ -99,10 +122,12 @@ state-only observation 的 leaf schema 是 `task-env-two-wheel-balance-state-v1`
 left_wheel_rate, right_wheel_rate]`，dtype 为 `float32`。reset 使用
 `two_wheel_balance_uniform_perturbation_v1`，固定 seed 会重现车体姿态、轮位置和速度扰动。
 
-TwoWheel 也通过 `@register_parallel_env()` 获得 generic `SceneBatchRuntime` 并行路径；single/B=1 共享同一
-TaskDefinition 语义，B=2/4 的 slot isolation 与 masked reset 由框架 lifecycle 负责。
+TwoWheel 的旧 `@register_parallel_env()` component 路线已退出；这里的 scalar 合同不证明当前
+TwoWheel device batch 支持。G06 的有界 Pendulum/PickCube 证据也不能外推到 TwoWheel。
 
 车体在 upright pitch/rate 与 wheel-rate 窗口内连续保持 10 个 control step 后 success；pitch 达到
 `0.75 rad` 时产生 failure 并 `terminated`。horizon 只产生 `truncated`，不会被 generic action adapter 隐式
 改变。两类 non-arm task 的 recorder 使用版本化 `universal_action/<component>`，组件由各自
 `universal_action_schema` 声明，不写 Panda 专用的 `arm_joint_position/gripper` 布局。
+
+[PickCube task](../../../tasks/pick_cube), [NutAssembly task](../../../tasks/nut_assembly), [Pendulum](../../../tasks/pendulum.py), and [TwoWheel](../../../tasks/two_wheel_balance.py) own their distinct task contracts.

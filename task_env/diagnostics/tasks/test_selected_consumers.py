@@ -1342,14 +1342,16 @@ def test_pickcube_position_caller_prepares_bound_request_without_solution_callba
         env.close()
 
 
-def test_nutassembly_rejects_unguarded_finite_external_action_without_step(fake):
-    env = make_env(IDS[1], config={'provider': 'mujoco', 'horizon': 3})
+def test_nutassembly_rejects_malformed_external_action_without_step():
+    env = make_env(IDS[1])
     try:
-        env.reset(seed=19)
-        with pytest.raises(RuntimeError, match='unguarded external actions are not admitted'):
-            env.step(np.zeros(8, dtype=np.float64))
-        assert env.state.control_step == 0
-        assert env._episode_mode is None and not env.session.calls
+        with pytest.raises(ValueError, match='quaternion'):
+            env.binding.prepare_action(np.zeros(8, dtype=np.float64))
+        with pytest.raises(ValueError, match='eight-dimensional'):
+            env.binding.prepare_action(np.zeros(7, dtype=np.float64))
+        invalid = np.array([.5, 0., .5, 1., 0., 0., 0., np.nan])
+        with pytest.raises(ValueError, match='eight-dimensional'):
+            env.binding.prepare_action(invalid)
     finally:
         env.close()
 
@@ -2051,12 +2053,12 @@ def test_task_success_does_not_stop_expert_before_solution_completion(fake):
     env.close()
 
 
-def test_nutassembly_public_example_does_not_admit_external_gripper_actions():
+def test_nutassembly_public_binding_admits_pose_actions():
     env=make_env(IDS[1])
     try:
-        assert env.binding.external_actions is False
-        with pytest.raises(RuntimeError, match='unguarded external actions are not admitted'):
-            env.step(np.zeros(8))
+        assert env.binding.external_actions is True
+        action = np.array([.5, 0., .5, 1., 0., 0., 0., 1.])
+        assert env.binding.prepare_action(action).values == tuple(action)
     finally:
         env.close()
 

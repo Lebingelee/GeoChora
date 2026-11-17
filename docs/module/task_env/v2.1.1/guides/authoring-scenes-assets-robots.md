@@ -2,7 +2,7 @@
 
 本页讲清一条执行链：**声明 → source composition/compiler → binding → SelectedReferenceEnv → RuntimeSession/provider**。目标不是让读者记住类名，而是知道“要改哪一层”和“不能把哪两件事混在一起”。
 
-> **验证口径（2026-11-17）**：本页按 `examples/tasks/declared_marker.py`、`task_env/artifacts/*`、`task_env/assembly/source_composition.py`、`task_env/robots/*` 静态核对；**本轮没有构造资产、没有启动引擎**。7b 正在变化的 BodyWrench producer/transport/API 标 `WAIT_7B_ACCEPTANCE`。
+> **验证口径（2026-11-17）**：7c002 已对 marker 的 MuJoCo CPU 生命周期做真实短测和独立读回；其余未注明的示例仍为静态核对。7b BodyWrench 的已接收范围见[最终主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)。
 
 ## 5.1 从最小场景理解唯一执行链
 
@@ -167,13 +167,7 @@ finally:
     env.close()
 ```
 
-**当前源码限制（2026-11-17 静态解析核对）：**`MarkerHeightEnv` 没有声明 `selected_robot_uids`/`default_robot_source_uid`，而 selected 配置解析会在 Robot 选择处要求非空 UID。用上面的 mapping 调用 `resolve_task_env_config(MarkerHeightEnv, config)` 会得到：
-
-```text
-ValueError: selected robot uid must be a nonempty trimmed string
-```
-
-显式加 `"robot": {"uid": "panda-v1"}` 也只会得到 `ValueError: selected task does not admit the requested robot`。因此本页用该例讲**声明/绑定结构**，**不把它当作可直接运行的新手任务**；真实自定义 Task 必须自己声明 Robot 选择字段（或走该 Task 的既有 owner 路线）。本 7c 文档包不修改生产示例来“让教程通过”，这是一个已记录的当前 drift。
+**7c002 实际验证：**示例现声明 Panda、R1、Task body 和 site 转移，compiler 创建 source snapshot 后由既有 composer 完成 Robot subject／Controller 绑定。MuJoCo CPU 的 marker-005 同一次运行完成 reset、非零 step、记录、再次 reset 和 close；独立 reader 读回 1 条 transition、2 个边界，Task metric 是 marker 高度。该结果等待独立主审，不能推广至其他 provider 或资产。旧的 Robot 声明缺失和后续构建失败保留在原执行记录。
 
 预期/失败：
 
@@ -289,14 +283,6 @@ action = np.array([x, y, z, qw, qx, qy, qz, gripper], dtype=np.float64)
 - 当前准入限 MuJoCo CPU implicitfast、source 明确绑定的有质量可动 body；每子步重读当前 COM；
 - 不把普通物体伪装 Robot、不把 wrench 伪装 joint channel、不通过清空 subject/selection 绕过检查。
 
-**`WAIT_7B_ACCEPTANCE`**：7b 正在新增/调整的 public BodyWrench producer、transport、API 签名与最终准入矩阵，本页不冻结。attempt002 需要回填：
+**7b 有界接收**：`scene_body_producers` 配置声明 writer 和 source body，scalar reset 后 `physical_scene_context()` 返回当前边界和绑定主体；用 `BodyWrenchV1` 构造贡献，再以 `step(action, scene_body_wrenches=(wrench,))` 与 Controller 的 joint effort 通过同一 interval 提交。producer 的 frame、作用点、力 N、矩 N·m、effect 和冲突规则由既有 typed compositor 检查；adapter 在每个已声明子步 lowering，interval 后由 owner 清除。Device 的受测入口和 `DeviceBodyWrenchCommand` 另按其实际签名使用；不要手工合并 native buffer。
 
-| 待填字段 | 当前 owner/入口 | attempt002 动作 |
-| --- | --- | --- |
-| producer API（谁创建、参数、返回类型） | 7b accepted HEAD 中的公共 typed 表达 | 按实际签名替换本页“当前公开 typed 表达”段落 |
-| transport/IPC 合同（scalar/device、哪些段可传） | `task_env/runtime/sessions/*` 与 provider adapter | 写实际支持/拒绝边界 |
-| provider × body/source 准入矩阵 | 7b 主审接收的 capability matrix | 只维护一份最终矩阵 |
-| 记录/回执字段与 H5 读回 | Recorder/reader owner | 回填实际 schema 与同 run 证据 |
-| 与 joint effort/position drive 的组合规则 | existing compositor owner | 按最终候选写 sum/effect 与冲突拒绝 |
-
-在此之前，读者只能把上述内容当**已稳定公共语义**，不能把本页当 7b 新接口的最终文档。
+记录区分 Controller 贡献与场景 producer、binding 和 native ACK；同运行独立 reader、状态响应与 close 需分别成立。MuJoCo 原 FREE angular-armature/implicitfast 力矩交集仍写入前拒绝；零 armature 诊断 source 的证据不替代原交集。GeoPhys 限显式 FREE，Isaac 6.2 scalar 与 MJWarp 4.0.1 B1 按受测主体和 source 有界接收，详见[唯一能力矩阵](../capabilities/capability-matrix.json)及[7b 独立主审](../maintenance/reviews/20261117_g07b_final_acceptance.md)。完整 scalar 例子见 [scene_body_wrench.py](../../../../../examples/tasks/scene_body_wrench.py)。

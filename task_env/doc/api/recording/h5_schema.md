@@ -3,11 +3,31 @@
 **Import path**：`task_env.recorders.RecorderConfig`  
 **任务域**：Dataset Recording  
 **稳定性**：Public API  
-**职责**：写出单轨迹 raw H5 v2，并保留 v1 历史文件的 inspect 兼容。
+**职责**：区分 generic raw、selected canonical 与 structured/device 记录及其读回合同。
 **调用者/消费者**：`TransitionRecorder.save_h5()`、离线读取器。  
 **源码**：`recorders/contracts.py`、`h5.py`、`flatten.py`
 
 本页的 v2 和 collection 描述适用于以下 generic wrapper/recorder；selected 的 canonical H5 入口及独立读回见 [录制示例](../../../../examples/recording/record_expert.py) 和 [检查示例](../../../../examples/recording/inspect_h5.py)，不要把这两种记录路径当成同一 schema。
+
+## Selected 记录与动作来源
+
+selected 路线先 reset，再调用 `start_recording(path)`，在同一环境上 step，最后 `finish_recording(reason)` 并在 `finally` 中 close。canonical outer 记录 T 条 transition 和 T+1 个边界；execution stream 另外保存原生子步应用；structured/device 记录有自己的 typed control、边界事件和 episode end。具体入口与格式由实际 binding 选择，不能把 generic v2 的 dataset 结构套到所有 H5。加载器检查 schema、时间和关联；提交 ACK 不是独立力测量，单个 H5 也不替代同运行 caller 的完成与 close 事实。
+
+旧 canonical metadata 的 `expert_identity` 是构建时声明的 Solution 身份，格式仍要求 SHA-256；录制开始时尚无动作，因此这个字段不能证明专家曾执行。新 transition 的 `expert_diagnostics.action_origin_v1` 以 JSON 字符串记录成功提交后的来源：`ordinary` 的实际 Solution identity 为 null、完成未评估；已校验 proposal 为 `solution_proposal` 并记录匹配身份；若 proposal 无法确认来源则标记 `solution_proposal_unverified` 而不宣称身份。旧文件没有该字段时来源是未知，不应反推。`planned_action` 是旧记录的 planned/hold 分类，不能单独证明专家计划轨迹完成；任务成功、Solution 完成和计划轨迹完成需分别依据实际字段和同运行 caller。
+
+读取当前仓库示例产生的单条文件，可使用下列离线 reader（不启动环境）：
+
+```python
+from pathlib import Path
+from examples._common import load_recording_summary
+
+summary = load_recording_summary(Path('episode.h5'))
+print(summary['schema'], summary['transitions'], summary['boundaries'])
+print(summary['expert_identity_role'], summary['action_origins'])
+assert summary['t_plus_one_valid']
+```
+
+此 reader 对旧 canonical 文件的缺失来源返回 `None`，不补造历史事实；v3 有独立字段合同，按具体 reader 使用。文件不存在、schema 或内容不匹配时读取会抛出异常。上面的来源字段是本次 7c002 正在验证的改动，独立主审前不作为全 provider 的接收声明。
 
 ## `RecorderConfig`
 

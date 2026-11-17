@@ -7,7 +7,7 @@
 > 当前状态见 [API 入口](../index.md) 和 [维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
 > Phase C 的标准方向是外部 Solution 产生 action 并交给 `env.step(action)`；
 > 下方历史 `step_expert()` 用法现仅是迁移前的受限兼容，不是标准 Env API。
-> NutAssembly 现有调用方驱动的 `act → step(action) → observe`，只接收带来源边界与控制请求的 `ExpertAction`；裸数组仍受限，完整物理验证待做。
+> NutAssembly 接收合法普通 pose 数组；调用方驱动 Solution 的 `ExpertAction` 仍需来源边界与控制请求。7c002 已有普通动作和完整 Solution 的有界运行，等待独立主审。
 
 **Import path**：不适用  
 **任务域**：Appendix  
@@ -15,6 +15,42 @@
 **职责**：集中说明已移除旧路径。  
 **调用者/消费者**：从旧 TaskEnv 导入迁移的用户。  
 **源码**：`task_env/__init__.py` 与各 package `__init__.py`
+
+## 当前调用迁移
+
+| 原做法 | 当前入口和边界 |
+| --- | --- |
+| `pick-cube-v1` / `nut-assembly-square-v1` 直接构造 | 使用 `pick-cube-p16-reference-v1` / `nut-assembly-outcome-reference-v1`；旧 UID 明确拒绝，不自动映射历史任务 |
+| 顶层 `provider`、`backend`、`horizon` | 在 selected config 的 `execution` 和 `episode` 中声明；未知字段拒绝 |
+| 独立 `BaseTaskEnv` 生命周期 | 它是 `SelectedReferenceEnv` 的兼容导出，不再维护第二套 reset/step |
+| Nut 的普通动作只能拒绝 | 合法 world pose 在 7c002 准入；Solution proposal 仍须 source/boundary/identity/control request，不能混用 |
+| 把 H5 `expert_identity` 当成实际动作来源 | 该字段是声明身份；新 transition 的 `action_origin_v1` 才记录普通动作或已校验 proposal，旧文件缺失保持未知 |
+| UI 图像与 task sensor 图像混用 | scalar UI `rgb_array` 为 owned CPU HWC uint8，task RGB 和 device named camera 按各自合同 |
+| 将 legacy host wrapper 包住 device same-step | 使用 device 的 `step()` 和其终止/reset 信息；旧 SB3/RSL wrapper 明确拒绝该组合 |
+
+以上为当前调用方向，不自动迁移旧录制或为未测组合授予支持。执行版本、示例和结果见[当前状态](../../../../docs/module/task_env/v2.1.1/maintenance/current-state.md)；下方章节保留各自历史时点。
+
+例如将旧的顶层 provider/horizon 配置迁到正式 selected section：
+
+```python
+import numpy as np
+from task_env import make_env
+
+env = make_env('nut-assembly-outcome-reference-v1', config={
+    'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu', 'deployment': 'in_process'},
+    'episode': {'seed': 19, 'horizon': 10},
+    'controller': {'profile_id': 'r3_continuous_v1'},
+})
+try:
+    obs, info = env.reset(seed=19)
+    pose = env.state.pose_world['panda-v1/ee']
+    action = np.asarray([*pose.position, *pose.quaternion_wxyz, 1.], dtype=np.float64)
+    obs, reward, terminated, truncated, info = env.step(action)
+finally:
+    env.close()
+```
+
+同类 MuJoCo Nut 普通 action 在 7c002 有真实运行；此代码块未单独执行。传入旧 UID 或旧顶层配置会明确拒绝；需历史重放时使用记录对应的冻结源码，不在当前 factory 注入兼容映射。
 
 | 旧路径 | canonical import |
 | --- | --- |

@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7B_ACCEPTED_7C001_ACCEPTED_7C002_READY_NOT_STARTED",
+  "status": "G07_7C_ATTEMPT002_RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -20,14 +20,8 @@
     "reason": "Maintainer approved revision003 7a dispatch: case-driven code review and minimal necessary integration; preserve original gates and one stage branch."
   },
   "active_packages": [],
-  "next_candidate": {
-    "substage": "7c",
-    "attempt": 2,
-    "package_id": "V211_G07_7C_ATTEMPT002",
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
-    "new_execution_attempt_started": false
-  },
-  "next_action": "Maintainer manually forwards the frozen002 package/Goal. No execution begun here. Complete Nut action repair,34 module-doc current pages and final docs; release writer for independent review; only after acceptance fast-forward local develop to finalstage7 HEAD. No remote/main/tag/Release.",
+  "next_candidate": null,
+  "next_action": "Independent review of 7c attempt002 return, including historical GPU monitoring gap; do not move develop before acceptance.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2407,8 +2401,8 @@
           "dependencies": [
             "7b"
           ],
-          "status": "ATTEMPT001_ACCEPTED_ATTEMPT002_READY_NOT_STARTED",
-          "attempt_count": 1,
+          "status": "ATTEMPT002_RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -2432,9 +2426,25 @@
               ],
               "review_decision": "Maintainer accepted attempt001 documentation scope; this is not 7b acceptance, 7c close, or version release.",
               "final_docs_head": "1e9081c48ec28854055928f1ef361dffc8d5f6a3"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G07_7C_ATTEMPT002",
+              "status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+              "started_at": "2026-11-17T17:45:01.323279+08:00",
+              "deadline": "2026-11-17T21:45:01.323279+08:00",
+              "input_head": "2c697908d7e7948c4b33e65fabdd6ec88e3dda1b",
+              "report_path": "workspace/maintenance/v211_g07c_attempt002/report.md",
+              "substep_budget_amendment": {
+                "authorized_at": "2026-11-17T18:39:45.526597+08:00",
+                "added": 30000,
+                "limit": 80000,
+                "prior_consumption_preserved": true
+              },
+              "tracked_summary": "reviews/20261117_g07c_attempt002_execution.md"
             }
           ],
-          "assigned_agent": null,
+          "assigned_agent": "Codex primary agent; sole writer",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt002_20261117/work-package.md",
           "package_sha256": "bb2941163a530caf1b94ca347aa620e9ea3de9809d398acda2a63ec72ae58fab",
           "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
@@ -2456,13 +2466,14 @@
           },
           "last_observation": {
             "date": "2026-11-17",
-            "state": "7b accepted;001 docs accepted/merged atc0aeef75; docs worktree and merged local branch removed after ignored/raw preservation.002 prepared for manual forwarding with Nut action fix, marker,34 current module-doc pages and final candidate docs. Count remains1, no Goal/native. Local develop fast-forward after independent002 acceptance."
+            "state": "Attempt002 executor returned; Nut ordinary and Solution representatives, marker and documentation candidate available for independent review. Earlier CPU-only runs lacked whole-card GPU sampling; supervised same-source representative rechecks retained. No acceptance or release inferred."
           },
           "evidence_refs": [
             "work-packages/20261117_g07c_attempt001_goal.md",
             "../planning/stage7-7c-tutorial-blueprint.md",
             "reviews/20261117_g07c_attempt001_integration.md",
-            "work-packages/20261117_g07c_attempt002_goal.md"
+            "work-packages/20261117_g07c_attempt002_goal.md",
+            "reviews/20261117_g07c_attempt002_execution.md"
           ],
           "commits": [
             "f943e193",
@@ -2487,14 +2498,14 @@
             ]
           },
           "blockers": [
-            "T-NUT-RANDOM: ordinary actions still refused; authorized for002 minimal task-local repair.",
-            "Final docs/API reconciliation and7c independent acceptance pending."
+            "Independent review pending; historical CPU-only runs lack whole-card GPU sampling.",
+            "GeoPhys Nut Rasterizer first-frame source/Scene rejection remains bounded rendering limitation."
           ],
           "prepared_attempt": 2,
           "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt002_20261117/goal-prompt.md",
           "goal_prompt_sha256": "3a46b24c57ca8474877d66ed5ac80dd6226cada659c9f1f28bc4c0fa2a46eba3",
           "input_head_role": "Actual preparation-successor dispatch-input HEAD; production source baselinec0aeef75. Original001 input/output retained as history.",
-          "package_status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+          "package_status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
           "dependency_exception": "Maintainer authorized independent documentation work before 7b acceptance; full7c close still requires accepted7b and attempt002.",
           "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt002_20261117/dispatch-input.json",
           "docs_final_head": "1e9081c48ec28854055928f1ef361dffc8d5f6a3",
@@ -3203,7 +3214,7 @@
     "historical_only": true
   },
   "g07c_attempt002_preparation": {
-    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
     "package_ref": "work-packages/20261117_g07c_attempt002_goal.md",
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt002_20261117/work-package.md",
     "package_sha256": "bb2941163a530caf1b94ca347aa620e9ea3de9809d398acda2a63ec72ae58fab",
@@ -3213,9 +3224,9 @@
     "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt002_20261117/dispatch-input.json",
     "source_baseline": "c0aeef75734b3f97902a3296514f6493598fe532",
     "ordinary_attempt_count_before_start": 1,
-    "assigned_executor": null,
-    "goal_started": false,
-    "native_started": false,
+    "assigned_executor": "Codex primary agent",
+    "goal_started": true,
+    "native_started": true,
     "budget": {
       "wall_minutes": 240,
       "expected_minutes": [
@@ -3223,7 +3234,13 @@
         240
       ],
       "native_cumulative_seconds": 3600,
-      "explicit_substeps": 50000
+      "explicit_substeps": 80000,
+      "substep_amendment": {
+        "authorized_at": "2026-11-17T18:39:45.526597+08:00",
+        "added": 30000,
+        "previous_limit": 50000,
+        "consumption_preserved": true
+      }
     },
     "module_docs": {
       "current_pages": 34,
@@ -3232,7 +3249,12 @@
       "additional_facade_mapping": true,
       "map_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt002_20261117/module-doc-map.json"
     },
-    "develop_policy": "Maintainer authorized local fast-forward only after independent002 acceptance; develop currently120281a1. No main/remote/tag/release."
+    "develop_policy": "Maintainer authorized local fast-forward only after independent002 acceptance; develop currently120281a1. No main/remote/tag/release.",
+    "started_at": "2026-11-17T17:45:01.323279+08:00",
+    "deadline": "2026-11-17T21:45:01.323279+08:00",
+    "execution_summary": "reviews/20261117_g07c_attempt002_execution.md",
+    "charged_native_seconds": 778.1657250191784,
+    "charged_explicit_substeps": 72980
   },
   "g07c_docs_integration": {
     "merge_head": "c0aeef75734b3f97902a3296514f6493598fe532",

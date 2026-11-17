@@ -22,6 +22,26 @@ optional SB3/RSL-RL learner or H5 recorder
 
 用户通过 public environment、Gymnasium spaces 和 metadata 访问数据；runtime、solver、Taichi field、contact workspace、actuator ctrl 和 qpos private layout 不属于通用用户契约。
 
+`make_env` 和环境生命周期是公共调用层；Task/Robot/source 声明与 binding 是受限制的扩展层；`BaseTaskEnv` 是同对象兼容名；provider adapter、transport、diagnostics 和原生内存布局属于内部实现。可 import 只说明名字可达，不等于所有组合已获支持。状态和动作按实际 Task schema 解释：reset 发布初始边界，step 先验证并绑定 action，再由 Controller 和 session 推进，最后输出新 observation 与评价；recording 是可选消费者，close 释放 owner。
+
+## 模块职责索引
+
+| 模块 | 深入入口 | 职责或边界 |
+| --- | --- | --- |
+| facade、registry | [构造](appendix/environment_creation.md) | UID、配置与公共 factory |
+| artifacts、assembly | [装配](composition/assembly_and_references.md) | 声明、source closure 和引用 |
+| robots、controllers | [主体与控制](composition/active_agents_and_control.md) | recipe、具名资源和控制匹配 |
+| objects、tasks/worlds | [对象](composition/passive_objects.md)、[世界](composition/worlds.md) | 场景实体及资产 |
+| tasks、environment | [任务语义](semantics/index.md) | reset、评价及生命周期 |
+| runtime | [运行边界](appendix/runtime_boundary.md) | session、transport、provider |
+| observations、render | [观测与渲染](appendix/observation_and_rendering.md) | 状态、图像与帧寿命 |
+| planners | [规划](planning/index.md) | 参考动作与 Solution |
+| recorders、trajectory | [记录](recording/index.md) | transition、H5 与离线读回 |
+| vectorization、alg、utils | [学习器](appendix/learner_integrations.md) | 批量、适配与变换 |
+| script、dependencies | [例子](examples/index.md)、[配置](appendix/configuration.md) | CLI、解释器与部署 |
+| reporter | [Reporter](reporter.md) | 可选报告，不拥有环境推进 |
+| diagnostics、doc、Skills | [文档入口](../index.md) | 诊断证据、教程与维护规则；非生产推进入口 |
+
 标准交互方向是外部 Solution 从 observation 推理 action，再由调用方交给 `env.step(action)`；`step_expert()` 仅作为受限兼容保留，不是标准 Env API。当前示例及轨迹脚本使用调用方驱动路线；PickCube 与 NutAssembly 的差异见[Solution 接口](planning/task_owned_solutions.md)。
 
 ## 最短入口

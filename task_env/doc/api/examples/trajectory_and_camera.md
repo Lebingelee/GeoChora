@@ -32,14 +32,58 @@ available for supported action conversion. `trajectory.replay` requires
 explicit `--historical` for legacy H5 replay. The separate
 `--selected-reexecute` route requires a fresh output and is not D0 reconstruction.
 
+## One recorded interval and a UI frame
+
+This complete scalar example associates a frame captured after the step with
+that returned boundary. It writes a fresh H5 path and closes before the offline
+reader; it does not claim task or Solution completion.
+
+```python
+from pathlib import Path
+import numpy as np
+from task_env import make_env
+from task_env.environment.config import CameraSpec
+from examples._common import load_recording_summary
+
+path = Path('pick-frame.h5')
+env = make_env('pick-cube-p16-reference-v1', config={
+    'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu', 'deployment': 'in_process'},
+    'episode': {'horizon': 10},
+    'render': {'backend': 'mujoco_reference', 'width': 128, 'height': 96},
+}, render_mode='rgb_array', observer_camera=CameraSpec(
+    'observer', width=128, height=96, position=(.5545, 0., 2.),
+    quaternion_wxyz=(2**-.5, 0., 2**-.5, 0.)))
+try:
+    obs, info = env.reset(seed=31)
+    pose = env.state.pose_world['panda-v1/ee']
+    action = np.asarray([*pose.position, *pose.quaternion_wxyz, 1.], dtype=np.float64)
+    action[0] += .001
+    env.start_recording(path)
+    obs, reward, terminated, truncated, info = env.step(action)
+    boundary = (env.state.control_step, env.state.simulation_time)
+    frame = env.render()
+    assert frame.shape == (96, 128, 3) and frame.dtype == np.uint8
+    assert boundary == (env.state.control_step, env.state.simulation_time)
+    env.finish_recording('external_stop')
+finally:
+    env.close()
+summary = load_recording_summary(path)
+assert summary['t_plus_one_valid']
+print(boundary, frame.shape, summary['action_origins'])
+```
+
+This particular block is statically checked, not rerun in 7c002. The earlier
+7b MuJoCo PickCube seed31 image evidence remains under its original source
+identity; a fresh observer requires compatible rendering dependencies. Never
+substitute that image for a different Nut or provider run.
+
 ## Camera and renderer support
 
 `CameraSpec` and camera observation contracts remain available for Task
 Artifacts that declare camera observations. UI rendering remains a separate
 `UiRenderProvider` contract. The old
 `task_env.script.camera.static`/`bound` scripts were tied to historical
-`pick-cube-v1` construction and now fail explicitly. The selected manipulation
-routes have no camera acceptance claim.
+`pick-cube-v1` construction and now fail explicitly. Selected manipulation camera acceptance is bounded by the actual source, provider, renderer and task in the current capability matrix; it is not a blanket claim. The 7c002 GeoPhys Nut Rasterizer attempt failed before its first frame on the canonical Scene/source closure condition.
 
 Historical bounded native renderer examples covered one scalar Pendulum frame through
 public `make_env` and one Pendulum batch frame through `merged_scene`, both on

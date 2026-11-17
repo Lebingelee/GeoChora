@@ -277,71 +277,45 @@ finally:
 - **Isaac direct**：必须显式选择 SDK 解释器；backend/device 为 `cuda`/`cuda:0`。direct 入口使用已安装 USD 资产；F06 Harness 则是另一条要求 `--source-delivery-manifest` 的合同，不能混用两个命令。
 - **Harness**：`--execution harness` 的 PickCube 只接受 `r3_continuous_v1`、horizon 1000、seed 31/32/33（其他 seed 需 `--diagnostic-seed`），并要求 fresh 输出目录。
 
-## 2.5 NutAssembly：随机动作版（当前真实缺口，`T-NUT-RANDOM`）
+## 2.5 NutAssembly：普通随机动作
 
-**这一节不能删减或伪装完成。**
-
-当前准备输入的源码事实：
-
-- `task_env/tasks/nut_assembly/specialization.py::_binding` 设置 `external_actions=False`；只准入 source-bound `ExpertAction`。
-- 同一 binding 的 `external_action_error` 是：`selected NutAssembly requires a source-bound ExpertAction; unguarded external actions are not admitted`。
-- `_validate_external_solution` 要求实际 `NutAssemblyOutcomeSolutionV1`，并核对同 provider/source/config/clock/identity。
-- `SelectedReferenceEnv._prepare_selected_step` 对普通数组在 `binding.external_actions=False` 时明确抛出 `RuntimeError`。
-
-因此：**构造一个合法的 8 维 pose 数组仍然不足以实现普通随机策略**。伪造 `solution_identity`/`request_boundary`、手改 binding 或关闭 guard 都不是教程允许的做法。
-
-下面是一个**预期拒绝**示例。它使用该 Task 实际准入的 seed 19（`None` 也解析为 19），确保失败发生在动作准入而不是 reset：
+Nut 的普通输入是八维 world absolute pose：xyz（m）、单位 `quaternion_wxyz`、夹爪标量。动作空间的边界是无限的，不直接以 `sample()` 作为物理可行采样；下例围绕 reset 的实测 TCP 生成 ±2 mm 的有限扰动，前四步保持并改变夹爪目标。seed 19 是该 Nut 路线的固定 reset 身份，1902 仅控制动作 RNG。普通动作不会得到 Solution 完成结论。
 
 ```python
-# workspace/tutorial/nut_random_expected_refusal.py
+from pathlib import Path
 import numpy as np
 from task_env import make_env
+from examples._common import load_recording_summary
 
-env = make_env(
-    "nut-assembly-outcome-reference-v1",
-    config={
-        "execution": {"physics_provider": "mujoco", "physics_backend": "cpu"},
-        "episode": {"horizon": 10},
-    },
-)
+path = Path('nut-random.h5')  # 使用不存在的新文件
+rng = np.random.default_rng(1902)
+env = make_env('nut-assembly-outcome-reference-v1', config={
+    'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu', 'deployment': 'in_process'},
+    'episode': {'horizon': 100},
+})
 try:
-    observation, info = env.reset(seed=19)             # 固定 provenance seed；不要套用 73/31
-    print("declared action space:", env.action_space)  # 仍声明参考 pose 空间
-    action = np.zeros(8, dtype=np.float64)
-    action[3] = 1.0                                    # 合法单位四元数
-    try:
-        env.step(action)
-    except RuntimeError as error:
-        print("EXPECTED REFUSAL:", error)
-        assert "source-bound ExpertAction" in str(error)
-    else:
-        raise AssertionError("ordinary random Nut action was unexpectedly admitted")
+    obs, info = env.reset(seed=19)
+    pose = env.state.pose_world['panda-v1/ee']
+    base = np.asarray(pose.position)
+    quat = np.asarray(pose.quaternion_wxyz)
+    env.start_recording(path)
+    for i in range(32):
+        delta = np.zeros(3) if i < 4 else rng.uniform(-.002, .002, 3)
+        gripper = 1. if i < 4 or i % 2 == 0 else -1.
+        action = np.r_[base + delta, quat, gripper]
+        obs, reward, terminated, truncated, info = env.step(action)
+        if terminated or truncated:
+            break
+    env.finish_recording('external_stop')
 finally:
     env.close()
+summary = load_recording_summary(path)
+print(summary['transitions'], summary['boundaries'], summary['action_origins'])
 ```
 
-### 运行卡
+本轮实际完成原 Panda 的 MuJoCo CPU 和 GeoPhys CPU 各 32 步，装配 Panda 的 MuJoCo CPU 8 步；每条均有同运行 H5 独立读回、状态响应和 close，等待独立主审。GeoPhys 的运行需已有受支持的隔离 worker；这里示例的 MuJoCo 配置不自动代表该部署。普通动作与 Solution proposal 不能在同一 episode 混用；错误 shape、非有限值或无效四元数被拒绝。正确的 Solution proposal 仍须核对 source、当前 episode/boundary、身份和 control request，不从普通数组伪造身份。
 
-| 必填项 | 本例取值 |
-| --- | --- |
-| 环境 | Core 解释器；MuJoCo CPU；无 display |
-| 身份 | `nut-assembly-outcome-reference-v1`；固定 seed 19；Panda／square-nut／square-peg |
-| 前置与启动 | `source scripts/setup/geochora-env.sh`；从仓库根运行；需要 Menagerie 资产 |
-| 输入/输出 | 声明空间是 8 维参考 pose；实际 `step` 在动作准入处抛 `RuntimeError`；没有任何物理 transition |
-| 结束 | 捕获并解释错误后 `finally: close()`；**不得**把这个例子标为随机控制成功 |
-| 验证 | 源码核对 `external_actions=False` 与错误文本；本轮 native=0；没有正向随机控制证据 |
-| 故障 | 若用 seed 31/73 → reset 先报 `selected NutAssembly NA-S0 has fixed provenance seed19`；不要把它误诊为动作准入 |
-
-### `T-NUT-RANDOM` 缺口表
-
-| 项目 | 内容 |
-| --- | --- |
-| 用户需求 | 用普通随机 action（不伪造 Solution 身份）驱动 NutAssembly |
-| 当前状态 | **未满足**（UNMET）。`external_actions=False`；普通数组在 `_prepare_selected_step` 被拒绝 |
-| 真实 owner | Task 绑定 `task_env/tasks/nut_assembly/specialization.py` + `SelectedReferenceEnv` 的动作准入；不是 provider/Controller |
-| 最小可能扩展点 | 由 Task owner 明确定义普通动作合同（例如新增/启用受控的 external action 模式）及其预检；本 7c 文档包**不实现**，也不放宽生产 guard |
-| 是否由 7b 最终输入自然解决 | 准备输入中未解决；attempt002 应按 7b 接收后的源码复核。若仍无能力，交维护者裁定是否另开 task-local 接线 |
-| 交付判定 | 预期拒绝示例**不等于**随机控制成功；整包只能报 `PARTIAL_DOCS_WITH_KNOWN_CAPABILITY_GAP` 中的这一能力缺口，不能以文档完整替代能力 |
+记录元数据中的 `expert_identity` 是声明身份；应结合每个 transition 的 `action_origin_v1` 判断本次动作来源。旧记录缺少该字段时来源未知，不能从 `planned_action` 推导 Solution 完成。有关独立读回和生命周期见 [H5 schema](../../../../../task_env/doc/api/recording/h5_schema.md)。
 
 ## 2.6 NutAssembly：原 Solution 版
 

@@ -1,11 +1,39 @@
 # Active agents and control
 
-**Import path**：`task_env.robots`、`task_env.controllers`  
-**任务域**：Task Composition  
-**稳定性**：classic 路线扩展接口；selected 控制契约另见 [Controller / Solution](../semantics/task_environment.md)
-**职责**：声明 active agent，并把 public action 转为 `ControlCommand`。  
-**调用者/消费者**：classic `BaseTaskEnv.step()`、`RuntimeBoundary.apply_control()`；不描述所有 selected 控制路线。
+**Import path**：`task_env.robots`、`task_env.controllers`
+**任务域**：Task Composition
+**稳定性**：Robot 声明与公共构造入口为公开或扩展接口；具体 Controller/provider 组合按版本矩阵限定。
+**职责**：Robot 声明组件、frame、joint、传动和能力；Controller 将被准入的动作解释为可提交的控制目标。
+**调用者/消费者**：Task builder、source composer、环境控制生命周期、runtime 和 recorder。
 **源码**：`task_env/robots/`、`controllers/`
+
+## 当前 selected 路线
+
+Task 的正式配置经 `make_env` 选择 Robot 和 Controller。Robot 提供 source recipe、具名资源与默认 Controller 声明；默认对象在绑定前不能被当成可执行的 native 转发器。共同 builder 将 Task source 与 Robot recipe 组合，公共绑定核对 Controller 输入／输出、资源、单位和传动，再将它绑定到实际 source；`RobotRuntime` 反映这个已绑定主体。显式选定的受支持 Controller 不应被默认值替换。普通 reset 按声明重建或恢复；显式切换仅限已声明并受测的路线。
+
+下例通过公开入口提交一个世界坐标 pose：前三项为米，后四项为 `wxyz` 四元数，最后为夹爪标量；具体合法范围与行为以 Task 的 action schema 及 Controller 为准。采样当前 TCP 后改变 1 mm 是小的非零命令，不保证任务成功。
+
+```python
+import numpy as np
+from task_env import make_env
+
+env = make_env('pick-cube-p16-reference-v1', config={
+    'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu', 'deployment': 'in_process'},
+    'episode': {'horizon': 10},
+})
+try:
+    obs, info = env.reset(seed=31)
+    pose = env.state.pose_world['panda-v1/ee']
+    action = np.asarray([*pose.position, *pose.quaternion_wxyz, 1.], dtype=np.float64)
+    action[0] += .001
+    obs, reward, terminated, truncated, info = env.step(action)
+finally:
+    env.close()
+```
+
+本页示例形式对应本轮 PickCube MuJoCo 单步验证，具体配置、R1／R1_split／R3 约束、模型需求和可切换范围以[版本 API](../../../../docs/module/task_env/v2.1.1/api/README.md)及[Controller 指南](../../../../docs/module/task_env/v2.1.1/guides/custom-controllers.md)为准；不把一个受测 profile 推广到任意 Robot。错误 shape、非有限值和无效姿态应在提交前拒绝。action、Controller 目标、实际 ACK 与物理响应是不同证据；每次 reset 后重新取得受代次限制的绑定。
+
+下面的 classic adapter 与 gripper 类型保留其各自兼容范围，不等价于 selected 的唯一控制入口。
 
 ## `task_env.robots.BaseAgent` / `PandaAgent`
 

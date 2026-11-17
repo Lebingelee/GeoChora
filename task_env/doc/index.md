@@ -1,10 +1,10 @@
 # TaskEnv 文档入口
 
-当前（2026-11-11）：G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；现进入正式入口、代码职责及项目整理优化，完成并人工接收后再进入 G06。先读[当前摘要](../../docs/module/task_env/v2.1.1/maintenance/current-state.md)和[优化安排](../../docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md)。旧 attempt 的失败／待审文字保留所属历史时点。
+当前（2026-11-17）：G01～G06 及 G07 7a/7b 已按各自范围有界接收；7c002 正在实施，完成后须独立主审。5c 和 E00～E16 的旧结案不重开。先读[当前摘要](../../docs/module/task_env/v2.1.1/maintenance/current-state.md)和[优化安排](../../docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md)。旧 attempt 的失败／待审文字保留所属历史时点。
 
 ## v2.1.1 新手入口与当前范围
 
-从 [v2.1.1 学习指南](../../docs/module/task_env/v2.1.1/guides/README.md) 开始，按“安装 → 无渲染 → 相机/窗口 → device batch → 环境/资产/Robot/Controller → API”学习；[安装与启动](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md) 仍是唯一安装教程。该指南标明未验证的新安装、T-NUT-RANDOM 需求缺口和 WAIT_7B_ACCEPTANCE 项，不把静态核对写成 native 成功。
+从 [v2.1.1 学习指南](../../docs/module/task_env/v2.1.1/guides/README.md) 开始，按“安装 → 无渲染 → 相机/窗口 → device batch → 环境/资产/Robot/Controller → API”学习；[安装与启动](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md) 仍是唯一安装教程。该指南区分未验证的新安装、本轮普通 Nut 有界运行、7b 已接收边界和独立主审状态，不把静态核对写成 native 成功。
 
 Empty、Pendulum、TwoWheel、PickCube 和 NutAssembly 已使用统一 `SelectedReferenceEnv` 及共同 episode owner，`BaseTaskEnv` 是同对象兼容导出。G06 canonical CUDA batch（Pendulum/PickCube × MuJoCo Warp/GeoPhys/Isaac）已有界接收；device `step()`、same-step autoreset、部分 reset、具名相机和 Isaac↔MJWarp 整批切换见 [device 教程](../../docs/module/task_env/v2.1.1/guides/quickstart-device-batch.md)。旧 SB3/RSL/parallel-render 入口是另一套合同，登记或历史运行不证明其已适配。
 

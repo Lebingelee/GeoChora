@@ -2887,7 +2887,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
         from ..planners.contracts import ExpertAction, validate_caller_solution_action
         if self.binding.external_solution_actions and type(action) is ExpertAction:
-            if self._episode_mode in {'expert', 'external_solution'}:
+            if self._episode_mode in {'expert', 'external'}:
                 raise RuntimeError('cannot mix caller actions with selected Solution execution')
             if self.solution is not None or self._external_solution_owner is not None:
                 raise RuntimeError('caller actions require reset without an Env-owned Solution')
@@ -2932,6 +2932,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
             raise RuntimeError('cannot mix external actions with selected Solution execution')
+        if self.solution is not None or self._external_solution_owner is not None:
+            raise RuntimeError('caller actions require reset without an Env-owned Solution')
         from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
         return prepare_selected_control_action(self, action)
 
@@ -3163,7 +3165,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                      and self.evaluation.success)), task_truncated=False,
                 control_step=self.state.control_step, horizon=self.horizon,
                 ignore_done=getattr(self.binding, 'physical_ignore_done', False))
-            self._episode_mode = 'external_solution' if proposal is not None and not caller_driven else 'external'
+            self._episode_mode = 'external_solution' if proposal is not None else 'external'
             self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
             if proposal is not None and not caller_driven:
                 self._observe_selected_solution(
@@ -3374,7 +3376,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._episode_execution_state().finish_step(
                 terminated=terminated, truncated=truncated,
             )
-            self._episode_mode = 'expert' if proposal is not None and not caller_driven else 'external'
+            self._episode_mode = ('external_solution' if caller_driven else 'expert') if proposal is not None else 'external'
             self._last_position_terminated = terminated
             self._last_position_truncated = truncated
             self._last_position_request = request
@@ -3585,7 +3587,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if proposal is not None and observer_solution is None and not caller_driven:
             observer_solution = self.solution
         requested_mode = (
-            'external' if caller_driven else
+            'external_solution' if caller_driven else
             'external_solution' if proposal is not None and observer_solution is self._external_solution_owner
             else 'expert' if proposal is not None else 'external'
         )
@@ -3594,7 +3596,22 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._episode_mode = requested_mode
         stage = proposal.stage if proposal is not None else 'external'
         diagnostics = dict(proposal.diagnostics) if proposal is not None else {}
-        if (requested_mode in {'external_solution', 'external'} and proposal is not None
+        # This is attached only to a successfully published transition below.
+        # The trajectory metadata's expert identity is a declared compatibility
+        # identity; it does not by itself establish the producer of an action.
+        if proposal is None:
+            action_origin = {'kind': 'ordinary', 'solution_identity': None,
+                             'solution_completion': 'not_evaluated'}
+        else:
+            validated = (isinstance(proposal.solution_identity, str)
+                         and proposal.solution_identity == self.value.get('solution_identity')
+                         and proposal.request_boundary == self.info.get('expert_execution_boundary_v1')
+                         and (proposal.control_request is not None if self.binding.control_request_required
+                              else proposal.control_request is None))
+            action_origin = {'kind': 'solution_proposal' if validated else 'solution_proposal_unverified',
+                             'solution_identity': proposal.solution_identity if validated else None}
+        diagnostics['action_origin_v1'] = action_origin
+        if (requested_mode == 'external_solution' and proposal is not None
                 and proposal.control_request is not None):
             control_request = proposal.control_request
             diagnostics['arm_execution_request_v1'] = {
@@ -3673,7 +3690,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if (self.binding.native_sample_factory is not None
                     and not callable(getattr(self.session, 'native_control_feedback_sample', None))):
                 raise RuntimeError('selected Provider RuntimeSession does not expose the required native feedback sample contract')
-            if self.binding.control_request_required:
+            if self.binding.control_request_required and proposal is not None:
                 failure_phase = 'controller_control_request_validation'
                 if proposal is None or proposal.control_request is None:
                     raise ValueError('selected control requires its versioned arm execution request')
@@ -3699,7 +3716,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             def observe(index, state, feedback, effective, applied, diag,
                         provider_feedback_sample=None):
                 observed_diagnostics = dict(diag)
-                if self.binding.native_sample_factory is not None:
+                if self.binding.native_sample_factory is not None and proposal is not None:
                     if proposal is None or request_boundary is None:
                         raise RuntimeError('native sample publication requires a source-bound Solution action')
                     if provider_feedback_sample is None:
@@ -3780,7 +3797,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                             },
                         })
             interval_receipt = None
-            if self.binding.native_interval_receipt_factory is not None:
+            if self.binding.native_interval_receipt_factory is not None and proposal is not None:
                 failure_phase = 'native_interval_receipt'
                 evaluation_boundary = self._execution_boundary(self.expert_execution_info())
                 interval_receipt = self.binding.native_interval_receipt_factory(

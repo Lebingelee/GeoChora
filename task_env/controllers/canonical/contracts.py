@@ -33,6 +33,8 @@ def reference_pose_action(action):
     vector = np.asarray(action, dtype=float)
     if vector.shape != (8,) or not np.isfinite(vector).all():
         raise ValueError('finite eight-dimensional absolute pose action required')
+    from ...utils.rotation import normalize_quat_wxyz
+    normalize_quat_wxyz(vector[3:7])
     return RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', tuple(map(float, vector)))
 
 

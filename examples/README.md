@@ -58,15 +58,12 @@ The current public entry points are:
 | Device whole-batch switch | `examples/parallel/reconfigure_device.py` | Accepted representative edge Isaac ↔ MuJoCo Warp for both tasks; GeoPhys cross-provider switching is not admitted. |
 
 For a small new-task declaration, see [`declared_marker.py`](tasks/declared_marker.py).
-It supplies a distinct task/Entity identity, reset sampler and evaluator while
-reusing Core's shared Panda/table/box construction. Import the example to register
-it; note that at this source baseline its selected configuration has no declared
-`selected_robot_uids`/`default_robot_source_uid`, so `make_env` rejects it at
-Robot selection (`selected robot uid must be a nonempty trimmed string`). Treat
-the file as a declaration/binding example, not a runnable new-task route; the
-[current guide](../docs/module/task_env/v2.1.1/guides/authoring-scenes-assets-robots.md)
-records this drift and the fields a real task must declare. The modified Marker
-route has synthetic checks only.
+It declares the Panda Robot and R1 profile, a source snapshot and named task
+bodies, then uses the common composition and Controller binding. In 7c002,
+MuJoCo CPU marker-005 completed reset, a nonzero step, recording, another reset
+and close; the same H5 was independently read as 1 transition and 2 boundaries.
+This bounded execution awaits independent review and does not imply other
+providers or arbitrary assets are supported. See the [authoring guide](../docs/module/task_env/v2.1.1/guides/authoring-scenes-assets-robots.md).
 
 ## Workflow matrix
 
