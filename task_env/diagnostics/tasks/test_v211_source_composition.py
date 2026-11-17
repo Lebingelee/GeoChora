@@ -196,34 +196,18 @@ def test_v1_composition_hash_schema_remains_frozen():
 
 def test_selected_robot_configuration_roundtrips_and_rejects_unknown():
     import task_env.robots  # Register the actual Robot owners, without building source.
-    from task_env.environment.config import ResolvedEnvConfig
     from task_env.environment.configuration import resolve_task_env_config
-
-    class Task:
-        uid = 'composition-test-task'
-        uses_selected_public_config = True
-        selected_controller_profiles = frozenset()
-        selected_parameter_limits = {}
-        selected_supports_isaac = False
-        selected_robot_uids = frozenset(('panda-v1', 'panda-arm-hand-v1'))
-
-        @staticmethod
-        def selected_default_config():
-            return ResolvedEnvConfig()
-
-        @staticmethod
-        def selected_default_controller_profile():
-            return None
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv as Task
 
     default = resolve_task_env_config(Task, None)
-    assert default.robot_uid is None
+    assert default.robot_uid == Task.default_robot_source_uid == 'panda-v1'
     for uid in Task.selected_robot_uids:
         chosen = resolve_task_env_config(Task, {'robot': {'uid': uid}})
         assert chosen.robot_uid == uid
         assert resolve_task_env_config(Task, chosen) == chosen
     with pytest.raises(ValueError, match='does not admit'):
         resolve_task_env_config(Task, {'robot': {'uid': 'other'}})
-    with pytest.raises(ValueError, match='exactly uid'):
+    with pytest.raises(ValueError, match='supports uid and native_drive only'):
         resolve_task_env_config(Task, {'robot': {'uid': 'panda-v1', 'extra': 1}})
 
 

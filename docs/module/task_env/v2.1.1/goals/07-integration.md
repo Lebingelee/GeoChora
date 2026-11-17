@@ -81,6 +81,13 @@ A3默认Controller必须按声明通道真实绑定并执行非零canonical acti
 
 已通过的九格及其他代表矩阵不要求重跑。按`78349184`族的`freeze-final.json`、`results-final.json`及原H5复用，保留输入身份、PickCube事件驱动完成/null字段及旧限制，只补实际受影响的最短定向检查。attempt002负责最终diff影响表和7b完整独立主审输入；不自动开始7c。240分钟新执行窗口仍受7b原native累计余额约3249秒和新子步周期余额约198825约束，本包另收紧新增显式子步至20000，不重置历史消耗；精确资源与状态见完整包。
 
+<a id="g07b-priority-disposition"></a>
+### 2026-11-17维护者优先级调整与主线补证
+
+attempt002生产返包`81d1138d`保持原PARTIAL。维护者要求只优先处理直接影响当前主线的部分，仿真器本身问题留专门后续，退休入口不强制恢复/迁移。按[裁决与补证](../maintenance/reviews/20261117_g07b_attempt002_priority_review.md)，修正当前Robot配置测试并通过7项现有合同/清理检查；MJWarp无producer补齐非零动作、reset、两份同运行H5独立读回与close，新增10子步，未改生产代码或重跑九格。两项退休PickCube注入入口的原失败保留，当前共同构建已有清理覆盖，不因此恢复旧factory。
+
+MuJoCo3.8.1 FREE角向armature／implicitfast的原生数值边界保留写入前拒绝，问题G07B-MJC-FREE-ARMATURE移交专门后续，不要求G07修引擎、换source/积分器或升级依赖。独立预声明的零阻尼/零armature夹具证据限其自身source，可证明公共载荷响应，不证明原组合修复；原失败与原B2-2状态保留。当前重点缺口已补证，7b进入最终独立主审，不以退休suite未全绿或上游数值研究自动开启attempt003；ordinary attempt_count仍2，版本接收另作判断。
+
 <a id="7c"></a>
 ## 7c：版本文档与能力记录
 

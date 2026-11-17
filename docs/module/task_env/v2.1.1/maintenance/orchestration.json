@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-17",
-  "status": "G07_7B_ATTEMPT002_IN_PROGRESS",
+  "status": "G07_7B_RETURNED_PARTIAL_TARGETED_REVIEW_COMPLETED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -22,8 +22,14 @@
   "active_packages": [
     "V211_G07_7B_ATTEMPT002"
   ],
-  "next_candidate": null,
-  "next_action": "Execute attempt002 under its frozen scope and budgets; 7c remains planned.",
+  "next_candidate": {
+    "substage": "7b",
+    "attempt": 2,
+    "activity": "final_independent_review",
+    "status": "READY_FOR_FINAL_INDEPENDENT_REVIEW",
+    "new_execution_attempt_started": false
+  },
+  "next_action": "Perform final independent7b acceptance on actual production81d1138d and targeted review evidence; no mandatory retired-entry restoration or MuJoCo native research. No attempt003 started. Isolated7c documentation has its own state; do not overwrite its writer.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2212,7 +2218,7 @@
           "dependencies": [
             "7a"
           ],
-          "status": "RETURNED_PARTIAL_AWAITING_INDEPENDENT_REVIEW",
+          "status": "RETURNED_PARTIAL_TARGETED_REVIEW_COMPLETED",
           "attempt_count": 2,
           "attempts": [
             {
@@ -2247,14 +2253,15 @@
               "ended_at": "2026-11-17T16:24:39.847822+08:00",
               "report_ref": "reviews/20261117_g07b_attempt002_execution.md",
               "native_seconds": 2024.1520105634117,
-              "explicit_substeps_conservative_upper_bound": 1750
+              "explicit_substeps_conservative_upper_bound": 1750,
+              "output_head": "81d1138d54f9397fe1bd3569871fdf8beb05dcb8"
             }
           ],
           "assigned_agent": "Codex primary agent, sole writer",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/work-package.md",
           "package_sha256": "037e2fe8a4b37a94d4f1141d54d6496b00441369a1245fc5ceb5aa8d263826e8",
           "input_head": "4fdf9379482af6bb913eb1a6587316e64b6a0fed",
-          "output_head": null,
+          "output_head": "81d1138d54f9397fe1bd3569871fdf8beb05dcb8",
           "expected_duration_minutes": [
             150,
             210
@@ -2300,12 +2307,13 @@
           },
           "last_observation": {
             "date": "2026-11-17",
-            "state": "Attempt002 returned PARTIAL; B2-2 production FREE angular-armature moment and alternate fixture eligibility remain unresolved; B2-5 legacy failures retained."
+            "state": "Maintainer prioritized current routes. Real Robot config regression repaired; 7 existing contract/cleanup cases pass. MJWarp no-producer record/reset/close plus two independent H5 readbacks pass. MuJoCo native numeric envelope deferred with pre-write guard; legacy failures preserved. Whole7b acceptance remains pending."
           },
           "evidence_refs": [
             "reviews/20261117_g07b_attempt001_execution.md",
             "reviews/20261117_g07b_bodywrench_gap.md",
-            "work-packages/20261117_g07b_attempt002_goal.md"
+            "work-packages/20261117_g07b_attempt002_goal.md",
+            "reviews/20261117_g07b_attempt002_priority_review.md"
           ],
           "commits": [
             "ab4f9b13c17bcf522ca84bcc8bc94ad527320052",
@@ -2313,13 +2321,12 @@
             "78349184d0600e2fb804e6461930c475bfcc67c1",
             "c41db4af"
           ],
-          "review_decision": null,
+          "review_decision": "TARGETED_CURRENT_ROUTE_REVIEW_COMPLETED_WHOLE_7B_PENDING",
           "blockers": [
-            "MuJoCo production FREE angular-armature moment guard and diagnostic fixture eligibility require disposition.",
-            "Affected regression has three stale fixture/retired-owner failures; broader old suite also fails."
+            "Final independent assessment of the full7b evidence and reused matrices remains; simulator research and retired injection-entry restoration are not mandatory development gates."
           ],
           "input_head_role": "Actual dispatch input",
-          "package_status": "IN_PROGRESS",
+          "package_status": "EXECUTED_RETURNED_PARTIAL",
           "goal_prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/goal-prompt.md",
           "goal_prompt_sha256": "b4d5ae6544a62dde8a096e47288654eb90d906e9d07ec505a6aab9b894d0d2cf",
           "dispatch_input_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7b_attempt002_20261117/dispatch-input.json",
@@ -2366,7 +2373,23 @@
               "actual_merge_commit": "ab4f9b13c17bcf522ca84bcc8bc94ad527320052"
             }
           },
-          "prepared_attempt": 2
+          "prepared_attempt": 2,
+          "targeted_review": {
+            "date": "2026-11-17",
+            "report_ref": "reviews/20261117_g07b_attempt002_priority_review.md",
+            "input_head": "81d1138d54f9397fe1bd3569871fdf8beb05dcb8",
+            "ordinary_attempt_count_unchanged": 2,
+            "new_execution_attempt_started": false,
+            "production_code_changed": false,
+            "test_cases_passed": 7,
+            "supervised_seconds": "12.0714955020230265",
+            "new_explicit_substeps": 10,
+            "native_remaining_seconds": "1213.37754819553814435",
+            "old_regression_result_preserved": "115 passed,3 failed",
+            "deferred_native_issue": "G07B-MJC-FREE-ARMATURE",
+            "alternate_fixture_scope": "Independently declared source; not the original production FREE moment intersection",
+            "old_retired_injection_entries": "Not restored; current cleanup coverage checked with existing tests"
+          }
         },
         {
           "id": "7c",
@@ -3019,8 +3042,8 @@
       "share_url": "https://chatgpt.com/s/cx_6afbcae03558819185bd591836e39ecc",
       "authorized_purpose": "Actual blockers within the frozen package; planning thread may answer in scope without concurrent source writing."
     },
-    "execution_goal_started": false,
-    "native_started": false,
+    "execution_goal_started": true,
+    "native_started": true,
     "attempt_count_increments_on_actual_start": true
   }
 }
