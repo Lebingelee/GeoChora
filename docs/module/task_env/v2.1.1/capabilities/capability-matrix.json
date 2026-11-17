@@ -1081,7 +1081,7 @@
       "ordinary_7b_attempt_count": 2,
       "final_nine_task_success": "9/9 at original78349184 input; no current native rerun",
       "report_ref": "../maintenance/reviews/20261117_g07b_final_acceptance.md",
-      "7c": "Independent documentation worktree has its own status; final attempt002 not started by this review."
+      "7c": "Attempt001 bounded docs accepted and integrated atc0aeef75; old docs worktree removed after preservation. Attempt002 ready for manual forwarding; no execution or final7c acceptance."
     },
     "record_completion_scope": "Post-5c historical five-route joint evidence: Five routes use same-run joint evidence: independent H5 readback and caller completion with verified identities. Four canonical H5 files lack completion field; Isaac v3 field is null. No H5-only completion claim; independent review supports bounded maintainer-authorized acceptance. G07 final nine similarly require each same-run caller completion, independent H5 and close; see final_pickcube_cells for actual original input identities.",
     "complete_solution_intersections": [
@@ -1540,5 +1540,16 @@
       "Original115/3 and other legacy failures preserved; no full-suite-green claim.",
       "Historical GeoPhys Nut and LIBERO limited outcome remain unchanged."
     ]
+  },
+  "g07c_attempt002_preparation": {
+    "status": "READY_FOR_MANUAL_FORWARD_NOT_STARTED",
+    "ordinary_attempt_count_before_start": 1,
+    "work_package_ref": "../maintenance/work-packages/20261117_g07c_attempt002_goal.md",
+    "unmet_before_execution": [
+      "T-NUT-RANDOM",
+      "declared-marker selected Robot declaration",
+      "Final module-doc/API/recovery/release-candidate reconciliation"
+    ],
+    "no_new_runtime_claim": true
   }
 }
