@@ -2384,7 +2384,7 @@
               "started_date": "2026-11-17",
               "returned_date": "2026-11-17",
               "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
-              "output_head": "287ca1cf",
+              "output_head": "f0b7f5de",
               "native_starts": 0,
               "explicit_physics_substeps": 0,
               "gpu_usage": 0,
@@ -2398,7 +2398,7 @@
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G07_7c_attempt001_20261117/work-package.md",
           "package_sha256": "80bbcbc4990a80ee8f1f848154455ecb5349a5ec7d06892f1bcce9628001ddc5",
           "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
-          "output_head": "287ca1cf",
+          "output_head": "f0b7f5de",
           "expected_duration_minutes": [
             180,
             240
@@ -2422,7 +2422,7 @@
             "work-packages/20261117_g07c_attempt001_goal.md",
             "../planning/stage7-7c-tutorial-blueprint.md"
           ],
-          "commits": ["f943e193", "83f8031a", "287ca1cf"],
+          "commits": ["f943e193", "83f8031a", "287ca1cf", "f4343330", "f0b7f5de"],
           "review_decision": null,
           "blockers": [
             "Final7c close waits for accepted7b; independent001 is explicitly allowed.",
@@ -3090,7 +3090,7 @@
     "branch": "codex/v211-stage7-docs",
     "source_baseline": "4fdf9379482af6bb913eb1a6587316e64b6a0fed",
     "input_head": "cc44e4204c0f3bcbed3e145a537a601707de931d",
-    "output_head": "287ca1cf",
+    "output_head": "f0b7f5de",
     "attempt_count": 1,
     "report_path": "workspace/maintenance/v211_g07c_attempt001/report.md",
     "tracked_summary": "reviews/20261117_g07c_attempt001_docs.md",
