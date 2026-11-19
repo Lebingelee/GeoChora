@@ -1,6 +1,6 @@
 # 从外部实验数据准备终态验证
 
-从GeoChora仓库根目录安装依赖，设置`PYTHONPATH=.`。
+从GeoChora仓库根目录安装依赖，设置`PYTHONPATH=.`。本例不依赖TableCraft任务ID注册，
 也不要求安装SimDataKit或TaskEnv。支持`low-detail-task/1.1.0`和`low-detail-task/1.2.0`原始任务。
 
 ```powershell

@@ -68,6 +68,13 @@ The selected task authoring API is task-owned. The public environment entry is
 the two task packages and should be treated as an API compatibility decision,
 not as interchangeable environment constructors.
 
+## External benchmark: TableCraft
+
+The separate [TableCraft benchmark collection](../../../../bench_deploy/tablecraft/README.md)
+provides the 50 frozen SimDataKit v2 task records, shared asset preparation,
+six diagnostic preview references and generic terminal-review preparation. It is not registered
+with `make_env`; see its README for the USD runtime integration boundary.
+
 ## Generic Pendulum and TwoWheel tasks
 
 `EmptyTaskEnv`, `PendulumEnv` and `TwoWheelBalanceEnv` have their own task

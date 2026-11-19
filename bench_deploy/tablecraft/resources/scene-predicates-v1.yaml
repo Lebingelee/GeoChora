@@ -1,0 +1,203 @@
+# Scene predicate vocabulary v1
+# Owner: SimDataKit (semantics + thresholds). Implementer: GeoChora validation (pins this version).
+# Changing meaning or thresholds requires a new file version; never edit v1 in place after release.
+version: scene-predicates/1.0.0
+status: draft  # becomes frozen together with franka-scene-50 2.0.0
+units: {length: m, angle: deg, time: s}
+frame: world, Z up; object names come from the dataset object manifest
+
+evaluation:
+  terminal_state: >-
+    Terminal predicates are evaluated once, on the settled final state: after the last gripper
+    release the recording continues until every task object has linear speed < 0.02 m/s for
+    0.5 s (or the episode ends). If the record never settles, terminal predicates are unknown.
+  three_valued: >-
+    Every threshold has a pass band and a fail band; a measurement between them is unknown.
+    Unknown may only come from that band or from missing evidence, never from vague meaning.
+  combination: >-
+    all = conjunction, any = disjunction, not = negation, with Kleene three-valued logic.
+    A task succeeds only when its goal is true; unknown goes to the reviewer fallback route.
+  support_evidence: >-
+    Support relations (In, OnTable, On) use the contact load path when contact records exist.
+    Without contact records an evaluator may use geometric support instead: the object's lowest
+    collision point lies within 0.003 m above the supporting surface and its center projects onto
+    that surface. Results must state which basis (contact or geometric) was used.
+  implicit_goal_terms: >-
+    Every task goal is implicitly conjoined with AllReleased (no task object is in gripper
+    contact at the end). Asset preservation stays with the existing asset checks, not this file.
+
+task_fields:
+  # Shape of the machine-checkable fields in a low-detail-task/1.2.0 row (under truth).
+  group: one of A (atomic skill), B (reference/attribute), C (spatial layout), D (long-horizon), E (dexterous pose)
+  bind: '{"?b": {"kind": "brick", "color": "red"}}  # optional'
+  goal: >-
+    node := {"all": [node, ...]} | {"any": [node, ...]} | {"not": node} | atom
+    atom := {"pred": <terminal predicate>, "args": [arg, ...]}
+    arg  := manifest object name | "?var" | drawer name | "drawer_front" | [arg, ...] (Row, Grouped)
+  process: >-
+    optional list of process atoms; Sequence args are goal nodes; Never args [object];
+    WhileGrasped args [object, "Upright" | "Inverted"].
+
+variables:
+  syntax: '"?name": {kind, color, size_class, initially_on, initial_orientation}'
+  semantics: >-
+    A bound variable ranges over manifest objects matching every given filter. Variables in one
+    task are pairwise distinct, and distinct from every object named explicitly in the same task. The goal is true if SOME assignment makes it true (existential),
+    false if EVERY assignment makes it false, unknown otherwise. The same variable denotes the
+    same object in every predicate and every Sequence stage of the task.
+
+predicates:
+  # ---------- containers ----------
+  Open:
+    args: [drawer]
+    meaning: 抽屉处于打开状态，开口足以放入场景中的球或积木。
+    measure: opening = -joint_position (m)
+    pass: "opening >= 0.14"
+    fail: "opening <= 0.10"
+  Closed:
+    args: [drawer]
+    meaning: 抽屉处于关闭状态。
+    measure: opening = -joint_position (m)
+    pass: "opening <= 0.01"
+    fail: "opening >= 0.03"
+  In:
+    args: [object, drawer]
+    meaning: 物体放在抽屉内腔里，由抽屉（或屉内其他物体）承托。
+    measure: >-
+      (a) collision footprint inside the drawer cavity translated by the current opening,
+      margin m = smallest inward clearance; (b) object center height between cavity floor and rim;
+      (c) contact load path from the object to the drawer, not through the robot.
+    pass: "m >= -0.002 and (b) and (c)"
+    fail: "m <= -0.006 or not (b) or no load path to the drawer"
+    note: resting against an inner wall (m about 0) counts as inside; calibrated 2026-11-18
+  # ---------- support ----------
+  OnTable:
+    args: [object]
+    meaning: 物体直接放在桌面上。
+    measure: direct contact load path object -> table
+    pass: "supported directly by table"
+    fail: "not supported directly by table"
+  "On":  # quoted: bare On is a YAML boolean
+    args: [object, object]
+    meaning: 第一个物体叠放在第二个物体上，由它承托，且不直接接触桌面。
+    measure: direct load path a -> b, and a has no direct table support
+    pass: "both hold"
+    fail: "either clearly violated"
+  Released:
+    args: [object]
+    meaning: 夹爪已松开该物体。
+    measure: contact between gripper finger scope and object at the terminal state
+    pass: "no finger contact and finger-object clearance >= 0.001"
+    fail: "finger contact present"
+  AllReleased:
+    args: []
+    meaning: 结束时夹爪不握持任何任务物体。
+    measure: Released for every manifest object
+  # ---------- orientation (bricks; stud axis = body +Z) ----------
+  Upright:
+    args: [brick]
+    meaning: 积木凸点朝上平放。
+    measure: angle between body +Z and world +Z
+    pass: "<= 15"
+    fail: ">= 25"
+  Inverted:
+    args: [brick]
+    meaning: 积木凸点朝下（倒扣）平放。
+    measure: angle between body +Z and world -Z
+    pass: "<= 15"
+    fail: ">= 25"
+  OnSide:
+    args: [brick]
+    meaning: 积木侧立，凸点方向大致水平。
+    measure: angle between body +Z and the horizontal plane
+    pass: "<= 15"
+    fail: ">= 25"
+  # ---------- planar relations (horizontal projection) ----------
+  Near:
+    args: [object, object]
+    meaning: 两物体相邻摆放（"旁边""挨着"）。
+    measure: horizontal gap between collision footprints (0 when touching)
+    pass: "gap <= 0.03"
+    fail: "gap >= 0.06"
+  Apart:
+    args: [object, object]
+    meaning: 两物体彼此分开，不接触。
+    measure: horizontal gap between collision footprints
+    pass: "gap >= 0.01"
+    fail: "gap <= 0.003"
+  Parallel:
+    args: [brick, brick]
+    meaning: 两块非方形积木的长边相互平行。
+    measure: angle between horizontal long axes, folded to [0, 90]
+    pass: "<= 10"
+    fail: ">= 20"
+    applies_to: bricks whose long/short edge ratio >= 1.25 (mid and long classes)
+  Perpendicular:
+    args: [brick, brick | drawer_front]
+    meaning: 长边相互垂直；drawer_front 表示抽屉前板长边（世界 X 轴）。
+    measure: 90 minus the folded angle between horizontal long axes
+    pass: "<= 10"
+    fail: ">= 20"
+  Row:
+    args: [object, object, object, "..."]
+    meaning: 若干物体沿一条直线排成一列（按给定顺序，正反方向均可），彼此分开。
+    measure: >-
+      fit a line to centers; residual r normalised by the narrowest footprint width; order of
+      projections along the line must equal the given order or its reverse; adjacent pairs Apart.
+    pass: "r <= 0.25 and order holds and adjacent pairs Apart"
+    fail: "r >= 0.75 or order violated or an adjacent pair touches"
+  Between:
+    args: [object, object, object]
+    meaning: 第一个物体位于后两个物体之间。
+    measure: >-
+      t = projection parameter of the first center on the segment from the second to the third
+      center; d = distance from the first center to that segment.
+    pass: "0.15 <= t <= 0.85 and d <= 0.03"
+    fail: "t <= 0 or t >= 1 or d >= 0.06"
+  Grouped:
+    args: [[object, "..."], [object, "..."]]
+    meaning: 物体分成两组：两组之间的距离明显大于组内物体之间的距离。
+    measure: >-
+      w = largest gap needed to connect each group internally (max edge of the minimum spanning
+      tree over horizontal footprint gaps, 0 for a single object, taken over both groups);
+      g = smallest horizontal gap between any member of one group and any member of the other.
+    pass: "g >= 2 * w and g >= 0.05 and w <= 0.06"
+    fail: "g <= w or g <= 0.02 or w >= 0.10"
+    note: clustering definition replaced a fixed 3 cm within-group bound; calibrated 2026-11-18
+  # ---------- displacement from the initial state ----------
+  Unmoved:
+    args: [object]
+    meaning: 物体保持在初始位置和姿态。
+    measure: translation and rotation between initial and terminal pose
+    pass: "translation <= 0.01 and rotation <= 10"
+    fail: "translation >= 0.02 or rotation >= 20"
+  AtInitialPositionOf:
+    args: [object, object]
+    meaning: 第一个物体位于第二个物体的初始位置（交换、轮换、放回原位）。
+    measure: horizontal distance from the first object's terminal center to the second's initial center
+    pass: "<= 0.03"
+    fail: ">= 0.05"
+
+process_predicates:
+  # Need the full recorded trajectory (pose + contact series). Implemented by the trajectory module.
+  Sequence:
+    args: [[goal, "..."]]
+    meaning: 各阶段目标按先后顺序依次成立（每个阶段在某个时刻成立，时刻严格递增）。
+    measure: ordered witness over the sample grid; the last stage is also checked on the terminal state
+    pass: "witness found on a complete record"
+    fail: "complete record and no witness possible"
+  Never:
+    args: [object]
+    meaning: 整个过程中机械臂（含夹爪）从未接触该物体。
+    measure: robot-object contact over the whole record
+    pass: "no contact on a complete record"
+    fail: "any contact sample"
+  WhileGrasped:
+    args: [object, Upright | Inverted]
+    meaning: 物体被夹爪握持期间，始终保持给定姿态。
+    measure: >-
+      for every sample with finger contact on both fingers (grasped), evaluate the orientation
+      predicate; the object must be grasped on at least one sample, otherwise the result is false
+      (pushing or dragging without a grasp does not satisfy it)
+    pass: "holds on every such sample of a complete record"
+    fail: "fails on any such sample"

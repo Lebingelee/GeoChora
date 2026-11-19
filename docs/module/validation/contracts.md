@@ -17,7 +17,7 @@
 
 `load_task_source`以显式`resource_root`（默认任务文件所在目录）解析资源，拒绝越界、缺失和重复ID，
 仅把`task_contract`与`initial_state`的JSON载入`dependencies`。原始资产由调用者保留来源和字节身份，
-不执行、不重新生成。[外部用户样例](../../../examples/validation/README.md)
+不执行、不重新生成。TableCraft任务读取与[外部用户样例](../../../examples/validation/README.md)
 复用同一校验。底层`prepare_source_review`仍保留自由source协议，不能据此宣称任务schema已验证。
 
 任务格式不合规为输入错误；格式合规而必要观测缺失时，继续沿用证据／审核的未知与错误区分。

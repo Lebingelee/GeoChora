@@ -11,6 +11,7 @@ Current source, production callers, and qualified evidence define behavior. Cano
 | Runtime and provider admission | `task_env/runtime/`, `task_env/artifacts/` | Consume provider public/runtime-facing APIs; do not inspect private solver state |
 | Controllers and actions | `task_env/controllers/`, `task_env/planners/` | Convert declared actions to canonical targets and feedback |
 | Recording and data conversion | `task_env/recorders/`, `task_env/trajectory/` | Keep schema, source, clock, and identity checks explicit |
+| Benchmark-specific task deployment | `bench_deploy/libero/`, `bench_deploy/tablecraft/` | Benchmark source, resource and task semantics; shared runtime remains TaskEnv-owned |
 | Offline task validation | `validation/` | Supplied source/evidence → measurements and independently checked terminal results; no environment lifecycle ownership |
 | Physics and native rendering | GeoPhys or another provider | Provider-owned implementations; no dependency on GeoChora internals |
 | Task/asset/policy harness direction | `docs/module/task_harness/`, `asset_harness/`, `policy_harness/` | Documentation describes responsibilities; it does not assert unimplemented modules |

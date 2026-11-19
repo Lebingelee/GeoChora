@@ -1,0 +1,11 @@
+LicenseRef-SimDataKit-Internal
+
+This release is for internal, non-blind evaluation and review only. The user
+provided scene.usdc without a public redistribution license. Inclusion here
+does not grant permission to publish or redistribute that scene or this package.
+
+The bundled Franka Panda model is third-party material under Apache-2.0;
+its original license and notices remain inside resources/panda-model.zip.
+No exclusive ownership or additional rights in that model are claimed.
+Task authoring, acceptance and difficulty labels are AI-reviewed and are not
+independent human-expert certification. Diagnostic videos are not formal scores.

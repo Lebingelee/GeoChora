@@ -71,6 +71,8 @@ Offline terminal validation is owned by the root [validation module](../../../va
 and its [module Skill](../geochora-validation/SKILL.md). Use those routes for recorded-data
 measurements, original-task review, one evidence expansion and independent verification.
 TaskEnv owns task construction, runtime, recorders, replay and lifecycle predicates.
+The [TableCraft benchmark package](../../../bench_deploy/tablecraft/README.md) owns its task collection;
+its optional review calls use validation. The existing task-data test remains under TaskEnv diagnostics.
 Keep recorded task_success, terminal judgments and formal Qualification distinct.
 Historical native evidence remains in the [2026-11-15 receipt](../../../docs/module/task_env/v2.1.0/maintenance/reviews/terminal-validation-20261115.md).
 

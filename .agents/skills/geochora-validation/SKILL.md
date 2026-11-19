@@ -36,6 +36,8 @@ lifecycle predicates. Complete trajectory validation remains future work.
 
 Generic validation consumes explicit data and imports no TaskEnv runtime. Keep task-specific source
 requirements in the Task Artifact; adapt inputs rather than adding per-task reviewers or another recorder.
+The [TableCraft deployment](../../../bench_deploy/tablecraft/README.md) owns its original task requirements
+and calls validation explicitly; it is a benchmark consumer, not a TaskEnv built-in environment.
 Use [tests](../../../validation/tests/README.md) to select numeric/protocol/adapter counterexamples.
 The standalone independence test runs recorded measurement and paired review with runtime imports blocked.
 

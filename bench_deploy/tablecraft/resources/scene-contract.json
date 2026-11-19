@@ -1,0 +1,86 @@
+{
+  "title": "固定场景操作公共说明",
+  "version": "2.0.0",
+  "source_scene": "resources/scene.usdc",
+  "robot": "resources/panda-model.zip",
+  "object_manifest": "resources/object-manifest.json",
+  "fixed_asset": "保留原场景桌子、柜体、18块积木、6个球及其几何、质量、初始位置和姿态。抽屉初态仅按每题setup覆盖。不能自行删物、改尺度、预置目标终态或增加帮助完成任务的物件。",
+  "robot_setup": {
+    "base_position_m": [
+      -0.1,
+      -0.52,
+      0.75
+    ],
+    "base_yaw_deg": 90,
+    "base_note": "Panda link0 固定于桌前沿外侧底座，朝向 +Y（面向桌面与柜体）；运行中不得移动。",
+    "initial_arm_joints_rad": [
+      0.0,
+      -0.785,
+      0.0,
+      -2.356,
+      0.0,
+      1.571,
+      0.785
+    ],
+    "initial_gripper": "open (each finger 0.04 m)",
+    "control": "控制方法与参数可自行选择；机械几何、关节范围和底座位姿不得修改。",
+    "reachability": "物体清单 graspable_from_fixed_base=false 的物体（当前为 purple_ball）不作为抓取对象，仅可作参照。"
+  },
+  "evaluation_camera": {
+    "resolution": [
+      1280,
+      720
+    ],
+    "fps": 30,
+    "fovy_deg": 45,
+    "views": {
+      "overview": {
+        "eye": [
+          0.65,
+          -1.25,
+          1.45
+        ],
+        "look_at": [
+          -0.17,
+          -0.025,
+          0.86
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ]
+      },
+      "top": {
+        "eye": [
+          0.08,
+          -0.35,
+          1.8
+        ],
+        "look_at": [
+          0.0,
+          -0.055,
+          0.93
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    "note": "视频与图片证据使用这两个视角；可另加相机，但不能替代上述视角。"
+  },
+  "physics": "使用真实重力、碰撞和夹爪接触完成操作；不得传送物体、粘接物体或直接给球/积木/抽屉设置动作轨迹来代替机械臂。保持原物体质量和接触材料，碰撞表示的等效导入适配应记录，不得改变可接触空间以降低难度。",
+  "drawer_identity": "drawer_1为最下层，drawer_2为中层，drawer_3为最上层；沿世界-Y拉开。未说明的抽屉保持原始关闭初态。",
+  "object_selection": "题面以物体清单中的公开名称或唯一描述指代对象；只有题面明确写“任选/任意一块”时才允许自选，此时以 truth.bind 列出的候选范围为准。",
+  "building": "积木任务按自然重力支撑理解，不要求卡扣咬合。题面说用原本分离的积木搭建时，不能把原有堆叠直接充作答案；搭建终态必须松爪，不靠机械臂支撑。",
+  "success": "以任务 truth.goal 判定（goal 本身不公开）；判定口径与阈值公开于 resources/scene-predicates-v1.yaml。在最后一次松爪后物体静止的终态上计算，结束时夹爪不得握持任务物体。",
+  "freedom": [
+    "符合目标的精确落点和朝向",
+    "抓取顺序（题面有顺序要求时除外）",
+    "轨迹、控制方法和完成时间"
+  ],
+  "evidence": "需保留连续的物体位姿、抽屉关节与接触记录；含过程要求的题须提供完整轨迹。只有最终图片不足以证明过程。",
+  "license": "scene.usdc由用户提供，未提供开放再分发许可，仅内部任务生产/验证；Panda模型Apache-2.0随zip保留许可。"
+}

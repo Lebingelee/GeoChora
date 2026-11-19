@@ -1,0 +1,5 @@
+# Preserve frozen source bytes and resource hashes across Windows checkouts.
+tasks.jsonl -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+resources/*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+resources/*.yaml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+LICENSE.txt -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

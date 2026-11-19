@@ -18,7 +18,9 @@ Use the [v2.1.1 current state](../../../../docs/module/task_env/v2.1.1/maintenan
 
 For offline terminal measurements, original-task review and independent verification,
 use the [validation module Skill](../../geochora-validation/SKILL.md) and
-[contract](../../../../docs/module/validation/contracts.md). TaskEnv owns runtime, recording and replay.
+[contract](../../../../docs/module/validation/contracts.md). TableCraft owns its original
+requirements in `bench_deploy/tablecraft/` and calls validation from `evaluation.py`
+and `cli.py`. TaskEnv owns runtime, recording and replay.
 
 ## Current examples and checks
 

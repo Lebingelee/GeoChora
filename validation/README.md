@@ -30,7 +30,7 @@ from validation.terminal.source_run import prepare_source_run, execute_source_ru
 任务输入优先通过`validation.inputs`。当前支持`low-detail-task/1.1.0`和`low-detail-task/1.2.0`，使用
 [原始schema及来源](schemas/README.md)校验后保留原文，不隐式升级其他版本。
 `load_task_source`核对资源位置和ID，并加载明确引用的任务／初态JSON合同。
-[外部任务样例](../examples/validation/README.md)共用这个入口校验。
+TableCraft和[外部任务样例](../examples/validation/README.md)共用这个入口校验。
 底层`reviews.prepare_source_review`仍是独立的source协议；任意非空JSON不等于已通过任务schema。
 
 `numeric.measure_source_requests`保留16项逐项测量方法，输入显式来源绑定的请求，返回数值、单位、
@@ -54,6 +54,7 @@ bool／null和诊断，不生成整体任务结论。来源指针证明出处，
 | `protocol.py`、`artifact_io.py`、`json_codec.py` | 请求校验、字节引用与输入表示 |
 
 TaskEnv继续维护任务定义、环境生命周期、Recorder、轨迹存储／回放和自身的运行判定。
+[TableCraft任务集合](../bench_deploy/tablecraft/README.md)通过显式调用使用本模块，任务来源由其部署包维护。
 PhysPi原生查询需调用者显式提供运行时Python；仅导入适配器或处理已有标准记录不需要该运行时。
 
 ## 证据和迁移

@@ -1,0 +1,880 @@
+{
+  "schema_version": "scene-object-manifest/1.0.0",
+  "source_scene": {
+    "path": "resources/scene.usdc",
+    "sha256": "f3fc7b0f93667f7a1e420d8949c16eb504e54f817af45353dfde6ca8e63a7978"
+  },
+  "frame": "world, metres, Z up, quaternion wxyz",
+  "naming": "球按颜色唯一命名；积木按 颜色_尺寸档_brick 命名，同色同档多块时按初始x坐标从小到大加序号。",
+  "size_classes_brick_long_edge_m": {
+    "small": [
+      0.0,
+      0.045
+    ],
+    "mid": [
+      0.045,
+      0.06
+    ],
+    "long": [
+      0.06,
+      1.0
+    ]
+  },
+  "objects": [
+    {
+      "name": "blue_ball",
+      "scene_prim": "/World/collection_task/ball_6",
+      "kind": "ball",
+      "color": "blue",
+      "color_zh": "蓝",
+      "rgb": [
+        0.01,
+        0.24,
+        0.72
+      ],
+      "size_m": [
+        0.04,
+        0.04,
+        0.04
+      ],
+      "pos": [
+        0.22,
+        -0.15,
+        0.7702
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "table",
+      "initial_orientation": "n/a",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "green_ball",
+      "scene_prim": "/World/collection_task/ball_2",
+      "kind": "ball",
+      "color": "green",
+      "color_zh": "绿",
+      "rgb": [
+        0.02,
+        0.5,
+        0.24
+      ],
+      "size_m": [
+        0.04,
+        0.04,
+        0.04
+      ],
+      "pos": [
+        -0.26,
+        0.025,
+        0.7702
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "table",
+      "initial_orientation": "n/a",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "orange_ball",
+      "scene_prim": "/World/collection_task/ball_3",
+      "kind": "ball",
+      "color": "orange",
+      "color_zh": "橙",
+      "rgb": [
+        0.95,
+        0.19,
+        0.04
+      ],
+      "size_m": [
+        0.034,
+        0.034,
+        0.034
+      ],
+      "pos": [
+        0.265,
+        0.055,
+        0.7672
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "table",
+      "initial_orientation": "n/a",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "purple_ball",
+      "scene_prim": "/World/collection_task/ball_4",
+      "kind": "ball",
+      "color": "purple",
+      "color_zh": "紫",
+      "rgb": [
+        0.35,
+        0.08,
+        0.62
+      ],
+      "size_m": [
+        0.038,
+        0.038,
+        0.038
+      ],
+      "pos": [
+        0.47,
+        0.275,
+        0.7692
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "table",
+      "initial_orientation": "n/a",
+      "graspable_from_fixed_base": false
+    },
+    {
+      "name": "red_ball",
+      "scene_prim": "/World/collection_task/ball_5",
+      "kind": "ball",
+      "color": "red",
+      "color_zh": "红",
+      "rgb": [
+        0.75,
+        0.04,
+        0.05
+      ],
+      "size_m": [
+        0.036,
+        0.036,
+        0.036
+      ],
+      "pos": [
+        -0.1,
+        -0.205,
+        0.7682
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "table",
+      "initial_orientation": "n/a",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "yellow_ball",
+      "scene_prim": "/World/collection_task/ball_1",
+      "kind": "ball",
+      "color": "yellow",
+      "color_zh": "黄",
+      "rgb": [
+        0.95,
+        0.55,
+        0.01
+      ],
+      "size_m": [
+        0.036,
+        0.036,
+        0.036
+      ],
+      "pos": [
+        -0.29,
+        0.29,
+        0.7682
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "table",
+      "initial_orientation": "n/a",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "blue_small_brick_1",
+      "scene_prim": "/World/collection_task/brick_02",
+      "kind": "brick",
+      "color": "blue",
+      "color_zh": "蓝",
+      "rgb": [
+        0.01,
+        0.24,
+        0.72
+      ],
+      "size_m": [
+        0.0316,
+        0.0316,
+        0.0228
+      ],
+      "pos": [
+        -0.384,
+        0.13,
+        0.7698
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "red_long_brick",
+      "size_class": "small",
+      "size_class_zh": "小",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "blue_small_brick_2",
+      "scene_prim": "/World/collection_task/brick_08",
+      "kind": "brick",
+      "color": "blue",
+      "color_zh": "蓝",
+      "rgb": [
+        0.01,
+        0.24,
+        0.72
+      ],
+      "size_m": [
+        0.0391,
+        0.0391,
+        0.0228
+      ],
+      "pos": [
+        -0.37,
+        -0.27,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9903,
+        0.0,
+        0.0,
+        0.1392
+      ],
+      "initially_on": "table",
+      "size_class": "small",
+      "size_class_zh": "小",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "blue_small_brick_3",
+      "scene_prim": "/World/collection_task/brick_14",
+      "kind": "brick",
+      "color": "blue",
+      "color_zh": "蓝",
+      "rgb": [
+        0.01,
+        0.24,
+        0.72
+      ],
+      "size_m": [
+        0.0411,
+        0.0411,
+        0.0228
+      ],
+      "pos": [
+        0.47,
+        -0.23,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9816,
+        0.0,
+        0.0,
+        0.1908
+      ],
+      "initially_on": "table",
+      "size_class": "small",
+      "size_class_zh": "小",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "green_mid_brick_1",
+      "scene_prim": "/World/collection_task/brick_10",
+      "kind": "brick",
+      "color": "green",
+      "color_zh": "绿",
+      "rgb": [
+        0.02,
+        0.5,
+        0.24
+      ],
+      "size_m": [
+        0.0506,
+        0.0364,
+        0.0228
+      ],
+      "pos": [
+        -0.08,
+        -0.27,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9986,
+        0.0,
+        0.0,
+        0.0523
+      ],
+      "initially_on": "table",
+      "size_class": "mid",
+      "size_class_zh": "中",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "green_mid_brick_2",
+      "scene_prim": "/World/collection_task/brick_04",
+      "kind": "brick",
+      "color": "green",
+      "color_zh": "绿",
+      "rgb": [
+        0.02,
+        0.5,
+        0.24
+      ],
+      "size_m": [
+        0.0524,
+        0.0394,
+        0.0228
+      ],
+      "pos": [
+        0.39,
+        0.19,
+        0.7698
+      ],
+      "quat_wxyz": [
+        0.9962,
+        0.0,
+        0.0,
+        -0.0872
+      ],
+      "initially_on": "yellow_mid_brick",
+      "size_class": "mid",
+      "size_class_zh": "中",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "green_small_brick",
+      "scene_prim": "/World/collection_task/brick_16",
+      "kind": "brick",
+      "color": "green",
+      "color_zh": "绿",
+      "rgb": [
+        0.02,
+        0.5,
+        0.24
+      ],
+      "size_m": [
+        0.0342,
+        0.0342,
+        0.0228
+      ],
+      "pos": [
+        0.48,
+        0.04,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.999,
+        0.0,
+        0.0,
+        0.0436
+      ],
+      "initially_on": "table",
+      "size_class": "small",
+      "size_class_zh": "小",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "orange_long_brick",
+      "scene_prim": "/World/collection_task/brick_05",
+      "kind": "brick",
+      "color": "orange",
+      "color_zh": "橙",
+      "rgb": [
+        0.95,
+        0.19,
+        0.04
+      ],
+      "size_m": [
+        0.0688,
+        0.0441,
+        0.0228
+      ],
+      "pos": [
+        -0.405,
+        -0.04,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9945,
+        0.0,
+        0.0,
+        0.1045
+      ],
+      "initially_on": "table",
+      "size_class": "long",
+      "size_class_zh": "长",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "orange_mid_brick",
+      "scene_prim": "/World/collection_task/brick_17",
+      "kind": "brick",
+      "color": "orange",
+      "color_zh": "橙",
+      "rgb": [
+        0.95,
+        0.19,
+        0.04
+      ],
+      "size_m": [
+        0.0531,
+        0.0408,
+        0.0228
+      ],
+      "pos": [
+        -0.47,
+        0.275,
+        0.773
+      ],
+      "quat_wxyz": [
+        -0.0,
+        0.9945,
+        -0.1045,
+        -0.0
+      ],
+      "initially_on": "table",
+      "size_class": "mid",
+      "size_class_zh": "中",
+      "initial_orientation": "inverted",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "orange_small_brick",
+      "scene_prim": "/World/collection_task/brick_11",
+      "kind": "brick",
+      "color": "orange",
+      "color_zh": "橙",
+      "rgb": [
+        0.95,
+        0.19,
+        0.04
+      ],
+      "size_m": [
+        0.0375,
+        0.0375,
+        0.0228
+      ],
+      "pos": [
+        0.04,
+        -0.29,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9945,
+        0.0,
+        0.0,
+        -0.1045
+      ],
+      "initially_on": "table",
+      "size_class": "small",
+      "size_class_zh": "小",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "purple_long_brick",
+      "scene_prim": "/World/collection_task/brick_12",
+      "kind": "brick",
+      "color": "purple",
+      "color_zh": "紫",
+      "rgb": [
+        0.35,
+        0.08,
+        0.62
+      ],
+      "size_m": [
+        0.0681,
+        0.0422,
+        0.0228
+      ],
+      "pos": [
+        0.17,
+        -0.26,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9962,
+        0.0,
+        0.0,
+        0.0872
+      ],
+      "initially_on": "table",
+      "size_class": "long",
+      "size_class_zh": "长",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "purple_small_brick_1",
+      "scene_prim": "/World/collection_task/brick_06",
+      "kind": "brick",
+      "color": "purple",
+      "color_zh": "紫",
+      "rgb": [
+        0.35,
+        0.08,
+        0.62
+      ],
+      "size_m": [
+        0.0387,
+        0.0387,
+        0.0228
+      ],
+      "pos": [
+        -0.3,
+        -0.1,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9914,
+        0.0,
+        0.0,
+        -0.1305
+      ],
+      "initially_on": "table",
+      "size_class": "small",
+      "size_class_zh": "小",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "purple_small_brick_2",
+      "scene_prim": "/World/collection_task/brick_18",
+      "kind": "brick",
+      "color": "purple",
+      "color_zh": "紫",
+      "rgb": [
+        0.35,
+        0.08,
+        0.62
+      ],
+      "size_m": [
+        0.0375,
+        0.0375,
+        0.0228
+      ],
+      "pos": [
+        0.245,
+        0.265,
+        0.773
+      ],
+      "quat_wxyz": [
+        -0.0,
+        0.9945,
+        0.1045,
+        0.0
+      ],
+      "initially_on": "table",
+      "size_class": "small",
+      "size_class_zh": "小",
+      "initial_orientation": "inverted",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "red_long_brick",
+      "scene_prim": "/World/collection_task/brick_01",
+      "kind": "brick",
+      "color": "red",
+      "color_zh": "红",
+      "rgb": [
+        0.75,
+        0.04,
+        0.05
+      ],
+      "size_m": [
+        0.0636,
+        0.0316,
+        0.0228
+      ],
+      "pos": [
+        -0.4,
+        0.13,
+        0.7502
+      ],
+      "quat_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initially_on": "table",
+      "size_class": "long",
+      "size_class_zh": "长",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "red_mid_brick_1",
+      "scene_prim": "/World/collection_task/brick_07",
+      "kind": "brick",
+      "color": "red",
+      "color_zh": "红",
+      "rgb": [
+        0.75,
+        0.04,
+        0.05
+      ],
+      "size_m": [
+        0.0515,
+        0.0379,
+        0.0228
+      ],
+      "pos": [
+        -0.48,
+        -0.2,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9976,
+        0.0,
+        0.0,
+        -0.0698
+      ],
+      "initially_on": "table",
+      "size_class": "mid",
+      "size_class_zh": "中",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "red_mid_brick_2",
+      "scene_prim": "/World/collection_task/brick_13",
+      "kind": "brick",
+      "color": "red",
+      "color_zh": "红",
+      "rgb": [
+        0.75,
+        0.04,
+        0.05
+      ],
+      "size_m": [
+        0.0524,
+        0.0394,
+        0.0228
+      ],
+      "pos": [
+        0.31,
+        -0.27,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9962,
+        0.0,
+        0.0,
+        -0.0872
+      ],
+      "initially_on": "table",
+      "size_class": "mid",
+      "size_class_zh": "中",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "yellow_long_brick_1",
+      "scene_prim": "/World/collection_task/brick_09",
+      "kind": "brick",
+      "color": "yellow",
+      "color_zh": "黄",
+      "rgb": [
+        0.95,
+        0.55,
+        0.01
+      ],
+      "size_m": [
+        0.0678,
+        0.0412,
+        0.0228
+      ],
+      "pos": [
+        -0.21,
+        -0.28,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9969,
+        0.0,
+        0.0,
+        -0.0785
+      ],
+      "initially_on": "table",
+      "size_class": "long",
+      "size_class_zh": "长",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "yellow_long_brick_2",
+      "scene_prim": "/World/collection_task/brick_15",
+      "kind": "brick",
+      "color": "yellow",
+      "color_zh": "黄",
+      "rgb": [
+        0.95,
+        0.55,
+        0.01
+      ],
+      "size_m": [
+        0.0694,
+        0.046,
+        0.0228
+      ],
+      "pos": [
+        0.36,
+        -0.06,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9925,
+        0.0,
+        0.0,
+        -0.1219
+      ],
+      "initially_on": "table",
+      "size_class": "long",
+      "size_class_zh": "长",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    },
+    {
+      "name": "yellow_mid_brick",
+      "scene_prim": "/World/collection_task/brick_03",
+      "kind": "brick",
+      "color": "yellow",
+      "color_zh": "黄",
+      "rgb": [
+        0.95,
+        0.55,
+        0.01
+      ],
+      "size_m": [
+        0.0524,
+        0.0394,
+        0.0228
+      ],
+      "pos": [
+        0.39,
+        0.19,
+        0.7502
+      ],
+      "quat_wxyz": [
+        0.9962,
+        0.0,
+        0.0,
+        -0.0872
+      ],
+      "initially_on": "table",
+      "size_class": "mid",
+      "size_class_zh": "中",
+      "initial_orientation": "upright",
+      "graspable_from_fixed_base": true
+    }
+  ],
+  "drawers": [
+    {
+      "name": "drawer_1",
+      "level_zh": "最下层",
+      "slide_axis": "-y",
+      "joint_range_m": [
+        -0.2,
+        0.0
+      ],
+      "closed_joint_m": 0.0,
+      "setup_open_joint_m": -0.18,
+      "cavity_when_closed": {
+        "x": [
+          -0.153,
+          0.153
+        ],
+        "y": [
+          0.052,
+          0.308
+        ],
+        "floor_z": 0.78,
+        "rim_z": 0.866
+      },
+      "operable_from_fixed_base": true
+    },
+    {
+      "name": "drawer_2",
+      "level_zh": "中层",
+      "slide_axis": "-y",
+      "joint_range_m": [
+        -0.2,
+        0.0
+      ],
+      "closed_joint_m": 0.0,
+      "setup_open_joint_m": -0.18,
+      "cavity_when_closed": {
+        "x": [
+          -0.153,
+          0.153
+        ],
+        "y": [
+          0.052,
+          0.308
+        ],
+        "floor_z": 0.898,
+        "rim_z": 0.984
+      },
+      "operable_from_fixed_base": true
+    },
+    {
+      "name": "drawer_3",
+      "level_zh": "最上层",
+      "slide_axis": "-y",
+      "joint_range_m": [
+        -0.2,
+        0.0
+      ],
+      "closed_joint_m": 0.0,
+      "setup_open_joint_m": -0.18,
+      "cavity_when_closed": {
+        "x": [
+          -0.153,
+          0.153
+        ],
+        "y": [
+          0.052,
+          0.308
+        ],
+        "floor_z": 1.016,
+        "rim_z": 1.102
+      },
+      "operable_from_fixed_base": true
+    }
+  ],
+  "reachability_note": "由运动学筛查得出（固定底座、关节限位留0.05 rad余量、不含碰撞检查）：false 表示该物体只能作参照，不作为抓取对象。"
+}

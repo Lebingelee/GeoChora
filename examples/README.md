@@ -65,6 +65,12 @@ and close; the same H5 was independently read as 1 transition and 2 boundaries.
 This bounded execution awaits independent review and does not imply other
 providers or arbitrary assets are supported. See the [authoring guide](../docs/module/task_env/v2.1.1/guides/authoring-scenes-assets-robots.md).
 
+The [TableCraft collection](../bench_deploy/tablecraft/README.md) contains
+all 50 tasks from SimDataKit `franka-scene-50@2.0.0`, with shared source assets,
+six diagnostic preview references and an adapter to the generic terminal reviewer. Browse it with
+`python examples/tasks/franka_scene.py list`. This is a task collection; its
+USD scene has not been registered as a `make_env` route.
+
 ## Workflow matrix
 
 | Workflow | Command | Current scope and result |

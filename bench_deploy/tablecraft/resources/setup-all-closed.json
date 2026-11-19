@@ -1,0 +1,11 @@
+{
+  "schema_version": "scene-task-setup/1.0.0",
+  "source_scene": "resources/scene.usdc",
+  "initial_drawer_joint_positions_m": {
+    "drawer_1": 0.0,
+    "drawer_2": 0.0,
+    "drawer_3": 0.0
+  },
+  "all_other_original_objects": "unchanged",
+  "robot_installation": "as described in scene-contract.json; no task outcome initially satisfied"
+}
