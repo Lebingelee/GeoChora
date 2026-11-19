@@ -33,6 +33,11 @@ from validation.terminal.source_run import prepare_source_run, execute_source_ru
 TableCraft和[外部任务样例](../examples/validation/README.md)共用这个入口校验。
 底层`reviews.prepare_source_review`仍是独立的source协议；任意非空JSON不等于已通过任务schema。
 
+终态验证有两条路线：任务带有机器可判goal（如`low-detail-task/1.2.0`的`truth.goal/bind`）且词表已注册时，
+走`validation.goals`**快速通道**，离线确定性判定，阈值公开、结果可复现；其余任务及快速通道给出“未知”的任务走审核路线。
+见[验证合同](../docs/module/validation/contracts.md#goal-evaluator)。当前注册词表：SimDataKit的`scene-predicates/1.0.0`；
+外部BDDL目标可经`validation.goals.converters.bddl`转换。演示轨迹校准用`python -m validation.goals.calibrate_demos`。
+
 `numeric.measure_source_requests`保留16项逐项测量方法，输入显式来源绑定的请求，返回数值、单位、
 bool／null和诊断，不生成整体任务结论。来源指针证明出处，原任务审核负责检查选用方法与条件的含义。
 

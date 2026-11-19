@@ -18,6 +18,8 @@ lifecycle predicates. Complete trajectory validation remains future work.
   reject unknown versions explicitly and preserve original requirements. The lower-level source
   review protocol accepts arbitrary source JSON and does not replace this task-contract check.
   Follow the [external input example](../../../examples/validation/README.md) for real run evidence.
+- Authored goals with a registered vocabulary: use [the deterministic evaluator](../../../validation/goals/evaluate.py)
+  on normalized state and trace evidence. See the [goal contract](../../../docs/module/validation/contracts.md#goal-evaluator).
 - Existing normalized world/m/s/WXYZ poses: use
   [`recorded.read_recorded_poses` or `adapt_recorded_poses`](../../../validation/adapters/recorded.py).
   Supply explicit source-byte identities and independent completion facts. Missing observations stay missing.

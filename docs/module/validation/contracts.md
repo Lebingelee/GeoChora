@@ -26,6 +26,12 @@
 
 ## 离线终态审核与数值测量
 
+终态验证分两条路线，入口与证据准备共用：
+- **goal快速通道**：任务带有机器可判goal且其词表已注册时，由`validation.goals`离线确定性判定，
+  阈值公开、结果可复现，比大模型判断更客观；见[goal判定](#goal-evaluator)。
+- **审核路线**：其余任务，以及快速通道给出“未知”的任务，走下述原任务直接判断与独立复核。
+快速通道是终态验证的一条路线，不是独立的验证体系；它不负责来源核对和补证，只在证据已标准化后下结论。
+
 当前诊断主流程直接读取原任务和同次原生证据：初审、必要时最多一次补证、独立复核布尔候选。
 发布满足／不满足／未知，执行错误另列；终态不等于完整过程、Expert完成或provider Qualification。
 通用几何与数值计算由validation维护，作为带来源的逐项事实；旧规格生成与多路线组合改为实验归档。
@@ -367,3 +373,66 @@ SHA-256和UTF-8字节数；比较使用完整原值，原始文件及哈希保�
 归档保留旧接口、依赖和测试，只供显式实验／历史复现，不是持续维护的第二份Core。
 TaskEnv和validation均不导入workspace；原始数据、标签、历史结果及冻结摘要不改写。
 PhysPi文件宿主仍可消费当前source两类job；它对旧job的兼容留给冻结producer，未修改其它仓库。
+
+<a id="goal-evaluator"></a>
+
+### goal快速通道：确定性目标判定（2026-11-18）
+
+`validation.goals`确定性判定`low-detail-task/1.2.0`行的`truth.goal`、`truth.bind`和`truth.process`，
+语义以goal声明的词表为准（目前注册的只有SimDataKit的`scene-predicates/1.0.0`；未注册的版本被拒绝）。输入是显式的标准化状态：
+`SceneState`（世界系、米、Z向上、WXYZ；对象位姿、抽屉开度、可选夹爪指点和接触对）与`Trace`
+（带时间的状态序列及独立的`recording_complete`）。不导入TaskEnv或物理运行时；`adapters/simdatakit_trace.py`
+读取SimDataKit演示`trace.json`（短prim名经manifest的`scene_prim`映射；抽屉开度由抽屉体y坐标推出，无接触记录）。
+
+- 结果为`True/False/None`：终态在稳定后的末态上求值（对象线速度<0.02 m/s持续最后0.5 s，否则终态未知），
+  all/any/not按Kleene逻辑，隐含合取`AllReleased`；每个阈值有通过带和失败带，二者之间为未知，缺证据为未知并给出原因。
+- bind为存在量词：变量两两不同且不同于任务中显式出现的对象；某赋值为真则真，全部为假则假，否则未知。
+  结果返回所选赋值、逐原子测量值（含到阈值的距离）和证据基础。
+- 支撑关系（In/OnTable/On）有接触记录时用接触载荷路径，否则用几何支撑（最低碰撞点位于支撑面上方0.003 m内且
+  中心投影在支撑面上），结果的`basis`注明使用了哪种。几何回退中词表未规定的数值（穿插容差0.006 m、
+  不支撑判据0.006 m、指点包络0.02／0.01 m、几何抓取0.015／0.030 m）集中在`Fallbacks`，
+  不是词表值，且写入每个结果的`basis`。
+- 过程：`Sequence`用`sampling.ordered_witness`并要求最后阶段在终态成立；`Never`需要接触记录与完整记录；
+  `WhileGrasped`只在双指接触（无接触记录时为指点几何近似）的样本上检查姿态，**从未握持则为假**。
+  无轨迹时过程为未知，原因`trace_required`。成功＝目标且过程。
+- Parallel/Perpendicular作用于非细长积木（长短边比<1.25）时返回假（词表已接受），不是未知。
+- `low-detail-task/1.2.0`的schema副本及SHA-256见`validation/schemas/README.md`；1.1.0行为不变。
+- 引擎与词表分离（2026-11-18 P1）：`goals/evaluate.py`是与词表无关的引擎，只负责goal写法、Kleene组合、
+  bind赋值遍历、通用过程组合`Sequence`、最佳赋值选取和结果组装；判断词含义经`goals/vocabulary.py`的
+  `VocabularyPlugin`提供：`version`、`predicates`（名→(函数, 元数)）、`process_predicates`（词表自有过程判断词）、
+  `when`/`evaluate_when`（求值时点规则，返回`settle`报告、阻断原因与注释）、`implicit_terms`（隐含合取项及结果字段名）、
+  `state_adapter`、`default_policy`、`bind_fields`。引擎按goal声明的词表版本查注册表，未声明或未注册即拒绝；
+  声明了插件未实现的判断词也拒绝。scene-predicates/1.0.0是第一个插件（`goals/vocabularies/scene_predicates.py`：
+  稳定末态规则、隐含`AllReleased`、`Scene`适配、`Never`/`WhileGrasped`、`EvalPolicy`中的`Bands`/`Fallbacks`），
+  语义与阈值不变。
+- 结果`goal-evaluation/1`新增顶层字段`goal_basis`（判定依据：`dataset_goal`、`native_converted`、
+  `llm_drafted_reviewed`、`terminal_review`；`evaluate_task(..., basis=)`，默认`dataset_goal`，即SimDataKit 1.2.0行）。
+  因既有`basis`字段已表示证据基础（`notes`、`support_and_evidence`），判定依据不复用该名。统计按`goal_basis`分开报告。
+- 词表固定与同步（2026-11-18）：`goals/vocabularies/scene-predicates-v1.yaml`是SimDataKit词表的固定副本
+  （SHA-256 `d0c915df…3c6890`，与franka-scene-50 2.0.0封存副本同字节）。`validation/tests/test_goal_vocabulary_sync.py`
+  核对副本字节、版本、判断词名与元数、全部通过／失败带及稳定规则与插件一致；本机存在SimDataKit时另核对其原文件未被原地修改
+  （可用`SIMDATAKIT_ROOT`指定，找不到则跳过）。词表变更须由SimDataKit发布新版本，GeoChora新增对应副本与插件，不改v1。
+- 与审核路线的测量关系（2026-11-18）：两条路线共用`validation.geometry`的`hull2`、`interior_margin2`、
+  `quat_wxyz_to_matrix`及`validation.sampling.ordered_witness`。下列量名称相近但**定义不同，保留两份实现**，
+  不得互相替代：
+
+  | 量 | goal快速通道 | 审核路线`numeric.py` |
+  |---|---|---|
+  | 在区域内 | 原语足迹在轴对齐抽屉腔矩形内的内缩余量＋高度＋承托 | 碰撞件顶点在定向区域多边形内（`collision_footprint_inside_region`） |
+  | 承托 | 竖直间隙＋中心投影（缺接触时的几何回退）或接触载荷路径 | 接触记录＋包络分离（`physically_supported_by`、`not_supported_by`） |
+  | 松爪 | 指点几何或指-物接触 | 接触记录（`released_from_gripper`） |
+  | 水平间距 | 足迹欧氏距离，接触为0 | `separation`有符号SAT间隙 |
+  | 稳定 | 线速度<0.02 m/s持续0.5 s | 位姿窗口内平移／转角上限（`sampled_pose_stable`） |
+
+- 外部格式转换（2026-11-18）：`goals/converters/bddl.py`把BDDL的`:goal`（可选`:init`）改写成goal写法，
+  `and/or/not`→`all/any/not`，判断词名与对象名保持原文；输出携带调用方指定的词表版本、源文件SHA-256、
+  转换器版本和`native_converted`。转换器按格式通用、只翻译写法不翻译含义；量词（`exists/forall`等）、数值比较、
+  未列入白名单的判断词或元数不符一律报错，不跳过、不猜测。转换得到的goal只能交给实现了对应原生语义的词表插件判定，
+  不得改用`scene-predicates`判定。
+- 判定入口分流（顺序固定）：① 数据集自带goal（`dataset_goal`）；② 原生成功条件可转换且已注册对应词表插件
+  （`native_converted`）；③ 大模型按已注册词表起草goal，经自动检查（名称与元数合法、初态不成立、存在可行赋值）
+  与独立审核后使用（`llm_drafted_reviewed`）；④ 以上都不满足，转`validation/terminal`终态审核（`terminal_review`）。
+  当前已实现①与②的BDDL转换步骤；尚无原生词表插件（LIBERO插件暂缓），③未实现。
+- `validation/goals/calibrate_demos.py`对19个1.0.0演示轨迹评估并报告一致／不一致，不调整阈值；
+  结果在SimDataKit v2工作区`evidence/demo-calibration.{json,md}`。这是离线合成与演示轨迹的校准，
+  不是原生精度认证或Qualification。
