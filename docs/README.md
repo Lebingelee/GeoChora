@@ -6,7 +6,8 @@
 - [Ownership and change boundaries](global/ownership.md)
 - [Roadmap](roadmap/README.md)
 - [TaskEnv versions](module/task_env/README.md)
-- [TaskEnv v2.1.1 planning — protocols and seven-stage route](module/task_env/v2.1.1/README.md)
+- [TaskEnv v2.1.1 protocols and seven-stage route](module/task_env/v2.1.1/README.md)
+- [Independent task validation](module/validation/README.md)
 
 ## Release records
 

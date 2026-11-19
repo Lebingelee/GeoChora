@@ -1,0 +1,134 @@
+{
+  "schema_version": "terminal-validation-closeout-index/0.1",
+  "date": "2026-11-15",
+  "input_head": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
+  "raw_artifacts_committed": false,
+  "path_root": "repository root; local workspace artifacts are ignored and must be supplied separately",
+  "campaigns": [
+    {
+      "name": "constructed",
+      "results": {
+        "path": "workspace/datasets/terminal-validation-mujoco/v1/evaluation/results.json",
+        "sha256": "ac987f66e1937a36d45c698202c8ec52eabc26d863f74fd7d805eea46481382d"
+      },
+      "campaign": {
+        "path": "workspace/datasets/terminal-validation-mujoco/v1/evaluation/campaign.json",
+        "sha256": "ace2472b6562921e78288782c7f2a055c60a41428d58dd992c2d3de5f057b3d6"
+      },
+      "private_reference": {
+        "path": "workspace/datasets/terminal-validation-mujoco/v1/private/labels.json",
+        "sha256": "87fb0afbdeb79973071335d2833d606000d97c8ac6deab3c35ce9d76f1dbd224"
+      },
+      "reference_scope": "Independent same-run geometric/physical computation; 3 preflight and 10 formal cases.",
+      "metrics": {
+        "preflight": {
+          "n": 3,
+          "known_gt": 3,
+          "gt_positive": 2,
+          "gt_negative": 1,
+          "determinate": 3,
+          "correct": 3,
+          "determinate_accuracy": 1.0,
+          "coverage": 1.0,
+          "false_accept": 0,
+          "false_reject": 0,
+          "unknown": 0,
+          "audit_errors": 0,
+          "calls": 7,
+          "known_total_tokens": 440013,
+          "missing_usage_calls": 0,
+          "expanded_cases": 1,
+          "complete_usage_cases": 3,
+          "median_case_tokens": 88863,
+          "p90_case_tokens": 263168,
+          "max_case_tokens": 263168
+        },
+        "formal": {
+          "n": 10,
+          "known_gt": 10,
+          "gt_positive": 5,
+          "gt_negative": 5,
+          "determinate": 10,
+          "correct": 10,
+          "determinate_accuracy": 1.0,
+          "coverage": 1.0,
+          "false_accept": 0,
+          "false_reject": 0,
+          "unknown": 0,
+          "audit_errors": 0,
+          "calls": 22,
+          "known_total_tokens": 1223701,
+          "missing_usage_calls": 0,
+          "expanded_cases": 2,
+          "complete_usage_cases": 10,
+          "median_case_tokens": 88174.0,
+          "p90_case_tokens": 246244,
+          "max_case_tokens": 274406
+        },
+        "all": {
+          "n": 13,
+          "known_gt": 13,
+          "gt_positive": 7,
+          "gt_negative": 6,
+          "determinate": 13,
+          "correct": 13,
+          "determinate_accuracy": 1.0,
+          "coverage": 1.0,
+          "false_accept": 0,
+          "false_reject": 0,
+          "unknown": 0,
+          "audit_errors": 0,
+          "calls": 29,
+          "known_total_tokens": 1663714,
+          "missing_usage_calls": 0,
+          "expanded_cases": 3,
+          "complete_usage_cases": 13,
+          "median_case_tokens": 88349,
+          "p90_case_tokens": 263168,
+          "max_case_tokens": 274406
+        }
+      }
+    },
+    {
+      "name": "scene50_transplant",
+      "results": {
+        "path": "workspace/datasets/terminal-validation-mujoco-scene50/v1/evaluation/results.json",
+        "sha256": "b5be7307524d5254bd534a189b350e3233d5a54c6096d8b914a5c4b46c48ebf4"
+      },
+      "campaign": {
+        "path": "workspace/datasets/terminal-validation-mujoco-scene50/v1/evaluation/campaign.json",
+        "sha256": "6c48c3610c4ece8240a51fdd30dcc0ccb62d8cd35751c71700f55ee12d275dad"
+      },
+      "private_reference": {
+        "path": "workspace/datasets/terminal-validation-mujoco-scene50/v1/private/labels.json",
+        "sha256": "3d6c5fc2244d5d8e7879741b191c97bdf722aa89694223e9c1fec907f7b3f86e"
+      },
+      "reference_scope": "Parent-agent qualitative reference supported by independent raw-data calculations and native images; approximate materials; 3 positive exploratory cases.",
+      "metrics": {
+        "metrics": {
+          "n": 3,
+          "reference_positive": 3,
+          "reference_negative": 0,
+          "determinate": 3,
+          "matches_reference": 3,
+          "unknown": 0,
+          "execution_errors": 0,
+          "calls": 6,
+          "known_total_tokens": 1878932,
+          "missing_usage_calls": 0,
+          "expanded_cases": 0,
+          "native_steps": 30646
+        }
+      }
+    }
+  ],
+  "checks": {
+    "targeted_regressions": 856,
+    "regressions_failed": 0,
+    "junit": {
+      "path": "workspace/tasks/terminal-validation-closeout-20261115/pytest.xml",
+      "sha256": "07c5ac552973ec8ea3432841e7b25cbf43d6911bd62ad65611b44027482eea9e"
+    }
+  },
+  "qualification": "Bounded terminal-review evidence, not whole-task/process or general provider Qualification."
+}

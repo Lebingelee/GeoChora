@@ -271,6 +271,9 @@ print(record["outcome"])
 - 源身份不能由文件名推断；读回与 caller 必须同 run。
 - 图像字节没有独立内容摘要；capture identity 描述边界，不等于像素正确性。
 
+对既有记录及同次运行的证据做数值测量或终态审核时，使用独立的 [validation 模块](../../../../../validation/README.md)。
+TaskEnv 记录的 `task_success`、离线终态结论与正式 Qualification 分别按各自证据解释。输入与证据要求见[验证合同](../../../validation/contracts.md)。
+
 ## 6.5 learner/vector 边界与迁移
 
 | 入口/概念 | 当前支持 | 明确拒绝/未迁移 | 正确替代 |

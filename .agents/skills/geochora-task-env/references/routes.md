@@ -14,6 +14,12 @@ Use the [v2.1.1 current state](../../../../docs/module/task_env/v2.1.1/maintenan
 - `task_env/observations/selected_reference.py` consumes Robot and Task observation declarations. Task RGB uses renderer capability and the published typed boundary; borrowed and renderer-only sources retain distinct resource ownership. The renderer is fixed until close.
 - LIBERO remains under `bench_deploy/libero/`; preserve its original source, task, OSC, gripper cadence and reader semantics rather than promoting it to a generic Core UID.
 
+## Independent validation
+
+For offline terminal measurements, original-task review and independent verification,
+use the [validation module Skill](../../geochora-validation/SKILL.md) and
+[contract](../../../../docs/module/validation/contracts.md). TaskEnv owns runtime, recording and replay.
+
 ## Current examples and checks
 
 - Ordinary scalar construction and recording: `examples/README.md`, `examples/tasks/pick_cube.py`, `examples/tasks/nut_assembly.py`, and `examples/recording/record_expert.py`. Isaac requires the selected interpreter and installed delivery; the advanced Harness has separate manifest requirements.

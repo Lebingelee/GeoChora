@@ -1,5 +1,9 @@
 """External task contracts reject malformed input before model execution."""
 import json
+from pathlib import Path
+import subprocess
+import sys
+import os
 
 import pytest
 
@@ -125,3 +129,17 @@ def test_duplicate_resource_identity_is_rejected(tmp_path):
     path = write_task(tmp_path, [{'id': 'scene', 'path': 'asset'}, {'id': 'scene', 'path': 'asset'}])
     with pytest.raises(TaskInputError, match='duplicate resource ID'):
         load_task_source(path)
+
+
+def test_external_example_checks_task_before_preparing_a_model_job(tmp_path):
+    invalid = tmp_path / 'task.json'; invalid.write_text('{"schema_version": "2.0.0"}', encoding='utf-8')
+    output = tmp_path / 'never-created'
+    command = [sys.executable, '-X', 'utf8', '-B', 'examples/validation/prepare_review.py',
+        '--task', str(invalid), '--evidence-bundle', str(tmp_path / 'missing.json'),
+        '--artifact-root', str(tmp_path), '--judge-profile', str(tmp_path / 'missing-judge.json'),
+        '--verifier-profile', str(tmp_path / 'missing-reviewer.json'), '--output', str(output)]
+    result = subprocess.run(command, cwd=Path(__file__).resolve().parents[2],
+        env=dict(os.environ, PYTHONPATH=os.pathsep.join(sys.path)),
+        capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0 and '/schema_version' in result.stderr
+    assert not output.exists()

@@ -65,6 +65,15 @@ For physical v3 H5 recordings use `task_env.recorders.load_physical_recording_h5
 
 For Artifact, Experiment, Evidence, and Judge packaging, also use the existing [`task-env-experiment-evidence` Skill](../../../task_env/.agents/skills/task-env-experiment-evidence/SKILL.md). For CLI-owned task candidates, follow the existing [Task Harness Skill](../geochora-task-harness/SKILL.md); do not confuse candidate feasibility with an accepted task.
 
+## Independent validation consumer
+
+Offline terminal validation is owned by the root [validation module](../../../validation/README.md)
+and its [module Skill](../geochora-validation/SKILL.md). Use those routes for recorded-data
+measurements, original-task review, one evidence expansion and independent verification.
+TaskEnv owns task construction, runtime, recorders, replay and lifecycle predicates.
+Keep recorded task_success, terminal judgments and formal Qualification distinct.
+Historical native evidence remains in the [2026-11-15 receipt](../../../docs/module/task_env/v2.1.0/maintenance/reviews/terminal-validation-20261115.md).
+
 ## Source and advanced interfaces
 
 Use [USD delivery and source identity](../../../docs/module/task_env/v2.1.0/contracts/task-artifact.md) and [runtime/provider boundaries](../../../docs/module/task_env/v2.1.0/contracts/runtime-and-providers.md) for explicit asset intake, representation, admission, and optional readback. Diagnostic readbacks are optional interfaces; they do not expand provider capability or authorize access to private solver state. Historical APIs and receipts remain under the versioned `history/` and `maintenance/` directories.

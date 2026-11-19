@@ -22,6 +22,7 @@
 
 - System and ownership: [architecture](docs/global/architecture.md), [ownership](docs/global/ownership.md).
 - Current TaskEnv: [version index](docs/module/task_env/README.md), [v2.1.1 current state](docs/module/task_env/v2.1.1/maintenance/current-state.md), [v2.1.1 API](docs/module/task_env/v2.1.1/api/README.md), and [v2.1.1 capability matrix](docs/module/task_env/v2.1.1/capabilities/capability-matrix.json). The [v2.1.0 candidate API](docs/module/task_env/v2.1.0/api/public-api.md), [Task Artifact](docs/module/task_env/v2.1.0/contracts/task-artifact.md), and [Qualification boundaries](docs/module/task_env/v2.1.0/contracts/qualification.md) retain their versioned scope.
+- For offline terminal validation of supplied evidence, see the [module](validation/README.md), [contract](docs/module/validation/contracts.md), and [module Skill](.agents/skills/geochora-validation/SKILL.md).
 - Version records: [v1.1.0 published baseline](docs/releases/v1.1/README.md), [v2.0.0 frozen source snapshot](docs/releases/v2.0.0/README.md), and [v2.1.0 local candidate](docs/releases/v2.1.0/README.md). The v2.1.0 matrix records bounded evidence; it is not a new Qualification.
 - Current direction: [v2.1.0 roadmap and follow-ups](docs/roadmap/README.md).
 - Repository governance: [.agents/skills/geochora/SKILL.md](.agents/skills/geochora/SKILL.md), [documentation](.agents/skills/geochora-doc-governance/SKILL.md), [architecture](.agents/skills/geochora-architecture-refactor/SKILL.md), [public API](.agents/skills/geochora-public-api-governance/SKILL.md), [tests](.agents/skills/geochora-test-governance/SKILL.md), and [TaskEnv](.agents/skills/geochora-task-env/SKILL.md).
@@ -64,6 +65,7 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
 - `task_env/` is the canonical owner of Geochora Core task and environment
   behavior. Core uses GeoPhys through its public/runtime-facing API; GeoPhys
   must not depend on Geochora internals.
+- `validation/` owns offline measurements, terminal review and evidence adapters. It consumes supplied records independently of TaskEnv and owns future trajectory validation.
 - Task-specific behavior belongs to its Task Artifact unless it is reusable
   Core behavior. Keep Task Artifact, Experiment configuration, observed
   Evidence, and Judge decisions distinct.

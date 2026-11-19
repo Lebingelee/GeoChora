@@ -86,6 +86,50 @@ D1 的 native control 与 canonical-target 具体层次必须由 campaign manife
 H5 save/load equality、roundtrip 或完成 expert 均不证明 D0/D1/D2、跨 provider qualification 或 Judge approval。
 Diagnostic shadow continuation 不得称 golden。历史各 campaign 原始 source/dirty facts 不改写。
 
+## 独立离线验证
+
+任务记录和原始证据可交给独立的[validation模块](../../../../../validation/README.md)。其[现行合同](../../../validation/contracts.md)定义数值计算、终态审核、一次补证与独立复核。TaskEnv负责运行、记录和自身的生命周期判定；离线验证结果不自动改变task_success或授予Qualification。
+
+<a id="offline-semantic-diagnostic"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#offline-semantic-diagnostic)。
+
+<a id="terminal-geometric-diagnostic"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-geometric-diagnostic)。
+
+<a id="terminal-numeric-measurements"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-numeric-measurements)。
+
+<a id="terminal-offline-contacts"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-offline-contacts)。
+
+<a id="terminal-source-review"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-source-review)。
+
+<a id="terminal-source-cost-controls"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-source-cost-controls)。
+
+<a id="terminal-adaptive-evidence"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-adaptive-evidence)。
+
+<a id="terminal-relation-runtime-diagnostic"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-relation-runtime-diagnostic)。
+
+<a id="terminal-specification-diagnostic"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-specification-diagnostic)。
+
+<a id="terminal-model-pipeline"></a>
+
+此节已迁至[独立验证合同](../../../validation/contracts.md#terminal-model-pipeline)。
+
 ## Learning 与 Rendering
 
 Generic SB3/RSL-RL adapters IMPLEMENTED；当前有界学习是 Pendulum × GeoPhys CPU ×

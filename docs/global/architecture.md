@@ -20,6 +20,18 @@ person / script / CI / external Agent
 
 `task_env/` is the one Core owner for task construction, configuration, runtime admission, reset/step lifecycle, controllers, observation contracts, recording, and evaluation. GeoPhys owns its solvers, native state, kernels, and renderer implementation. Core and task code must not read provider-private solver or renderer state to compensate for a missing public contract.
 
+## Independent task validation
+
+The repository-root `validation/` module owns offline validation of supplied experiment
+evidence: geometric/numeric measurements, original-task terminal review, evidence expansion
+and independent confirmation. Its generic implementation imports neither TaskEnv nor a
+physics runtime. Explicit source adapters read existing public records; native runtime
+queries require a caller-selected runtime executable. TaskEnv continues to own environment
+lifecycle, recording/replay and its runtime evaluation; task-specific requirements stay
+with Task Artifacts. Consumers call validation explicitly with source and evidence.
+Trajectory-wide validation is a future extension, not a current capability.
+See the [validation contract](../module/validation/contracts.md).
+
 ## Current runtime boundary
 
 Selected PickCube and NutAssembly references use one `SelectedReferenceEnv` lifecycle owner and public `RuntimeSession` routes. Task-specific reset, evaluation, source composition, and solution policy remain in their task owners. The v2.1 candidate adds configuration precedence and explicit renderer selection facts; selected-task rendering remains state-only unless a separately documented route admits a renderer. A general Physics × Renderer matrix is not established.

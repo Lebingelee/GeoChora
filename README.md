@@ -32,6 +32,13 @@ For TaskEnv navigation, start at the [developer documentation](task_env/doc/inde
 
 This is a basic scalar API example, not a qualification claim. Optional learning dependencies are listed separately in `task_env/requirements-rl.txt`; Isaac Sim uses a separate installed environment and is not installed by these requirements.
 
+## Offline task validation
+
+[`validation/`](validation/README.md) independently reads existing experiment evidence for
+numeric measurements and terminal review. Install `validation/requirements.txt` for this
+offline route; TaskEnv and a physics runtime are not required. Trajectory-wide validation
+is a future extension. Validation results do not grant formal Qualification.
+
 ## Documentation
 
 - [Documentation index](docs/README.md)
