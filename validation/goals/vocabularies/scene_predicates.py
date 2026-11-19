@@ -42,8 +42,8 @@ def settled_final_state(trace, final_state, objects, policy):
         return WhenOutcome(settle, 'not_settled',
                            ('terminal predicates unknown: final state never settled (vocabulary evaluation.terminal_state)',))
     if settle['settled'] is None:
-        return WhenOutcome(settle, None,
-                           (f"settledness not verified ({settle.get('reason')}); terminal state evaluated as given",))
+        return WhenOutcome(settle, 'settled_terminal_unverified',
+                           (f"settledness not verified ({settle.get('reason')}); endpoint predicates are conditional",))
     return WhenOutcome(settle)
 
 

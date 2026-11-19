@@ -183,8 +183,6 @@ def _run(args, result):
             result['requirements'] = [*goal['atoms'], {'pred': 'AllReleased', **goal['all_released']}]
         value = goal['goal']
         reason = goal['goal_reason']
-        if goal['settle'].get('settled') is not True:
-            value, reason = None, 'settled_terminal_unverified'
         if value is not None:
             result.update(status='determinate', terminal=value, scope='authored_terminal_goal', reason=reason)
             return

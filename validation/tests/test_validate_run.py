@@ -95,6 +95,11 @@ def test_custom_goal_uses_bound_state_without_task_catalog(tmp_path, opening, se
     result = read_json(out / 'result.json')
     assert result['terminal'] is outcome
     assert result['status'] == ('unknown' if outcome is None else 'determinate')
+    goal = read_json(out / 'goal-result.json')
+    assert goal['goal'] is outcome and goal['success'] is outcome
+    if settled is None:
+        assert goal['goal_if_settled'] is True
+        assert goal['goal_reason'] == result['reason'] == 'settled_terminal_unverified'
 
 
 def test_opt_in_file_review_for_plain_text_task(tmp_path, monkeypatch):

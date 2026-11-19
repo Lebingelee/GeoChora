@@ -64,7 +64,8 @@ def state(poses=None, openings=None, fingers=None, contacts=None, time=None):
             quat[k] = q
     return SceneState(positions=pos, orientations_wxyz=quat, drawer_openings=openings or {'drawer_1': 0.0},
                       finger_positions=fingers if fingers is not None else {'finger_left': [5, 5, 5], 'finger_right': [5, 5, 6]},
-                      contacts=contacts, contacts_available=contacts is not None, time=time)
+                      contacts=contacts, contacts_available=contacts is not None, time=time,
+                      settled=True if time is None else None)
 
 
 def scene(poses=None, initial=None, **kw):
