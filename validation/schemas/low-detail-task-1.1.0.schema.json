@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simdatakit.local/schemas/low-detail-authored-task-1.1.0.json",
+  "title": "Authored low-detail candidate task (not frozen release v2)",
+  "description": "独立候选合同。验收只约束公开目标及必要语义；执行和取证设置不构成隐藏目标。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "language",
+    "domain",
+    "prompt",
+    "truth"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "low-detail-task/1.1.0"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "domain": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 20
+    },
+    "tags": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_.-]*$"
+      }
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/resource"
+      }
+    },
+    "truth": {
+      "$ref": "#/$defs/truth"
+    }
+  },
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "format": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.+-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_capabilities",
+        "difficulty",
+        "acceptance",
+        "source"
+      ],
+      "properties": {
+        "required_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"
+          }
+        },
+        "difficulty": {
+          "$ref": "#/$defs/difficulty"
+        },
+        "acceptance": {
+          "$ref": "#/$defs/acceptance"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "difficulty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "scores"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scene_composition",
+            "temporal_evolution",
+            "physical_interaction",
+            "api_composition",
+            "resource_and_control",
+            "visual_verification"
+          ],
+          "properties": {
+            "scene_composition": {
+              "$ref": "#/$defs/score"
+            },
+            "temporal_evolution": {
+              "$ref": "#/$defs/score"
+            },
+            "physical_interaction": {
+              "$ref": "#/$defs/score"
+            },
+            "api_composition": {
+              "$ref": "#/$defs/score"
+            },
+            "resource_and_control": {
+              "$ref": "#/$defs/score"
+            },
+            "visual_verification": {
+              "$ref": "#/$defs/score"
+            }
+          }
+        }
+      }
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "behaviors",
+        "open_choices",
+        "evidence"
+      ],
+      "properties": {
+        "policy": {
+          "const": "low_detail_lenient"
+        },
+        "behaviors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/behavior"
+          }
+        },
+        "open_choices": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "description": "取证原则；不得把技术预算或格式变成任务成功阈值。",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "process",
+            "completion",
+            "insufficient_evidence",
+            "execution_budget_exhausted"
+          ],
+          "properties": {
+            "process": {
+              "type": "string",
+              "minLength": 1
+            },
+            "completion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "boundary_interpretation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "numerical_tolerance": {
+              "type": "string",
+              "minLength": 1
+            },
+            "insufficient_evidence": {
+              "const": "unverified"
+            },
+            "execution_budget_exhausted": {
+              "const": "execution_limit_not_proven_task_failure"
+            }
+          }
+        }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description",
+        "public_basis",
+        "criteria"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "public_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subjects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "criteria": {
+          "type": "object",
+          "minProperties": 1
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "source_id",
+        "parent_task_ids"
+      ],
+      "properties": {
+        "kind": {
+          "const": "authored"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_task_ids": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    }
+  }
+}
