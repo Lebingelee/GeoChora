@@ -126,8 +126,16 @@ def _window_request(root, window):
     if not isinstance(window, dict) or set(window) - common - {'seconds', 'start_frame', 'end_frame'}:
         raise ValueError('unsupported terminal window fields')
     path = checked_ref(root, window['source_ref'])
-    source = read_json(path)
-    declared = _source_pointer(source, window['pointer'])
+    if path.suffix.lower() in {'.yaml', '.yml'}:
+        from validation.goals import EvalPolicy
+        pinned = Path(__file__).resolve().parents[1] / 'goals/vocabularies/scene-predicates-v1.yaml'
+        if (digest(path) != digest(pinned) or window['pointer'] != '/evaluation/terminal_state'
+                or 'seconds' not in window or 'sample_dt_pointer' in window):
+            raise ValueError('unsupported vocabulary window declaration')
+        declared = EvalPolicy().settle_window_s
+    else:
+        source = read_json(path)
+        declared = _source_pointer(source, window['pointer'])
     if 'seconds' in window:
         seconds = window['seconds']
         if (set(window) & {'start_frame', 'end_frame'} or not _finite(seconds) or seconds <= 0
@@ -1132,6 +1140,27 @@ def prepare_source_evidence(root, state_evidence_ref, output_directory, *,
     with (output / 'source-evidence.json').open('x', encoding='utf-8') as stream:
         json.dump(result, stream, ensure_ascii=False, indent=2, allow_nan=False)
     return result
+
+
+def goal_states(record):
+    """Convert named world poses and an admitted terminal window to goal inputs."""
+    from validation.goals import SceneState, Trace
+
+    def convert(sample):
+        positions = sample['positions']
+        fingers = {target: positions[name] for name, target in
+                   [('leftfinger', 'finger_left'), ('rightfinger', 'finger_right')] if name in positions}
+        return SceneState(positions=positions, orientations_wxyz=sample['orientations_wxyz'],
+                          time=sample['time_s'], finger_positions=fingers)
+
+    initial = record['initial']
+    first = convert(initial) if initial['valid_for_task_initial'] else SceneState()
+    last = convert(record['terminal'])
+    window = record.get('terminal_window')
+    tail = None
+    if window and window['complete'] and window['end_time_s'] == last.time:
+        tail = Trace([convert(sample) for sample in window['samples']], recording_complete=False)
+    return first, last, tail
 
 
 def main():

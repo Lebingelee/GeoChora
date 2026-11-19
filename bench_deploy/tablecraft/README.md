@@ -36,6 +36,8 @@ SimDataKit 为 v2 的 6 道题另外保存了 GeoPhys + Flora 脚本预览。命
 
 ## 准备终态审核
 
+已有实验的原任务 JSON 与 PhysPi 运行目录时，可直接使用[通用验证入口](../../examples/validation/README.md#统一入口)执行离线判定及可选审核。
+
 每题的 `truth.goal` 给出权威终态判据。可选的 `truth.bind` 限定对象选择，`truth.process` 描述执行过程要求。对象清单、谓词词表和逐题初态均来自同一发布版。调用方提供同一次运行的终点及证据；涉及动作顺序的判断还需相应的轨迹记录。
 
 ```powershell

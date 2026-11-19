@@ -1,0 +1,19 @@
+{
+  "endpoint": {
+    "episode_id": "synthetic-indicator-run",
+    "endpoint_id": "frame-10",
+    "valid": true,
+    "time_s": 1.0,
+    "asset_family": "indicator"
+  },
+  "evidence": [
+    {
+      "episode_id": "synthetic-indicator-run",
+      "endpoint_id": "frame-10",
+      "id": "indicator_readback",
+      "kind": "raw_state",
+      "path": "indicator.json",
+      "sha256": "bddf673a1f04249c9d35681ea4639efb81e6820656259ad197fb367b5a6757b7"
+    }
+  ]
+}

@@ -12,6 +12,9 @@ lifecycle predicates. Complete trajectory validation remains future work.
 
 ## Route the request
 
+- To validate an external task against a sealed PhysPi run or a supplied evidence bundle, use
+  [the unified CLI](../../../examples/validation/README.md). Model review requires explicit opt-in.
+
 - Task records: use [`inputs.validate_task`, `load_task` and `load_task_source`](../../../validation/inputs.py).
   The [pinned schemas](../../../validation/schemas/README.md) cover `low-detail-task/1.1.0` and
   `low-detail-task/1.2.0`;

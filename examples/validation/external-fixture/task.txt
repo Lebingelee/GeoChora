@@ -1,0 +1,1 @@
+At the recorded endpoint the indicator must be green.

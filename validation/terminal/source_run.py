@@ -272,6 +272,22 @@ def execute_source_run(output_directory, invoke):
     return result
 
 
+def run_file_host(output_directory, host_script, *, agent_dir=None, node="node"):
+    """Execute a prepared review using the PhysPi-compatible file host."""
+    script = Path(host_script).resolve(strict=True)
+
+    def invoke(input_path, output_path):
+        command = [node, str(script), '--input', str(input_path), '--output', str(output_path)]
+        if agent_dir:
+            command.extend(['--agent-dir', str(agent_dir)])
+        completed = subprocess.run(command, capture_output=True, timeout=360, check=False)
+        _save(input_path.parent / 'host-execution.json', {'return_code': completed.returncode})
+        if completed.returncode != 0:
+            raise RuntimeError('external terminal host failed; inspect saved host output')
+
+    return execute_source_run(output_directory, invoke)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='stage', required=True)
@@ -300,18 +316,7 @@ def main():
         print(json.dumps({'status': 'prepared_no_model_call',
             'input': read_json(args.output / 'judge/input-summary.json')}))
         return
-    script = args.host_script.resolve(strict=True)
-
-    def invoke(input_path, output_path):
-        command = [args.node, str(script), '--input', str(input_path), '--output', str(output_path)]
-        if args.agent_dir:
-            command.extend(['--agent-dir', str(args.agent_dir)])
-        completed = subprocess.run(command, capture_output=True, timeout=360, check=False)
-        _save(input_path.parent / 'host-execution.json', {'return_code': completed.returncode})
-        if completed.returncode != 0:
-            raise RuntimeError('external terminal host failed; inspect saved host output')
-
-    result = execute_source_run(args.output, invoke)
+    result = run_file_host(args.output, args.host_script, agent_dir=args.agent_dir, node=args.node)
     print(json.dumps(result, ensure_ascii=False))
     if result['status'] == 'execution_failed':
         raise SystemExit(1)

@@ -6,6 +6,8 @@ Validation检查要求是否满足；项目的正式能力资格认定仍称Qual
 
 ## 使用
 
+从用户自有任务和已有实验开始，使用 `python -m validation.validate_run`。它接收 PhysPi 运行目录或标准证据包，默认离线检查，显式启用后才执行模型审核。见[统一入口与可运行示例](../examples/validation/README.md#统一入口)。
+
 从仓库根目录使用Python及`validation/requirements.txt`中的NumPy和JSON Schema校验依赖。
 通用验证入口不导入TaskEnv，也不构造环境、运行仿真或内置模型SDK。
 
